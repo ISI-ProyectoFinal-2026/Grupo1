@@ -1,0 +1,17 @@
+**POC: Moderación automática de imágenes**
+
+**Objetivo:**
+Validar si es posible detectar automáticamente si una foto subida por un usuario contiene una mascota (de cualquier especie) o no, para poder aceptar/rechazar publicaciones sin revisión manual.
+
+**¿Cómo se evalúo?**
+Primero se probó YOLOv8 (modelo pre-entrenado en el dataset COCO) pero tenia cierta limitaciones en su entrenamiento base, ya que no detectaba animales tales como: tortugas, conejos, entre otros. Animales que si pueden ser mascotas para algunas personas.
+Segundo se probó CLIP (modelo de OpenAI), que compara la imagen contra una lista de descripciones en texto y devuelve qué tan probable es cada una. Es el enfoque final, con el que quedó funcionando el POC.
+
+Todo esto se armó en un notebook de Google Colab que:
+1) Lee las fotos de prueba desde una carpeta de Google Drive
+2) Corre el modelo sobre cada imagen
+3) Muestra el resultado (aceptada/rechazada) en una grilla visual
+4) Calcula el % de aciertos sobre el total
+
+**Resultados**
+Clip mostró una buena destreza al momento de comparar si es un animal o no la foto que se le dió a analizar, por eso, se eligió de momento este modelo para la moderación automática de imágenes en el MVP.
