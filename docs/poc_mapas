@@ -1,0 +1,12 @@
+# Reporte de Spike: [POC] Geolocalización y mapas #4
+
+## 1. APIs Evaluadas y Comparativa de Costos
+* **Google Maps API:** Alta precisión y base de datos robusta, pero requiere obligatoriamente tarjeta de crédito para registrar la API y cuenta con un límite gratuito de $200 USD mensuales que puede ser riesgoso en entornos de desarrollo académico si se configuran bucles infinitos.
+* **Mapbox:** Excelente estética visual, ofrece un free-tier de hasta 50,000 cargas mensuales, pero también requiere un método de pago registrado para producción.
+* **Leaflet + OpenStreetMap (OSM):** Librería Open Source y totalmente gratuita. No requiere claves de API comerciales ni tarjetas de crédito. Permite el manejo de capas, marcadores personalizados y renderizado de geometrías (radios) de manera eficiente.
+
+## 2. Decisión Documentada
+Se selecciona **Leaflet + OpenStreetMap** para el desarrollo del MVP/Piloto en San Rafael. 
+
+**Justificación:**
+Al ser una prueba piloto acotada geográficamente y un proyecto universitario, mitigar el riesgo económico es prioritario. Leaflet ofrece todas las características técnicas requeridas (marcar coordenadas de mascotas y delimitar radios de cercanía para alertas dinámicas) a costo cero y con una curva de aprendizaje sumamente baja.
