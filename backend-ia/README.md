@@ -7,7 +7,7 @@ Setup de conexión a base de datos para la issue "Configurar la base de datos co
 Crear un archivo `.env` en esta carpeta (no versionado) con:
 
 ```
-DATABASE_URL=postgresql+asyncpg://patitas:patitas@localhost:5432/patitas
+DATABASE_URL=postgresql+asyncpg://patitas:patitas@localhost:5433/patitas
 ```
 
 ## Setup

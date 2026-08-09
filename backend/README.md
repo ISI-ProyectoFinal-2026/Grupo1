@@ -7,11 +7,11 @@ Setup de base de datos para la issue "Configurar la base de datos con sus respec
 Crear un archivo `.env` en esta carpeta (no versionado) con:
 
 ```
-DATABASE_URL=postgresql://patitas:patitas@localhost:5432/patitas
+DATABASE_URL=postgresql://patitas:patitas@localhost:5433/patitas
 NODE_ENV=development
 ```
 
-(usar las mismas credenciales que `docker/ENV_VARS.md` si se cambiaron los defaults).
+(usar las mismas credenciales/puerto que `docker/ENV_VARS.md` si se cambiaron los defaults; el contenedor publica en `5433` del host para no chocar con un Postgres nativo local en `5432`).
 
 ## Levantar la base de datos
 
