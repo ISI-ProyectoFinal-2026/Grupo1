@@ -1,2 +1,17 @@
 # Local AI runtime state
 .atl/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Node (backend/)
+node_modules/
+dist/
+
+# Python (backend-ia/)
+__pycache__/
+*.pyc
+.venv/
+venv/

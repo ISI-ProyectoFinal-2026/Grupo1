@@ -1,0 +1,182 @@
+// PATITAS - Esquema de base de datos (Backend Principal)
+// Fuente de verdad del esquema: docs/ARQUITECTURA.md (sección 5).
+// El servicio Backend IA (backend-ia/) lee y escribe sobre las mismas tablas
+// `reports` y `report_embeddings`, pero NO gestiona migraciones: Prisma es la
+// única fuente de migraciones para toda la base de datos.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis, vector]
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String?  @map("full_name")
+  phone        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  pets          Pet[]
+  reports       Report[]
+  notifications Notification[]
+  messages      Message[]
+  chatsAsUserA  Chat[]          @relation("ChatUserA")
+  chatsAsUserB  Chat[]          @relation("ChatUserB")
+
+  @@map("users")
+}
+
+model Pet {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  name        String?
+  species     String? // dog | cat | other
+  breed       String?
+  age         Int?
+  description String?
+  microchipId String?  @map("microchip_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id])
+  reports Report[]
+
+  @@map("pets")
+}
+
+enum ReportType {
+  lost
+  found
+
+  @@map("report_type")
+}
+
+enum ReportStatus {
+  pending
+  published
+  rejected
+  resolved
+
+  @@map("report_status")
+}
+
+model Report {
+  id              Int          @id @default(autoincrement())
+  userId          Int          @map("user_id")
+  petId           Int?         @map("pet_id")
+  reportType      ReportType   @map("report_type")
+  status          ReportStatus @default(pending)
+  title           String
+  description     String?
+  imageUrl        String?      @map("image_url")
+  // PostGIS point (lat/long). Prisma no modela tipos geométricos de forma
+  // nativa: se declara como Unsupported y se maneja con SQL crudo cuando haga
+  // falta (ST_DWithin, etc. — ver docs/ARQUITECTURA.md sección 4.3).
+  location        Unsupported("geometry(Point, 4326)")?
+  locationAddress String?      @map("location_address")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  publishedAt     DateTime?    @map("published_at")
+
+  user   User             @relation(fields: [userId], references: [id])
+  pet    Pet?             @relation(fields: [petId], references: [id])
+  embedding      ReportEmbedding?
+  matchesAsLost  ReportMatch[]   @relation("MatchLost")
+  matchesAsFound ReportMatch[]   @relation("MatchFound")
+  chats          Chat[]
+  notifications  Notification[]
+
+  @@index([status])
+  @@index([reportType])
+  @@map("reports")
+}
+
+model ReportEmbedding {
+  id        Int      @id @default(autoincrement())
+  reportId  Int      @unique @map("report_id")
+  // OpenCLIP output. Escrito por el Backend IA, consumido por el Backend
+  // Principal para el matching por similitud (pgvector `<->`).
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  report Report @relation(fields: [reportId], references: [id])
+
+  @@map("report_embeddings")
+}
+
+enum MatchStatus {
+  pending
+  confirmed
+  rejected
+
+  @@map("match_status")
+}
+
+model ReportMatch {
+  id              Int         @id @default(autoincrement())
+  reportLostId    Int         @map("report_lost_id")
+  reportFoundId   Int         @map("report_found_id")
+  similarityScore Float?      @map("similarity_score")
+  status          MatchStatus @default(pending)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  confirmedAt     DateTime?   @map("confirmed_at")
+
+  reportLost  Report @relation("MatchLost", fields: [reportLostId], references: [id])
+  reportFound Report @relation("MatchFound", fields: [reportFoundId], references: [id])
+
+  @@unique([reportLostId, reportFoundId])
+  @@index([status])
+  @@map("report_matches")
+}
+
+model Chat {
+  id        Int      @id @default(autoincrement())
+  userAId   Int      @map("user_a_id")
+  userBId   Int      @map("user_b_id")
+  reportId  Int?     @map("report_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userA    User      @relation("ChatUserA", fields: [userAId], references: [id])
+  userB    User      @relation("ChatUserB", fields: [userBId], references: [id])
+  report   Report?   @relation(fields: [reportId], references: [id])
+  messages Message[]
+
+  @@map("chats")
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  chatId    Int      @map("chat_id")
+  senderId  Int      @map("sender_id")
+  content   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  chat   Chat @relation(fields: [chatId], references: [id])
+  sender User @relation(fields: [senderId], references: [id])
+
+  @@map("messages")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  type      String? // match_suggested | message | report_status_change
+  title     String?
+  message   String?
+  reportId  Int?     @map("report_id")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id])
+  report Report? @relation(fields: [reportId], references: [id])
+
+  @@index([userId])
+  @@map("notifications")
+}
