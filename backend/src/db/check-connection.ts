@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   const extensions = await prisma.$queryRaw<Array<{ extname: string }>>`
     SELECT extname FROM pg_extension WHERE extname IN ('postgis', 'vector')
   `;
-  const found = extensions.map((e) => e.extname).sort();
+  const found = extensions.map((e: { extname: string }) => e.extname).sort();
   const missing = ["postgis", "vector"].filter((ext) => !found.includes(ext));
 
   if (missing.length > 0) {
