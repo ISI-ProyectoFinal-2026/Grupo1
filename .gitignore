@@ -1,5 +1,6 @@
 # Local AI runtime state
 .atl/
+.codegraph/
 
 # Environment variables
 .env
