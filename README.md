@@ -190,10 +190,7 @@ Ver [CONTRIBUTING.md](./CONTRIBUTING.md) para detalles.
 
 ---
 
-## 📞 Contacto
 
-- **Email:** thebochitas@gmail.com
-- **GitHub:** [ISI-ProyectoFinal-2026/Grupo1](https://github.com/ISI-ProyectoFinal-2026/Grupo1)
 
 ---
 
