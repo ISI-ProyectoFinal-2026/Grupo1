@@ -30,13 +30,14 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def check_connection() -> bool:
-    """Verifica la conexión y que la extensión pgvector esté activa."""
+    """Verifica la conexión y que las extensiones pgvector y PostGIS estén activas."""
     async with engine.connect() as conn:
         result = await conn.execute(text("SELECT 1"))
         if result.scalar_one() != 1:
             return False
 
         ext_result = await conn.execute(
-            text("SELECT extname FROM pg_extension WHERE extname = 'vector'")
+            text("SELECT extname FROM pg_extension WHERE extname IN ('vector', 'postgis')")
         )
-        return ext_result.first() is not None
+        found = {row[0] for row in ext_result.fetchall()}
+        return {"vector", "postgis"}.issubset(found)

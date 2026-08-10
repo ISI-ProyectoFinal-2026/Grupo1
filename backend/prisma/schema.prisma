@@ -132,6 +132,7 @@ model ReportMatch {
   reportFound Report @relation("MatchFound", fields: [reportFoundId], references: [id])
 
   @@unique([reportLostId, reportFoundId])
+  @@index([reportFoundId])
   @@index([status])
   @@map("report_matches")
 }
@@ -148,6 +149,7 @@ model Chat {
   report   Report?   @relation(fields: [reportId], references: [id])
   messages Message[]
 
+  @@unique([userAId, userBId])
   @@map("chats")
 }
 
