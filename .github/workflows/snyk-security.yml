@@ -42,10 +42,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
       - name: Set up Snyk CLI to check for security issues
         uses: snyk/actions/setup@806182742461562b67788a64410098c9d9b96adb
-      - name: Install dependencies
+      - name: Install Node.js dependencies
         run: cd backend && npm install
+      - name: Install Python dependencies
+        run: cd backend-ia && pip install -r requirements.txt
       - name: Snyk Code test
         run: cd backend && snyk code test --sarif > snyk-code.sarif || true # || true
 
