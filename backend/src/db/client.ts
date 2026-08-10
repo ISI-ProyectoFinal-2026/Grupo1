@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 
 // Singleton para evitar múltiples pools de conexión en dev (hot-reload).
