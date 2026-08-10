@@ -11,14 +11,25 @@
     "prisma:studio": "prisma studio",
     "db:check": "ts-node src/db/check-connection.ts",
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev": "ts-node src/index.ts",
+    "test": "jest"
   },
   "dependencies": {
-    "@prisma/client": "^5.20.0"
+    "@prisma/client": "^5.20.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.14.0",
+    "@types/supertest": "^7.2.1",
+    "jest": "^30.4.2",
     "prisma": "^5.20.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.2"
   },
