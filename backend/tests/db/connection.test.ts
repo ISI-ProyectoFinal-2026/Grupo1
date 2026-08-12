@@ -43,16 +43,16 @@ describe("Database Connection Tests", () => {
 
   test("debe verificar estructura de tabla reports con PostGIS", async () => {
     const columns = await prisma.$queryRaw<
-      Array<{ column_name: string; data_type: string }>
+      Array<{ column_name: string; udt_name: string }>
     >`
-      SELECT column_name, data_type
+      SELECT column_name, udt_name
       FROM information_schema.columns
       WHERE table_name = 'reports'
     `;
 
     const locationCol = columns.find((c) => c.column_name === "location");
     expect(locationCol).toBeDefined();
-    expect(locationCol?.data_type).toBe("geometry");
+    expect(locationCol?.udt_name).toBe("geometry");
   });
 
   test("debe verificar estructura de tabla report_embeddings con pgvector", async () => {

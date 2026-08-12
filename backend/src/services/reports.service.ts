@@ -1,0 +1,136 @@
+import { Prisma, ReportType, ReportStatus } from "@prisma/client";
+import { prisma } from "../db/client";
+import { AppError } from "../errors/app-error";
+import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
+
+function isPrismaKnownError(error: unknown, code: string): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
+}
+
+interface ReportRow {
+  id: number;
+  userId: number;
+  petId: number | null;
+  reportType: ReportType;
+  status: ReportStatus;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  locationAddress: string | null;
+  lat: number | null;
+  lng: number | null;
+  createdAt: Date;
+  updatedAt: Date;
+  publishedAt: Date | null;
+}
+
+export interface ReportDTO extends Omit<ReportRow, "lat" | "lng"> {
+  location: { lat: number; lng: number } | null;
+}
+
+function toReportDTO(row: ReportRow): ReportDTO {
+  const { lat, lng, ...rest } = row;
+  return { ...rest, location: lat !== null && lng !== null ? { lat, lng } : null };
+}
+
+const reportColumns = Prisma.sql`
+  id, user_id AS "userId", pet_id AS "petId", report_type AS "reportType",
+  status, title, description, image_url AS "imageUrl",
+  location_address AS "locationAddress",
+  ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng,
+  created_at AS "createdAt", updated_at AS "updatedAt", published_at AS "publishedAt"
+`;
+
+export async function list(filters: ListReportsQuery = {}): Promise<ReportDTO[]> {
+  const conditions: Prisma.Sql[] = [];
+  if (filters.type) conditions.push(Prisma.sql`report_type = ${filters.type}::report_type`);
+  if (filters.status) conditions.push(Prisma.sql`status = ${filters.status}::report_status`);
+  const where = conditions.length ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}` : Prisma.empty;
+
+  const rows = await prisma.$queryRaw<ReportRow[]>`
+    SELECT ${reportColumns} FROM reports ${where} ORDER BY created_at DESC
+  `;
+  return rows.map(toReportDTO);
+}
+
+export async function getById(id: number): Promise<ReportDTO> {
+  const rows = await prisma.$queryRaw<ReportRow[]>`
+    SELECT ${reportColumns} FROM reports WHERE id = ${id}
+  `;
+  if (!rows[0]) {
+    throw new AppError(404, "Reporte no encontrado");
+  }
+  return toReportDTO(rows[0]);
+}
+
+export async function create(data: CreateReportInput): Promise<ReportDTO> {
+  const reportId = await prisma.$transaction(async (tx) => {
+    let created;
+    try {
+      created = await tx.report.create({
+        data: {
+          userId: data.userId,
+          petId: data.petId ?? null,
+          reportType: data.reportType,
+          status: "published",
+          title: data.title,
+          description: data.description ?? null,
+          imageUrl: data.imageUrl ?? null,
+          locationAddress: data.locationAddress ?? null,
+          publishedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      if (isPrismaKnownError(error, "P2003")) {
+        throw new AppError(400, "userId o petId no corresponde a un registro existente");
+      }
+      throw error;
+    }
+    await tx.$executeRaw`
+      UPDATE reports
+      SET location = ST_SetSRID(ST_MakePoint(${data.location.lng}, ${data.location.lat}), 4326)
+      WHERE id = ${created.id}
+    `;
+    return created.id;
+  });
+
+  return getById(reportId);
+}
+
+export async function update(id: number, data: UpdateReportInput): Promise<ReportDTO> {
+  const { location, ...scalarData } = data;
+
+  await prisma.$transaction(async (tx) => {
+    try {
+      await tx.report.update({ where: { id }, data: scalarData });
+    } catch (error) {
+      if (isPrismaKnownError(error, "P2025")) {
+        throw new AppError(404, "Reporte no encontrado");
+      }
+      if (isPrismaKnownError(error, "P2003")) {
+        throw new AppError(400, "petId no corresponde a una mascota existente");
+      }
+      throw error;
+    }
+    if (location) {
+      await tx.$executeRaw`
+        UPDATE reports
+        SET location = ST_SetSRID(ST_MakePoint(${location.lng}, ${location.lat}), 4326)
+        WHERE id = ${id}
+      `;
+    }
+  });
+
+  return getById(id);
+}
+
+export async function remove(id: number): Promise<void> {
+  try {
+    await prisma.report.delete({ where: { id } });
+  } catch (error) {
+    if (isPrismaKnownError(error, "P2025")) {
+      throw new AppError(404, "Reporte no encontrado");
+    }
+    throw error;
+  }
+}
