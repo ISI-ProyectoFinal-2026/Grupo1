@@ -41,7 +41,9 @@ model Pet {
   species     String? // dog | cat | other
   breed       String?
   age         Int?
+  color       String?
   description String?
+  photoUrls   String[] @map("photo_urls")
   microchipId String?  @map("microchip_id")
   createdAt   DateTime @default(now()) @map("created_at")
 

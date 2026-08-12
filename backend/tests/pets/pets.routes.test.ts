@@ -5,6 +5,13 @@ import { prisma } from "../../src/db/client";
 describe("GET/POST/PUT/DELETE /api/pets", () => {
   let userId: number;
   const createdPetIds: number[] = [];
+  const basePetData = {
+    breed: "Labrador",
+    age: 3,
+    color: "Marrón",
+    description: "Mascota de prueba",
+    photoUrls: ["https://cdn.example.com/foto1.jpg"],
+  };
 
   beforeAll(async () => {
     const user = await prisma.user.create({
@@ -29,15 +36,38 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   });
 
   test("POST /api/pets crea una mascota y responde 201", async () => {
-    const res = await request(app).post("/api/pets").send({ userId, name: "Rocky" });
+    const res = await request(app)
+      .post("/api/pets")
+      .send({ userId, name: "Rocky", ...basePetData });
 
     expect(res.status).toBe(201);
     expect(res.body.name).toBe("Rocky");
+    expect(res.body.color).toBe("Marrón");
+    expect(res.body.photoUrls).toEqual(["https://cdn.example.com/foto1.jpg"]);
     createdPetIds.push(res.body.id);
   });
 
   test("POST /api/pets responde 400 si el body es inválido", async () => {
     const res = await request(app).post("/api/pets").send({ name: "Sin userId" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  test("POST /api/pets responde 400 si falta un campo requerido (color)", async () => {
+    const { color, ...withoutColor } = basePetData;
+    const res = await request(app)
+      .post("/api/pets")
+      .send({ userId, name: "Sin color", ...withoutColor });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  test("POST /api/pets responde 400 si no se incluye ninguna foto", async () => {
+    const res = await request(app)
+      .post("/api/pets")
+      .send({ userId, name: "Sin fotos", ...basePetData, photoUrls: [] });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
@@ -54,7 +84,9 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   });
 
   test("GET /api/pets responde 200 con un array", async () => {
-    const created = await request(app).post("/api/pets").send({ userId, name: "Lista" });
+    const created = await request(app)
+      .post("/api/pets")
+      .send({ userId, name: "Lista", ...basePetData });
     createdPetIds.push(created.body.id);
 
     const res = await request(app).get("/api/pets");
@@ -65,7 +97,9 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   });
 
   test("GET /api/pets/:id responde 200 con la mascota", async () => {
-    const created = await request(app).post("/api/pets").send({ userId, name: "Buscada" });
+    const created = await request(app)
+      .post("/api/pets")
+      .send({ userId, name: "Buscada", ...basePetData });
     createdPetIds.push(created.body.id);
 
     const res = await request(app).get(`/api/pets/${created.body.id}`);
@@ -85,7 +119,9 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   });
 
   test("PUT /api/pets/:id actualiza la mascota", async () => {
-    const created = await request(app).post("/api/pets").send({ userId, name: "Original" });
+    const created = await request(app)
+      .post("/api/pets")
+      .send({ userId, name: "Original", ...basePetData });
     createdPetIds.push(created.body.id);
 
     const res = await request(app).put(`/api/pets/${created.body.id}`).send({ name: "Actualizada" });
@@ -100,7 +136,9 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   });
 
   test("DELETE /api/pets/:id elimina la mascota y responde 204", async () => {
-    const created = await request(app).post("/api/pets").send({ userId, name: "A borrar" });
+    const created = await request(app)
+      .post("/api/pets")
+      .send({ userId, name: "A borrar", ...basePetData });
 
     const res = await request(app).delete(`/api/pets/${created.body.id}`);
 

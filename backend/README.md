@@ -38,6 +38,21 @@ npm run db:check
 
 Imprime éxito si la conexión funciona y si las extensiones `postgis` y `vector` están activas (criterio de aceptación de la issue).
 
+## Crear una migración nueva
+
+```bash
+npm run prisma:migrate   # prisma migrate dev
+```
+
+Este comando necesita una terminal interactiva real. Si se corre desde un entorno sin TTY (CI, scripts, agentes), Prisma puede llegar a aplicar el cambio en la base de desarrollo y fallar recién al escribir el archivo de la migración, dejando el historial (`_prisma_migrations`) desincronizado del contenido de `prisma/migrations/`. Si eso pasa:
+
+1. Revisar con `docker exec patitas-postgres psql -U patitas -d patitas -c "\d <tabla>"` qué se aplicó realmente.
+2. Revertir esos cambios a mano si no quedó un `.sql` correspondiente en `prisma/migrations/`.
+3. Borrar la fila fantasma de `_prisma_migrations` (o `npx prisma migrate resolve --rolled-back <nombre>` si quedó marcada como fallida).
+4. Escribir el `migration.sql` a mano en `prisma/migrations/<timestamp>_<nombre>/` y aplicar con `npm run prisma:deploy`.
+
+`npm run prisma:deploy` (usado para levantar el proyecto) sí es seguro en cualquier entorno no interactivo.
+
 ## Modelos
 
 Ver `prisma/schema.prisma`. Mapea 1:1 el esquema documentado en `../docs/ARQUITECTURA.md` (sección 5): `users`, `pets`, `reports`, `report_embeddings`, `report_matches`, `chats`, `messages`, `notifications`.

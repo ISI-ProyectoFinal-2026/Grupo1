@@ -239,7 +239,9 @@ CREATE TABLE pets (
   species VARCHAR(50),  -- dog, cat, other
   breed VARCHAR(255),
   age INT,
+  color VARCHAR(100),
   description TEXT,
+  photo_urls TEXT[],  -- URLs subidas a Cloudflare R2, mínimo 1 al registrar
   microchip_id VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW(),
   FOREIGN KEY (user_id) REFERENCES users(id)
