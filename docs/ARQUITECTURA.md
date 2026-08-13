@@ -372,6 +372,25 @@ PUT /api/pets/:id
 DELETE /api/pets/:id
 ```
 
+### Almacenamiento (Cloudflare R2)
+```http
+POST /api/uploads/presign
+```
+El backend no recibe los bytes de la imagen: genera una URL PUT firmada (expira a los 5 min) para que el frontend suba directo a R2, y el frontend le pasa la URL final al backend recién en el `POST /pets` o `POST /reports` correspondiente.
+
+Request:
+```json
+{ "fileName": "foto.png", "contentType": "image/png" }
+```
+`contentType` solo admite `image/jpeg`, `image/png` o `image/webp`.
+
+Response `201`:
+```json
+{ "uploadUrl": "...", "publicUrl": "...", "key": "pets/<uuid>.<ext>" }
+```
+
+**Estructura de almacenamiento**: los objetos se guardan bajo el prefijo `pets/`, con un nombre generado por el backend (`<uuid>.<ext>`, extensión derivada del `contentType` validado) — nunca el nombre de archivo que manda el cliente, para evitar colisiones y path traversal.
+
 ### Reportes
 ```http
 GET /api/reports?type=lost&status=published&page=1
