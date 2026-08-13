@@ -34,5 +34,5 @@ class ReportEmbedding(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     report_id: Mapped[int] = mapped_column(ForeignKey("reports.id"), unique=True)
-    embedding: Mapped[list[float]] = mapped_column(Vector(1536))
+    embedding: Mapped[list[float]] = mapped_column(Vector(512))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())
