@@ -4,4 +4,7 @@ module.exports = {
   testEnvironment: "node",
   rootDir: ".",
   testMatch: ["<rootDir>/tests/**/*.test.ts"],
+  transform: {
+    "^.+\\.ts$": ["ts-jest", { isolatedModules: true }],
+  },
 };
