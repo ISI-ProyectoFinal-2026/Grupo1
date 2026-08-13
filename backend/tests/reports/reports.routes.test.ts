@@ -134,4 +134,18 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     const res = await request(app).delete("/api/reports/999999999");
     expect(res.status).toBe(404);
   });
+
+  test("POST /api/reports responde con tag ENCONTRADO cuando reportType es found", async () => {
+    const res = await request(app).post("/api/reports").send({ userId, ...baseReportData });
+    createdReportIds.push(res.body.id);
+    expect(res.body.tag).toEqual({ label: "ENCONTRADO", color: expect.any(String) });
+  });
+
+  test("PUT /api/reports/:id con status resolved responde con tag RESUELTO", async () => {
+    const created = await request(app).post("/api/reports").send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+
+    const res = await request(app).put(`/api/reports/${created.body.id}`).send({ status: "resolved" });
+    expect(res.body.tag.label).toBe("RESUELTO");
+  });
 });

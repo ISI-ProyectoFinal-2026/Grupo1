@@ -147,4 +147,35 @@ describe("reports.service", () => {
   test("remove() lanza AppError 404 si no existe", async () => {
     await expect(reportsService.remove(-1)).rejects.toMatchObject({ statusCode: 404 });
   });
+
+  test("create() con reportType found expone tag ENCONTRADO", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+    expect(report.tag.label).toBe("ENCONTRADO");
+  });
+
+  test("create() con reportType lost expone tag PERDIDO", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
+    createdReportIds.push(report.id);
+    expect(report.tag.label).toBe("PERDIDO");
+  });
+
+  test("update() a status resolved expone tag RESUELTO sin importar el reportType", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
+    createdReportIds.push(report.id);
+
+    const updated = await reportsService.update(report.id, { status: "resolved" });
+    expect(updated.tag.label).toBe("RESUELTO");
+  });
+
+  test("los tags PERDIDO, ENCONTRADO y RESUELTO tienen colores diferenciados entre sí", async () => {
+    const lost = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
+    createdReportIds.push(lost.id);
+    const found = await reportsService.create({ userId, ...baseReportData, reportType: "found" });
+    createdReportIds.push(found.id);
+    const resolved = await reportsService.update(found.id, { status: "resolved" });
+
+    const colors = new Set([lost.tag.color, found.tag.color, resolved.tag.color]);
+    expect(colors.size).toBe(3);
+  });
 });
