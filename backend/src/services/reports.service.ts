@@ -24,13 +24,36 @@ interface ReportRow {
   publishedAt: Date | null;
 }
 
+export type ReportTagLabel = "PERDIDO" | "ENCONTRADO" | "RESUELTO";
+
+export interface ReportTag {
+  label: ReportTagLabel;
+  color: string;
+}
+
+const REPORT_TAG_COLORS: Record<ReportTagLabel, string> = {
+  PERDIDO: "#EF4444",
+  ENCONTRADO: "#3B82F6",
+  RESUELTO: "#22C55E",
+};
+
+function toReportTag(reportType: ReportType, status: ReportStatus): ReportTag {
+  const label: ReportTagLabel = status === "resolved" ? "RESUELTO" : reportType === "lost" ? "PERDIDO" : "ENCONTRADO";
+  return { label, color: REPORT_TAG_COLORS[label] };
+}
+
 export interface ReportDTO extends Omit<ReportRow, "lat" | "lng"> {
   location: { lat: number; lng: number } | null;
+  tag: ReportTag;
 }
 
 function toReportDTO(row: ReportRow): ReportDTO {
   const { lat, lng, ...rest } = row;
-  return { ...rest, location: lat !== null && lng !== null ? { lat, lng } : null };
+  return {
+    ...rest,
+    location: lat !== null && lng !== null ? { lat, lng } : null,
+    tag: toReportTag(row.reportType, row.status),
+  };
 }
 
 const reportColumns = Prisma.sql`
