@@ -1,6 +1,7 @@
 import { prisma } from "../../src/db/client";
 import { AppError } from "../../src/errors/app-error";
 import * as reportsService from "../../src/services/reports.service";
+import * as matchingService from "../../src/services/matching.service";
 
 describe("reports.service", () => {
   let userId: number;
@@ -166,6 +167,29 @@ describe("reports.service", () => {
 
     const updated = await reportsService.update(report.id, { status: "resolved" });
     expect(updated.tag.label).toBe("RESUELTO");
+  });
+
+  test("create() dispara triggerEmbeddingGeneration cuando el reporte tiene imageUrl", async () => {
+    const spy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {});
+
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    expect(spy).toHaveBeenCalledWith(report.id, baseReportData.imageUrl);
+    spy.mockRestore();
+  });
+
+  test("create() sigue devolviendo el reporte creado aunque triggerEmbeddingGeneration falle", async () => {
+    const spy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {
+      throw new Error("ai service down");
+    });
+
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    expect(report.id).toBeDefined();
+    expect(report.status).toBe("published");
+    spy.mockRestore();
   });
 
   test("los tags PERDIDO, ENCONTRADO y RESUELTO tienen colores diferenciados entre sí", async () => {

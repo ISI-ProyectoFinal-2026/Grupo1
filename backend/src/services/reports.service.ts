@@ -1,6 +1,7 @@
 import { Prisma, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import * as matchingService from "./matching.service";
 import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
@@ -117,7 +118,19 @@ export async function create(data: CreateReportInput): Promise<ReportDTO> {
     return created.id;
   });
 
-  return getById(reportId);
+  const report = await getById(reportId);
+  if (report.imageUrl) {
+    // Fire-and-forget: no se espera la inferencia de ML. Se envuelve en
+    // try/catch además del .catch() interno del servicio para que ni
+    // siquiera un error síncrono al disparar la llamada haga fallar la
+    // creación del reporte.
+    try {
+      matchingService.triggerEmbeddingGeneration(report.id, report.imageUrl);
+    } catch (error) {
+      console.error(`[matching] fallo al disparar la generación de embedding para report ${report.id}:`, error);
+    }
+  }
+  return report;
 }
 
 export async function update(id: number, data: UpdateReportInput): Promise<ReportDTO> {
