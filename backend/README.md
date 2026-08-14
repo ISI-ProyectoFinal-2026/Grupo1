@@ -9,6 +9,11 @@ Crear un archivo `.env` en esta carpeta (no versionado) con:
 ```
 DATABASE_URL=postgresql://patitas:patitas@localhost:5433/patitas
 NODE_ENV=development
+
+# Backend IA (issue #18 — matching por similitud). Si no está seteada, el
+# trigger de generación de embedding simplemente no hace nada (no rompe
+# la creación del reporte, ver src/services/matching.service.ts).
+AI_SERVICE_URL=http://localhost:8000
 ```
 
 (usar las mismas credenciales/puerto que `docker/ENV_VARS.md` si se cambiaron los defaults; el contenedor publica en `5433` del host para no chocar con un Postgres nativo local en `5432`).
@@ -57,4 +62,8 @@ Este comando necesita una terminal interactiva real. Si se corre desde un entorn
 
 Ver `prisma/schema.prisma`. Mapea 1:1 el esquema documentado en `../docs/ARQUITECTURA.md` (sección 5): `users`, `pets`, `reports`, `report_embeddings`, `report_matches`, `chats`, `messages`, `notifications`.
 
-**Prisma es la única fuente de migraciones** para toda la base de datos, incluidas las tablas que también usa el Backend IA (`reports`, `report_embeddings`). El Backend IA solo lee/escribe sobre esas tablas vía SQLAlchemy, sin generar sus propias migraciones (ver `../backend-ia/README.md`).
+**Prisma es la única fuente de migraciones** para toda la base de datos, incluidas las tablas que también usa el Backend IA (`reports`, `report_embeddings`, `report_matches`). El Backend IA solo lee/escribe sobre esas tablas vía SQLAlchemy, sin generar sus propias migraciones (ver `../backend-ia/README.md`).
+
+## Matching por similitud (issue #18)
+
+`src/services/matching.service.ts` dispara (fire-and-forget) la generación de embedding en Backend IA al crear un reporte con imagen, y expone `GET /api/reports/:id/matches` para listar los candidatos que Backend IA ya calculó y guardó en `report_matches`. El cálculo de embeddings/similitud en sí vive en `../backend-ia` (ver su README).
