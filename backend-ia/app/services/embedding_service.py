@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ml.pipeline import detect_and_crop, generate_embedding
 from app.models import ReportEmbedding
+from app.services import matching_service
 
 
 async def process_report_image(report_id: int, image_url: str, session: AsyncSession) -> bool:
@@ -42,5 +43,12 @@ async def process_report_image(report_id: int, image_url: str, session: AsyncSes
     )
     await session.execute(stmt)
     await session.commit()
+
+    # Best-effort: si la búsqueda de matches falla, el embedding ya guardado
+    # no debe deshacerse ni la request fallar por esto.
+    try:
+        await matching_service.find_and_store_matches(report_id, session)
+    except Exception:  # noqa: BLE001 - no debe propagar, el embedding ya se guardó
+        await session.rollback()
 
     return True

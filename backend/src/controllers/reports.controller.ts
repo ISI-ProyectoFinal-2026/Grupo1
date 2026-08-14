@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as reportsService from "../services/reports.service";
+import * as matchingService from "../services/matching.service";
 import {
   createReportSchema,
   listReportsQuerySchema,
@@ -36,4 +37,11 @@ export async function remove(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
   await reportsService.remove(id);
   res.status(204).send();
+}
+
+export async function getMatches(req: Request, res: Response): Promise<void> {
+  const { id } = reportIdParamSchema.parse(req.params);
+  await reportsService.getById(id); // dispara 404 si no existe
+  const matches = await matchingService.listMatches(id);
+  res.status(200).json(matches);
 }
