@@ -29,6 +29,11 @@ export const reportIdParamSchema = z.object({
 export const listReportsQuerySchema = z.object({
   type: z.enum([ReportType.lost, ReportType.found]).optional(),
   status: z.enum([ReportStatus.pending, ReportStatus.published, ReportStatus.rejected, ReportStatus.resolved]).optional(),
+  breed: z.string().min(1).optional(),
+  zone: z.string().min(1).optional(),
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional(),
+  order: z.enum(["asc", "desc"]).optional(),
 });
 
 export type CreateReportInput = z.infer<typeof createReportSchema>;
