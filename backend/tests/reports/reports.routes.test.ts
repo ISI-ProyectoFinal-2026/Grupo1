@@ -148,4 +148,30 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     const res = await request(app).put(`/api/reports/${created.body.id}`).send({ status: "resolved" });
     expect(res.body.tag.label).toBe("RESUELTO");
   });
+
+  test("GET /api/reports sin filtros solo trae reportes activos (published)", async () => {
+    const created = await request(app).post("/api/reports").send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+    await request(app).put(`/api/reports/${created.body.id}`).send({ status: "resolved" });
+
+    const res = await request(app).get("/api/reports");
+    expect(res.status).toBe(200);
+    expect(res.body.some((r: { id: number }) => r.id === created.body.id)).toBe(false);
+  });
+
+  test("GET /api/reports?zone= filtra por zona", async () => {
+    const created = await request(app)
+      .post("/api/reports")
+      .send({ userId, ...baseReportData, locationAddress: "Plaza de Mayo, CABA" });
+    createdReportIds.push(created.body.id);
+
+    const res = await request(app).get("/api/reports?zone=Plaza de Mayo");
+    expect(res.status).toBe(200);
+    expect(res.body.some((r: { id: number }) => r.id === created.body.id)).toBe(true);
+  });
+
+  test("GET /api/reports?order=asc responde 200 y acepta el parámetro", async () => {
+    const res = await request(app).get("/api/reports?order=asc");
+    expect(res.status).toBe(200);
+  });
 });
