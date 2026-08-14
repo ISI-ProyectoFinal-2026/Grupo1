@@ -118,13 +118,12 @@ Ver [ESTRUCTURA_PROYECTO.md](./ESTRUCTURA_PROYECTO.md) para detalles completos.
 ## 🔄 Flujo Principal
 
 1. **Usuario sube imagen** → Se guarda en Cloudflare R2
-2. **Backend crea reporte** → Estado: pendiente
-3. **Reporte se encola** → Job en Redis Queue
-4. **Backend IA procesa** → YOLO + OpenCLIP
-5. **Se buscan similares** → pgvector matching
-6. **Usuario confirma** → Match manual
+2. **Backend crea reporte** → Backend IA se dispara (hoy: llamada directa fire-and-forget; a futuro: job en Redis Queue)
+3. **Backend IA procesa** → YOLO + OpenCLIP, guarda embedding
+4. **Se buscan similares** → pgvector matching (mismo paso, sin cola todavía)
+5. **Usuario confirma** → Match manual (pendiente: notificación al usuario, hoy solo hay un endpoint de lectura)
 
-Ver [ARQUITECTURA.md#4-flujo-funcional](./ARQUITECTURA.md#4-flujo-funcional---caso-de-uso-principal) para diagrama detallado.
+Ver [ARQUITECTURA.md#4-flujo-funcional](./ARQUITECTURA.md#4-flujo-funcional---caso-de-uso-principal) para el detalle de qué está implementado vs. la arquitectura objetivo.
 
 ---
 

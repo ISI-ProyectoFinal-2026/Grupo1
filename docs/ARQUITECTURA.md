@@ -149,66 +149,78 @@ Usuario                 Frontend                 Backend Ppal          R2       
   └─ Usuario revisa candidatos y confirma manualmente
 ```
 
-### 4.2 Procesamiento de IA (Asíncrono)
+> **Estado de implementación (issue #18):** el flujo de arriba es la arquitectura
+> objetivo. Lo implementado hasta ahora (sin cola todavía) es una versión
+> simplificada: el Backend Ppal llama a Backend IA de forma síncrona
+> *fire-and-forget* (sin esperar la respuesta, sin bloquear al usuario) al
+> crear el reporte, y **Backend IA escribe el embedding y los matches
+> directo en Postgres** (no hay callback HTTP de vuelta a Backend Ppal). La
+> cola Redis y el callback `POST /api/internal/...` quedan como trabajo
+> futuro — ver detalle real en 4.2/4.3 y en `backend-ia/README.md`.
+
+### 4.2 Procesamiento de IA
 
 ```
-Secuencia en Backend IA:
+Objetivo (con cola, futuro): Backend IA desencola un job de Redis con
+{ report_id, image_url } y procesa async.
 
-1. Desencolar job de Redis
-   - job.image_url: URL en Cloudflare R2
-   - job.report_id: ID del reporte
-   
-2. Descargar imagen desde R2
-   
-3. Ejecutar YOLO v8
+Implementado hoy (issue #18, sin cola): Backend Ppal llama fire-and-forget
+POST {AI_SERVICE_URL}/reports/{report_id}/embedding con { "image_url": ... }
+apenas crea el reporte (solo si tiene imagen). Backend IA responde
+sincrónicamente dentro de esa misma request:
+
+1. Descargar imagen desde la URL recibida (R2 en producción)
+
+2. Ejecutar YOLOv8 (yolov8n.pt)
    if not is_pet(image):
-     return REJECTED  # Reporte rechazado, auditoría
-   
-4. Ejecutar OpenCLIP
-   embedding = generate_embedding(image)  # vector [1536]
-   
-5. Enviar embedding a Backend Ppal
-   POST /api/internal/reports/{report_id}/embedding
-   {
-     "embedding": [0.123, 0.456, ...],
-     "status": "published"
-   }
-   
-6. Backend Ppal actualiza:
-   - Embedding en Postgres
-   - Estado del reporte: "published"
-   - Busca coincidencias (pgvector)
-   - Notifica al usuario si hay match
+     return 422  # sin más efecto, no se guarda nada
+
+3. Ejecutar OpenCLIP (ViT-B-32, pretrained laion2b_s34b_b79k)
+   embedding = generate_embedding(image)  # vector [512]
+   (dimensión validada empíricamente en docs/pocs/POC_Similitudes.ipynb;
+   no todo checkpoint de OpenCLIP da 1536, por eso el ajuste de schema)
+
+4. Backend IA guarda directo en Postgres (sin callback a Backend Ppal):
+   - UPSERT embedding en report_embeddings
+   - Busca coincidencias (pgvector, ver 4.3) y las guarda en report_matches
+   - responde 201 a Backend Ppal (que no espera ni usa el body)
+
+Pendiente: notificar al usuario (no existe aún ruta/servicio de
+notifications), y mover este paso a un worker de cola en vez de síncrono
+dentro de la request.
 ```
 
 ### 4.3 Matching por Similitud
 
 ```
-1. Backend IA envía embedding al Backend Principal
-   
-2. Backend Principal ejecuta:
-   SELECT 
-     r.id, 
-     r.user_id,
-     r.embedding <-> new_embedding AS distance
+Implementado en backend-ia/app/services/matching_service.py, se ejecuta
+en el mismo paso 4 de arriba (no es un servicio ni un endpoint aparte):
+
+1. Backend IA, luego de guardar el embedding nuevo, ejecuta:
+   SELECT r.id, r.report_type,
+     1 - (re.embedding <-> :embedding) AS similarity
    FROM reports r
-   WHERE 
-     r.status = 'published'
-     AND r.report_type != new_report_type  -- Tipo opuesto
-     AND ST_DWithin(r.location, new_location, 5000)  -- 5km
-     AND r.created_at > NOW() - INTERVAL '30 days'  -- 30 días max
-   ORDER BY distance ASC
+   JOIN report_embeddings re ON re.report_id = r.id
+   WHERE r.status = 'published'
+     AND r.report_type != :report_type  -- Tipo opuesto
+     AND r.id != :report_id
+     AND ST_DWithin(r.location::geography, CAST(:location AS geography), 5000)  -- 5km reales
+     AND r.created_at > NOW() - INTERVAL '30 days'
+   ORDER BY re.embedding <-> :embedding ASC
    LIMIT 5;
-   
-3. Si distance < umbral (ej: 0.4 en cosine, a calibrar):
-   - Crear registro en tabla report_matches
-   - Notificar al usuario dueño del reporte original
-   - Usuario revisa y confirma o rechaza
-   
-4. Si usuario confirma:
-   - Actualizar estado de matches
-   - Marcar reportes como "resolved"
-   - Notificar a ambos usuarios
+
+   (el cast a `::geography` es necesario: `reports.location` es
+   `geometry(Point, 4326)` en grados, no metros — sin el cast, "5000"
+   se interpreta como 5000 grados, no como 5km)
+
+2. Si similarity >= SIMILARITY_THRESHOLD (0.75 hoy — punto medio del rango
+   65%-85% que midió el POC, documentado como provisional, ver
+   docs/pocs/poc_similitudes.md):
+   - UPSERT en report_matches (no pisa un match ya confirmed/rejected)
+
+3. Pendiente (no implementado en la issue #18): notificar al usuario
+   dueño del reporte, y el flujo de confirmar/rechazar un match desde
+   el frontend (hoy solo hay GET /api/reports/:id/matches de lectura).
 ```
 
 ---
@@ -282,7 +294,7 @@ CREATE TABLE reports (
 CREATE TABLE report_embeddings (
   id SERIAL PRIMARY KEY,
   report_id INT UNIQUE NOT NULL REFERENCES reports(id),
-  embedding vector(1536),  -- OpenCLIP output
+  embedding vector(512),  -- OpenCLIP ViT-B-32 output (validado en el POC)
   created_at TIMESTAMP DEFAULT NOW(),
   FOREIGN KEY (report_id) REFERENCES reports(id)
 );
@@ -427,23 +439,32 @@ PUT /api/notifications/:id/read
 DELETE /api/notifications/:id
 ```
 
-### Endpoints Internos (Backend IA → Backend Principal)
-```http
-POST /api/internal/reports/:report_id/embedding
-{
-  "embedding": [...],
-  "status": "published"
-}
+### Endpoints Internos (Backend Principal → Backend IA)
 
-POST /api/internal/reports/:report_id/reject
+**Implementado (issue #18)** — al revés de lo planteado originalmente:
+Backend IA no le devuelve nada a Backend Ppal, escribe directo en Postgres
+(ver 4.2/4.3). El endpoint real vive en Backend IA:
+
+```http
+POST {AI_SERVICE_URL}/reports/:report_id/embedding
 {
-  "reason": "not_a_pet"
+  "image_url": "https://r2.../image-123.jpg"
 }
+→ 201 si detectó la mascota y guardó embedding + matches
+→ 422 si no detectó una mascota en la imagen
 ```
+
+`POST /api/internal/reports/:report_id/reject` (planteado originalmente
+para auditar rechazos) no está implementado — hoy un 422 no deja rastro
+más que la respuesta HTTP.
 
 ---
 
 ## 7. Cola de Trabajo - Flujo de Jobs
+
+> **No implementado todavía** (issue #18 usa fire-and-forget síncrono, ver
+> 4.2). Esta sección documenta la arquitectura objetivo para cuando se
+> aborde la cola en una iteración futura.
 
 ### Modelo de Job (Redis Queue)
 
@@ -578,8 +599,8 @@ R2_SECRET_KEY=your-secret
 R2_BUCKET_NAME=patitas-images
 R2_ENDPOINT=https://your-account.r2.cloudflarestorage.com
 
-# Backend IA
-IA_SERVICE_URL=http://ia-backend:8000
+# Backend IA (nombre real de la variable en backend/src/services/matching.service.ts)
+AI_SERVICE_URL=http://ia-backend:8000
 
 # Other
 FRONTEND_URL=https://patitas.app
@@ -590,17 +611,20 @@ FRONTEND_URL=https://patitas.app
 PYTHON_ENV=production
 PORT=8000
 
-# YOLO / OpenCLIP models
-YOLO_MODEL_PATH=/models/yolov8m.pt
-OPENCLIP_MODEL=ViT-B-32
-OPENCLIP_PRETRAINED=openai
+# YOLO / OpenCLIP — nombres de modelo hardcodeados hoy en
+# backend-ia/app/ml/pipeline.py (no son variables de entorno todavía),
+# validados en docs/pocs/POC_Similitudes.ipynb:
+# YOLO: yolov8n.pt (nano, se descarga solo vía ultralytics)
+# OpenCLIP: ViT-B-32, pretrained=laion2b_s34b_b79k (NO "openai" — da 512 dims)
 
-# Backend Principal
-BACKEND_URL=http://backend-principal:3001
-BACKEND_API_KEY=internal-key-for-auth
+DATABASE_URL=postgresql+asyncpg://patitas:patitas@localhost:5433/patitas
 
-# Redis (para queue)
-REDIS_URL=redis://redis:6379
+# Backend Principal — no implementado (no hay callback HTTP, ver 4.2/6)
+# BACKEND_URL=http://backend-principal:3001
+# BACKEND_API_KEY=internal-key-for-auth
+
+# Redis (para queue) — no implementado todavía, ver sección 7
+# REDIS_URL=redis://redis:6379
 ```
 
 ---

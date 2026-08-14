@@ -209,7 +209,7 @@ location geometry(Point, 4326)  -- ✅ Presente
 
 ### Tabla `report_embeddings` - pgvector
 ```sql
-embedding vector(1536)  -- ✅ Presente
+embedding vector(512)  -- ✅ Presente (ajustado en issue #18: ViT-B-32 da 512 dims, no 1536)
 -- Índice HNSW vector_cosine_ops ✅ Presente
 -- Búsqueda por similaridad <-> operador listo
 ```
@@ -228,7 +228,7 @@ engine = create_async_engine(
 
 ## 📝 Notas de Implementación
 
-1. **Variables de entorno críticas**: DATABASE_URL, JWT_SECRET, REDIS_URL, IA_SERVICE_URL
+1. **Variables de entorno críticas**: DATABASE_URL, JWT_SECRET, REDIS_URL, AI_SERVICE_URL
 2. **Puerto PostgreSQL**: 5433 (por Docker, evita conflicto con instancia local)
 3. **Puerto Backend Ppal**: 3001 (interno, load balancer en nginx)
 4. **Puerto Backend IA**: 8000 (FastAPI default)

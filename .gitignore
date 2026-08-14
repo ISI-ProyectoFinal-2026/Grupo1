@@ -16,3 +16,9 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+.pytest_cache/
+
+# Pesos de modelos ML descargados automaticamente (ultralytics/open_clip)
+*.pt
+*.pth
+*.onnx

@@ -149,6 +149,46 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     expect(res.body.tag.label).toBe("RESUELTO");
   });
 
+  test("GET /api/reports/:id/matches responde 200 con la lista de matches sugeridos", async () => {
+    const lost = await request(app)
+      .post("/api/reports")
+      .send({ userId, ...baseReportData, reportType: "lost", title: "Perdido cerca de Once" });
+    createdReportIds.push(lost.body.id);
+    const found = await request(app)
+      .post("/api/reports")
+      .send({ userId, ...baseReportData, reportType: "found", title: "Encontrado en Once" });
+    createdReportIds.push(found.body.id);
+
+    await prisma.reportMatch.create({
+      data: { reportLostId: lost.body.id, reportFoundId: found.body.id, similarityScore: 0.81, status: "pending" },
+    });
+
+    const res = await request(app).get(`/api/reports/${lost.body.id}/matches`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({
+      reportId: found.body.id,
+      title: "Encontrado en Once",
+      reportType: "found",
+      similarityScore: 0.81,
+      status: "pending",
+    });
+
+    await prisma.reportMatch.deleteMany({ where: { reportLostId: lost.body.id, reportFoundId: found.body.id } });
+  });
+
+  test("GET /api/reports/:id/matches responde 200 con un array vacío si no hay matches", async () => {
+    const created = await request(app).post("/api/reports").send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+
+    const res = await request(app).get(`/api/reports/${created.body.id}/matches`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  test("GET /api/reports/:id/matches responde 404 si el reporte no existe", async () => {
+    const res = await request(app).get("/api/reports/999999999/matches");
+    expect(res.status).toBe(404);
   test("GET /api/reports sin filtros solo trae reportes activos (published)", async () => {
     const created = await request(app).post("/api/reports").send({ userId, ...baseReportData });
     createdReportIds.push(created.body.id);
