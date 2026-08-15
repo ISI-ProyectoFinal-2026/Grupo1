@@ -8,6 +8,21 @@ import { prisma } from "../db/client";
  * Nota: el body usa `image_url` (snake_case) porque así lo espera el
  * endpoint `POST /reports/{report_id}/embedding` del Backend IA
  * (Pydantic model `EmbeddingRequest.image_url`, ver backend-ia/app/main.py).
+ *
+ * Moderación de contenido (POC, issue #19): el Backend IA responde 201
+ * cuando detectó una mascota y generó el embedding, y 422 cuando no
+ * detectó ninguna mascota en la imagen (contenido irrelevante). Usamos
+ * ese código de estado para resolver el reporte fuera de "pending":
+ * 201 -> published, 422 -> rejected. Cualquier otro resultado (otro
+ * status HTTP, o el fetch rechazando por falla de red) es inconcluso,
+ * no un veredicto de moderación: se loguea y el reporte queda "pending"
+ * para revisión manual, sin lanzar ni generar un unhandled rejection.
+ *
+ * La actualización se hace acá con Prisma directo (no llamando de vuelta
+ * a reports.service.ts) porque reports.service.ts ya importa este módulo;
+ * llamar en sentido inverso crearía una dependencia circular. Este archivo
+ * ya lee `reports` directamente vía SQL crudo en listMatches, así que una
+ * escritura directa con Prisma acá es consistente con el layering existente.
  */
 export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): void {
   const baseUrl = process.env.AI_SERVICE_URL;
@@ -17,9 +32,17 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image_url: imageUrl }),
-  }).catch((error) => {
-    console.error(`[matching] fallo al generar embedding para report ${reportId}:`, error);
-  });
+  })
+    .then(async (response) => {
+      if (response.status === 201) {
+        await prisma.report.update({ where: { id: reportId }, data: { status: "published" } });
+      } else if (response.status === 422) {
+        await prisma.report.update({ where: { id: reportId }, data: { status: "rejected" } });
+      }
+    })
+    .catch((error) => {
+      console.error(`[matching] fallo al generar embedding para report ${reportId}:`, error);
+    });
 }
 
 export interface MatchDTO {

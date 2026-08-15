@@ -105,7 +105,11 @@ export async function create(data: CreateReportInput): Promise<ReportDTO> {
           userId: data.userId,
           petId: data.petId ?? null,
           reportType: data.reportType,
-          status: "published",
+          // POC de moderación de contenido (issue #19): si hay imagen,
+          // el reporte queda "pending" hasta que el Backend IA confirme
+          // (vía triggerEmbeddingGeneration) que detectó una mascota.
+          // Sin imagen no hay nada que validar, se publica directo.
+          status: data.imageUrl ? "pending" : "published",
           title: data.title,
           description: data.description ?? null,
           imageUrl: data.imageUrl ?? null,

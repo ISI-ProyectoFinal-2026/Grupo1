@@ -60,9 +60,13 @@ describe("reports.service", () => {
     reportType: "found" as const,
     title: "Perrito encontrado en Plaza de Mayo",
     description: "Cachorro mestizo, collar rojo",
-    imageUrl: "https://cdn.example.com/hallazgo.jpg",
     location: { lat: -34.6037, lng: -58.3816 },
     locationAddress: "Plaza de Mayo, CABA",
+  };
+
+  const baseReportDataWithImage = {
+    ...baseReportData,
+    imageUrl: "https://cdn.example.com/hallazgo.jpg",
   };
 
   test("create() crea un reporte de avistamiento sin petId (encontrado)", async () => {
@@ -187,10 +191,10 @@ describe("reports.service", () => {
   test("create() dispara triggerEmbeddingGeneration cuando el reporte tiene imageUrl", async () => {
     const spy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {});
 
-    const report = await reportsService.create({ userId, ...baseReportData });
+    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
     createdReportIds.push(report.id);
 
-    expect(spy).toHaveBeenCalledWith(report.id, baseReportData.imageUrl);
+    expect(spy).toHaveBeenCalledWith(report.id, baseReportDataWithImage.imageUrl);
     spy.mockRestore();
   });
 
@@ -199,12 +203,26 @@ describe("reports.service", () => {
       throw new Error("ai service down");
     });
 
-    const report = await reportsService.create({ userId, ...baseReportData });
+    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
     createdReportIds.push(report.id);
 
     expect(report.id).toBeDefined();
-    expect(report.status).toBe("published");
+    expect(report.status).toBe("pending");
     spy.mockRestore();
+  });
+
+  test("create() inserta con status pending cuando se provee imageUrl (queda pendiente de moderación)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    createdReportIds.push(report.id);
+
+    expect(report.status).toBe("pending");
+  });
+
+  test("create() inserta con status published cuando no se provee imageUrl (nada que validar)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    expect(report.status).toBe("published");
   });
 
   test("los tags PERDIDO, ENCONTRADO y RESUELTO tienen colores diferenciados entre sí", async () => {
