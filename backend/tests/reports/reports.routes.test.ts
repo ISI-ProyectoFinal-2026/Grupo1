@@ -9,7 +9,6 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     reportType: "found",
     title: "Perrito encontrado en Plaza de Mayo",
     description: "Cachorro mestizo, collar rojo",
-    imageUrl: "https://cdn.example.com/hallazgo.jpg",
     location: { lat: -34.6037, lng: -58.3816 },
     locationAddress: "Plaza de Mayo, CABA",
   };
@@ -189,6 +188,8 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   test("GET /api/reports/:id/matches responde 404 si el reporte no existe", async () => {
     const res = await request(app).get("/api/reports/999999999/matches");
     expect(res.status).toBe(404);
+  });
+
   test("GET /api/reports sin filtros solo trae reportes activos (published)", async () => {
     const created = await request(app).post("/api/reports").send({ userId, ...baseReportData });
     createdReportIds.push(created.body.id);
@@ -213,5 +214,22 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   test("GET /api/reports?order=asc responde 200 y acepta el parámetro", async () => {
     const res = await request(app).get("/api/reports?order=asc");
     expect(res.status).toBe(200);
+  });
+
+  test("POST /api/reports con imageUrl crea el reporte con status pending y GET /api/reports?status=pending lo incluye", async () => {
+    const created = await request(app)
+      .post("/api/reports")
+      .send({ userId, ...baseReportData, imageUrl: "https://cdn.example.com/hallazgo.jpg" });
+    createdReportIds.push(created.body.id);
+
+    expect(created.status).toBe(201);
+    expect(created.body.status).toBe("pending");
+
+    const feed = await request(app).get("/api/reports");
+    expect(feed.body.some((r: { id: number }) => r.id === created.body.id)).toBe(false);
+
+    const queue = await request(app).get("/api/reports?status=pending");
+    expect(queue.status).toBe(200);
+    expect(queue.body.some((r: { id: number }) => r.id === created.body.id)).toBe(true);
   });
 });

@@ -4,11 +4,13 @@ import { prisma } from "../../src/db/client";
 describe("matching.service", () => {
   const originalEnv = { ...process.env };
   let fetchMock: jest.Mock;
+  let updateSpy: jest.SpyInstance;
 
   beforeEach(() => {
     fetchMock = jest.fn();
     // @ts-expect-error -- test double, no necesita implementar el tipo completo de fetch
     global.fetch = fetchMock;
+    updateSpy = jest.spyOn(prisma.report, "update").mockResolvedValue({} as never);
   });
 
   afterEach(() => {
@@ -24,9 +26,9 @@ describe("matching.service", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test("hace POST a AI_SERVICE_URL/reports/:id/embedding con el body correcto", () => {
+  test("hace POST a AI_SERVICE_URL/reports/:id/embedding con el body correcto", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
-    fetchMock.mockResolvedValue({ ok: true });
+    fetchMock.mockResolvedValue({ status: 201 });
 
     triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
 
@@ -36,9 +38,42 @@ describe("matching.service", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image_url: "https://cdn.example.com/foto.jpg" }),
     });
+
+    // deja que la resolución interna del fetch procese antes de que termine el test
+    await new Promise((resolve) => setImmediate(resolve));
   });
 
-  test("un fetch que rechaza no lanza ni genera un unhandled rejection", async () => {
+  test("fetch resuelve con status 201 (mascota detectada) -> marca el reporte como published", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue({ status: 201 });
+
+    triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(updateSpy).toHaveBeenCalledWith({ where: { id: 42 }, data: { status: "published" } });
+  });
+
+  test("fetch resuelve con status 422 (sin mascota detectada) -> marca el reporte como rejected", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue({ status: 422 });
+
+    triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(updateSpy).toHaveBeenCalledWith({ where: { id: 42 }, data: { status: "rejected" } });
+  });
+
+  test("fetch resuelve con un status distinto de 201/422 -> no actualiza el status del reporte", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue({ status: 500 });
+
+    expect(() => triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg")).not.toThrow();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  test("un fetch que rechaza no lanza ni genera un unhandled rejection, y no actualiza el status", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockRejectedValue(new Error("network down"));
 
@@ -46,6 +81,7 @@ describe("matching.service", () => {
 
     // deja que el .catch() interno procese el rechazo antes de que termine el test
     await new Promise((resolve) => setImmediate(resolve));
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 });
 
