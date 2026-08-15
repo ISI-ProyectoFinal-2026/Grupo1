@@ -1,10 +1,12 @@
 import { prisma } from "../../src/db/client";
 import { AppError } from "../../src/errors/app-error";
 import * as reportsService from "../../src/services/reports.service";
+import * as matchingService from "../../src/services/matching.service";
 
 describe("reports.service", () => {
   let userId: number;
   let petId: number;
+  let petIdPoodle: number;
   const createdReportIds: number[] = [];
 
   beforeAll(async () => {
@@ -25,6 +27,19 @@ describe("reports.service", () => {
       },
     });
     petId = pet.id;
+
+    const poodle = await prisma.pet.create({
+      data: {
+        userId,
+        name: "Toby",
+        breed: "Poodle",
+        age: 2,
+        color: "Blanco",
+        description: "Mascota de prueba 2",
+        photoUrls: [],
+      },
+    });
+    petIdPoodle = poodle.id;
   });
 
   afterEach(async () => {
@@ -36,6 +51,7 @@ describe("reports.service", () => {
 
   afterAll(async () => {
     await prisma.pet.delete({ where: { id: petId } });
+    await prisma.pet.delete({ where: { id: petIdPoodle } });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.$disconnect();
   });
@@ -44,9 +60,13 @@ describe("reports.service", () => {
     reportType: "found" as const,
     title: "Perrito encontrado en Plaza de Mayo",
     description: "Cachorro mestizo, collar rojo",
-    imageUrl: "https://cdn.example.com/hallazgo.jpg",
     location: { lat: -34.6037, lng: -58.3816 },
     locationAddress: "Plaza de Mayo, CABA",
+  };
+
+  const baseReportDataWithImage = {
+    ...baseReportData,
+    imageUrl: "https://cdn.example.com/hallazgo.jpg",
   };
 
   test("create() crea un reporte de avistamiento sin petId (encontrado)", async () => {

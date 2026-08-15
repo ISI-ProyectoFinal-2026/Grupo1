@@ -30,6 +30,7 @@ model User {
   messages      Message[]
   chatsAsUserA  Chat[]          @relation("ChatUserA")
   chatsAsUserB  Chat[]          @relation("ChatUserB")
+  reportFlags   ReportFlag[]
 
   @@map("users")
 }
@@ -94,10 +95,35 @@ model Report {
   matchesAsFound ReportMatch[]   @relation("MatchFound")
   chats          Chat[]
   notifications  Notification[]
+  flags          ReportFlag[]
 
   @@index([status])
   @@index([reportType])
   @@map("reports")
+}
+
+enum ReportFlagStatus {
+  pending
+  reviewed
+
+  @@map("report_flag_status")
+}
+
+model ReportFlag {
+  id        Int               @id @default(autoincrement())
+  reportId  Int               @map("report_id")
+  userId    Int               @map("user_id")
+  reason    String
+  status    ReportFlagStatus  @default(pending)
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  report Report @relation(fields: [reportId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([reportId, userId])
+  @@index([status])
+  @@index([reportId])
+  @@map("report_flags")
 }
 
 model ReportEmbedding {
@@ -105,7 +131,7 @@ model ReportEmbedding {
   reportId  Int      @unique @map("report_id")
   // OpenCLIP output. Escrito por el Backend IA, consumido por el Backend
   // Principal para el matching por similitud (pgvector `<->`).
-  embedding Unsupported("vector(1536)")
+  embedding Unsupported("vector(512)")
   createdAt DateTime @default(now()) @map("created_at")
 
   report Report @relation(fields: [reportId], references: [id])

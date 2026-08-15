@@ -9,7 +9,6 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     reportType: "found",
     title: "Perrito encontrado en Plaza de Mayo",
     description: "Cachorro mestizo, collar rojo",
-    imageUrl: "https://cdn.example.com/hallazgo.jpg",
     location: { lat: -34.6037, lng: -58.3816 },
     locationAddress: "Plaza de Mayo, CABA",
   };
