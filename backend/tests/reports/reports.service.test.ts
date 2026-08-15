@@ -147,4 +147,196 @@ describe("reports.service", () => {
   test("remove() lanza AppError 404 si no existe", async () => {
     await expect(reportsService.remove(-1)).rejects.toMatchObject({ statusCode: 404 });
   });
+
+  test("create() con reportType found expone tag ENCONTRADO", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+    expect(report.tag.label).toBe("ENCONTRADO");
+  });
+
+  test("create() con reportType lost expone tag PERDIDO", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
+    createdReportIds.push(report.id);
+    expect(report.tag.label).toBe("PERDIDO");
+  });
+
+  test("update() a status resolved expone tag RESUELTO sin importar el reportType", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
+    createdReportIds.push(report.id);
+
+    const updated = await reportsService.update(report.id, { status: "resolved" });
+    expect(updated.tag.label).toBe("RESUELTO");
+  });
+
+  test("create() dispara triggerEmbeddingGeneration cuando el reporte tiene imageUrl", async () => {
+    const spy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {});
+
+    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    createdReportIds.push(report.id);
+
+    expect(spy).toHaveBeenCalledWith(report.id, baseReportDataWithImage.imageUrl);
+    spy.mockRestore();
+  });
+
+  test("create() sigue devolviendo el reporte creado aunque triggerEmbeddingGeneration falle", async () => {
+    const spy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {
+      throw new Error("ai service down");
+    });
+
+    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    createdReportIds.push(report.id);
+
+    expect(report.id).toBeDefined();
+    expect(report.status).toBe("pending");
+    spy.mockRestore();
+  });
+
+  test("create() inserta con status pending cuando se provee imageUrl (queda pendiente de moderación)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    createdReportIds.push(report.id);
+
+    expect(report.status).toBe("pending");
+  });
+
+  test("create() inserta con status published cuando no se provee imageUrl (nada que validar)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    expect(report.status).toBe("published");
+  });
+
+  test("los tags PERDIDO, ENCONTRADO y RESUELTO tienen colores diferenciados entre sí", async () => {
+    const lost = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
+    createdReportIds.push(lost.id);
+    const found = await reportsService.create({ userId, ...baseReportData, reportType: "found" });
+    createdReportIds.push(found.id);
+    const resolved = await reportsService.update(found.id, { status: "resolved" });
+
+    const colors = new Set([lost.tag.color, found.tag.color, resolved.tag.color]);
+    expect(colors.size).toBe(3);
+  });
+
+  test("list() sin filtro de status solo devuelve reportes activos (published)", async () => {
+    const published = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(published.id);
+    const resolved = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(resolved.id);
+    await reportsService.update(resolved.id, { status: "resolved" });
+
+    const activeFeed = await reportsService.list();
+    expect(activeFeed.some((r) => r.id === published.id)).toBe(true);
+    expect(activeFeed.some((r) => r.id === resolved.id)).toBe(false);
+
+    const resolvedOnly = await reportsService.list({ status: "resolved" });
+    expect(resolvedOnly.some((r) => r.id === resolved.id)).toBe(true);
+  });
+
+  test("list() filtra por raza a través de la mascota asociada", async () => {
+    const labradorReport = await reportsService.create({ userId, petId, ...baseReportData });
+    createdReportIds.push(labradorReport.id);
+    const poodleReport = await reportsService.create({ userId, petId: petIdPoodle, ...baseReportData });
+    createdReportIds.push(poodleReport.id);
+
+    const reports = await reportsService.list({ breed: "Labrador" });
+    expect(reports.some((r) => r.id === labradorReport.id)).toBe(true);
+    expect(reports.some((r) => r.id === poodleReport.id)).toBe(false);
+  });
+
+  test("list() filtra por raza sin distinguir mayúsculas/minúsculas", async () => {
+    const labradorReport = await reportsService.create({ userId, petId, ...baseReportData });
+    createdReportIds.push(labradorReport.id);
+
+    const reports = await reportsService.list({ breed: "labrador" });
+    expect(reports.some((r) => r.id === labradorReport.id)).toBe(true);
+  });
+
+  test("list() filtra por zona con match parcial de locationAddress", async () => {
+    const plazaDeMayo = await reportsService.create({
+      userId,
+      ...baseReportData,
+      locationAddress: "Plaza de Mayo, CABA",
+    });
+    createdReportIds.push(plazaDeMayo.id);
+    const parqueRivadavia = await reportsService.create({
+      userId,
+      ...baseReportData,
+      locationAddress: "Parque Rivadavia, CABA",
+    });
+    createdReportIds.push(parqueRivadavia.id);
+
+    const reports = await reportsService.list({ zone: "Plaza de Mayo" });
+    expect(reports.some((r) => r.id === plazaDeMayo.id)).toBe(true);
+    expect(reports.some((r) => r.id === parqueRivadavia.id)).toBe(false);
+  });
+
+  test("list() filtra por rango de fechas (dateFrom/dateTo)", async () => {
+    const recent = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(recent.id);
+    const old = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(old.id);
+    await prisma.$executeRaw`UPDATE reports SET created_at = '2020-01-01T00:00:00Z' WHERE id = ${old.id}`;
+
+    const onlyRecent = await reportsService.list({ dateFrom: new Date(Date.now() - 60_000) });
+    expect(onlyRecent.some((r) => r.id === recent.id)).toBe(true);
+    expect(onlyRecent.some((r) => r.id === old.id)).toBe(false);
+
+    const onlyOld = await reportsService.list({ dateTo: new Date("2020-06-01") });
+    expect(onlyOld.some((r) => r.id === old.id)).toBe(true);
+    expect(onlyOld.some((r) => r.id === recent.id)).toBe(false);
+  });
+
+  test("close() cierra el reporte y devuelve tag RESUELTO", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    const closed = await reportsService.close(report.id, { userId });
+    expect(closed.status).toBe("resolved");
+    expect(closed.tag.label).toBe("RESUELTO");
+  });
+
+  test("close() excluye el reporte del feed activo", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    await reportsService.close(report.id, { userId });
+
+    const feed = await reportsService.list();
+    expect(feed.some((r) => r.id === report.id)).toBe(false);
+  });
+
+  test("close() lanza AppError 404 si el reporte no existe", async () => {
+    await expect(reportsService.close(-1, { userId })).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test("close() lanza AppError 403 si el userId no es el autor", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    await expect(reportsService.close(report.id, { userId: userId + 1 })).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  test("close() lanza AppError 409 si el reporte ya está resuelto", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+    await reportsService.close(report.id, { userId });
+
+    await expect(reportsService.close(report.id, { userId })).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  test("list() ordena por fecha, DESC por defecto y ASC cuando se pide", async () => {
+    const first = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(first.id);
+    await prisma.$executeRaw`UPDATE reports SET created_at = '2021-01-01T00:00:00Z' WHERE id = ${first.id}`;
+    const second = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(second.id);
+    await prisma.$executeRaw`UPDATE reports SET created_at = '2022-01-01T00:00:00Z' WHERE id = ${second.id}`;
+
+    const desc = await reportsService.list({ order: "desc" });
+    const descIds = desc.map((r) => r.id).filter((id) => id === first.id || id === second.id);
+    expect(descIds).toEqual([second.id, first.id]);
+
+    const asc = await reportsService.list({ order: "asc" });
+    const ascIds = asc.map((r) => r.id).filter((id) => id === first.id || id === second.id);
+    expect(ascIds).toEqual([first.id, second.id]);
+  });
 });
