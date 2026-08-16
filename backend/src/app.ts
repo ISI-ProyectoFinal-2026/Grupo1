@@ -1,4 +1,5 @@
 import express from "express";
+import { authRouter } from "./routes/auth.routes";
 import { petsRouter } from "./routes/pets.routes";
 import { uploadsRouter } from "./routes/uploads.routes";
 import { reportsRouter } from "./routes/reports.routes";
@@ -8,6 +9,7 @@ export const app = express();
 
 app.use(express.json());
 
+app.use("/api/auth", authRouter);
 app.use("/api/pets", petsRouter);
 app.use("/api/uploads", uploadsRouter);
 app.use("/api/reports", reportsRouter);
