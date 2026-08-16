@@ -216,6 +216,38 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     expect(res.status).toBe(200);
   });
 
+  test("POST /api/reports/:id/close responde 200 con status resolved", async () => {
+    const created = await request(app).post("/api/reports").send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+
+    const res = await request(app).post(`/api/reports/${created.body.id}/close`).send({ userId });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("resolved");
+    expect(res.body.tag.label).toBe("RESUELTO");
+  });
+
+  test("POST /api/reports/:id/close responde 404 si el reporte no existe", async () => {
+    const res = await request(app).post("/api/reports/999999999/close").send({ userId });
+    expect(res.status).toBe(404);
+  });
+
+  test("POST /api/reports/:id/close responde 403 si el userId no es el autor", async () => {
+    const created = await request(app).post("/api/reports").send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+
+    const res = await request(app).post(`/api/reports/${created.body.id}/close`).send({ userId: userId + 1 });
+    expect(res.status).toBe(403);
+  });
+
+  test("POST /api/reports/:id/close responde 409 si el reporte ya está resuelto", async () => {
+    const created = await request(app).post("/api/reports").send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+    await request(app).post(`/api/reports/${created.body.id}/close`).send({ userId });
+
+    const res = await request(app).post(`/api/reports/${created.body.id}/close`).send({ userId });
+    expect(res.status).toBe(409);
+  });
+
   test("POST /api/reports con imageUrl crea el reporte con status pending y GET /api/reports?status=pending lo incluye", async () => {
     const created = await request(app)
       .post("/api/reports")

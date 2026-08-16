@@ -36,6 +36,11 @@ export const listReportsQuerySchema = z.object({
   order: z.enum(["asc", "desc"]).optional(),
 });
 
+export const closeReportSchema = z.object({
+  userId: z.number().int().positive(),
+});
+
 export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type UpdateReportInput = z.infer<typeof updateReportSchema>;
+export type CloseReportInput = z.infer<typeof closeReportSchema>;
 export type ListReportsQuery = z.infer<typeof listReportsQuerySchema>;

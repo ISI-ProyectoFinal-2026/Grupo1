@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import * as reportsService from "../services/reports.service";
 import * as matchingService from "../services/matching.service";
 import {
+  closeReportSchema,
   createReportSchema,
   listReportsQuerySchema,
   reportIdParamSchema,
@@ -37,6 +38,13 @@ export async function remove(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
   await reportsService.remove(id);
   res.status(204).send();
+}
+
+export async function close(req: Request, res: Response): Promise<void> {
+  const { id } = reportIdParamSchema.parse(req.params);
+  const data = closeReportSchema.parse(req.body);
+  const report = await reportsService.close(id, data);
+  res.status(200).json(report);
 }
 
 export async function getMatches(req: Request, res: Response): Promise<void> {

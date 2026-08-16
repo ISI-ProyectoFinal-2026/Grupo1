@@ -10,4 +10,5 @@ reportsRouter.get("/:id", reportsController.getById);
 reportsRouter.get("/:id/matches", reportsController.getMatches);
 reportsRouter.put("/:id", reportsController.update);
 reportsRouter.delete("/:id", reportsController.remove);
+reportsRouter.post("/:id/close", reportsController.close);
 reportsRouter.post("/:id/flags", reportFlagsController.create);

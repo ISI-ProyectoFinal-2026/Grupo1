@@ -305,6 +305,44 @@ describe("reports.service", () => {
     expect(onlyOld.some((r) => r.id === recent.id)).toBe(false);
   });
 
+  test("close() cierra el reporte y devuelve tag RESUELTO", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    const closed = await reportsService.close(report.id, { userId });
+    expect(closed.status).toBe("resolved");
+    expect(closed.tag.label).toBe("RESUELTO");
+  });
+
+  test("close() excluye el reporte del feed activo", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    await reportsService.close(report.id, { userId });
+
+    const feed = await reportsService.list();
+    expect(feed.some((r) => r.id === report.id)).toBe(false);
+  });
+
+  test("close() lanza AppError 404 si el reporte no existe", async () => {
+    await expect(reportsService.close(-1, { userId })).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test("close() lanza AppError 403 si el userId no es el autor", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    await expect(reportsService.close(report.id, { userId: userId + 1 })).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  test("close() lanza AppError 409 si el reporte ya está resuelto", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+    await reportsService.close(report.id, { userId });
+
+    await expect(reportsService.close(report.id, { userId })).rejects.toMatchObject({ statusCode: 409 });
+  });
+
   test("list() ordena por fecha, DESC por defecto y ASC cuando se pide", async () => {
     const first = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(first.id);

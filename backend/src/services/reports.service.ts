@@ -2,7 +2,7 @@ import { Prisma, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import * as matchingService from "./matching.service";
-import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
+import { CreateReportInput, UpdateReportInput, ListReportsQuery, CloseReportInput } from "../validators/reports.validator";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -170,6 +170,18 @@ export async function update(id: number, data: UpdateReportInput): Promise<Repor
     }
   });
 
+  return getById(id);
+}
+
+export async function close(id: number, data: CloseReportInput): Promise<ReportDTO> {
+  const report = await getById(id);
+  if (report.userId !== data.userId) {
+    throw new AppError(403, "No tenés permiso para cerrar este reporte");
+  }
+  if (report.status === "resolved") {
+    throw new AppError(409, "El reporte ya está resuelto");
+  }
+  await prisma.report.update({ where: { id }, data: { status: "resolved" } });
   return getById(id);
 }
 
