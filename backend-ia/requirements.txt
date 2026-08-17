@@ -9,7 +9,7 @@ pydantic-settings==2.15.0
 
 # ML pipeline (detección YOLO + embeddings OpenCLIP) — ver docs/pocs/POC_Similitudes.ipynb
 torch==2.6.0
-torchvision==0.21.0
+torchvision==0.28.0
 open_clip_torch==2.24.0
 ultralytics==8.3.28
 pillow==10.4.0
