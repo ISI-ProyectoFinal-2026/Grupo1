@@ -1,6 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import * as uploadsController from "../controllers/uploads.controller";
+import { requireAuth } from "../middlewares/auth.middleware";
 
 export const uploadsRouter = Router();
 
@@ -13,4 +14,4 @@ const uploadLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === "test",
 });
 
-uploadsRouter.post("/presign", uploadLimiter, uploadsController.presign);
+uploadsRouter.post("/presign", uploadLimiter, requireAuth, uploadsController.presign);

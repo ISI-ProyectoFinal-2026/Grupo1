@@ -1,4 +1,5 @@
 import request from "supertest";
+import jwt from "jsonwebtoken";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 
@@ -6,6 +7,7 @@ describe("POST /api/reports/:id/flags", () => {
   let userId: number;
   let reporterId: number;
   let reportId: number;
+  let token: string;
   const createdFlagIds: number[] = [];
 
   beforeAll(async () => {
@@ -18,6 +20,7 @@ describe("POST /api/reports/:id/flags", () => {
       data: { email: `report-flags-routes-test-reporter-${Date.now()}@example.com`, passwordHash: "test-hash" },
     });
     reporterId = reporter.id;
+    token = jwt.sign({ sub: reporter.id, email: reporter.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
 
     const report = await prisma.report.create({
       data: {
@@ -47,7 +50,7 @@ describe("POST /api/reports/:id/flags", () => {
 
   test("POST /api/reports/:id/flags crea un reporte de moderación y responde 201", async () => {
     const res = await request(app)
-      .post(`/api/reports/${reportId}/flags`)
+      .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
       .send({ userId: reporterId, reason: "Publicación falsa" });
 
     expect(res.status).toBe(201);
@@ -59,38 +62,38 @@ describe("POST /api/reports/:id/flags", () => {
   });
 
   test("POST /api/reports/:id/flags responde 400 si falta reason", async () => {
-    const res = await request(app).post(`/api/reports/${reportId}/flags`).send({ userId: reporterId });
+    const res = await request(app).post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`).send({ userId: reporterId });
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
   });
 
   test("POST /api/reports/:id/flags responde 400 si falta userId", async () => {
-    const res = await request(app).post(`/api/reports/${reportId}/flags`).send({ reason: "Publicación falsa" });
+    const res = await request(app).post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`).send({ reason: "Publicación falsa" });
     expect(res.status).toBe(400);
   });
 
   test("POST /api/reports/:id/flags responde 404 si el reporte no existe", async () => {
     const res = await request(app)
-      .post("/api/reports/999999999/flags")
+      .post("/api/reports/999999999/flags").set("Authorization", `Bearer ${token}`)
       .send({ userId: reporterId, reason: "Publicación falsa" });
     expect(res.status).toBe(404);
   });
 
   test("POST /api/reports/:id/flags responde 400 si el id no es numérico", async () => {
     const res = await request(app)
-      .post("/api/reports/abc/flags")
+      .post("/api/reports/abc/flags").set("Authorization", `Bearer ${token}`)
       .send({ userId: reporterId, reason: "Publicación falsa" });
     expect(res.status).toBe(400);
   });
 
   test("POST /api/reports/:id/flags responde 409 si el mismo usuario reporta la misma publicación dos veces", async () => {
     const first = await request(app)
-      .post(`/api/reports/${reportId}/flags`)
+      .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
       .send({ userId: reporterId, reason: "Publicación falsa" });
     createdFlagIds.push(first.body.id);
 
     const res = await request(app)
-      .post(`/api/reports/${reportId}/flags`)
+      .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
       .send({ userId: reporterId, reason: "Otra vez" });
     expect(res.status).toBe(409);
   });

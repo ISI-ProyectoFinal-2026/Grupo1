@@ -1,9 +1,11 @@
 import request from "supertest";
+import jwt from "jsonwebtoken";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 
 describe("GET/POST/PUT/DELETE /api/pets", () => {
   let userId: number;
+  let token: string;
   const createdPetIds: number[] = [];
   const basePetData = {
     breed: "Labrador",
@@ -21,6 +23,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
       },
     });
     userId = user.id;
+    token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
   });
 
   afterEach(async () => {
@@ -37,7 +40,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
   test("POST /api/pets crea una mascota y responde 201", async () => {
     const res = await request(app)
-      .post("/api/pets")
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
       .send({ userId, name: "Rocky", ...basePetData });
 
     expect(res.status).toBe(201);
@@ -48,7 +51,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   });
 
   test("POST /api/pets responde 400 si el body es inválido", async () => {
-    const res = await request(app).post("/api/pets").send({ name: "Sin userId" });
+    const res = await request(app).post("/api/pets").set("Authorization", `Bearer ${token}`).send({ name: "Sin userId" });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
@@ -57,7 +60,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   test("POST /api/pets responde 400 si falta un campo requerido (color)", async () => {
     const { color, ...withoutColor } = basePetData;
     const res = await request(app)
-      .post("/api/pets")
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
       .send({ userId, name: "Sin color", ...withoutColor });
 
     expect(res.status).toBe(400);
@@ -66,7 +69,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
   test("POST /api/pets responde 400 si no se incluye ninguna foto", async () => {
     const res = await request(app)
-      .post("/api/pets")
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
       .send({ userId, name: "Sin fotos", ...basePetData, photoUrls: [] });
 
     expect(res.status).toBe(400);
@@ -75,7 +78,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
   test("POST /api/pets responde 400 si el JSON del body está mal formado", async () => {
     const res = await request(app)
-      .post("/api/pets")
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
       .set("Content-Type", "application/json")
       .send('{"userId":1,"name":"Malformado"');
 
@@ -85,7 +88,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
   test("GET /api/pets responde 200 con un array", async () => {
     const created = await request(app)
-      .post("/api/pets")
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
       .send({ userId, name: "Lista", ...basePetData });
     createdPetIds.push(created.body.id);
 
@@ -98,7 +101,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
   test("GET /api/pets/:id responde 200 con la mascota", async () => {
     const created = await request(app)
-      .post("/api/pets")
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
       .send({ userId, name: "Buscada", ...basePetData });
     createdPetIds.push(created.body.id);
 
@@ -120,27 +123,27 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
   test("PUT /api/pets/:id actualiza la mascota", async () => {
     const created = await request(app)
-      .post("/api/pets")
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
       .send({ userId, name: "Original", ...basePetData });
     createdPetIds.push(created.body.id);
 
-    const res = await request(app).put(`/api/pets/${created.body.id}`).send({ name: "Actualizada" });
+    const res = await request(app).put(`/api/pets/${created.body.id}`).set("Authorization", `Bearer ${token}`).send({ name: "Actualizada" });
 
     expect(res.status).toBe(200);
     expect(res.body.name).toBe("Actualizada");
   });
 
   test("PUT /api/pets/:id responde 404 si no existe", async () => {
-    const res = await request(app).put("/api/pets/999999999").send({ name: "x" });
+    const res = await request(app).put("/api/pets/999999999").set("Authorization", `Bearer ${token}`).send({ name: "x" });
     expect(res.status).toBe(404);
   });
 
   test("DELETE /api/pets/:id elimina la mascota y responde 204", async () => {
     const created = await request(app)
-      .post("/api/pets")
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
       .send({ userId, name: "A borrar", ...basePetData });
 
-    const res = await request(app).delete(`/api/pets/${created.body.id}`);
+    const res = await request(app).delete(`/api/pets/${created.body.id}`).set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(204);
 
@@ -149,7 +152,44 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   });
 
   test("DELETE /api/pets/:id responde 404 si no existe", async () => {
-    const res = await request(app).delete("/api/pets/999999999");
+    const res = await request(app).delete("/api/pets/999999999").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(404);
+  });
+
+  describe("autenticación en /api/pets", () => {
+    test("POST /api/pets sin token responde 401", async () => {
+      const res = await request(app).post("/api/pets").send({ userId, name: "Sin token", ...basePetData });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBeDefined();
+    });
+
+    test("POST /api/pets con token expirado responde 401", async () => {
+      const expiredToken = jwt.sign({ sub: userId, email: "expired@example.com" }, process.env.JWT_SECRET!, {
+        expiresIn: -1,
+      });
+
+      const res = await request(app)
+        .post("/api/pets")
+        .set("Authorization", `Bearer ${expiredToken}`)
+        .send({ userId, name: "Token vencido", ...basePetData });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBeDefined();
+    });
+
+    test("POST /api/pets con token válido responde 201", async () => {
+      const res = await request(app)
+        .post("/api/pets")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ userId, name: "Con token", ...basePetData });
+
+      expect(res.status).toBe(201);
+      createdPetIds.push(res.body.id);
+    });
+
+    test("GET /api/pets sin token responde 200 (endpoint público)", async () => {
+      const res = await request(app).get("/api/pets");
+      expect(res.status).toBe(200);
+    });
   });
 });
