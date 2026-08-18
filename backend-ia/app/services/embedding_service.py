@@ -24,7 +24,7 @@ async def process_report_image(report_id: int, image_url: str, session: AsyncSes
     si no se detectó ninguna (sin más efectos secundarios: el flujo de
     "rechazar reporte" queda fuera de este slice).
     """
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(image_url)
         response.raise_for_status()
 

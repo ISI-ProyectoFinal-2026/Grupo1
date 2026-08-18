@@ -1,11 +1,23 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db import check_connection, get_db
 from app.services import embedding_service
 
 app = FastAPI(title="PATITAS - Backend IA")
+
+_internal_key_header = APIKeyHeader(name="X-Internal-Key", auto_error=False)
+
+
+async def verify_internal_key(key: str | None = Security(_internal_key_header)) -> None:
+    """Valida que la request venga del backend principal via INTERNAL_API_KEY."""
+    if not settings.internal_api_key:
+        return
+    if key != settings.internal_api_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 class EmbeddingRequest(BaseModel):
@@ -36,6 +48,7 @@ async def create_report_embedding(
     report_id: int,
     body: EmbeddingRequest,
     session: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_internal_key),
 ) -> dict[str, str]:
     """Genera y guarda el embedding de la imagen de un reporte.
 

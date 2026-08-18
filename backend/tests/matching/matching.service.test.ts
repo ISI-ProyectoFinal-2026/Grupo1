@@ -35,7 +35,7 @@ describe("matching.service", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/reports/42/embedding", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Internal-Key": "" },
       body: JSON.stringify({ image_url: "https://cdn.example.com/foto.jpg" }),
     });
 
@@ -73,15 +73,18 @@ describe("matching.service", () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  test("un fetch que rechaza no lanza ni genera un unhandled rejection, y no actualiza el status", async () => {
+  test("un fetch que rechaza no lanza, agota los reintentos y pasa el reporte a rejected", async () => {
+    jest.useFakeTimers();
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockRejectedValue(new Error("network down"));
 
     expect(() => triggerEmbeddingGeneration(1, "https://cdn.example.com/foto.jpg")).not.toThrow();
 
-    // deja que el .catch() interno procese el rechazo antes de que termine el test
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(updateSpy).not.toHaveBeenCalled();
+    // avanza todos los timers de retry (1s + 5s) y espera que las promesas se resuelvan
+    await jest.runAllTimersAsync();
+
+    expect(updateSpy).toHaveBeenCalledWith({ where: { id: 1 }, data: { status: "rejected" } });
+    jest.useRealTimers();
   });
 });
 

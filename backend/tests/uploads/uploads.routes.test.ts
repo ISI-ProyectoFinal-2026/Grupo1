@@ -53,7 +53,7 @@ describe("POST /api/uploads/presign", () => {
   test("responde 201 con uploadUrl, publicUrl y key para un input válido", async () => {
     const res = await request(app)
       .post("/api/uploads/presign")
-      .send({ fileName: "foto.jpg", contentType: "image/jpeg" });
+      .send({ fileName: "foto.jpg", contentType: "image/jpeg", fileSize: 1_000_000 });
 
     expect(res.status).toBe(201);
     expect(res.body.uploadUrl).toBe(
