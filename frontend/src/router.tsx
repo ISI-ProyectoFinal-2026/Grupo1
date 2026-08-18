@@ -6,6 +6,7 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: <MainLayout />,
+    errorElement: <div className="p-6">Página no encontrada</div>,
     children: [{ index: true, element: <Home /> }],
   },
 ]);

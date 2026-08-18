@@ -19,6 +19,7 @@ src/
   services/    # llamadas a la API (axios)
   hooks/       # hooks custom
   types/       # tipos compartidos
+  stores/      # stores de Zustand
 router.tsx     # definición de rutas (React Router)
 ```
 
