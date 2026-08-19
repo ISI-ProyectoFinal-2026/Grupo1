@@ -8,7 +8,7 @@ function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
 }
 
-interface ReportRow {
+export interface ReportRow {
   id: number;
   userId: number;
   petId: number | null;
@@ -48,7 +48,7 @@ export interface ReportDTO extends Omit<ReportRow, "lat" | "lng"> {
   tag: ReportTag;
 }
 
-function toReportDTO(row: ReportRow): ReportDTO {
+export function toReportDTO(row: ReportRow): ReportDTO {
   const { lat, lng, ...rest } = row;
   return {
     ...rest,
@@ -57,7 +57,7 @@ function toReportDTO(row: ReportRow): ReportDTO {
   };
 }
 
-const reportColumns = Prisma.sql`
+export const reportColumns = Prisma.sql`
   r.id, r.user_id AS "userId", r.pet_id AS "petId", r.report_type AS "reportType",
   r.status, r.title, r.description, r.image_url AS "imageUrl",
   r.location_address AS "locationAddress",
