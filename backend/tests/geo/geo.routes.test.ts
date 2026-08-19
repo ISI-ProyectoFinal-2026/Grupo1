@@ -1,13 +1,19 @@
 import request from "supertest";
+import jwt from "jsonwebtoken";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 
 describe("GET /api/geo/nearby y GET /api/geo/map", () => {
   let userId: number;
+  let token: string;
   const createdReportIds: number[] = [];
 
   function reportAt(lat: number, lng: number, title: string) {
     return { userId, reportType: "found", title, location: { lat, lng } };
+  }
+
+  function createReport(lat: number, lng: number, title: string) {
+    return request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send(reportAt(lat, lng, title));
   }
 
   beforeAll(async () => {
@@ -15,12 +21,15 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
       data: { email: `geo-routes-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
     });
     userId = user.id;
+    token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
   });
 
   afterEach(async () => {
     while (createdReportIds.length > 0) {
-      const id = createdReportIds.pop()!;
-      await prisma.report.deleteMany({ where: { id } });
+      const id = createdReportIds.pop();
+      if (id !== undefined) {
+        await prisma.report.deleteMany({ where: { id } });
+      }
     }
   });
 
@@ -30,9 +39,9 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
   });
 
   test("GET /api/geo/nearby responde 200 con reportes dentro del radio y excluye los lejanos", async () => {
-    const inside = await request(app).post("/api/reports").send(reportAt(-34.6037, -58.3816, "Cerca del Obelisco"));
+    const inside = await createReport(-34.6037, -58.3816, "Cerca del Obelisco");
     createdReportIds.push(inside.body.id);
-    const outside = await request(app).post("/api/reports").send(reportAt(-38.0055, -57.5426, "En Mar del Plata"));
+    const outside = await createReport(-38.0055, -57.5426, "En Mar del Plata");
     createdReportIds.push(outside.body.id);
 
     const res = await request(app).get("/api/geo/nearby?lat=-34.6037&lng=-58.3816&radius=5");
@@ -43,7 +52,7 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
   });
 
   test("GET /api/geo/nearby incluye las coordenadas lat/lng de cada reporte", async () => {
-    const created = await request(app).post("/api/reports").send(reportAt(-34.6037, -58.3816, "Con coordenadas"));
+    const created = await createReport(-34.6037, -58.3816, "Con coordenadas");
     createdReportIds.push(created.body.id);
 
     const res = await request(app).get("/api/geo/nearby?lat=-34.6037&lng=-58.3816&radius=5");
@@ -69,9 +78,9 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
   });
 
   test("GET /api/geo/map responde 200 con reportes dentro del bounding box y excluye los que quedan afuera", async () => {
-    const inside = await request(app).post("/api/reports").send(reportAt(-34.6037, -58.3816, "Dentro del bbox"));
+    const inside = await createReport(-34.6037, -58.3816, "Dentro del bbox");
     createdReportIds.push(inside.body.id);
-    const outside = await request(app).post("/api/reports").send(reportAt(-38.0055, -57.5426, "Fuera del bbox"));
+    const outside = await createReport(-38.0055, -57.5426, "Fuera del bbox");
     createdReportIds.push(outside.body.id);
 
     const res = await request(app).get("/api/geo/map?bounds=-34.7,-58.5,-34.5,-58.3");
@@ -82,7 +91,7 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
   });
 
   test("GET /api/geo/map incluye las coordenadas lat/lng de cada reporte", async () => {
-    const created = await request(app).post("/api/reports").send(reportAt(-34.6037, -58.3816, "Con coordenadas"));
+    const created = await createReport(-34.6037, -58.3816, "Con coordenadas");
     createdReportIds.push(created.body.id);
 
     const res = await request(app).get("/api/geo/map?bounds=-34.7,-58.5,-34.5,-58.3");
