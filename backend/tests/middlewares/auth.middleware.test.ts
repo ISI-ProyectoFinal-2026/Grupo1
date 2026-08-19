@@ -22,12 +22,9 @@ describe("requireAuth", () => {
     const req = buildReq(undefined);
     const next = jest.fn();
 
-    expect(() => requireAuth(req, {} as Response, next)).toThrow(AppError);
-    try {
-      requireAuth(req, {} as Response, next);
-    } catch (error) {
-      expect((error as AppError).statusCode).toBe(401);
-    }
+    expect(() => requireAuth(req, {} as Response, next)).toThrow(
+      expect.objectContaining({ statusCode: 401 })
+    );
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -48,22 +45,20 @@ describe("requireAuth", () => {
   });
 
   test("con token expirado tira AppError 401", () => {
-    const expiredToken = jwt.sign({ sub: "1", email: "a@example.com" }, process.env.JWT_SECRET!, {
+    const expiredToken = jwt.sign({ sub: 1, email: "a@example.com" }, process.env.JWT_SECRET!, {
       expiresIn: -1,
     });
     const req = buildReq(`Bearer ${expiredToken}`);
     const next = jest.fn();
 
-    expect(() => requireAuth(req, {} as Response, next)).toThrow(AppError);
-    try {
-      requireAuth(req, {} as Response, next);
-    } catch (error) {
-      expect((error as AppError).statusCode).toBe(401);
-    }
+    expect(() => requireAuth(req, {} as Response, next)).toThrow(
+      expect.objectContaining({ statusCode: 401 })
+    );
+    expect(next).not.toHaveBeenCalled();
   });
 
   test("con token válido cuelga userId en req y llama a next()", () => {
-    const validToken = jwt.sign({ sub: "42", email: "a@example.com" }, process.env.JWT_SECRET!, {
+    const validToken = jwt.sign({ sub: 42, email: "a@example.com" }, process.env.JWT_SECRET!, {
       expiresIn: "1h",
     });
     const req = buildReq(`Bearer ${validToken}`);
@@ -71,7 +66,7 @@ describe("requireAuth", () => {
 
     requireAuth(req, {} as Response, next);
 
-    expect(req.userId).toBe("42");
+    expect(req.userId).toBe(42);
     expect(next).toHaveBeenCalledTimes(1);
   });
 });

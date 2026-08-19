@@ -5,13 +5,13 @@ import { AppError } from "../errors/app-error";
 declare global {
   namespace Express {
     interface Request {
-      userId?: string;
+      userId?: number;
     }
   }
 }
 
 interface AccessTokenPayload {
-  sub: string;
+  sub: number;
   email: string;
 }
 
@@ -25,13 +25,16 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   const token = authHeader.slice("Bearer ".length);
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as AccessTokenPayload;
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as unknown as AccessTokenPayload;
     req.userId = payload.sub;
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       throw new AppError(401, "El token expiró, iniciá sesión nuevamente");
     }
-    throw new AppError(401, "Token inválido");
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw new AppError(401, "Token inválido");
+    }
+    throw error;
   }
 }
