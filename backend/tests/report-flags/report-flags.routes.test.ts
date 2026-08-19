@@ -67,11 +67,6 @@ describe("POST /api/reports/:id/flags", () => {
     expect(res.body.error).toBeDefined();
   });
 
-  test("POST /api/reports/:id/flags responde 400 si falta userId", async () => {
-    const res = await request(app).post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`).send({ reason: "Publicación falsa" });
-    expect(res.status).toBe(400);
-  });
-
   test("POST /api/reports/:id/flags responde 404 si el reporte no existe", async () => {
     const res = await request(app)
       .post("/api/reports/999999999/flags").set("Authorization", `Bearer ${token}`)

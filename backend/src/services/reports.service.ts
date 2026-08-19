@@ -2,7 +2,7 @@ import { Prisma, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import * as matchingService from "./matching.service";
-import { CreateReportInput, UpdateReportInput, ListReportsQuery, CloseReportInput } from "../validators/reports.validator";
+import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -96,7 +96,7 @@ export async function getById(id: number): Promise<ReportDTO> {
   return toReportDTO(rows[0]);
 }
 
-export async function create(data: CreateReportInput): Promise<ReportDTO> {
+export async function create(data: CreateReportInput & { userId: number }): Promise<ReportDTO> {
   const reportId = await prisma.$transaction(async (tx) => {
     let created;
     try {
@@ -146,7 +146,12 @@ export async function create(data: CreateReportInput): Promise<ReportDTO> {
   return report;
 }
 
-export async function update(id: number, data: UpdateReportInput): Promise<ReportDTO> {
+export async function update(id: number, userId: number, data: UpdateReportInput): Promise<ReportDTO> {
+  const existing = await getById(id);
+  if (existing.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para modificar este reporte");
+  }
+
   const { location, ...scalarData } = data;
 
   await prisma.$transaction(async (tx) => {
@@ -173,9 +178,9 @@ export async function update(id: number, data: UpdateReportInput): Promise<Repor
   return getById(id);
 }
 
-export async function close(id: number, data: CloseReportInput): Promise<ReportDTO> {
+export async function close(id: number, userId: number): Promise<ReportDTO> {
   const report = await getById(id);
-  if (report.userId !== data.userId) {
+  if (report.userId !== userId) {
     throw new AppError(403, "No tenés permiso para cerrar este reporte");
   }
   if (report.status === "resolved") {
@@ -185,7 +190,12 @@ export async function close(id: number, data: CloseReportInput): Promise<ReportD
   return getById(id);
 }
 
-export async function remove(id: number): Promise<void> {
+export async function remove(id: number, userId: number): Promise<void> {
+  const report = await getById(id);
+  if (report.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para eliminar este reporte");
+  }
+
   try {
     await prisma.report.delete({ where: { id } });
   } catch (error) {

@@ -15,12 +15,21 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     locationAddress: "Plaza de Mayo, CABA",
   };
 
+  let otherUserId: number;
+  let otherToken: string;
+
   beforeAll(async () => {
     const user = await prisma.user.create({
       data: { email: `reports-routes-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
     });
     userId = user.id;
     token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+
+    const otherUser = await prisma.user.create({
+      data: { email: `reports-routes-test-other-${Date.now()}@example.com`, passwordHash: "test-hash" },
+    });
+    otherUserId = otherUser.id;
+    otherToken = jwt.sign({ sub: otherUser.id, email: otherUser.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
   });
 
   afterEach(async () => {
@@ -32,6 +41,7 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
 
   afterAll(async () => {
     await prisma.user.delete({ where: { id: userId } });
+    await prisma.user.delete({ where: { id: otherUserId } });
     await prisma.$disconnect();
   });
 
@@ -55,11 +65,6 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   test("POST /api/reports responde 400 si falta title", async () => {
     const { title, ...withoutTitle } = baseReportData;
     const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...withoutTitle });
-    expect(res.status).toBe(400);
-  });
-
-  test("POST /api/reports responde 400 si el userId no existe", async () => {
-    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId: 999999999, ...baseReportData });
     expect(res.status).toBe(400);
   });
 
@@ -123,6 +128,16 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     expect(res.status).toBe(404);
   });
 
+  test("PUT /api/reports/:id responde 403 si el usuario no es el autor", async () => {
+    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+
+    const res = await request(app)
+      .put(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${otherToken}`)
+      .send({ title: "Robado" });
+    expect(res.status).toBe(403);
+  });
+
   test("DELETE /api/reports/:id elimina el reporte y responde 204", async () => {
     const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
     const res = await request(app).delete(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${token}`);
@@ -135,6 +150,14 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   test("DELETE /api/reports/:id responde 404 si no existe", async () => {
     const res = await request(app).delete("/api/reports/999999999").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(404);
+  });
+
+  test("DELETE /api/reports/:id responde 403 si el usuario no es el autor", async () => {
+    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+
+    const res = await request(app).delete(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${otherToken}`);
+    expect(res.status).toBe(403);
   });
 
   test("POST /api/reports responde con tag ENCONTRADO cuando reportType es found", async () => {
@@ -234,11 +257,11 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     expect(res.status).toBe(404);
   });
 
-  test("POST /api/reports/:id/close responde 403 si el userId no es el autor", async () => {
+  test("POST /api/reports/:id/close responde 403 si el usuario no es el autor", async () => {
     const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
     createdReportIds.push(created.body.id);
 
-    const res = await request(app).post(`/api/reports/${created.body.id}/close`).set("Authorization", `Bearer ${token}`).send({ userId: userId + 1 });
+    const res = await request(app).post(`/api/reports/${created.body.id}/close`).set("Authorization", `Bearer ${otherToken}`).send({});
     expect(res.status).toBe(403);
   });
 

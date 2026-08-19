@@ -141,7 +141,7 @@ describe("reports.service", () => {
     const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
-    const updated = await reportsService.update(report.id, { title: "Actualizado" });
+    const updated = await reportsService.update(report.id, userId, { title: "Actualizado" });
     expect(updated.title).toBe("Actualizado");
   });
 
@@ -149,23 +149,39 @@ describe("reports.service", () => {
     const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
-    const updated = await reportsService.update(report.id, { location: { lat: 10, lng: 20 } });
+    const updated = await reportsService.update(report.id, userId, { location: { lat: 10, lng: 20 } });
     expect(updated.location?.lat).toBeCloseTo(10, 5);
     expect(updated.location?.lng).toBeCloseTo(20, 5);
   });
 
   test("update() lanza AppError 404 si no existe", async () => {
-    await expect(reportsService.update(-1, { title: "x" })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(reportsService.update(-1, userId, { title: "x" })).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test("update() lanza AppError 403 si el userId no es el autor", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    await expect(reportsService.update(report.id, userId + 1, { title: "x" })).rejects.toMatchObject({
+      statusCode: 403,
+    });
   });
 
   test("remove() elimina el reporte", async () => {
     const report = await reportsService.create({ userId, ...baseReportData });
-    await reportsService.remove(report.id);
+    await reportsService.remove(report.id, userId);
     await expect(reportsService.getById(report.id)).rejects.toMatchObject({ statusCode: 404 });
   });
 
   test("remove() lanza AppError 404 si no existe", async () => {
-    await expect(reportsService.remove(-1)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(reportsService.remove(-1, userId)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test("remove() lanza AppError 403 si el userId no es el autor", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    await expect(reportsService.remove(report.id, userId + 1)).rejects.toMatchObject({ statusCode: 403 });
   });
 
   test("create() con reportType found expone tag ENCONTRADO", async () => {
@@ -184,7 +200,7 @@ describe("reports.service", () => {
     const report = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
     createdReportIds.push(report.id);
 
-    const updated = await reportsService.update(report.id, { status: "resolved" });
+    const updated = await reportsService.update(report.id, userId, { status: "resolved" });
     expect(updated.tag.label).toBe("RESUELTO");
   });
 
@@ -230,7 +246,7 @@ describe("reports.service", () => {
     createdReportIds.push(lost.id);
     const found = await reportsService.create({ userId, ...baseReportData, reportType: "found" });
     createdReportIds.push(found.id);
-    const resolved = await reportsService.update(found.id, { status: "resolved" });
+    const resolved = await reportsService.update(found.id, userId, { status: "resolved" });
 
     const colors = new Set([lost.tag.color, found.tag.color, resolved.tag.color]);
     expect(colors.size).toBe(3);
@@ -241,7 +257,7 @@ describe("reports.service", () => {
     createdReportIds.push(published.id);
     const resolved = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(resolved.id);
-    await reportsService.update(resolved.id, { status: "resolved" });
+    await reportsService.update(resolved.id, userId, { status: "resolved" });
 
     const activeFeed = await reportsService.list();
     expect(activeFeed.some((r) => r.id === published.id)).toBe(true);
@@ -309,7 +325,7 @@ describe("reports.service", () => {
     const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
-    const closed = await reportsService.close(report.id, { userId });
+    const closed = await reportsService.close(report.id, userId);
     expect(closed.status).toBe("resolved");
     expect(closed.tag.label).toBe("RESUELTO");
   });
@@ -318,29 +334,29 @@ describe("reports.service", () => {
     const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
-    await reportsService.close(report.id, { userId });
+    await reportsService.close(report.id, userId);
 
     const feed = await reportsService.list();
     expect(feed.some((r) => r.id === report.id)).toBe(false);
   });
 
   test("close() lanza AppError 404 si el reporte no existe", async () => {
-    await expect(reportsService.close(-1, { userId })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(reportsService.close(-1, userId)).rejects.toMatchObject({ statusCode: 404 });
   });
 
   test("close() lanza AppError 403 si el userId no es el autor", async () => {
     const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
-    await expect(reportsService.close(report.id, { userId: userId + 1 })).rejects.toMatchObject({ statusCode: 403 });
+    await expect(reportsService.close(report.id, userId + 1)).rejects.toMatchObject({ statusCode: 403 });
   });
 
   test("close() lanza AppError 409 si el reporte ya está resuelto", async () => {
     const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
-    await reportsService.close(report.id, { userId });
+    await reportsService.close(report.id, userId);
 
-    await expect(reportsService.close(report.id, { userId })).rejects.toMatchObject({ statusCode: 409 });
+    await expect(reportsService.close(report.id, userId)).rejects.toMatchObject({ statusCode: 409 });
   });
 
   test("list() ordena por fecha, DESC por defecto y ASC cuando se pide", async () => {

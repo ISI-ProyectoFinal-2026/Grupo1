@@ -15,6 +15,9 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
     photoUrls: ["https://cdn.example.com/foto1.jpg"],
   };
 
+  let otherUserId: number;
+  let otherToken: string;
+
   beforeAll(async () => {
     const user = await prisma.user.create({
       data: {
@@ -24,6 +27,15 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
     });
     userId = user.id;
     token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+
+    const otherUser = await prisma.user.create({
+      data: {
+        email: `pets-routes-test-other-${Date.now()}@example.com`,
+        passwordHash: "test-hash",
+      },
+    });
+    otherUserId = otherUser.id;
+    otherToken = jwt.sign({ sub: otherUser.id, email: otherUser.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
   });
 
   afterEach(async () => {
@@ -35,6 +47,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
   afterAll(async () => {
     await prisma.user.delete({ where: { id: userId } });
+    await prisma.user.delete({ where: { id: otherUserId } });
     await prisma.$disconnect();
   });
 
@@ -154,6 +167,28 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   test("DELETE /api/pets/:id responde 404 si no existe", async () => {
     const res = await request(app).delete("/api/pets/999999999").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(404);
+  });
+
+  test("PUT /api/pets/:id responde 403 si el usuario no es el dueño", async () => {
+    const created = await request(app)
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
+      .send({ name: "Ajena", ...basePetData });
+    createdPetIds.push(created.body.id);
+
+    const res = await request(app)
+      .put(`/api/pets/${created.body.id}`).set("Authorization", `Bearer ${otherToken}`)
+      .send({ name: "Robada" });
+    expect(res.status).toBe(403);
+  });
+
+  test("DELETE /api/pets/:id responde 403 si el usuario no es el dueño", async () => {
+    const created = await request(app)
+      .post("/api/pets").set("Authorization", `Bearer ${token}`)
+      .send({ name: "Ajena", ...basePetData });
+    createdPetIds.push(created.body.id);
+
+    const res = await request(app).delete(`/api/pets/${created.body.id}`).set("Authorization", `Bearer ${otherToken}`);
+    expect(res.status).toBe(403);
   });
 
   describe("autenticación en /api/pets", () => {

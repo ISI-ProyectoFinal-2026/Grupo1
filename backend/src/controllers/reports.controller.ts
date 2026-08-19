@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import * as reportsService from "../services/reports.service";
 import * as matchingService from "../services/matching.service";
 import {
-  closeReportSchema,
   createReportSchema,
   listReportsQuerySchema,
   reportIdParamSchema,
@@ -17,7 +16,7 @@ export async function list(req: Request, res: Response): Promise<void> {
 
 export async function create(req: Request, res: Response): Promise<void> {
   const data = createReportSchema.parse(req.body);
-  const report = await reportsService.create(data);
+  const report = await reportsService.create({ ...data, userId: req.userId! });
   res.status(201).json(report);
 }
 
@@ -30,20 +29,19 @@ export async function getById(req: Request, res: Response): Promise<void> {
 export async function update(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
   const data = updateReportSchema.parse(req.body);
-  const report = await reportsService.update(id, data);
+  const report = await reportsService.update(id, req.userId!, data);
   res.status(200).json(report);
 }
 
 export async function remove(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
-  await reportsService.remove(id);
+  await reportsService.remove(id, req.userId!);
   res.status(204).send();
 }
 
 export async function close(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
-  const data = closeReportSchema.parse(req.body);
-  const report = await reportsService.close(id, data);
+  const report = await reportsService.close(id, req.userId!);
   res.status(200).json(report);
 }
 
