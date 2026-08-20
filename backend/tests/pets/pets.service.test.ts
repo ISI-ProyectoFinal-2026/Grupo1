@@ -80,23 +80,37 @@ describe("pets.service", () => {
     const pet = await petsService.create({ userId, name: "Original", ...basePetData });
     createdPetIds.push(pet.id);
 
-    const updated = await petsService.update(pet.id, { name: "Actualizada" });
+    const updated = await petsService.update(pet.id, userId, { name: "Actualizada" });
     expect(updated.name).toBe("Actualizada");
   });
 
   test("update() lanza AppError 404 si no existe", async () => {
-    await expect(petsService.update(-1, { name: "x" })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(petsService.update(-1, userId, { name: "x" })).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test("update() lanza AppError 403 si el userId no es el dueño", async () => {
+    const pet = await petsService.create({ userId, name: "Ajena", ...basePetData });
+    createdPetIds.push(pet.id);
+
+    await expect(petsService.update(pet.id, userId + 1, { name: "x" })).rejects.toMatchObject({ statusCode: 403 });
   });
 
   test("remove() elimina la mascota", async () => {
     const pet = await petsService.create({ userId, name: "A borrar", ...basePetData });
 
-    await petsService.remove(pet.id);
+    await petsService.remove(pet.id, userId);
 
     await expect(petsService.getById(pet.id)).rejects.toMatchObject({ statusCode: 404 });
   });
 
   test("remove() lanza AppError 404 si no existe", async () => {
-    await expect(petsService.remove(-1)).rejects.toMatchObject({ statusCode: 404 });
+    await expect(petsService.remove(-1, userId)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test("remove() lanza AppError 403 si el userId no es el dueño", async () => {
+    const pet = await petsService.create({ userId, name: "Ajena", ...basePetData });
+    createdPetIds.push(pet.id);
+
+    await expect(petsService.remove(pet.id, userId + 1)).rejects.toMatchObject({ statusCode: 403 });
   });
 });

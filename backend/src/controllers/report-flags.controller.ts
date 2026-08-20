@@ -5,6 +5,6 @@ import { createReportFlagSchema, reportFlagReportIdParamSchema } from "../valida
 export async function create(req: Request, res: Response): Promise<void> {
   const { id } = reportFlagReportIdParamSchema.parse(req.params);
   const data = createReportFlagSchema.parse(req.body);
-  const flag = await reportFlagsService.create(id, data);
+  const flag = await reportFlagsService.create(id, { ...data, userId: req.userId! });
   res.status(201).json(flag);
 }

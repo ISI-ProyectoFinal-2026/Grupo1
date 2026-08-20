@@ -1,4 +1,5 @@
 import request from "supertest";
+import jwt from "jsonwebtoken";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 const getSignedUrlMock = jest.fn();
@@ -33,9 +34,25 @@ describe("POST /api/uploads/presign", () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { app } = require("../../src/app");
 
+  // generated after requiring app.ts above, since that's what triggers
+  // dotenv/config to load JWT_SECRET from .env
+  const token = jwt.sign({ sub: "1", email: "uploads-test@example.com" }, process.env.JWT_SECRET!, {
+    expiresIn: "1h",
+  });
+
+  test("responde 401 sin token de autenticación", async () => {
+    const res = await request(app)
+      .post("/api/uploads/presign")
+      .send({ fileName: "foto.jpg", contentType: "image/jpeg", fileSize: 1_000_000 });
+
+    expect(res.status).toBe(401);
+    expect(getSignedUrlMock).not.toHaveBeenCalled();
+  });
+
   test("responde 400 si contentType no está soportado", async () => {
     const res = await request(app)
       .post("/api/uploads/presign")
+      .set("Authorization", `Bearer ${token}`)
       .send({ fileName: "foto.gif", contentType: "image/gif" });
 
     expect(res.status).toBe(400);
@@ -44,7 +61,10 @@ describe("POST /api/uploads/presign", () => {
   });
 
   test("responde 400 si falta fileName o contentType", async () => {
-    const res = await request(app).post("/api/uploads/presign").send({ fileName: "foto.jpg" });
+    const res = await request(app)
+      .post("/api/uploads/presign")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ fileName: "foto.jpg" });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
@@ -53,6 +73,7 @@ describe("POST /api/uploads/presign", () => {
   test("responde 201 con uploadUrl, publicUrl y key para un input válido", async () => {
     const res = await request(app)
       .post("/api/uploads/presign")
+      .set("Authorization", `Bearer ${token}`)
       .send({ fileName: "foto.jpg", contentType: "image/jpeg", fileSize: 1_000_000 });
 
     expect(res.status).toBe(201);

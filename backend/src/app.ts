@@ -7,6 +7,10 @@ import { reportsRouter } from "./routes/reports.routes";
 import { geoRouter } from "./routes/geo.routes";
 import { errorHandler } from "./middlewares/error-handler";
 
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET no está definida. Configurá la variable de entorno antes de iniciar el servidor.");
+}
+
 export const app = express();
 
 app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173" }));
