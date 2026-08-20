@@ -36,7 +36,7 @@
     "@types/node": "^20.14.0",
     "@types/supertest": "^7.2.1",
     "jest": "^30.4.2",
-    "prisma": "^5.20.0",
+    "prisma": "^7.9.1",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2",
