@@ -31,6 +31,7 @@ model User {
   chatsAsUserA  Chat[]          @relation("ChatUserA")
   chatsAsUserB  Chat[]          @relation("ChatUserB")
   reportFlags   ReportFlag[]
+  business      Business?
 
   @@map("users")
 }
@@ -209,4 +210,38 @@ model Notification {
 
   @@index([userId])
   @@map("notifications")
+}
+
+enum BusinessCategory {
+  VETERINARIA
+  REFUGIO
+  PET_SHOP
+  OTRO
+
+  @@map("business_category")
+}
+
+enum BusinessPlan {
+  FREE
+  PRO
+  PREMIUM
+
+  @@map("business_plan")
+}
+
+model Business {
+  id            Int              @id @default(autoincrement())
+  userId        Int              @unique @map("user_id")
+  name          String
+  cuit          String           @unique
+  address       String
+  phone         String
+  category      BusinessCategory
+  plan          BusinessPlan     @default(FREE)
+  planExpiresAt DateTime?        @map("plan_expires_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("businesses")
 }
