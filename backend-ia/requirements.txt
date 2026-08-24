@@ -11,7 +11,7 @@ pydantic-settings==2.15.0
 torch==2.13.0
 torchvision==0.28.0
 open_clip_torch==2.24.0
-ultralytics==8.3.28
+ultralytics==8.4.124
 pillow==10.4.0
 httpx==0.28.1
 numpy==2.1.3
