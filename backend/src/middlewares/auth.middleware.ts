@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { AppError } from "../errors/app-error";
+import { verifyAccessToken } from "../utils/jwt";
 
 declare global {
   namespace Express {
@@ -8,11 +9,6 @@ declare global {
       userId?: number;
     }
   }
-}
-
-interface AccessTokenPayload {
-  sub: number;
-  email: string;
 }
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
@@ -25,7 +21,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   const token = authHeader.slice("Bearer ".length);
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as unknown as AccessTokenPayload;
+    const payload = verifyAccessToken(token);
     req.userId = payload.sub;
     next();
   } catch (error) {
