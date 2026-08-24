@@ -11,7 +11,7 @@ export function list() {
   return prisma.pet.findMany();
 }
 
-export async function create(data: CreatePetInput) {
+export async function create(data: CreatePetInput & { userId: number }) {
   try {
     return await prisma.pet.create({ data });
   } catch (error) {
@@ -30,7 +30,12 @@ export async function getById(id: number) {
   return pet;
 }
 
-export async function update(id: number, data: UpdatePetInput) {
+export async function update(id: number, userId: number, data: UpdatePetInput) {
+  const pet = await getById(id);
+  if (pet.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para modificar esta mascota");
+  }
+
   try {
     return await prisma.pet.update({ where: { id }, data });
   } catch (error) {
@@ -41,7 +46,12 @@ export async function update(id: number, data: UpdatePetInput) {
   }
 }
 
-export async function remove(id: number) {
+export async function remove(id: number, userId: number) {
+  const pet = await getById(id);
+  if (pet.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para eliminar esta mascota");
+  }
+
   try {
     await prisma.pet.delete({ where: { id } });
   } catch (error) {

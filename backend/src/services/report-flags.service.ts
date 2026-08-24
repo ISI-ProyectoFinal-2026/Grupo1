@@ -7,7 +7,7 @@ function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
 }
 
-export async function create(reportId: number, data: CreateReportFlagInput): Promise<ReportFlag> {
+export async function create(reportId: number, data: CreateReportFlagInput & { userId: number }): Promise<ReportFlag> {
   const report = await prisma.report.findUnique({ where: { id: reportId } });
   if (!report) {
     throw new AppError(404, "Reporte no encontrado");

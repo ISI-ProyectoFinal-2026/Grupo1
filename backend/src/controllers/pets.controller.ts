@@ -9,7 +9,7 @@ export async function list(_req: Request, res: Response): Promise<void> {
 
 export async function create(req: Request, res: Response): Promise<void> {
   const data = createPetSchema.parse(req.body);
-  const pet = await petsService.create(data);
+  const pet = await petsService.create({ ...data, userId: req.userId! });
   res.status(201).json(pet);
 }
 
@@ -22,12 +22,12 @@ export async function getById(req: Request, res: Response): Promise<void> {
 export async function update(req: Request, res: Response): Promise<void> {
   const { id } = petIdParamSchema.parse(req.params);
   const data = updatePetSchema.parse(req.body);
-  const pet = await petsService.update(id, data);
+  const pet = await petsService.update(id, req.userId!, data);
   res.status(200).json(pet);
 }
 
 export async function remove(req: Request, res: Response): Promise<void> {
   const { id } = petIdParamSchema.parse(req.params);
-  await petsService.remove(id);
+  await petsService.remove(id, req.userId!);
   res.status(204).send();
 }

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const createPetSchema = z.object({
-  userId: z.number().int().positive(),
   name: z.string().min(1),
   species: z.string().min(1).optional(),
   breed: z.string().min(1),
@@ -12,7 +11,7 @@ export const createPetSchema = z.object({
   microchipId: z.string().min(1).optional(),
 });
 
-export const updatePetSchema = createPetSchema.omit({ userId: true }).partial();
+export const updatePetSchema = createPetSchema.partial();
 
 export const petIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),

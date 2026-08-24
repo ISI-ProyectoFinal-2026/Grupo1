@@ -24,13 +24,33 @@ import { prisma } from "../db/client";
  * ya lee `reports` directamente vía SQL crudo en listMatches, así que una
  * escritura directa con Prisma acá es consistente con el layering existente.
  */
+const RETRY_DELAYS_MS = [1_000, 5_000, 30_000];
+
+async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fetch(url, options);
+    } catch (err) {
+      lastError = err;
+      if (attempt < RETRY_DELAYS_MS.length - 1) {
+        await new Promise((res) => setTimeout(res, RETRY_DELAYS_MS[attempt]));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): void {
   const baseUrl = process.env.AI_SERVICE_URL;
   if (!baseUrl) return;
 
-  fetch(`${baseUrl}/reports/${reportId}/embedding`, {
+  fetchWithRetry(`${baseUrl}/reports/${reportId}/embedding`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Internal-Key": process.env.INTERNAL_API_KEY ?? "",
+    },
     body: JSON.stringify({ image_url: imageUrl }),
   })
     .then(async (response) => {
@@ -40,8 +60,9 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
         await prisma.report.update({ where: { id: reportId }, data: { status: "rejected" } });
       }
     })
-    .catch((error) => {
-      console.error(`[matching] fallo al generar embedding para report ${reportId}:`, error);
+    .catch(async (error) => {
+      console.error(`[matching] fallo al generar embedding para report ${reportId} tras ${RETRY_DELAYS_MS.length} intentos:`, error);
+      await prisma.report.update({ where: { id: reportId }, data: { status: "rejected" } });
     });
 }
 
