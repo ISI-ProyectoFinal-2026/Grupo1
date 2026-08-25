@@ -11,12 +11,15 @@ import { prisma } from "../db/client";
  *
  * Moderación de contenido (POC, issue #19): el Backend IA responde 201
  * cuando detectó una mascota y generó el embedding, y 422 cuando no
- * detectó ninguna mascota en la imagen (contenido irrelevante). Usamos
- * ese código de estado para resolver el reporte fuera de "pending":
- * 201 -> published, 422 -> rejected. Cualquier otro resultado (otro
- * status HTTP, o el fetch rechazando por falla de red) es inconcluso,
- * no un veredicto de moderación: se loguea y el reporte queda "pending"
+ * detectó ninguna mascota en la imagen (contenido irrelevante). Solo
+ * esos dos códigos son un veredicto de moderación y resuelven el reporte
+ * fuera de "pending": 201 -> published, 422 -> rejected.
+ *
+ * Cualquier otro resultado (otro status HTTP, o el fetch rechazando por
+ * falla de red) es INCONCLUSO: se loguea y el reporte queda "pending"
  * para revisión manual, sin lanzar ni generar un unhandled rejection.
+ * Rechazar ante una caída del Backend IA descartaría reportes legítimos
+ * de forma permanente y silenciosa (issue #125).
  *
  * La actualización se hace acá con Prisma directo (no llamando de vuelta
  * a reports.service.ts) porque reports.service.ts ya importa este módulo;
@@ -26,17 +29,37 @@ import { prisma } from "../db/client";
  */
 const RETRY_DELAYS_MS = [1_000, 5_000, 30_000];
 
+/**
+ * Reintenta tanto ante una falla de red (fetch que rechaza) como ante un 5xx,
+ * porque un 502/503 del Backend IA es igual de transitorio que un socket caído
+ * y antes se descartaba en el primer intento. Un 4xx, en cambio, es una
+ * respuesta deliberada del servicio: se devuelve tal cual, sin reintentar.
+ *
+ * Si se agotan los intentos con un 5xx se devuelve esa última respuesta, para
+ * que el llamador la trate como inconclusa por la misma vía que cualquier otro
+ * status inesperado.
+ */
 async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
   let lastError: unknown;
+  let lastResponse: Response | undefined;
+
   for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
     try {
-      return await fetch(url, options);
+      const response = await fetch(url, options);
+      if (response.status < 500) {
+        return response;
+      }
+      lastResponse = response;
     } catch (err) {
       lastError = err;
-      if (attempt < RETRY_DELAYS_MS.length - 1) {
-        await new Promise((res) => setTimeout(res, RETRY_DELAYS_MS[attempt]));
-      }
     }
+    if (attempt < RETRY_DELAYS_MS.length - 1) {
+      await new Promise((res) => setTimeout(res, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+
+  if (lastResponse) {
+    return lastResponse;
   }
   throw lastError;
 }
@@ -55,14 +78,25 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
   })
     .then(async (response) => {
       if (response.status === 201) {
-        await prisma.report.update({ where: { id: reportId }, data: { status: "published" } });
+        // publishedAt se sella acá y no en la creación, porque hasta este
+        // momento el reporte nunca estuvo publicado.
+        await prisma.report.update({
+          where: { id: reportId },
+          data: { status: "published", publishedAt: new Date() },
+        });
       } else if (response.status === 422) {
         await prisma.report.update({ where: { id: reportId }, data: { status: "rejected" } });
+      } else {
+        console.error(
+          `[matching] respuesta inconclusa del Backend IA para report ${reportId} (status ${response.status}); queda en pending para revisión manual`
+        );
       }
     })
-    .catch(async (error) => {
-      console.error(`[matching] fallo al generar embedding para report ${reportId} tras ${RETRY_DELAYS_MS.length} intentos:`, error);
-      await prisma.report.update({ where: { id: reportId }, data: { status: "rejected" } });
+    .catch((error) => {
+      console.error(
+        `[matching] fallo al generar embedding para report ${reportId} tras ${RETRY_DELAYS_MS.length} intentos; queda en pending para revisión manual:`,
+        error
+      );
     });
 }
 

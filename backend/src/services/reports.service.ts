@@ -114,7 +114,10 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
           description: data.description ?? null,
           imageUrl: data.imageUrl ?? null,
           locationAddress: data.locationAddress ?? null,
-          publishedAt: new Date(),
+          // Solo se sella la fecha si el reporte nace publicado. Si queda en
+          // "pending", lo publica (y sella la fecha) matching.service al recibir
+          // el veredicto del Backend IA.
+          publishedAt: data.imageUrl ? null : new Date(),
         },
       });
     } catch (error) {

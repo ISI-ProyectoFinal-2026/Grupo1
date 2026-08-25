@@ -234,6 +234,15 @@ describe("reports.service", () => {
     expect(report.status).toBe("pending");
   });
 
+  test("create() deja publishedAt en null mientras el reporte está pendiente de moderación", async () => {
+    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    createdReportIds.push(report.id);
+
+    // Un reporte en "pending" todavía no se publicó: sellar la fecha acá hacía
+    // que el detalle mostrara "Publicado: <fecha>" para algo que nunca lo estuvo.
+    expect(report.publishedAt).toBeNull();
+  });
+
   test("create() inserta con status published cuando no se provee imageUrl (nada que validar)", async () => {
     const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);

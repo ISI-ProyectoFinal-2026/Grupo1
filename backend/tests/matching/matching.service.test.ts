@@ -50,7 +50,11 @@ describe("matching.service", () => {
     triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(updateSpy).toHaveBeenCalledWith({ where: { id: 42 }, data: { status: "published" } });
+    // publishedAt se sella recien acá, no en la creación del reporte.
+    expect(updateSpy).toHaveBeenCalledWith({
+      where: { id: 42 },
+      data: { status: "published", publishedAt: expect.any(Date) },
+    });
   });
 
   test("fetch resuelve con status 422 (sin mascota detectada) -> marca el reporte como rejected", async () => {
@@ -63,17 +67,32 @@ describe("matching.service", () => {
     expect(updateSpy).toHaveBeenCalledWith({ where: { id: 42 }, data: { status: "rejected" } });
   });
 
-  test("fetch resuelve con un status distinto de 201/422 -> no actualiza el status del reporte", async () => {
+  test("un 5xx es transitorio: reintenta y publica si un intento posterior responde 201", async () => {
+    jest.useFakeTimers();
     process.env.AI_SERVICE_URL = "http://localhost:8000";
-    fetchMock.mockResolvedValue({ status: 500 });
+    fetchMock.mockResolvedValueOnce({ status: 503 }).mockResolvedValueOnce({ status: 201 });
+
+    triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    await jest.runAllTimersAsync();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy.mock.calls[0][0].data.status).toBe("published");
+    jest.useRealTimers();
+  });
+
+  test("un 4xx distinto de 422 no es un veredicto de moderación: no reintenta ni toca el status", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue({ status: 400 });
 
     expect(() => triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg")).not.toThrow();
     await new Promise((resolve) => setImmediate(resolve));
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  test("un fetch que rechaza no lanza, agota los reintentos y pasa el reporte a rejected", async () => {
+  test("agotar los reintentos por falla de red deja el reporte en pending, no lo rechaza", async () => {
     jest.useFakeTimers();
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockRejectedValue(new Error("network down"));
@@ -83,7 +102,22 @@ describe("matching.service", () => {
     // avanza todos los timers de retry (1s + 5s) y espera que las promesas se resuelvan
     await jest.runAllTimersAsync();
 
-    expect(updateSpy).toHaveBeenCalledWith({ where: { id: 1 }, data: { status: "rejected" } });
+    // Una caída del Backend IA no es un veredicto de moderación: rechazar acá
+    // descartaría reportes legítimos de forma permanente y silenciosa.
+    expect(updateSpy).not.toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
+  test("agotar los reintentos por 5xx deja el reporte en pending", async () => {
+    jest.useFakeTimers();
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue({ status: 502 });
+
+    triggerEmbeddingGeneration(1, "https://cdn.example.com/foto.jpg");
+    await jest.runAllTimersAsync();
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(updateSpy).not.toHaveBeenCalled();
     jest.useRealTimers();
   });
 });
