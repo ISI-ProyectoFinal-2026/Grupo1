@@ -31,8 +31,14 @@ interface SocketData {
 export type ChatServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 type ChatSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 
-function chatRoom(chatId: number): string {
+export function chatRoom(chatId: number): string {
   return `chat:${chatId}`;
+}
+
+let chatIO: ChatServer | undefined;
+
+export function getChatIO(): ChatServer | undefined {
+  return chatIO;
 }
 
 function toErrorMessage(error: unknown): string {
@@ -68,6 +74,7 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
   const io: ChatServer = new Server(httpServer, {
     cors: { origin: process.env.FRONTEND_URL || "http://localhost:5173" },
   });
+  chatIO = io;
 
   io.use((socket, next) => {
     const token = extractToken(socket);

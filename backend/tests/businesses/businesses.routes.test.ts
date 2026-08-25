@@ -12,11 +12,14 @@ describe("POST/GET/PUT /api/businesses", () => {
 
   const baseBusinessData = {
     name: "Refugio Patitas Felices",
-    cuit: "30712345678",
     address: "Ruta 8 km 45",
     phone: "1133445566",
     category: "REFUGIO",
   };
+
+  function uniqueCuit(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 
   beforeAll(async () => {
     const user = await prisma.user.create({
@@ -51,7 +54,7 @@ describe("POST/GET/PUT /api/businesses", () => {
     const res = await request(app)
       .post("/api/businesses")
       .set("Authorization", `Bearer ${token}`)
-      .send(baseBusinessData);
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
 
     expect(res.status).toBe(201);
     expect(res.body.userId).toBe(userId);
@@ -78,7 +81,7 @@ describe("POST/GET/PUT /api/businesses", () => {
     const created = await request(app)
       .post("/api/businesses")
       .set("Authorization", `Bearer ${token}`)
-      .send(baseBusinessData);
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(created.body.id);
 
     const res = await request(app).get("/api/businesses/me").set("Authorization", `Bearer ${token}`);
@@ -102,7 +105,7 @@ describe("POST/GET/PUT /api/businesses", () => {
     const created = await request(app)
       .post("/api/businesses")
       .set("Authorization", `Bearer ${token}`)
-      .send(baseBusinessData);
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(created.body.id);
 
     const res = await request(app)
@@ -126,7 +129,7 @@ describe("POST/GET/PUT /api/businesses", () => {
     const created = await request(app)
       .post("/api/businesses")
       .set("Authorization", `Bearer ${token}`)
-      .send(baseBusinessData);
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(created.body.id);
 
     const res = await request(app).get("/api/businesses/me/stats").set("Authorization", `Bearer ${token}`);

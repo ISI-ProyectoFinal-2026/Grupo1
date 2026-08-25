@@ -6,6 +6,7 @@ import { uploadsRouter } from "./routes/uploads.routes";
 import { reportsRouter } from "./routes/reports.routes";
 import { geoRouter } from "./routes/geo.routes";
 import { businessesRouter } from "./routes/businesses.routes";
+import { chatsRouter } from "./routes/chats.routes";
 import { errorHandler } from "./middlewares/error-handler";
 
 if (!process.env.JWT_SECRET) {
@@ -23,6 +24,7 @@ app.use("/api/uploads", uploadsRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/geo", geoRouter);
 app.use("/api/businesses", businessesRouter);
+app.use("/api/chats", chatsRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: { message: "Recurso no encontrado" } });
