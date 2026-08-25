@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { AppError } from "../errors/app-error";
 import { PresignUploadInput } from "../validators/uploads.validator";
 
 const PRESIGN_EXPIRY_SECONDS = 300;
@@ -10,6 +11,32 @@ const CONTENT_TYPE_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
+
+const REQUIRED_R2_VARS = [
+  "R2_ENDPOINT",
+  "R2_BUCKET_NAME",
+  "R2_PUBLIC_URL",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+] as const;
+
+/**
+ * Sin esta guarda, un .env sin las claves de R2 llega hasta el SDK de AWS y
+ * revienta con "No value provided for input HTTP label: Bucket", un 500 mudo
+ * que no dice cuál es la variable que falta. Se valida acá y no al arrancar el
+ * server para que el resto de la API siga levantando en entornos de desarrollo
+ * donde todavía no se configuró el bucket.
+ */
+function assertR2Configured(): void {
+  const missing = REQUIRED_R2_VARS.filter((name) => !process.env[name]);
+  if (missing.length > 0) {
+    throw new AppError(
+      503,
+      "El servicio de almacenamiento de imágenes no está configurado",
+      { missingEnvVars: missing }
+    );
+  }
+}
 
 function getS3Client(): S3Client {
   return new S3Client({
@@ -34,6 +61,8 @@ export interface PresignedUpload {
 }
 
 export async function createPresignedUpload(data: PresignUploadInput): Promise<PresignedUpload> {
+  assertR2Configured();
+
   const key = buildObjectKey(data.contentType);
   const client = getS3Client();
 
