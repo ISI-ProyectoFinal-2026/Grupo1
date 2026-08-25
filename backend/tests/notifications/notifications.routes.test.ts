@@ -159,4 +159,70 @@ describe("/api/notifications", () => {
     const deleted = await prisma.notification.findUnique({ where: { id: notification.id } });
     expect(deleted).toBeNull();
   });
+
+  describe("POST /api/notifications/internal/match", () => {
+    const originalKey = process.env.INTERNAL_API_KEY;
+
+    beforeAll(() => {
+      process.env.INTERNAL_API_KEY = "test-internal-key";
+    });
+
+    afterAll(() => {
+      if (originalKey === undefined) {
+        delete process.env.INTERNAL_API_KEY;
+      } else {
+        process.env.INTERNAL_API_KEY = originalKey;
+      }
+    });
+
+    afterEach(async () => {
+      await prisma.notification.deleteMany({ where: { type: "match_suggested" } });
+    });
+
+    test("responde 401 si falta el header X-Internal-Key", async () => {
+      const res = await request(app)
+        .post("/api/notifications/internal/match")
+        .send({ lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 });
+
+      expect(res.status).toBe(401);
+    });
+
+    test("responde 401 si el header X-Internal-Key es incorrecto", async () => {
+      const res = await request(app)
+        .post("/api/notifications/internal/match")
+        .set("X-Internal-Key", "clave-incorrecta")
+        .send({ lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 });
+
+      expect(res.status).toBe(401);
+    });
+
+    test("crea una notificación para cada dueño de los reportes con la clave correcta", async () => {
+      const res = await request(app)
+        .post("/api/notifications/internal/match")
+        .set("X-Internal-Key", "test-internal-key")
+        .send({ lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 });
+
+      expect(res.status).toBe(201);
+      expect(res.body).toHaveLength(2);
+
+      const notifications = await prisma.notification.findMany({
+        where: { type: "match_suggested", userId: { in: [userId, otherUserId] } },
+      });
+      expect(notifications).toHaveLength(2);
+
+      const forOwner = notifications.find((n) => n.userId === userId);
+      const forOtherOwner = notifications.find((n) => n.userId === otherUserId);
+      expect(forOwner?.reportId).toBe(otherReportId);
+      expect(forOtherOwner?.reportId).toBe(reportId);
+    });
+
+    test("responde 400 si el body es inválido", async () => {
+      const res = await request(app)
+        .post("/api/notifications/internal/match")
+        .set("X-Internal-Key", "test-internal-key")
+        .send({ lostReportId: reportId });
+
+      expect(res.status).toBe(400);
+    });
+  });
 });
