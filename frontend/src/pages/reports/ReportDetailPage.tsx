@@ -1,18 +1,20 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { getReport } from "@/services/reports.service";
+import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
+import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
+import PendingBanner from "@/components/reports/PendingBanner";
+import MatchCard from "@/components/reports/MatchCard";
 
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: report, isLoading, error } = useQuery({
-    queryKey: ["report", id],
-    queryFn: () => getReport(Number(id)),
-    enabled: !!id,
-  });
+  const { data: report, isLoading, error } = useReportDetailQuery(id ? Number(id) : undefined);
+  const { data: matches, isLoading: isLoadingMatches } = useReportMatchesQuery(
+    id ? Number(id) : undefined,
+    report?.status,
+  );
 
   if (isLoading) {
     return (
@@ -126,6 +128,31 @@ export default function ReportDetailPage() {
             <p className="text-sm text-gray-500">
               Estado: <span className="font-semibold text-gray-900">{report.status}</span>
             </p>
+          </div>
+
+          <div className="border-t pt-6 mt-6">
+            {report.status === "pending" ? (
+              <PendingBanner />
+            ) : (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                  Coincidencias sugeridas
+                </h3>
+                {isLoadingMatches ? (
+                  <div className="flex justify-center py-4">
+                    <Spinner size="sm" />
+                  </div>
+                ) : matches && matches.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {matches.map((match) => (
+                      <MatchCard key={match.reportId} match={match} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No se encontraron coincidencias todavía</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
