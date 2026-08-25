@@ -1,5 +1,6 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth.store";
+import { Outlet } from 'react-router-dom'
 
 function MainLayout() {
   const navigate = useNavigate();
@@ -27,12 +28,15 @@ function MainLayout() {
             </button>
           </div>
         )}
+    <div className='flex min-h-screen flex-col'>
+      <nav className='border-b border-gray-200 px-6 py-4'>
+        <span className='text-lg font-semibold text-gray-900'>PATITAS</span>
       </nav>
-      <main className="flex-1">
+      <main className='flex-1'>
         <Outlet />
       </main>
     </div>
-  );
+  )
 }
 
-export default MainLayout;
+export default MainLayout
