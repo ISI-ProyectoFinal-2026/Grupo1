@@ -1,6 +1,6 @@
 export interface ApiError {
   error: {
-    message: string;
-    details?: Array<{ path: string; message: string }>;
-  };
+    message: string
+    details?: Array<{ path: string; message: string }>
+  }
 }
