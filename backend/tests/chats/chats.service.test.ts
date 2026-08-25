@@ -74,4 +74,89 @@ describe("chats.service", () => {
       expect(stored).not.toBeNull();
     });
   });
+
+  describe("getMessages()", () => {
+    test("devuelve los mensajes del chat ordenados por fecha de creación", async () => {
+      const first = await chatsService.createMessage(chatId, userAId, "primero");
+      const second = await chatsService.createMessage(chatId, userBId, "segundo");
+
+      const messages = await chatsService.getMessages(chatId);
+      const firstIndex = messages.findIndex((m) => m.id === first.id);
+      const secondIndex = messages.findIndex((m) => m.id === second.id);
+
+      expect(firstIndex).toBeGreaterThanOrEqual(0);
+      expect(secondIndex).toBeGreaterThan(firstIndex);
+    });
+  });
+
+  describe("listByUser()", () => {
+    test("devuelve los chats donde el usuario participa como userA o userB", async () => {
+      const chatsForA = await chatsService.listByUser(userAId);
+      expect(chatsForA.some((c) => c.id === chatId)).toBe(true);
+
+      const chatsForB = await chatsService.listByUser(userBId);
+      expect(chatsForB.some((c) => c.id === chatId)).toBe(true);
+    });
+
+    test("no devuelve chats de otros usuarios", async () => {
+      const chatsForOutsider = await chatsService.listByUser(outsiderId);
+      expect(chatsForOutsider.some((c) => c.id === chatId)).toBe(false);
+    });
+  });
+
+  describe("createChat()", () => {
+    let reportId: number;
+    const createdChatIds: number[] = [];
+
+    beforeAll(async () => {
+      const report = await prisma.report.create({
+        data: { userId: userAId, reportType: "lost", title: "Perro perdido" },
+      });
+      reportId = report.id;
+    });
+
+    afterEach(async () => {
+      while (createdChatIds.length > 0) {
+        const id = createdChatIds.pop()!;
+        await prisma.chat.deleteMany({ where: { id } });
+      }
+    });
+
+    afterAll(async () => {
+      await prisma.report.delete({ where: { id: reportId } });
+    });
+
+    test("crea el chat vinculado a los usuarios y al reporte", async () => {
+      const chat = await chatsService.createChat(outsiderId, userAId, reportId);
+      createdChatIds.push(chat.id);
+
+      expect(chat.userAId).toBe(outsiderId);
+      expect(chat.userBId).toBe(userAId);
+      expect(chat.reportId).toBe(reportId);
+    });
+
+    test("lanza AppError 409 si ya existe un chat entre los mismos usuarios", async () => {
+      const chat = await chatsService.createChat(outsiderId, userAId, reportId);
+      createdChatIds.push(chat.id);
+
+      await expect(chatsService.createChat(outsiderId, userAId, reportId)).rejects.toMatchObject({
+        statusCode: 409,
+      });
+    });
+
+    test("lanza AppError 409 si ya existe un chat entre los mismos usuarios en orden inverso", async () => {
+      const chat = await chatsService.createChat(outsiderId, userAId, reportId);
+      createdChatIds.push(chat.id);
+
+      await expect(chatsService.createChat(userAId, outsiderId, reportId)).rejects.toMatchObject({
+        statusCode: 409,
+      });
+    });
+
+    test("lanza AppError 400 si participantId no corresponde a un usuario existente", async () => {
+      await expect(chatsService.createChat(outsiderId, 999999999, reportId)).rejects.toMatchObject({
+        statusCode: 400,
+      });
+    });
+  });
 });

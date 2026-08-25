@@ -9,11 +9,14 @@ describe("businesses.service", () => {
 
   const baseBusinessData = {
     name: "Veterinaria San Roque",
-    cuit: "30712345678",
     address: "Av. Siempre Viva 123",
     phone: "1122334455",
     category: "VETERINARIA" as const,
   };
+
+  function uniqueCuit(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 
   beforeAll(async () => {
     const user = await prisma.user.create({
@@ -41,7 +44,7 @@ describe("businesses.service", () => {
   });
 
   test("create() crea el comercio vinculado al usuario", async () => {
-    const business = await businessesService.create({ userId, ...baseBusinessData });
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(business.id);
 
     expect(business.id).toBeDefined();
@@ -51,31 +54,32 @@ describe("businesses.service", () => {
   });
 
   test("create() lanza AppError 409 si el usuario ya tiene un comercio registrado", async () => {
-    const business = await businessesService.create({ userId, ...baseBusinessData });
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(business.id);
 
     await expect(
-      businessesService.create({ userId, ...baseBusinessData, cuit: "30787654321" })
+      businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() })
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
   test("create() lanza AppError 409 si el cuit ya está registrado", async () => {
-    const business = await businessesService.create({ userId, ...baseBusinessData });
+    const cuit = uniqueCuit();
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit });
     createdBusinessIds.push(business.id);
 
     await expect(
-      businessesService.create({ userId: otherUserId, ...baseBusinessData })
+      businessesService.create({ userId: otherUserId, ...baseBusinessData, cuit })
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
   test("create() lanza AppError 400 si el userId no corresponde a un usuario existente", async () => {
     await expect(
-      businessesService.create({ userId: 999999999, ...baseBusinessData })
+      businessesService.create({ userId: 999999999, ...baseBusinessData, cuit: uniqueCuit() })
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   test("getByUserId() devuelve el comercio del usuario", async () => {
-    const business = await businessesService.create({ userId, ...baseBusinessData });
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(business.id);
 
     const found = await businessesService.getByUserId(userId);
@@ -89,7 +93,7 @@ describe("businesses.service", () => {
   });
 
   test("updateByUserId() actualiza los datos del comercio", async () => {
-    const business = await businessesService.create({ userId, ...baseBusinessData });
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(business.id);
 
     const updated = await businessesService.updateByUserId(userId, { name: "Nuevo nombre" });
@@ -103,7 +107,7 @@ describe("businesses.service", () => {
   });
 
   test("getStats() devuelve estadísticas básicas del comercio", async () => {
-    const business = await businessesService.create({ userId, ...baseBusinessData });
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(business.id);
 
     const stats = await businessesService.getStats(userId);

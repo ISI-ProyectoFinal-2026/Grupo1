@@ -1,12 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AuthUser } from "@/types";
+import type { AuthUser } from "@/types/auth";
 
 interface AuthState {
   token: string | null;
   user: AuthUser | null;
   setAuth: (token: string, user: AuthUser) => void;
-  clearAuth: () => void;
+  logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -15,8 +15,10 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       user: null,
       setAuth: (token, user) => set({ token, user }),
-      clearAuth: () => set({ token: null, user: null }),
+      logout: () => set({ token: null, user: null }),
     }),
-    { name: "patitas-auth" }
-  )
+    {
+      name: "patitas-auth",
+    },
+  ),
 );

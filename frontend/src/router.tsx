@@ -1,20 +1,35 @@
 import { createBrowserRouter } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import Home from "./pages/Home";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
-import CreateReportPage from "./features/report-create/pages/CreateReportPage";
+import FeedPage from "./pages/reports/FeedPage";
+import CreateReportPage from "./pages/reports/CreateReportPage";
+import ReportDetailPage from "./pages/reports/ReportDetailPage";
+import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <MainLayout />,
-    errorElement: <div className="p-6">Página no encontrada</div>,
+    errorElement: <NotFound />,
     children: [
-      { index: true, element: <Home /> },
+      { path: "login", element: <Login /> },
+      { path: "register", element: <Register /> },
       {
         element: <ProtectedRoute />,
-        children: [{ path: "reports/new", element: <CreateReportPage /> }],
+        children: [
+          { index: true, element: <Home /> },
+          { path: "reports", element: <FeedPage /> },
+          { path: "reports/new", element: <CreateReportPage /> },
+          { path: "reports/:id", element: <ReportDetailPage /> },
+        ],
       },
     ],
+  },
+  {
+    path: "*",
+    element: <NotFound />,
   },
 ]);
