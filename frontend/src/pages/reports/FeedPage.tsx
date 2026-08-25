@@ -17,9 +17,10 @@ export default function FeedPage() {
   const [dateTo, setDateTo] = useState("");
 
   const { data: reports = [], isLoading, error } = useQuery({
-    queryKey: ["reports", { type: type || undefined, zone: zone || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }],
+    queryKey: ["reports", { type, zone, dateFrom, dateTo }],
     queryFn: () =>
       listReports({
+        status: "published",
         type: type || undefined,
         zone: zone || undefined,
         dateFrom: dateFrom || undefined,
