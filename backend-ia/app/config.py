@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://patitas:patitas@localhost:5433/patitas"
     sql_echo: bool = False
     internal_api_key: str = ""
+    node_backend_url: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
