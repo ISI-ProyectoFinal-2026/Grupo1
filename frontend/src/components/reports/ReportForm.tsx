@@ -69,17 +69,16 @@ export default function ReportForm({ initialData }: ReportFormProps) {
       navigate(`/reports/${result.id}`, {
         state: { message: "Reporte creado exitosamente" },
       });
-    } catch (err) {
-      if (err instanceof Error) {
-        if ("errors" in err) {
-          const errors = err as any;
-          const fieldErrs: Record<string, string> = {};
-          errors.errors?.forEach((e: any) => {
-            const path = e.path?.[0] || "general";
-            fieldErrs[path] = e.message;
-          });
-          setFieldErrors(fieldErrs);
-        }
+    } catch (err: any) {
+      if (err.errors) {
+        const fieldErrs: Record<string, string> = {};
+        err.errors.forEach((e: any) => {
+          const path = e.path?.[0] || "general";
+          fieldErrs[path] = e.message;
+        });
+        setFieldErrors(fieldErrs);
+        setFormError("Por favor, corregí los errores del formulario");
+      } else if (err instanceof Error) {
         setFormError(err.message);
       } else {
         setFormError("Error al crear el reporte");
