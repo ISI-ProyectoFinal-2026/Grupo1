@@ -4,17 +4,32 @@ Setup de base de datos para la issue "Configurar la base de datos con sus respec
 
 ## Variables de entorno
 
-Crear un archivo `.env` en esta carpeta (no versionado) con:
+Copiar `.env.example` a `.env` (no versionado) y ajustar:
 
+```bash
+cp .env.example .env
 ```
-DATABASE_URL=postgresql://patitas:patitas@localhost:5433/patitas
-NODE_ENV=development
 
-# Backend IA (issue #18 — matching por similitud). Si no está seteada, el
-# trigger de generación de embedding simplemente no hace nada (no rompe
-# la creación del reporte, ver src/services/matching.service.ts).
-AI_SERVICE_URL=http://localhost:8000
-```
+| Variable | Obligatoria | Para qué |
+|---|---|---|
+| `DATABASE_URL` | sí | Puerto `5433` en el host, ver `../docker/ENV_VARS.md` |
+| `JWT_SECRET` / `JWT_EXPIRY` | sí | Firma de los tokens de sesión |
+| `INTERNAL_API_KEY` | **sí** | Clave compartida con el Backend IA. **Mismo valor que en `../backend-ia/.env`** (ver abajo) |
+| `AI_SERVICE_URL` | no | Backend IA. Si no está seteada, el trigger de generación de embedding no hace nada (no rompe la creación del reporte, ver `src/services/matching.service.ts`) |
+| `FRONTEND_URL` | no | Origen permitido por CORS |
+| `PORT` | no | Default `3001` |
+| `R2_*` | no | Upload de imágenes. Si faltan, `POST /api/uploads/presign` responde `503` diciendo cuál falta |
+
+### `INTERNAL_API_KEY`
+
+Es la clave que usan el Backend Principal y el Backend IA para reconocerse entre sí en las llamadas server-to-server, donde no hay usuario logueado ni JWT. **Tiene que tener el mismo valor en los dos servicios.**
+
+Se usa en las dos direcciones, y las dos fallan cerrado si falta:
+
+- **Node → Backend IA** (`POST /reports/{id}/embedding`): se manda en el header `X-Internal-Key`. Si no coincide, el Backend IA responde `401` y el reporte con imagen **se queda en `pending`** — el log lo dice explícitamente para que no se confunda con una caída del servicio.
+- **Backend IA → Node** (`POST /api/notifications/internal/match`): lo valida `requireInternalKey`. Si falta, el match se guarda igual pero nadie recibe la notificación.
+
+Detalle completo en `../docker/ENV_VARS.md` y en `../backend-ia/README.md`.
 
 (usar las mismas credenciales/puerto que `docker/ENV_VARS.md` si se cambiaron los defaults; el contenedor publica en `5433` del host para no chocar con un Postgres nativo local en `5432`).
 
