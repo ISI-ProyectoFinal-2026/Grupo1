@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as chatsService from "../services/chats.service";
+import * as notificationsService from "../services/notifications.service";
 import { chatRoom, getChatIO } from "../sockets/chat.socket";
 import { chatIdParamSchema, createChatSchema, sendMessageBodySchema } from "../validators/chats.validator";
 
@@ -24,8 +25,17 @@ export async function getMessages(req: Request, res: Response): Promise<void> {
 export async function sendMessage(req: Request, res: Response): Promise<void> {
   const { id } = chatIdParamSchema.parse(req.params);
   const { content } = sendMessageBodySchema.parse(req.body);
-  await chatsService.assertParticipant(id, req.userId!);
+  const chat = await chatsService.assertParticipant(id, req.userId!);
   const message = await chatsService.createMessage(id, req.userId!, content);
+
+  // La notificación es secundaria al envío: si falla, el mensaje igual se
+  // persiste y se emite. No queremos que un error de notificación devuelva 500.
+  try {
+    await notificationsService.notifyNewMessage(chat, message);
+  } catch (error) {
+    console.error(`[chats] no se pudo notificar el mensaje del chat ${id}:`, error);
+  }
+
   getChatIO()?.to(chatRoom(id)).emit("receive_message", message);
   res.status(201).json(message);
 }

@@ -3,6 +3,7 @@ import { Message } from "@prisma/client";
 import { Server, Socket } from "socket.io";
 import { AppError } from "../errors/app-error";
 import * as chatsService from "../services/chats.service";
+import * as notificationsService from "../services/notifications.service";
 import { verifyAccessToken } from "../utils/jwt";
 import { joinChatSchema, leaveChatSchema, sendMessageSchema } from "../validators/chat-socket.validator";
 
@@ -121,8 +122,16 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
     socket.on("send_message", async (payload, ack) => {
       try {
         const { chatId, content } = sendMessageSchema.parse(payload);
-        await chatsService.assertParticipant(chatId, socket.data.userId);
+        const chat = await chatsService.assertParticipant(chatId, socket.data.userId);
         const message = await chatsService.createMessage(chatId, socket.data.userId, content);
+
+        // Notificación best-effort: no debe tumbar el envío en tiempo real.
+        try {
+          await notificationsService.notifyNewMessage(chat, message);
+        } catch (notifyError) {
+          console.error(`[chat.socket] no se pudo notificar el mensaje del chat ${chatId}:`, notifyError);
+        }
+
         io.to(chatRoom(chatId)).emit("receive_message", message);
         ack?.({ ok: true, data: message });
       } catch (error) {

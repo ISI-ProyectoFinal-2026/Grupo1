@@ -1,4 +1,4 @@
-import { Notification } from "@prisma/client";
+import { Chat, Message, Notification } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 
@@ -112,5 +112,39 @@ export async function notifyMatch(data: NotifyMatchInput): Promise<Notification[
     lostOwnerId: lostReport.userId,
     foundOwnerId: foundReport.userId,
     similarityScore: data.similarityScore,
+  });
+}
+
+const MESSAGE_PREVIEW_MAX_LENGTH = 80;
+
+/**
+ * Dado un chat y el emisor de un mensaje, devuelve el id del OTRO participante
+ * (el receptor). Un chat siempre tiene exactamente dos participantes, así que
+ * el receptor es el que no es el emisor.
+ */
+export function resolveMessageRecipientId(chat: Pick<Chat, "userAId" | "userBId">, senderId: number): number {
+  return chat.userAId === senderId ? chat.userBId : chat.userAId;
+}
+
+/**
+ * Crea una notificación de tipo "message" para el receptor de un mensaje recién
+ * enviado. El emisor nunca se notifica a sí mismo. Se llama desde ambos caminos
+ * de envío (REST y Socket.io) para que la notificación se genere siempre, sin
+ * importar cómo llegó el mensaje.
+ */
+export async function notifyNewMessage(chat: Chat, message: Message): Promise<Notification> {
+  const recipientId = resolveMessageRecipientId(chat, message.senderId);
+  const content = (message.content ?? "").trim();
+  const preview =
+    content.length > MESSAGE_PREVIEW_MAX_LENGTH ? `${content.slice(0, MESSAGE_PREVIEW_MAX_LENGTH)}…` : content;
+
+  return prisma.notification.create({
+    data: {
+      userId: recipientId,
+      type: "message",
+      title: "Nuevo mensaje",
+      message: preview ? `Tenés un mensaje nuevo: "${preview}"` : "Tenés un mensaje nuevo.",
+      reportId: chat.reportId,
+    },
   });
 }

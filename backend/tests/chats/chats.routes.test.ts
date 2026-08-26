@@ -59,6 +59,7 @@ describe("/api/chats", () => {
 
   afterAll(async () => {
     await prisma.message.deleteMany({ where: { chatId } });
+    await prisma.notification.deleteMany({ where: { userId: { in: [userAId, userBId, outsiderId] } } });
     await prisma.chat.delete({ where: { id: chatId } });
     await prisma.report.delete({ where: { id: reportId } });
     await prisma.user.delete({ where: { id: userAId } });
@@ -134,6 +135,24 @@ describe("/api/chats", () => {
 
     const stored = await prisma.message.findUnique({ where: { id: res.body.id } });
     expect(stored).not.toBeNull();
+  });
+
+  test("POST /api/chats/:id/messages crea una notificación 'message' para el receptor y no para el emisor", async () => {
+    await prisma.notification.deleteMany({ where: { userId: { in: [userAId, userBId] }, type: "message" } });
+
+    const res = await request(app)
+      .post(`/api/chats/${chatId}/messages`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ content: "¿la viste por el barrio?" });
+    expect(res.status).toBe(201);
+
+    const forRecipient = await prisma.notification.findMany({ where: { userId: userBId, type: "message" } });
+    expect(forRecipient).toHaveLength(1);
+    expect(forRecipient[0].reportId).toBe(reportId);
+    expect(forRecipient[0].isRead).toBe(false);
+
+    const forSender = await prisma.notification.findMany({ where: { userId: userAId, type: "message" } });
+    expect(forSender).toHaveLength(0);
   });
 
   test("POST /api/chats/:id/messages responde 403 si el usuario no participa del chat", async () => {
