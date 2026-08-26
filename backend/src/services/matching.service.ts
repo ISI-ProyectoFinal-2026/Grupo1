@@ -100,6 +100,79 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
     });
 }
 
+/**
+ * Los reintentos de `triggerEmbeddingGeneration` viven en memoria y se agotan
+ * en ~36s. Si el Backend IA estuvo caído más que eso —o si el proceso de Node
+ * se reinició con la llamada en vuelo— el reporte queda en "pending" y nadie
+ * vuelve a mirarlo nunca: no se publica, no genera embedding y no puede
+ * matchear. Esta reconciliación periódica es la red de contención para eso.
+ *
+ * `RECONCILE_GRACE_MS` es más largo que el presupuesto de reintentos para no
+ * pisar una generación que todavía está en curso, y `RECONCILE_MAX_AGE_MS`
+ * acota la ventana: un reporte que sigue pending después de un día tiene un
+ * problema que reintentar no arregla (imagen borrada del storage, URL rota),
+ * así que se deja de insistir y queda para revisión manual en vez de generar
+ * un reintento infinito cada pasada.
+ */
+const RECONCILE_GRACE_MS = 2 * 60 * 1000;
+const RECONCILE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const RECONCILE_INTERVAL_MS = 5 * 60 * 1000;
+// Cota por pasada: el Backend IA procesa la inferencia de forma síncrona, así
+// que disparar toda la cola de una encolaría requests que expiran esperando.
+const RECONCILE_BATCH_SIZE = 10;
+
+/**
+ * Vuelve a disparar la generación de embedding para los reportes atascados en
+ * "pending". Devuelve cuántos se reencolaron.
+ */
+export async function reconcilePendingReports(): Promise<number> {
+  if (!process.env.AI_SERVICE_URL) return 0;
+
+  const now = Date.now();
+  const stuck = await prisma.report.findMany({
+    where: {
+      status: "pending",
+      imageUrl: { not: null },
+      createdAt: {
+        lt: new Date(now - RECONCILE_GRACE_MS),
+        gt: new Date(now - RECONCILE_MAX_AGE_MS),
+      },
+    },
+    select: { id: true, imageUrl: true },
+    orderBy: { createdAt: "asc" },
+    take: RECONCILE_BATCH_SIZE,
+  });
+
+  for (const report of stuck) {
+    // imageUrl no puede ser null acá por el filtro de la query, pero Prisma no
+    // estrecha el tipo a partir de un `not: null` en el where.
+    triggerEmbeddingGeneration(report.id, report.imageUrl as string);
+  }
+
+  if (stuck.length > 0) {
+    console.log(`[matching] reencolados ${stuck.length} reporte(s) atascados en pending`);
+  }
+  return stuck.length;
+}
+
+/**
+ * Arranca la reconciliación periódica. Se llama una vez al levantar el server
+ * (ver src/index.ts). El timer es `unref`ado para que no mantenga vivo el
+ * proceso por sí solo (importante para los tests y para un shutdown limpio).
+ */
+export function startPendingReportsReconciliation(): NodeJS.Timeout {
+  const run = () => {
+    reconcilePendingReports().catch((error) => {
+      console.error("[matching] fallo la reconciliación de reportes pending:", error);
+    });
+  };
+
+  run();
+  const timer = setInterval(run, RECONCILE_INTERVAL_MS);
+  timer.unref();
+  return timer;
+}
+
 export interface MatchDTO {
   reportId: number;
   title: string;

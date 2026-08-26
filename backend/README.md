@@ -67,3 +67,17 @@ Ver `prisma/schema.prisma`. Mapea 1:1 el esquema documentado en `../docs/ARQUITE
 ## Matching por similitud (issue #18)
 
 `src/services/matching.service.ts` dispara (fire-and-forget) la generación de embedding en Backend IA al crear un reporte con imagen, y expone `GET /api/reports/:id/matches` para listar los candidatos que Backend IA ya calculó y guardó en `report_matches`. El cálculo de embeddings/similitud en sí vive en `../backend-ia` (ver su README).
+
+### Reportes atascados en `pending`
+
+Un reporte con imagen nace `pending` y solo pasa a `published` (o `rejected`) cuando llega el veredicto del Backend IA. Los reintentos de ese disparo viven en memoria y se agotan en ~36s, así que si el Backend IA estuvo caído más que eso —o si el proceso de Node se reinició con la llamada en vuelo— el reporte se quedaba en `pending` para siempre: invisible en el feed, sin embedding y sin poder matchear.
+
+`reconcilePendingReports()` es la red de contención: al levantar el server y cada 5 minutos vuelve a disparar la generación de embedding para los reportes `pending` con imagen que ya pasaron el grace period de 2 minutos y siguen dentro de una ventana de 24 horas. Pasadas esas 24 horas se deja de insistir (una imagen borrada del storage no se arregla reintentando) y el reporte queda para revisión manual:
+
+```sql
+SELECT id, title, created_at FROM reports
+WHERE status = 'pending' AND image_url IS NOT NULL
+  AND created_at < now() - interval '24 hours';
+```
+
+Como todo el flujo depende de `AI_SERVICE_URL`, si esa variable no está seteada la reconciliación no hace nada (mismo criterio que el disparo original).
