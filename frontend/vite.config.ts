@@ -14,6 +14,12 @@ export default defineConfig({
         target: "http://localhost:3001",
         changeOrigin: true,
       },
+      // handshake y upgrade de socket.io
+      "/socket.io": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })
