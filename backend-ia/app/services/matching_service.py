@@ -79,11 +79,21 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
     candidates_result = await session.execute(
         text(
             """
+            -- `<=>` es distancia COSENO en pgvector, así que `1 - (a <=> b)` es
+            -- la similitud coseno que mide el POC y con la que se calibró
+            -- SIMILARITY_THRESHOLD. NO usar `<->`: ese es distancia L2 y, aun
+            -- con embeddings normalizados, `1 - L2` no es la similitud coseno
+            -- (dos fotos de la misma mascota con coseno 0.87 dan L2 0.51, o sea
+            -- 0.49 "similitud", debajo del umbral: no matchearía nunca).
+            -- `<=>` es además el operador que puede usar el índice HNSW, creado
+            -- con `vector_cosine_ops` (ver backend/prisma/migrations/
+            -- 20260813000000_fix_report_embedding_dimension).
+            --
             -- ST_DWithin recibe metros cuando ambos operandos son `geography`.
             -- `r.location` es `geometry(Point, 4326)` (grados WGS84): sin el
             -- cast a geography, "5000" se interpretaría como 5000 GRADOS (todo
             -- el planeta), no 5000 metros.
-            SELECT r.id, r.report_type, 1 - (re.embedding <-> :embedding) AS similarity
+            SELECT r.id, r.report_type, 1 - (re.embedding <=> :embedding) AS similarity
             FROM reports r
             JOIN report_embeddings re ON re.report_id = r.id
             WHERE r.status = 'published'
@@ -91,7 +101,7 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
               AND r.id != :report_id
               AND ST_DWithin(r.location::geography, CAST(:location AS geography), 5000)
               AND r.created_at > NOW() - INTERVAL '30 days'
-            ORDER BY re.embedding <-> :embedding ASC
+            ORDER BY re.embedding <=> :embedding ASC
             LIMIT 5
             """
         ),

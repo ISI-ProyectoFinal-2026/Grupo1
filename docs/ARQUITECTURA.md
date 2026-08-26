@@ -198,7 +198,7 @@ en el mismo paso 4 de arriba (no es un servicio ni un endpoint aparte):
 
 1. Backend IA, luego de guardar el embedding nuevo, ejecuta:
    SELECT r.id, r.report_type,
-     1 - (re.embedding <-> :embedding) AS similarity
+     1 - (re.embedding <=> :embedding) AS similarity
    FROM reports r
    JOIN report_embeddings re ON re.report_id = r.id
    WHERE r.status = 'published'
@@ -206,8 +206,15 @@ en el mismo paso 4 de arriba (no es un servicio ni un endpoint aparte):
      AND r.id != :report_id
      AND ST_DWithin(r.location::geography, CAST(:location AS geography), 5000)  -- 5km reales
      AND r.created_at > NOW() - INTERVAL '30 days'
-   ORDER BY re.embedding <-> :embedding ASC
+   ORDER BY re.embedding <=> :embedding ASC
    LIMIT 5;
+
+   (`<=>` es la distancia COSENO de pgvector: `1 - (a <=> b)` es la
+   similitud coseno con la que se calibro el umbral en el POC, y es el
+   unico operador que puede usar el indice HNSW `vector_cosine_ops`.
+   `<->` es distancia L2 y NO sirve aca: dos fotos de la misma mascota
+   con coseno 0.87 dan L2 0.51, o sea 0.49 de "similitud", debajo del
+   umbral de 0.75)
 
    (el cast a `::geography` es necesario: `reports.location` es
    `geometry(Point, 4326)` en grados, no metros — sin el cast, "5000"

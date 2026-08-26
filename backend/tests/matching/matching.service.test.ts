@@ -1,4 +1,4 @@
-import { triggerEmbeddingGeneration, listMatches } from "../../src/services/matching.service";
+import { triggerEmbeddingGeneration, listMatches, reconcilePendingReports } from "../../src/services/matching.service";
 import { prisma } from "../../src/db/client";
 
 describe("matching.service", () => {
@@ -210,5 +210,149 @@ describe("matching.service listMatches", () => {
     expect(matches).toEqual([]);
 
     await prisma.report.delete({ where: { id: otherReport.id } });
+  });
+});
+
+describe("matching.service reconcilePendingReports", () => {
+  const originalEnv = { ...process.env };
+  let fetchMock: jest.Mock;
+  let userId: number;
+  let stuckId: number;
+  let recienCreadoId: number;
+  let demasiadoViejoId: number;
+  let sinImagenId: number;
+
+  const MINUTO = 60 * 1000;
+  const HORA = 60 * MINUTO;
+  const DIA = 24 * HORA;
+
+  const embeddingUrl = (id: number) => `http://localhost:8000/reports/${id}/embedding`;
+  const calledUrls = () => fetchMock.mock.calls.map((call) => call[0] as string);
+
+  beforeAll(async () => {
+    const user = await prisma.user.create({
+      data: { email: `matching-reconcile-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
+    });
+    userId = user.id;
+
+    const base = { userId, reportType: "lost" as const, status: "pending" as const };
+
+    // Atascado: pasó el grace period de 2 min y todavía está dentro de la
+    // ventana de 24h -> se debe reencolar. Se lo siembra casi en el borde de
+    // la ventana (23h) para que sea el más viejo de los candidatos y quede
+    // siempre dentro del batch, sin importar qué otros reportes pending tenga
+    // la base de desarrollo compartida.
+    stuckId = (
+      await prisma.report.create({
+        data: {
+          ...base,
+          title: "Atascado",
+          imageUrl: "https://cdn.example.com/atascado.jpg",
+          createdAt: new Date(Date.now() - 23 * HORA),
+        },
+      })
+    ).id;
+
+    // Recién creado: los reintentos en memoria todavía pueden estar corriendo,
+    // reencolarlo ahora duplicaría la inferencia.
+    recienCreadoId = (
+      await prisma.report.create({
+        data: { ...base, title: "Recién creado", imageUrl: "https://cdn.example.com/nuevo.jpg" },
+      })
+    ).id;
+
+    // Fuera de la ventana: reintentar no lo va a arreglar, queda para revisión manual.
+    demasiadoViejoId = (
+      await prisma.report.create({
+        data: {
+          ...base,
+          title: "Demasiado viejo",
+          imageUrl: "https://cdn.example.com/viejo.jpg",
+          createdAt: new Date(Date.now() - 3 * DIA),
+        },
+      })
+    ).id;
+
+    // Sin imagen no hay nada que procesar (esos nacen published, pero se
+    // cubre igual para que la query no los tome nunca).
+    sinImagenId = (
+      await prisma.report.create({
+        data: { ...base, title: "Sin imagen", createdAt: new Date(Date.now() - 10 * MINUTO) },
+      })
+    ).id;
+  });
+
+  afterAll(async () => {
+    await prisma.report.deleteMany({
+      where: { id: { in: [stuckId, recienCreadoId, demasiadoViejoId, sinImagenId] } },
+    });
+    await prisma.user.delete({ where: { id: userId } });
+    await prisma.$disconnect();
+  });
+
+  beforeEach(() => {
+    fetchMock = jest.fn().mockResolvedValue({ status: 201 });
+    // @ts-expect-error -- test double, no necesita implementar el tipo completo de fetch
+    global.fetch = fetchMock;
+    // OBLIGATORIO: reconcilePendingReports() barre toda la tabla `reports`, no
+    // solo las filas que siembra este test. Sin este mock, un fetch que
+    // responde 201 publicaría de verdad cualquier reporte pending que la base
+    // de desarrollo compartida tenga acumulado. No des-mockear dentro de un test.
+    jest.spyOn(prisma.report, "update").mockResolvedValue({} as never);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.restoreAllMocks();
+  });
+
+  test("no hace nada si AI_SERVICE_URL no está configurada", async () => {
+    delete process.env.AI_SERVICE_URL;
+
+    await expect(reconcilePendingReports()).resolves.toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("reencola solo el reporte atascado dentro de la ventana, con su image_url", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+
+    const reencolados = await reconcilePendingReports();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // La base de desarrollo es compartida y puede tener otros reportes
+    // atascados, así que se afirma sobre los reportes sembrados acá y no
+    // sobre el total reencolado.
+    expect(reencolados).toBeGreaterThanOrEqual(1);
+    expect(calledUrls()).toContain(embeddingUrl(stuckId));
+    expect(fetchMock).toHaveBeenCalledWith(
+      embeddingUrl(stuckId),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ image_url: "https://cdn.example.com/atascado.jpg" }),
+      })
+    );
+
+    // Dentro del grace period, fuera de la ventana, o sin imagen: no se tocan.
+    expect(calledUrls()).not.toContain(embeddingUrl(recienCreadoId));
+    expect(calledUrls()).not.toContain(embeddingUrl(demasiadoViejoId));
+    expect(calledUrls()).not.toContain(embeddingUrl(sinImagenId));
+  });
+
+  test("un reporte que ya fue publicado deja de reencolarse", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+
+    // El status se cambia por SQL crudo a propósito: `prisma.report.update`
+    // queda mockeado durante todo este describe para que la reconciliación no
+    // pueda escribir sobre los reportes reales de la base de desarrollo
+    // compartida (barre toda la tabla, no solo lo que siembra el test).
+    await prisma.$executeRaw`UPDATE reports SET status = 'published'::report_status WHERE id = ${stuckId}`;
+    try {
+      await reconcilePendingReports();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(calledUrls()).not.toContain(embeddingUrl(stuckId));
+    } finally {
+      await prisma.$executeRaw`UPDATE reports SET status = 'pending'::report_status WHERE id = ${stuckId}`;
+    }
   });
 });

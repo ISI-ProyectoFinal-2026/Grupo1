@@ -131,7 +131,8 @@ model ReportEmbedding {
   id        Int      @id @default(autoincrement())
   reportId  Int      @unique @map("report_id")
   // OpenCLIP output. Escrito por el Backend IA, consumido por el Backend
-  // Principal para el matching por similitud (pgvector `<->`).
+  // Principal para el matching por similitud (distancia coseno de pgvector,
+  // operador `<=>`, que es el que usa el indice HNSW vector_cosine_ops).
   embedding Unsupported("vector(512)")
   createdAt DateTime @default(now()) @map("created_at")
 

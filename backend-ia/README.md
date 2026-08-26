@@ -53,6 +53,8 @@ Internamente (`app/services/embedding_service.py` + `app/services/matching_servi
 2. Genera el embedding con **OpenCLIP ViT-B-32** (pretrained `laion2b_s34b_b79k` — **no** `openai`, da otra dimensión) y lo guarda en `report_embeddings` (`vector(512)`).
 3. Busca candidatos por similitud coseno (pgvector) entre reportes de tipo opuesto (lost↔found), dentro de 5km / 30 días / publicados, y guarda los que superen `SIMILARITY_THRESHOLD` (0.75, constante documentada en `matching_service.py` — valor provisional, ver `docs/pocs/poc_similitudes.md`) en `report_matches`.
 
+La similitud se calcula con `1 - (a <=> b)`: **`<=>` es distancia coseno**, y es el único operador que puede usar el índice HNSW (creado con `vector_cosine_ops`). No cambiarlo por `<->` (distancia L2): aun con embeddings normalizados `1 - L2` no es la similitud coseno y el umbral deja de tener sentido — dos fotos de la misma mascota con coseno 0.87 dan L2 0.51, o sea 0.49 de "similitud", y no matchearían nunca.
+
 Modelo y umbral están validados contra `docs/pocs/POC_Similitudes.ipynb` — no cambiar el checkpoint de OpenCLIP ni el modelo YOLO sin volver a correr esa validación, ya que la dimensión del embedding y los porcentajes de similitud dependen del checkpoint exacto.
 
 **No implementado todavía:** cola Redis (hoy es síncrono dentro de la request), notificación al usuario cuando hay un match, y confirmar/rechazar un match desde el frontend (`GET /api/reports/:id/matches` en el Backend Principal es de solo lectura).
