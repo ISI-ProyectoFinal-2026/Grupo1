@@ -22,6 +22,9 @@ function MainLayout() {
             <Link to="/reports" className="text-gray-600 hover:text-gray-900">
               Reportes
             </Link>
+            <Link to="/chats" className="text-gray-600 hover:text-gray-900">
+              Chats
+            </Link>
             <span className="text-gray-600">{user.email}</span>
             <button
               type="button"
