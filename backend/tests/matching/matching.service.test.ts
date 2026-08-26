@@ -92,6 +92,20 @@ describe("matching.service", () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
+  test("un 401 del Backend IA (auth interna mal configurada) deja el reporte en pending", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue({ status: 401 });
+
+    triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Un 401 es un problema de configuracion (INTERNAL_API_KEY que no coincide
+    // entre los dos servicios), no un veredicto de moderacion: no se publica ni
+    // se rechaza el reporte, y no se reintenta porque reintentar no lo arregla.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
   test("agotar los reintentos por falla de red deja el reporte en pending, no lo rechaza", async () => {
     jest.useFakeTimers();
     process.env.AI_SERVICE_URL = "http://localhost:8000";

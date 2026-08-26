@@ -86,6 +86,16 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
         });
       } else if (response.status === 422) {
         await prisma.report.update({ where: { id: reportId }, data: { status: "rejected" } });
+      } else if (response.status === 401) {
+        // Se distingue del resto de los status inconclusos porque no es una
+        // falla transitoria: reintentar no lo arregla nunca, hay que tocar
+        // configuración. Sin este mensaje, el único síntoma visible es que
+        // todos los reportes con imagen se quedan en pending sin explicación.
+        console.error(
+          `[matching] el Backend IA rechazó la autenticación interna (401) para report ${reportId}: ` +
+            `INTERNAL_API_KEY no coincide entre backend/.env y backend-ia/.env, o falta en alguno de los dos. ` +
+            `El reporte queda en pending hasta que se corrija la configuración (ver backend-ia/README.md)`
+        );
       } else {
         console.error(
           `[matching] respuesta inconclusa del Backend IA para report ${reportId} (status ${response.status}); queda en pending para revisión manual`
