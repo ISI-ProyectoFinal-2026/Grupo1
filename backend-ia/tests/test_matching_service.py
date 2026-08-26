@@ -3,6 +3,7 @@ patrón que test_embedding_service.py). Siembra reportes/embeddings por SQL
 crudo y verifica qué queda persistido en `report_matches`.
 """
 
+import math
 import uuid
 
 import pytest
@@ -15,8 +16,27 @@ from app.services import matching_service
 NEAR_LAT, NEAR_LNG = -34.6037, -58.3816  # Plaza de Mayo, CABA
 FAR_LAT, FAR_LNG = -34.6037, -57.9000  # ~40km al este, fuera del radio de 5km
 
-EMBEDDING_A = [0.5] * 512
-EMBEDDING_DISTINTO = [-0.5] * 512  # muy lejos de A en distancia, baja similitud
+
+def _unit_vector_at_cosine(cosine: float) -> list[float]:
+    """Vector unitario de 512 dims cuya similitud coseno con EMBEDDING_BASE
+    es exactamente `cosine`.
+    """
+    return [cosine, math.sqrt(1 - cosine**2)] + [0.0] * 510
+
+
+# Los embeddings reales llegan normalizados (norma L2 = 1, ver
+# app/ml/pipeline.generate_embedding) y el POC (docs/pocs/poc_similitudes.md)
+# midió ~0.85-0.89 de similitud coseno para la MISMA mascota y ~0.65 para
+# mascotas distintas. Los fixtures reproducen esos valores para que el test
+# ejerza el umbral de verdad.
+#
+# REGRESIÓN: sembrar vectores idénticos (coseno 1.0) hace que el test pase con
+# cualquier métrica y no distingue `<=>` (coseno) de `<->` (L2). Con `<->`, este
+# par de 0.87 de coseno da 1 - 0.51 = 0.49 de "similitud", debajo del umbral de
+# 0.75, y no se crea ningún match.
+EMBEDDING_BASE = _unit_vector_at_cosine(1.0)
+EMBEDDING_MISMA_MASCOTA = _unit_vector_at_cosine(0.87)
+EMBEDDING_OTRA_MASCOTA = _unit_vector_at_cosine(0.65)
 
 
 def _vector_literal(values: list[float]) -> str:
@@ -77,37 +97,37 @@ async def _insert_embedding(session, report_id: int, embedding: list[float]) -> 
 
 @pytest_asyncio.fixture
 async def scenario():
-    """Siembra: un 'found' con embedding A (el reporte "recién procesado"),
+    """Siembra: un 'found' con EMBEDDING_BASE (el reporte "recién procesado"),
     y 5 candidatos alrededor:
-      - lost_match: embedding == A, opuesto, cerca, reciente -> DEBE matchear.
-      - lost_baja_similitud: embedding muy distinto, opuesto, cerca, reciente -> NO matchea (similitud < umbral).
-      - found_mismo_tipo: embedding == A, MISMO tipo, cerca, reciente -> filtrado por tipo.
-      - lost_fuera_de_radio: embedding == A, opuesto, LEJOS, reciente -> filtrado por radio.
-      - lost_fuera_de_recencia: embedding == A, opuesto, cerca, VIEJO (>30 días) -> filtrado por recencia.
+      - lost_match: coseno 0.87 (misma mascota), opuesto, cerca, reciente -> DEBE matchear.
+      - lost_baja_similitud: coseno 0.65 (otra mascota), opuesto, cerca, reciente -> NO matchea (similitud < umbral).
+      - found_mismo_tipo: coseno 0.87, MISMO tipo, cerca, reciente -> filtrado por tipo.
+      - lost_fuera_de_radio: coseno 0.87, opuesto, LEJOS, reciente -> filtrado por radio.
+      - lost_fuera_de_recencia: coseno 0.87, opuesto, cerca, VIEJO (>30 días) -> filtrado por recencia.
     """
     email = f"matching-service-test-{uuid.uuid4()}@example.com"
     async with async_session_factory() as session:
         user_id = await _insert_user(session, email)
 
         found_id = await _insert_report(session, user_id, "found", NEAR_LAT, NEAR_LNG)
-        await _insert_embedding(session, found_id, EMBEDDING_A)
+        await _insert_embedding(session, found_id, EMBEDDING_BASE)
 
         lost_match_id = await _insert_report(session, user_id, "lost", NEAR_LAT, NEAR_LNG)
-        await _insert_embedding(session, lost_match_id, EMBEDDING_A)
+        await _insert_embedding(session, lost_match_id, EMBEDDING_MISMA_MASCOTA)
 
         lost_baja_similitud_id = await _insert_report(session, user_id, "lost", NEAR_LAT, NEAR_LNG)
-        await _insert_embedding(session, lost_baja_similitud_id, EMBEDDING_DISTINTO)
+        await _insert_embedding(session, lost_baja_similitud_id, EMBEDDING_OTRA_MASCOTA)
 
         found_mismo_tipo_id = await _insert_report(session, user_id, "found", NEAR_LAT, NEAR_LNG)
-        await _insert_embedding(session, found_mismo_tipo_id, EMBEDDING_A)
+        await _insert_embedding(session, found_mismo_tipo_id, EMBEDDING_MISMA_MASCOTA)
 
         lost_fuera_de_radio_id = await _insert_report(session, user_id, "lost", FAR_LAT, FAR_LNG)
-        await _insert_embedding(session, lost_fuera_de_radio_id, EMBEDDING_A)
+        await _insert_embedding(session, lost_fuera_de_radio_id, EMBEDDING_MISMA_MASCOTA)
 
         lost_fuera_de_recencia_id = await _insert_report(
             session, user_id, "lost", NEAR_LAT, NEAR_LNG, created_at_expr="now() - interval '40 days'"
         )
-        await _insert_embedding(session, lost_fuera_de_recencia_id, EMBEDDING_A)
+        await _insert_embedding(session, lost_fuera_de_recencia_id, EMBEDDING_MISMA_MASCOTA)
 
         await session.commit()
 
@@ -154,7 +174,7 @@ async def test_crea_match_solo_para_el_candidato_similar_opuesto_cerca_y_recient
     row = rows[0]
     assert row["report_lost_id"] == scenario["lost_match_id"]
     assert row["report_found_id"] == scenario["found_id"]
-    assert row["similarity_score"] == pytest.approx(1.0, abs=1e-6)
+    assert row["similarity_score"] == pytest.approx(0.87, abs=1e-4)
     assert row["status"] == "pending"
 
 
