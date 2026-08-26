@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ZodError } from "zod";
 import { createReportSchema, type CreateReportFormData } from "@/types/validators/report.validator";
 import { createReport } from "@/services/reports.service";
 import type { ReportLocation } from "@/types/report.types";
@@ -69,13 +70,16 @@ export default function ReportForm({ initialData }: ReportFormProps) {
       navigate(`/reports/${result.id}`, {
         state: { message: "Reporte creado exitosamente" },
       });
-    } catch (err: any) {
-      if (err.errors) {
+    } catch (err) {
+      // Zod 4 expone las incidencias en `issues`; `errors` era la propiedad de
+      // v3 y hoy es undefined, así que un formulario inválido caía al branch
+      // genérico y le mostraba al usuario el JSON crudo del ZodError.
+      if (err instanceof ZodError) {
         const fieldErrs: Record<string, string> = {};
-        err.errors.forEach((e: any) => {
-          const path = e.path?.[0] || "general";
-          fieldErrs[path] = e.message;
-        });
+        for (const issue of err.issues) {
+          const path = String(issue.path[0] ?? "general");
+          fieldErrs[path] = issue.message;
+        }
         setFieldErrors(fieldErrs);
         setFormError("Por favor, corregí los errores del formulario");
       } else if (err instanceof Error) {

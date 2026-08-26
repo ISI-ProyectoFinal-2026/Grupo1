@@ -1,5 +1,11 @@
 import { useState, useRef } from "react";
-import { getPresignedUrl, uploadToR2 } from "@/services/uploads.service";
+import {
+  ALLOWED_UPLOAD_TYPES,
+  MAX_UPLOAD_BYTES,
+  getPresignedUrl,
+  uploadToR2,
+  type UploadContentType,
+} from "@/services/uploads.service";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 
 interface ImageUploaderProps {
@@ -13,9 +19,7 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-  const MAX_SIZE_MB = 5;
-  const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+  const MAX_SIZE_MB = Math.floor(MAX_UPLOAD_BYTES / 1_000_000);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -23,12 +27,12 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
 
     setError(null);
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!ALLOWED_UPLOAD_TYPES.includes(file.type as UploadContentType)) {
       setError("Solo se permiten JPG, PNG o WebP");
       return;
     }
 
-    if (file.size > MAX_SIZE_BYTES) {
+    if (file.size > MAX_UPLOAD_BYTES) {
       setError(`La imagen debe pesar menos de ${MAX_SIZE_MB}MB`);
       return;
     }
@@ -38,7 +42,11 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
 
     setIsLoading(true);
     try {
-      const presignData = await getPresignedUrl(file.name, file.type as any);
+      const presignData = await getPresignedUrl(
+        file.name,
+        file.type as UploadContentType,
+        file.size
+      );
       await uploadToR2(presignData.uploadUrl, file);
       onSuccess(presignData.publicUrl);
       setPreview(null);
@@ -86,7 +94,9 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
                 <p className="text-sm text-gray-600 mt-2">
                   Click aquí o arrastra una imagen
                 </p>
-                <p className="text-xs text-gray-500">JPG, PNG o WebP (máx. 5MB)</p>
+                    <p className="text-xs text-gray-500">
+                  JPG, PNG o WebP (máx. {MAX_SIZE_MB}MB)
+                </p>
               </>
             )}
           </div>

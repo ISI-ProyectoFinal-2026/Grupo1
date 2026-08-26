@@ -70,6 +70,39 @@ describe("POST /api/uploads/presign", () => {
     expect(res.body.error).toBeDefined();
   });
 
+  test("responde 503 y nombra las variables faltantes si R2 no está configurado", async () => {
+    const savedBucket = process.env.R2_BUCKET_NAME;
+    const savedPublicUrl = process.env.R2_PUBLIC_URL;
+    delete process.env.R2_BUCKET_NAME;
+    delete process.env.R2_PUBLIC_URL;
+
+    const res = await request(app)
+      .post("/api/uploads/presign")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ fileName: "foto.jpg", contentType: "image/jpeg", fileSize: 1_000_000 });
+
+    // Antes esto llegaba al SDK de AWS y salía como un 500 sin pistas.
+    expect(res.status).toBe(503);
+    expect(res.body.error.details.missingEnvVars).toEqual(["R2_BUCKET_NAME", "R2_PUBLIC_URL"]);
+    expect(getSignedUrlMock).not.toHaveBeenCalled();
+
+    process.env.R2_BUCKET_NAME = savedBucket;
+    process.env.R2_PUBLIC_URL = savedPublicUrl;
+  });
+
+  test("responde 400 si falta fileSize, que el backend necesita para validar el tamaño", async () => {
+    const res = await request(app)
+      .post("/api/uploads/presign")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ fileName: "foto.jpg", contentType: "image/jpeg" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.details).toEqual([
+      expect.objectContaining({ path: "fileSize" }),
+    ]);
+    expect(getSignedUrlMock).not.toHaveBeenCalled();
+  });
+
   test("responde 201 con uploadUrl, publicUrl y key para un input válido", async () => {
     const res = await request(app)
       .post("/api/uploads/presign")
