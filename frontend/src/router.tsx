@@ -7,6 +7,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import FeedPage from "./pages/reports/FeedPage";
 import CreateReportPage from "./pages/reports/CreateReportPage";
 import ReportDetailPage from "./pages/reports/ReportDetailPage";
+import ChatPage from "./pages/chat/ChatPage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -24,6 +25,8 @@ export const router = createBrowserRouter([
           { path: "reports", element: <FeedPage /> },
           { path: "reports/new", element: <CreateReportPage /> },
           { path: "reports/:id", element: <ReportDetailPage /> },
+          { path: "chats", element: <ChatPage /> },
+          { path: "chats/:id", element: <ChatPage /> },
         ],
       },
     ],
