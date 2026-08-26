@@ -65,6 +65,7 @@ describe("chat.socket", () => {
   afterAll(async () => {
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     await prisma.message.deleteMany({ where: { chatId } });
+    await prisma.notification.deleteMany({ where: { userId: { in: [userAId, userBId, outsiderId] } } });
     await prisma.chat.delete({ where: { id: chatId } });
     await prisma.user.delete({ where: { id: userAId } });
     await prisma.user.delete({ where: { id: userBId } });
@@ -164,6 +165,23 @@ describe("chat.socket", () => {
     const stored = await prisma.message.findUnique({ where: { id: ack.data!.id } });
     expect(stored).not.toBeNull();
     expect(stored?.content).toBe("mensaje persistido");
+  });
+
+  test("un mensaje enviado por socket crea una notificación 'message' para el receptor", async () => {
+    await prisma.notification.deleteMany({ where: { userId: userBId, type: "message" } });
+
+    const clientA = connect({ auth: { token: tokenA } });
+    await new Promise<void>((resolve) => clientA.on("connect", () => resolve()));
+
+    const ack = await emitWithAck<{ id: number }>(clientA, "send_message", {
+      chatId,
+      content: "te aviso por acá",
+    });
+    expect(ack.ok).toBe(true);
+
+    const forRecipient = await prisma.notification.findMany({ where: { userId: userBId, type: "message" } });
+    expect(forRecipient).toHaveLength(1);
+    expect(forRecipient[0].isRead).toBe(false);
   });
 
   test("un usuario que no participa del chat no puede unirse ni enviar mensajes", async () => {
