@@ -4,11 +4,33 @@ Servicio de generación de embeddings y búsqueda de similitud por imagen (issue
 
 ## Variables de entorno
 
-Crear un archivo `.env` en esta carpeta (no versionado) con:
+Copiar `.env.example` a `.env` (no versionado) y ajustar:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Obligatoria | Para qué |
+|---|---|---|
+| `DATABASE_URL` | sí | Misma base que el Backend Principal. Puerto `5433` en el host, ver `../docker/ENV_VARS.md` |
+| `INTERNAL_API_KEY` | **sí** | Clave compartida con el Backend Principal. **Mismo valor que en `../backend/.env`** |
+| `NODE_BACKEND_URL` | no | URL del Backend Principal, para avisarle cuando se persiste un match y dispare las notificaciones |
+| `ALLOW_INSECURE_INTERNAL` | no | Escotilla solo para desarrollo local, ver abajo |
+| `SQL_ECHO` | no | Loguea todo el SQL de SQLAlchemy |
+
+### `INTERNAL_API_KEY` y por qué el servicio falla cerrado
+
+`POST /reports/{report_id}/embedding` se llama servicio a servicio, sin usuario logueado, así que no hay JWT: se autentica con una clave compartida que viaja en el header `X-Internal-Key`. **Tiene que ser el mismo valor que `INTERNAL_API_KEY` en `../backend/.env`**; si no coincide, el Backend IA responde `401` y los reportes con imagen se quedan en `pending`.
+
+Si la variable no está configurada, el endpoint **rechaza todo con `401`**. Es deliberado: este endpoint descarga imágenes, corre dos modelos de ML y escribe en `report_embeddings` / `report_matches`, así que una configuración ausente tiene que dejarlo cerrado. La versión anterior hacía lo contrario —retornaba sin validar cuando la clave estaba vacía— y eso dejó el endpoint público en todos los entornos (issue #106).
+
+Para desarrollo local, si necesitás levantarlo sin configurar la clave, hay que pedirlo a mano:
 
 ```
-DATABASE_URL=postgresql+asyncpg://patitas:patitas@localhost:5433/patitas
+ALLOW_INSECURE_INTERNAL=true
 ```
+
+El servicio atiende sin autenticar y loguea un warning en cada arranque. **Nunca en un entorno desplegado.**
 
 ## Setup
 
