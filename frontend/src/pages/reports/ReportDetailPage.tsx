@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
 import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
+import { getFlyer } from "@/services/reports.service";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import PendingBanner from "@/components/reports/PendingBanner";
@@ -15,6 +18,23 @@ export default function ReportDetailPage() {
     id ? Number(id) : undefined,
     report?.status,
   );
+  const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
+  const flyerMutation = useMutation({
+    mutationFn: () => getFlyer(Number(id)),
+    onSuccess: (data) => setFlyerUrl(data.flyerUrl),
+  });
+
+  const shareFlyer = async (url: string) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: report?.title, url });
+        return;
+      } catch {
+        // el usuario canceló el share nativo, no hace falta avisar nada
+      }
+    }
+    await navigator.clipboard.writeText(url);
+  };
 
   if (isLoading) {
     return (
@@ -121,6 +141,38 @@ export default function ReportDetailPage() {
               <p className="text-gray-700 whitespace-pre-wrap">
                 {report.description}
               </p>
+            </div>
+          )}
+
+          {report.status !== "pending" && (
+            <div className="border-t pt-6 mb-2">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                Flyer para compartir
+              </h3>
+              {!flyerUrl ? (
+                <Button
+                  variant="secondary"
+                  isLoading={flyerMutation.isPending}
+                  onClick={() => flyerMutation.mutate()}
+                >
+                  Generar flyer
+                </Button>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                  <img src={flyerUrl} alt="Flyer del reporte" className="w-40 rounded-md shadow" />
+                  <div className="flex gap-3">
+                    <a href={flyerUrl} download target="_blank" rel="noreferrer">
+                      <Button variant="secondary">Descargar</Button>
+                    </a>
+                    <Button variant="primary" onClick={() => shareFlyer(flyerUrl)}>
+                      Compartir
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {flyerMutation.isError && (
+                <p className="text-sm text-red-600 mt-2">No se pudo generar el flyer, intentá de nuevo.</p>
+              )}
             </div>
           )}
 

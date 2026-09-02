@@ -63,22 +63,42 @@ describe("chats.service", () => {
 
   describe("createMessage()", () => {
     test("persiste el mensaje asociado al chat y al remitente", async () => {
-      const message = await chatsService.createMessage(chatId, userAId, "hola!");
+      const message = await chatsService.createMessage(chatId, userAId, { content: "hola!" });
 
       expect(message.id).toBeDefined();
       expect(message.chatId).toBe(chatId);
       expect(message.senderId).toBe(userAId);
       expect(message.content).toBe("hola!");
+      expect(message.imageUrl).toBeNull();
 
       const stored = await prisma.message.findUnique({ where: { id: message.id } });
       expect(stored).not.toBeNull();
+    });
+
+    test("persiste un mensaje de solo imagen, sin texto", async () => {
+      const message = await chatsService.createMessage(chatId, userAId, {
+        imageUrl: "https://pub-test.r2.dev/chat/foto.jpg",
+      });
+
+      expect(message.content).toBeNull();
+      expect(message.imageUrl).toBe("https://pub-test.r2.dev/chat/foto.jpg");
+    });
+
+    test("persiste un mensaje con texto e imagen a la vez", async () => {
+      const message = await chatsService.createMessage(chatId, userAId, {
+        content: "mirá esto",
+        imageUrl: "https://pub-test.r2.dev/chat/foto2.jpg",
+      });
+
+      expect(message.content).toBe("mirá esto");
+      expect(message.imageUrl).toBe("https://pub-test.r2.dev/chat/foto2.jpg");
     });
   });
 
   describe("getMessages()", () => {
     test("devuelve los mensajes del chat ordenados por fecha de creación", async () => {
-      const first = await chatsService.createMessage(chatId, userAId, "primero");
-      const second = await chatsService.createMessage(chatId, userBId, "segundo");
+      const first = await chatsService.createMessage(chatId, userAId, { content: "primero" });
+      const second = await chatsService.createMessage(chatId, userBId, { content: "segundo" });
 
       const messages = await chatsService.getMessages(chatId);
       const firstIndex = messages.findIndex((m) => m.id === first.id);

@@ -18,7 +18,10 @@ interface ServerToClientEvents {
 interface ClientToServerEvents {
   join_chat: (payload: { chatId: number }, ack?: Ack) => void;
   leave_chat: (payload: { chatId: number }, ack?: Ack) => void;
-  send_message: (payload: { chatId: number; content: string }, ack?: Ack<Message>) => void;
+  send_message: (
+    payload: { chatId: number; content?: string; imageUrl?: string },
+    ack?: Ack<Message>
+  ) => void;
 }
 
 interface InterServerEvents {
@@ -121,9 +124,9 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
 
     socket.on("send_message", async (payload, ack) => {
       try {
-        const { chatId, content } = sendMessageSchema.parse(payload);
+        const { chatId, content, imageUrl } = sendMessageSchema.parse(payload);
         const chat = await chatsService.assertParticipant(chatId, socket.data.userId);
-        const message = await chatsService.createMessage(chatId, socket.data.userId, content);
+        const message = await chatsService.createMessage(chatId, socket.data.userId, { content, imageUrl });
 
         // Notificación best-effort: no debe tumbar el envío en tiempo real.
         try {

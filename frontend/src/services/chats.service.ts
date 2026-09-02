@@ -1,5 +1,5 @@
 import { api } from './api'
-import type { ChatDTO, CreateChatInput, MessageDTO } from '@/types/chat.types'
+import type { ChatDTO, CreateChatInput, MessageDTO, SendMessageInput } from '@/types/chat.types'
 
 export async function listChats(): Promise<ChatDTO[]> {
   const { data } = await api.get<ChatDTO[]>('/chats')
@@ -17,7 +17,7 @@ export async function getMessages(chatId: number): Promise<MessageDTO[]> {
 }
 
 // fallback REST cuando el socket no está conectado
-export async function sendMessage(chatId: number, content: string): Promise<MessageDTO> {
-  const { data } = await api.post<MessageDTO>(`/chats/${chatId}/messages`, { content })
+export async function sendMessage(chatId: number, input: SendMessageInput): Promise<MessageDTO> {
+  const { data } = await api.post<MessageDTO>(`/chats/${chatId}/messages`, input)
   return data
 }

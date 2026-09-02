@@ -24,9 +24,9 @@ export async function getMessages(req: Request, res: Response): Promise<void> {
 
 export async function sendMessage(req: Request, res: Response): Promise<void> {
   const { id } = chatIdParamSchema.parse(req.params);
-  const { content } = sendMessageBodySchema.parse(req.body);
+  const { content, imageUrl } = sendMessageBodySchema.parse(req.body);
   const chat = await chatsService.assertParticipant(id, req.userId!);
-  const message = await chatsService.createMessage(id, req.userId!, content);
+  const message = await chatsService.createMessage(id, req.userId!, { content, imageUrl });
 
   // La notificación es secundaria al envío: si falla, el mensaje igual se
   // persiste y se emite. No queremos que un error de notificación devuelva 500.

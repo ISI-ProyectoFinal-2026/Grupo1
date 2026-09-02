@@ -155,6 +155,35 @@ describe("/api/chats", () => {
     expect(forSender).toHaveLength(0);
   });
 
+  test("POST /api/chats/:id/messages con imageUrl (sin content) persiste el mensaje y responde 201", async () => {
+    const res = await request(app)
+      .post(`/api/chats/${chatId}/messages`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ imageUrl: "https://pub-test.r2.dev/chat/foto.jpg" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.imageUrl).toBe("https://pub-test.r2.dev/chat/foto.jpg");
+    expect(res.body.content).toBeNull();
+  });
+
+  test("POST /api/chats/:id/messages responde 400 si no manda ni content ni imageUrl", async () => {
+    const res = await request(app)
+      .post(`/api/chats/${chatId}/messages`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/chats/:id/messages responde 400 si imageUrl no es una URL válida", async () => {
+    const res = await request(app)
+      .post(`/api/chats/${chatId}/messages`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ imageUrl: "no-es-una-url" });
+
+    expect(res.status).toBe(400);
+  });
+
   test("POST /api/chats/:id/messages responde 403 si el usuario no participa del chat", async () => {
     const res = await request(app)
       .post(`/api/chats/${chatId}/messages`)
