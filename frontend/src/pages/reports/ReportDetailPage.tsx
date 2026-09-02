@@ -4,6 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
 import { getFlyer } from "@/services/reports.service";
+import { createChat, listChats } from "@/services/chats.service";
+import { useAuthStore } from "@/stores/auth.store";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import PendingBanner from "@/components/reports/PendingBanner";
@@ -22,6 +24,31 @@ export default function ReportDetailPage() {
   const flyerMutation = useMutation({
     mutationFn: () => getFlyer(Number(id)),
     onSuccess: (data) => setFlyerUrl(data.flyerUrl),
+  });
+
+  const currentUserId = useAuthStore((state) => state.user?.id);
+
+  // Punto de entrada al chat. Sin esto no hay forma de iniciar una conversación
+  // desde la app: ChatList sólo muestra chats que ya existen en la base.
+  const contactMutation = useMutation({
+    mutationFn: async (ownerId: number) => {
+      try {
+        const chat = await createChat({ reportId: Number(id), participantId: ownerId });
+        return chat.id;
+      } catch (createError) {
+        // El backend responde 409 si ya existe un chat con ese participante: el
+        // par de usuarios es único y no distingue por reporte (schema.prisma,
+        // @@unique([userAId, userBId])). En ese caso el chat ya está, hay que
+        // encontrarlo para poder abrirlo en vez de dejar al usuario trabado.
+        const chats = await listChats();
+        const existing = chats.find(
+          (chat) => chat.userAId === ownerId || chat.userBId === ownerId,
+        );
+        if (!existing) throw createError;
+        return existing.id;
+      }
+    },
+    onSuccess: (chatId) => navigate(`/chats/${chatId}`),
   });
 
   const shareFlyer = async (url: string) => {
@@ -172,6 +199,26 @@ export default function ReportDetailPage() {
               )}
               {flyerMutation.isError && (
                 <p className="text-sm text-red-600 mt-2">No se pudo generar el flyer, intentá de nuevo.</p>
+              )}
+            </div>
+          )}
+
+          {currentUserId !== undefined && currentUserId !== report.userId && (
+            <div className="border-t pt-6 mb-2">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                ¿Tenés información sobre esta mascota?
+              </h3>
+              <Button
+                variant="primary"
+                isLoading={contactMutation.isPending}
+                onClick={() => contactMutation.mutate(report.userId)}
+              >
+                Contactar al autor
+              </Button>
+              {contactMutation.isError && (
+                <p className="text-sm text-red-600 mt-2">
+                  No se pudo abrir el chat, intentá de nuevo.
+                </p>
               )}
             </div>
           )}
