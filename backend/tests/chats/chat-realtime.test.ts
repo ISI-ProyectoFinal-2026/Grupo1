@@ -196,4 +196,149 @@ describe("chat en tiempo real (#141)", () => {
     }, 30000);
   });
 
+  describe("reconexión", () => {
+    test("tras una caída de transporte el cliente vuelve solo y recibe mensajes de nuevo", async () => {
+      const clientB = connect({
+        auth: { token: tokenB },
+        reconnection: true,
+        reconnectionDelay: 50,
+      });
+      await waitForConnect(clientB);
+      expect((await emitWithAck(clientB, "join_chat", { chatId })).ok).toBe(true);
+
+      // Corta el transporte por debajo, como una caída de red real: el cliente
+      // no llamó a disconnect(), así que socket.io tiene que reconectar solo.
+      const reconnected = waitForEvent<number>(clientB, "connect");
+      clientB.io.engine.close();
+      await reconnected;
+      expect(clientB.connected).toBe(true);
+
+      // Al reconectar el socket es nuevo y las rooms del anterior se perdieron:
+      // sin volver a join_chat no llega nada. Esto es exactamente lo que hace
+      // useChatSocket cuando el status vuelve a 'connected'.
+      expect((await emitWithAck(clientB, "join_chat", { chatId })).ok).toBe(true);
+
+      const recibido = waitForEvent<{ content: string }>(clientB, "receive_message");
+      const clientA = connect({ auth: { token: tokenA } });
+      await waitForConnect(clientA);
+      await emitWithAck(clientA, "send_message", { chatId, content: "después de reconectar" });
+
+      expect((await recibido).content).toBe("después de reconectar");
+    });
+
+    test("los mensajes enviados durante la caída se recuperan del historial", async () => {
+      const clientB = connect({ auth: { token: tokenB } });
+      await waitForConnect(clientB);
+      await emitWithAck(clientB, "join_chat", { chatId });
+
+      // B se cae y A sigue escribiendo mientras tanto.
+      clientB.close();
+      await waitUntil(() => !clientB.connected);
+
+      const contenido = `mensaje mientras B estaba caído ${Date.now()}`;
+      const clientA = connect({ auth: { token: tokenA } });
+      await waitForConnect(clientA);
+      await emitWithAck(clientA, "send_message", { chatId, content: contenido });
+
+      // El socket no reenvía lo perdido: la recuperación es por REST, que es lo
+      // que hace useChatSocket invalidando la query al reconectar.
+      const res = await request(app)
+        .get(`/api/chats/${chatId}/messages`)
+        .set("Authorization", `Bearer ${tokenB}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.some((m: { content: string }) => m.content === contenido)).toBe(true);
+    });
+  });
+
+  describe("listeners y rooms", () => {
+    test("50 ciclos de conexión y desconexión no dejan sockets ni rooms colgados", async () => {
+      const sala = chatRoom(chatId);
+      const roomsAntes = io.sockets.adapter.rooms.size;
+
+      for (let i = 0; i < 50; i++) {
+        const client = ioc(`http://localhost:${port}`, {
+          transports: ["websocket"],
+          forceNew: true,
+          reconnection: false,
+          auth: { token: tokenA },
+        });
+        await waitForConnect(client);
+        await emitWithAck(client, "join_chat", { chatId });
+        client.close();
+      }
+
+      await waitUntil(() => io.engine.clientsCount === 0);
+      await waitUntil(() => !io.sockets.adapter.rooms.has(sala));
+
+      expect(io.sockets.sockets.size).toBe(0);
+      expect(io.sockets.adapter.rooms.size).toBe(roomsAntes);
+    }, 30000);
+
+    test("leave_chat borra la room cuando sale el último socket", async () => {
+      const sala = chatRoom(chatId);
+      const client = connect({ auth: { token: tokenA } });
+      await waitForConnect(client);
+
+      await emitWithAck(client, "join_chat", { chatId });
+      expect(io.sockets.adapter.rooms.get(sala)?.size).toBe(1);
+
+      await emitWithAck(client, "leave_chat", { chatId });
+      expect(io.sockets.adapter.rooms.has(sala)).toBe(false);
+    });
+
+    test("el server no acumula listeners al conectar y desconectar clientes", async () => {
+      const listenersAntes = io.sockets.listenerCount("connection");
+
+      for (let i = 0; i < 10; i++) {
+        const client = connect({ auth: { token: tokenA } });
+        await waitForConnect(client);
+        client.close();
+      }
+      await waitUntil(() => io.engine.clientsCount === 0);
+
+      expect(io.sockets.listenerCount("connection")).toBe(listenersAntes);
+    });
+  });
+
+  describe("carga del historial", () => {
+    test("el historial con 150 mensajes se sirve completo, ordenado y dentro del presupuesto", async () => {
+      const TOTAL = 150;
+      await prisma.message.createMany({
+        data: Array.from({ length: TOTAL }, (_, i) => ({
+          chatId,
+          senderId: i % 2 === 0 ? userAId : userBId,
+          content: `carga-${SUITE_TAG}-${String(i).padStart(4, "0")}`,
+        })),
+      });
+
+      const inicio = Date.now();
+      const res = await request(app)
+        .get(`/api/chats/${chatId}/messages`)
+        .set("Authorization", `Bearer ${tokenA}`);
+      const duracion = Date.now() - inicio;
+
+      expect(res.status).toBe(200);
+      expect(res.body.length).toBeGreaterThanOrEqual(TOTAL);
+
+      const deLaCarga = res.body.filter((m: { content: string | null }) =>
+        m.content?.startsWith(`carga-${SUITE_TAG}-`)
+      );
+      expect(deLaCarga).toHaveLength(TOTAL);
+
+      // Orden ascendente por fecha, que es lo que el frontend asume al pintar.
+      const fechas = res.body.map((m: { createdAt: string }) => new Date(m.createdAt).getTime());
+      expect(fechas).toEqual([...fechas].sort((a, b) => a - b));
+
+      console.log(`[#141] GET /messages con ${res.body.length} mensajes: ${duracion}ms`);
+      expect(duracion).toBeLessThan(2000);
+    }, 30000);
+
+    // El handler de send_message es async: hace await del insert en la base y
+    // recién después emite a la room. Si se disparan varios envíos sin esperar
+    // el ack anterior, los handlers corren solapados y el orden de emisión puede
+    // no ser el de llegada. Importa porque el frontend appendea el mensaje al
+    // final del array sin reordenar (appendMessage en useChatSocket).
+  });
+
 });
