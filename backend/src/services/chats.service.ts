@@ -54,6 +54,17 @@ export async function assertParticipant(chatId: number, userId: number): Promise
   return chat;
 }
 
-export async function createMessage(chatId: number, senderId: number, content: string): Promise<Message> {
-  return prisma.message.create({ data: { chatId, senderId, content } });
+export interface CreateMessageInput {
+  content?: string;
+  imageUrl?: string;
+}
+
+export async function createMessage(
+  chatId: number,
+  senderId: number,
+  data: CreateMessageInput
+): Promise<Message> {
+  return prisma.message.create({
+    data: { chatId, senderId, content: data.content ?? null, imageUrl: data.imageUrl ?? null },
+  });
 }
