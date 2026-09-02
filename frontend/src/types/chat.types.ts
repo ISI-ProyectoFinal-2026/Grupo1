@@ -11,7 +11,13 @@ export interface MessageDTO {
   chatId: number
   senderId: number
   content: string | null
+  imageUrl: string | null
   createdAt: string
+}
+
+export interface SendMessageInput {
+  content?: string
+  imageUrl?: string
 }
 
 export interface CreateChatInput {
@@ -36,7 +42,7 @@ export interface ClientToServerEvents {
   join_chat: (payload: { chatId: number }, ack?: (response: SocketAck) => void) => void
   leave_chat: (payload: { chatId: number }, ack?: (response: SocketAck) => void) => void
   send_message: (
-    payload: { chatId: number; content: string },
+    payload: { chatId: number; content?: string; imageUrl?: string },
     ack?: (response: SocketAck<MessageDTO>) => void
   ) => void
 }

@@ -9,6 +9,7 @@ import type {
   ChatConnectionStatus,
   ClientToServerEvents,
   MessageDTO,
+  SendMessageInput,
   ServerToClientEvents,
 } from '@/types/chat.types'
 
@@ -133,7 +134,7 @@ export function useChatSocket(chatId: number | undefined) {
   }, [chatId, isConnected])
 
   const sendMessage = useCallback(
-    async (content: string): Promise<MessageDTO> => {
+    async (input: SendMessageInput): Promise<MessageDTO> => {
       if (!chatId) {
         throw new Error('No hay un chat seleccionado')
       }
@@ -141,7 +142,7 @@ export function useChatSocket(chatId: number | undefined) {
       const socket = socketRef.current
       if (!socket?.connected) {
         // sin socket el mensaje igual se persiste por REST
-        const message = await sendMessageRest(chatId, content)
+        const message = await sendMessageRest(chatId, input)
         queryClient.setQueryData<MessageDTO[]>(chatMessagesQueryKey(chatId), (current) =>
           appendMessage(current, message)
         )
@@ -149,7 +150,7 @@ export function useChatSocket(chatId: number | undefined) {
       }
 
       return new Promise<MessageDTO>((resolve, reject) => {
-        socket.emit('send_message', { chatId, content }, (response) => {
+        socket.emit('send_message', { chatId, ...input }, (response) => {
           if (!response.ok) {
             setError(response.error)
             reject(new Error(response.error))

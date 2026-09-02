@@ -20,7 +20,16 @@ function MessageBubble({ message, isOwn }: MessageBubbleProps) {
           isOwn ? 'rounded-br-sm bg-blue-600 text-white' : 'rounded-bl-sm bg-gray-100 text-gray-900'
         }`}
       >
-        <p className='whitespace-pre-wrap break-words text-sm'>{message.content ?? ''}</p>
+        {message.imageUrl && (
+          <a href={message.imageUrl} target='_blank' rel='noreferrer'>
+            <img
+              src={message.imageUrl}
+              alt='Imagen enviada en el chat'
+              className='mb-1 max-h-60 max-w-full rounded-lg object-cover'
+            />
+          </a>
+        )}
+        {message.content && <p className='whitespace-pre-wrap break-words text-sm'>{message.content}</p>}
         <time
           dateTime={message.createdAt}
           className={`mt-1 block text-right text-[11px] ${
