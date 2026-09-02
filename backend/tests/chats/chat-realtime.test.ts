@@ -171,4 +171,29 @@ describe("chat en tiempo real (#141)", () => {
     });
   });
 
+  describe("orden de los mensajes", () => {
+    test("una ráfaga de 30 mensajes sin esperar ack llega completa y en orden", async () => {
+      const clientA = connect({ auth: { token: tokenA } });
+      const clientB = connect({ auth: { token: tokenB } });
+      await Promise.all([waitForConnect(clientA), waitForConnect(clientB)]);
+      await emitWithAck(clientB, "join_chat", { chatId });
+
+      const TOTAL = 30;
+      const prefijo = `rafaga-${Date.now()}`;
+      const recibidos: string[] = [];
+      clientB.on("receive_message", (message: { content: string | null }) => {
+        if (message.content?.startsWith(prefijo)) recibidos.push(message.content);
+      });
+
+      const enviados = Array.from({ length: TOTAL }, (_, i) => `${prefijo}-${String(i).padStart(3, "0")}`);
+      // Ráfaga real: se emiten todos de una y recién después se esperan los ack.
+      const acks = enviados.map((content) => emitWithAck(clientA, "send_message", { chatId, content }));
+      const resultados = await Promise.all(acks);
+      expect(resultados.every((ack) => ack.ok)).toBe(true);
+
+      await waitUntil(() => recibidos.length === TOTAL, 10000);
+      expect(recibidos).toEqual(enviados);
+    }, 30000);
+  });
+
 });
