@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth.store";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 function MainLayout() {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ function MainLayout() {
             <Link to="/chats" className="text-gray-600 hover:text-gray-900">
               Chats
             </Link>
+            <NotificationBell />
             <span className="text-gray-600">{user.email}</span>
             <button
               type="button"
