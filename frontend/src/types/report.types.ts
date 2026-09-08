@@ -15,6 +15,7 @@ export interface ReportDTO {
   title: string
   description: string | null
   imageUrl: string | null
+  customFlyerUrl: string | null
   locationAddress: string | null
   location: ReportLocation | null
   tag: { label: string; color: string }

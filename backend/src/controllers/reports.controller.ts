@@ -6,6 +6,7 @@ import {
   createReportSchema,
   listReportsQuerySchema,
   reportIdParamSchema,
+  setCustomFlyerSchema,
   updateReportSchema,
 } from "../validators/reports.validator";
 
@@ -56,6 +57,17 @@ export async function getMatches(req: Request, res: Response): Promise<void> {
 export async function getFlyer(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
   const report = await reportsService.getById(id); // dispara 404 si no existe
+  if (report.customFlyerUrl) {
+    res.status(200).json({ flyerUrl: report.customFlyerUrl });
+    return;
+  }
   const flyerUrl = await flyerService.getOrCreateFlyerUrl(report);
   res.status(200).json({ flyerUrl });
+}
+
+export async function setCustomFlyer(req: Request, res: Response): Promise<void> {
+  const { id } = reportIdParamSchema.parse(req.params);
+  const { flyerUrl } = setCustomFlyerSchema.parse(req.body);
+  const report = await reportsService.setCustomFlyer(id, req.userId!, flyerUrl);
+  res.status(200).json(report);
 }

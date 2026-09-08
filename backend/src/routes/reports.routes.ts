@@ -11,6 +11,7 @@ reportsRouter.get("/:id", reportsController.getById);
 reportsRouter.get("/:id/matches", reportsController.getMatches);
 reportsRouter.get("/:id/flyer", reportsController.getFlyer);
 reportsRouter.put("/:id", requireAuth, reportsController.update);
+reportsRouter.put("/:id/flyer/custom", requireAuth, reportsController.setCustomFlyer);
 reportsRouter.delete("/:id", requireAuth, reportsController.remove);
 reportsRouter.post("/:id/close", requireAuth, reportsController.close);
 reportsRouter.post("/:id/flags", requireAuth, reportFlagsController.create);

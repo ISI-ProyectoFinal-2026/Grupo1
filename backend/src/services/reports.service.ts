@@ -17,6 +17,7 @@ export interface ReportRow {
   title: string;
   description: string | null;
   imageUrl: string | null;
+  customFlyerUrl: string | null;
   locationAddress: string | null;
   lat: number | null;
   lng: number | null;
@@ -60,6 +61,7 @@ export function toReportDTO(row: ReportRow): ReportDTO {
 export const reportColumns = Prisma.sql`
   r.id, r.user_id AS "userId", r.pet_id AS "petId", r.report_type AS "reportType",
   r.status, r.title, r.description, r.image_url AS "imageUrl",
+  r.custom_flyer_url AS "customFlyerUrl",
   r.location_address AS "locationAddress",
   ST_Y(r.location::geometry) AS lat, ST_X(r.location::geometry) AS lng,
   r.created_at AS "createdAt", r.updated_at AS "updatedAt", r.published_at AS "publishedAt"
@@ -190,6 +192,15 @@ export async function close(id: number, userId: number): Promise<ReportDTO> {
     throw new AppError(409, "El reporte ya está resuelto");
   }
   await prisma.report.update({ where: { id }, data: { status: "resolved" } });
+  return getById(id);
+}
+
+export async function setCustomFlyer(id: number, userId: number, flyerUrl: string): Promise<ReportDTO> {
+  const report = await getById(id);
+  if (report.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para modificar el flyer de este reporte");
+  }
+  await prisma.report.update({ where: { id }, data: { customFlyerUrl: flyerUrl } });
   return getById(id);
 }
 

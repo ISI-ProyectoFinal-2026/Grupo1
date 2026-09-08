@@ -39,3 +39,8 @@ export async function getFlyer(id: number): Promise<{ flyerUrl: string }> {
   const { data } = await api.get<{ flyerUrl: string }>(`/reports/${id}/flyer`);
   return data;
 }
+
+export async function uploadCustomFlyer(id: number, flyerUrl: string): Promise<ReportDTO> {
+  const { data } = await api.put<ReportDTO>(`/reports/${id}/flyer/custom`, { flyerUrl });
+  return data;
+}

@@ -34,6 +34,12 @@ export const listReportsQuerySchema = z.object({
   order: z.enum(["asc", "desc"]).optional(),
 });
 
+export const setCustomFlyerSchema = z.object({
+  flyerUrl: z.string().min(1, "Se requiere la URL del flyer"),
+});
+
+export type SetCustomFlyerInput = z.infer<typeof setCustomFlyerSchema>;
+
 export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type UpdateReportInput = z.infer<typeof updateReportSchema>;
 export type ListReportsQuery = z.infer<typeof listReportsQuerySchema>;
