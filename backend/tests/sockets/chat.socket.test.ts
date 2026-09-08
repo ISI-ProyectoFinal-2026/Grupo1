@@ -152,6 +152,43 @@ describe("chat.socket", () => {
     expect(received.senderId).toBe(userAId);
   });
 
+  test("un mensaje enviado con imageUrl (sin content) llega y se persiste", async () => {
+    const clientA = connect({ auth: { token: tokenA } });
+    const clientB = connect({ auth: { token: tokenB } });
+
+    await Promise.all([
+      new Promise<void>((resolve) => clientA.on("connect", () => resolve())),
+      new Promise<void>((resolve) => clientB.on("connect", () => resolve())),
+    ]);
+    await emitWithAck(clientB, "join_chat", { chatId });
+
+    const receivedByB = new Promise<{ imageUrl: string | null; content: string | null }>((resolve) => {
+      clientB.on("receive_message", resolve);
+    });
+
+    const sendAck = await emitWithAck<{ id: number; imageUrl: string | null }>(clientA, "send_message", {
+      chatId,
+      imageUrl: "https://pub-test.r2.dev/chat/foto.jpg",
+    });
+    expect(sendAck.ok).toBe(true);
+    expect(sendAck.data?.imageUrl).toBe("https://pub-test.r2.dev/chat/foto.jpg");
+
+    const received = await receivedByB;
+    expect(received.imageUrl).toBe("https://pub-test.r2.dev/chat/foto.jpg");
+    expect(received.content).toBeNull();
+
+    const stored = await prisma.message.findUnique({ where: { id: sendAck.data!.id } });
+    expect(stored?.imageUrl).toBe("https://pub-test.r2.dev/chat/foto.jpg");
+  });
+
+  test("rechaza send_message sin content ni imageUrl", async () => {
+    const clientA = connect({ auth: { token: tokenA } });
+    await new Promise<void>((resolve) => clientA.on("connect", () => resolve()));
+
+    const ack = await emitWithAck(clientA, "send_message", { chatId });
+    expect(ack.ok).toBe(false);
+  });
+
   test("el mensaje enviado se persiste en la base de datos", async () => {
     const clientA = connect({ auth: { token: tokenA } });
     await new Promise<void>((resolve) => clientA.on("connect", () => resolve()));

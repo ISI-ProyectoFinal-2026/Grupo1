@@ -5,6 +5,7 @@ import { useChatMessagesQuery } from '@/hooks/useChatMessagesQuery'
 import { useChatSocket } from '@/hooks/useChatSocket'
 import { useChatsQuery } from '@/hooks/useChatsQuery'
 import { useAuthStore } from '@/stores/auth.store'
+import type { SendMessageInput } from '@/types/chat.types'
 
 function toErrorMessage(error: unknown): string | null {
   return error instanceof Error ? error.message : null
@@ -25,8 +26,8 @@ function ChatPage() {
   const messagesQuery = useChatMessagesQuery(chatId)
   const { status, error: socketError, sendMessage } = useChatSocket(chatId)
 
-  async function handleSend(content: string) {
-    await sendMessage(content)
+  async function handleSend(input: SendMessageInput) {
+    await sendMessage(input)
   }
 
   if (!currentUserId) return null

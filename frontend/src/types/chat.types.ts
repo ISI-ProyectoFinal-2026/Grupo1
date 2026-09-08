@@ -11,7 +11,13 @@ export interface MessageDTO {
   chatId: number
   senderId: number
   content: string | null
+  imageUrl: string | null
   createdAt: string
+}
+
+export interface SendMessageInput {
+  content?: string
+  imageUrl?: string
 }
 
 export interface CreateChatInput {
@@ -36,9 +42,17 @@ export interface ClientToServerEvents {
   join_chat: (payload: { chatId: number }, ack?: (response: SocketAck) => void) => void
   leave_chat: (payload: { chatId: number }, ack?: (response: SocketAck) => void) => void
   send_message: (
-    payload: { chatId: number; content: string },
+    payload: { chatId: number; content?: string; imageUrl?: string },
     ack?: (response: SocketAck<MessageDTO>) => void
   ) => void
 }
 
-export type ChatConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
+// `unauthorized` es terminal: el server rechazó el handshake desde el middleware
+// de auth y socket.io-client ya descartó sus subscripciones, así que no va a
+// reintentar solo. No confundirlo con `reconnecting`, que sí se recupera.
+export type ChatConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
+  | 'unauthorized'

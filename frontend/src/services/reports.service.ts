@@ -34,3 +34,8 @@ export async function getMatches(id: number): Promise<MatchDTO[]> {
   const { data } = await api.get<MatchDTO[]>(`/reports/${id}/matches`);
   return data;
 }
+
+export async function getFlyer(id: number): Promise<{ flyerUrl: string }> {
+  const { data } = await api.get<{ flyerUrl: string }>(`/reports/${id}/flyer`);
+  return data;
+}

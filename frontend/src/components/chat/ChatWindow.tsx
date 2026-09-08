@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import Button from '@/components/ui/Button'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import Spinner from '@/components/ui/Spinner'
+import {
+  ALLOWED_UPLOAD_TYPES,
+  MAX_UPLOAD_BYTES,
+  getPresignedUrl,
+  uploadToR2,
+  type UploadContentType,
+} from '@/services/uploads.service'
 import MessageBubble from './MessageBubble'
-import type { ChatConnectionStatus, MessageDTO } from '@/types/chat.types'
+import type { ChatConnectionStatus, MessageDTO, SendMessageInput } from '@/types/chat.types'
 
 interface ChatWindowProps {
   messages: MessageDTO[]
@@ -12,14 +20,17 @@ interface ChatWindowProps {
   isLoading: boolean
   loadError: string | null
   sendError: string | null
-  onSend: (content: string) => Promise<void>
+  onSend: (input: SendMessageInput) => Promise<void>
 }
+
+const MAX_UPLOAD_MB = Math.floor(MAX_UPLOAD_BYTES / 1_000_000)
 
 const statusLabels: Record<ChatConnectionStatus, string> = {
   connecting: 'Conectando…',
   connected: 'En línea',
   reconnecting: 'Reconectando…',
   disconnected: 'Sin conexión',
+  unauthorized: 'Sesión expirada',
 }
 
 const statusDotClasses: Record<ChatConnectionStatus, string> = {
@@ -27,6 +38,7 @@ const statusDotClasses: Record<ChatConnectionStatus, string> = {
   connected: 'bg-green-500',
   reconnecting: 'bg-amber-500',
   disconnected: 'bg-gray-400',
+  unauthorized: 'bg-red-500',
 }
 
 function ChatWindow({
@@ -40,7 +52,11 @@ function ChatWindow({
 }: ChatWindowProps) {
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [imageError, setImageError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const isUnauthorized = connectionStatus === 'unauthorized'
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' })
@@ -53,12 +69,40 @@ function ChatWindow({
 
     setIsSending(true)
     try {
-      await onSend(content)
+      await onSend({ content })
       setDraft('')
     } catch {
       // el error ya se muestra desde sendError
     } finally {
       setIsSending(false)
+    }
+  }
+
+  async function handleFileSelect(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (!file) return
+
+    setImageError(null)
+
+    if (!ALLOWED_UPLOAD_TYPES.includes(file.type as UploadContentType)) {
+      setImageError('Solo se permiten imágenes JPG, PNG o WebP')
+      return
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setImageError(`La imagen debe pesar menos de ${MAX_UPLOAD_MB}MB`)
+      return
+    }
+
+    setIsUploadingImage(true)
+    try {
+      const presign = await getPresignedUrl(file.name, file.type as UploadContentType, file.size)
+      await uploadToR2(presign.uploadUrl, file)
+      await onSend({ imageUrl: presign.publicUrl })
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : 'No se pudo enviar la imagen')
+    } finally {
+      setIsUploadingImage(false)
     }
   }
 
@@ -97,9 +141,43 @@ function ChatWindow({
         <div ref={bottomRef} />
       </div>
 
+      {isUnauthorized ? (
+        <div className='border-t border-gray-200 px-4 py-3'>
+          <p className='text-sm text-gray-700'>
+            Tu sesión expiró, por eso el chat dejó de recibir mensajes.{' '}
+            <Link to='/login' className='font-medium text-blue-600 hover:underline'>
+              Iniciá sesión de nuevo
+            </Link>{' '}
+            para seguir la conversación.
+          </p>
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className='border-t border-gray-200 px-4 py-3'>
         {sendError && <ErrorMessage message={sendError} className='mb-2' />}
+        {imageError && <ErrorMessage message={imageError} className='mb-2' />}
         <div className='flex items-center gap-2'>
+          <label htmlFor='chat-image-input' className='sr-only'>
+            Adjuntar imagen
+          </label>
+          <input
+            ref={fileInputRef}
+            id='chat-image-input'
+            type='file'
+            accept={ALLOWED_UPLOAD_TYPES.join(',')}
+            className='hidden'
+            onChange={handleFileSelect}
+            disabled={isUploadingImage}
+          />
+          <Button
+            type='button'
+            variant='secondary'
+            isLoading={isUploadingImage}
+            onClick={() => fileInputRef.current?.click()}
+            aria-label='Adjuntar imagen'
+          >
+            📎
+          </Button>
+
           <label htmlFor='chat-message-input' className='sr-only'>
             Mensaje
           </label>
@@ -117,6 +195,7 @@ function ChatWindow({
           </Button>
         </div>
       </form>
+      )}
     </section>
   )
 }

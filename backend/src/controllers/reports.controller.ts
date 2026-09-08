@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as reportsService from "../services/reports.service";
 import * as matchingService from "../services/matching.service";
+import * as flyerService from "../services/flyer.service";
 import {
   createReportSchema,
   listReportsQuerySchema,
@@ -50,4 +51,11 @@ export async function getMatches(req: Request, res: Response): Promise<void> {
   await reportsService.getById(id); // dispara 404 si no existe
   const matches = await matchingService.listMatches(id);
   res.status(200).json(matches);
+}
+
+export async function getFlyer(req: Request, res: Response): Promise<void> {
+  const { id } = reportIdParamSchema.parse(req.params);
+  const report = await reportsService.getById(id); // dispara 404 si no existe
+  const flyerUrl = await flyerService.getOrCreateFlyerUrl(report);
+  res.status(200).json({ flyerUrl });
 }

@@ -77,3 +77,24 @@ export async function createPresignedUpload(data: PresignUploadInput): Promise<P
 
   return { uploadUrl, publicUrl, key };
 }
+
+/**
+ * Sube un buffer generado por el propio backend (ej. un flyer compuesto en
+ * canvas) directo a R2, sin pasar por el flujo de presigned URL que usa el
+ * cliente para sus propias fotos.
+ */
+export async function uploadBuffer(key: string, body: Buffer, contentType: string): Promise<string> {
+  assertR2Configured();
+
+  const client = getS3Client();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+
+  return `${process.env.R2_PUBLIC_URL}/${key}`;
+}
