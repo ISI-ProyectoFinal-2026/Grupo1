@@ -142,4 +142,116 @@ describe("POST/GET/PUT /api/businesses", () => {
     const res = await request(app).get("/api/businesses/me/stats").set("Authorization", `Bearer ${otherToken}`);
     expect(res.status).toBe(404);
   });
+
+  async function createBusiness(): Promise<{ id: number }> {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+    return created.body;
+  }
+
+  test("GET /api/businesses es público y no expone cuit ni userId", async () => {
+    const business = await createBusiness();
+
+    const res = await request(app).get("/api/businesses");
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    const found = res.body.find((item: { id: number }) => item.id === business.id);
+    expect(found).toBeDefined();
+    expect(found).not.toHaveProperty("cuit");
+    expect(found).not.toHaveProperty("userId");
+  });
+
+  test("GET /api/businesses?category filtra por rubro", async () => {
+    const business = await createBusiness();
+
+    const same = await request(app).get("/api/businesses").query({ category: "REFUGIO" });
+    const other = await request(app).get("/api/businesses").query({ category: "PET_SHOP" });
+
+    expect(same.status).toBe(200);
+    expect(same.body.some((item: { id: number }) => item.id === business.id)).toBe(true);
+    expect(other.body.some((item: { id: number }) => item.id === business.id)).toBe(false);
+  });
+
+  test("GET /api/businesses responde 400 si la categoría es inválida", async () => {
+    const res = await request(app).get("/api/businesses").query({ category: "NO_EXISTE" });
+    expect(res.status).toBe(400);
+  });
+
+  test("GET /api/businesses/:id es público y registra la vista en las stats del dueño", async () => {
+    const business = await createBusiness();
+
+    const res = await request(app).get(`/api/businesses/${business.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(business.id);
+    expect(res.body).not.toHaveProperty("cuit");
+
+    const stats = await request(app).get("/api/businesses/me/stats").set("Authorization", `Bearer ${token}`);
+    expect(stats.body).toEqual({ views: 1, contacts: 0 });
+  });
+
+  test("GET /api/businesses/:id no cuenta la visita del propio dueño", async () => {
+    const business = await createBusiness();
+
+    await request(app).get(`/api/businesses/${business.id}`).set("Authorization", `Bearer ${token}`);
+
+    const stats = await request(app).get("/api/businesses/me/stats").set("Authorization", `Bearer ${token}`);
+    expect(stats.body.views).toBe(0);
+  });
+
+  test("GET /api/businesses/:id responde 404 si el comercio no existe", async () => {
+    const res = await request(app).get("/api/businesses/999999999");
+    expect(res.status).toBe(404);
+  });
+
+  test("GET /api/businesses/me no se resuelve como /:id", async () => {
+    const business = await createBusiness();
+
+    const res = await request(app).get("/api/businesses/me").set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(business.id);
+    expect(res.body.cuit).toBeDefined();
+  });
+
+  test("POST /api/businesses/:id/contact sin token responde 401", async () => {
+    const business = await createBusiness();
+
+    const res = await request(app).post(`/api/businesses/${business.id}/contact`);
+    expect(res.status).toBe(401);
+  });
+
+  test("POST /api/businesses/:id/contact responde 204 y suma un contacto real", async () => {
+    const business = await createBusiness();
+
+    const res = await request(app)
+      .post(`/api/businesses/${business.id}/contact`)
+      .set("Authorization", `Bearer ${otherToken}`);
+
+    expect(res.status).toBe(204);
+
+    const stats = await request(app).get("/api/businesses/me/stats").set("Authorization", `Bearer ${token}`);
+    expect(stats.body).toEqual({ views: 0, contacts: 1 });
+  });
+
+  test("POST /api/businesses/:id/contact responde 400 si el dueño contacta su propio comercio", async () => {
+    const business = await createBusiness();
+
+    const res = await request(app)
+      .post(`/api/businesses/${business.id}/contact`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/businesses/:id/contact responde 404 si el comercio no existe", async () => {
+    const res = await request(app)
+      .post("/api/businesses/999999999/contact")
+      .set("Authorization", `Bearer ${otherToken}`);
+
+    expect(res.status).toBe(404);
+  });
 });
