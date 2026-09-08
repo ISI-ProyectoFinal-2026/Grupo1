@@ -1,7 +1,23 @@
-import { Business, Prisma } from "@prisma/client";
+import { Business, BusinessEventType, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
-import { CreateBusinessInput, UpdateBusinessInput } from "../validators/businesses.validator";
+import {
+  CreateBusinessInput,
+  ListBusinessesQuery,
+  UpdateBusinessInput,
+} from "../validators/businesses.validator";
+
+// Proyección pública de un comercio: deja afuera `cuit` y `userId`, que son
+// datos del titular y solo se devuelven al dueño por GET /me.
+const publicBusinessSelect = {
+  id: true,
+  name: true,
+  address: true,
+  phone: true,
+  category: true,
+  plan: true,
+  createdAt: true,
+} satisfies Prisma.BusinessSelect;
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -16,6 +32,8 @@ export interface BusinessStats {
   views: number;
   contacts: number;
 }
+
+export type PublicBusiness = Prisma.BusinessGetPayload<{ select: typeof publicBusinessSelect }>;
 
 export async function create(data: CreateBusinessInput & { userId: number }): Promise<Business> {
   try {
@@ -56,9 +74,86 @@ export async function updateByUserId(userId: number, data: UpdateBusinessInput):
   }
 }
 
+export async function listPublic(filters: ListBusinessesQuery): Promise<PublicBusiness[]> {
+  return prisma.business.findMany({
+    where: filters.category ? { category: filters.category } : undefined,
+    select: publicBusinessSelect,
+    orderBy: { name: "asc" },
+  });
+}
+
+export async function getPublicById(id: number): Promise<PublicBusiness> {
+  const business = await prisma.business.findUnique({ where: { id }, select: publicBusinessSelect });
+  if (!business) {
+    throw new AppError(404, "Comercio no encontrado");
+  }
+  return business;
+}
+
+async function getOwnerIdOrThrow(businessId: number): Promise<number> {
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { userId: true },
+  });
+  if (!business) {
+    throw new AppError(404, "Comercio no encontrado");
+  }
+  return business.userId;
+}
+
+/**
+ * Registra una visita al perfil público del comercio.
+ *
+ * Las visitas del propio dueño se descartan en silencio: son un efecto
+ * secundario de que el comercio revise su ficha, no interés real, y contarlas
+ * inflaría la métrica que después muestra su dashboard.
+ */
+export async function recordView(businessId: number, viewerUserId?: number): Promise<void> {
+  const ownerId = await getOwnerIdOrThrow(businessId);
+  if (viewerUserId !== undefined && viewerUserId === ownerId) {
+    return;
+  }
+
+  await prisma.businessEvent.create({
+    data: { businessId, type: BusinessEventType.VIEW, userId: viewerUserId ?? null },
+  });
+}
+
+/**
+ * Registra un contacto hacia el comercio. A diferencia de la vista, contactarse
+ * es una acción explícita: si el dueño la dispara sobre su propio comercio se
+ * responde 400 en vez de ignorarla, para que el error sea visible.
+ */
+export async function recordContact(businessId: number, userId: number): Promise<void> {
+  const ownerId = await getOwnerIdOrThrow(businessId);
+  if (userId === ownerId) {
+    throw new AppError(400, "No podés contactar a tu propio comercio");
+  }
+
+  await prisma.businessEvent.create({
+    data: { businessId, type: BusinessEventType.CONTACT, userId },
+  });
+}
+
+/**
+ * Métricas del dashboard, agregadas sobre los eventos realmente persistidos en
+ * `business_events`. Un comercio sin interacciones devuelve ceros porque no
+ * ocurrió nada, no porque el dato falte.
+ */
 export async function getStats(userId: number): Promise<BusinessStats> {
-  await getByUserId(userId);
-  // No existe infraestructura de analytics (vistas/contactos) en el proyecto
-  // todavía: se devuelve un stub en cero hasta que se implemente el tracking.
-  return { views: 0, contacts: 0 };
+  const business = await getByUserId(userId);
+
+  const grouped = await prisma.businessEvent.groupBy({
+    by: ["type"],
+    where: { businessId: business.id },
+    _count: { _all: true },
+  });
+
+  const countOf = (type: BusinessEventType): number =>
+    grouped.find((row) => row.type === type)?._count._all ?? 0;
+
+  return {
+    views: countOf(BusinessEventType.VIEW),
+    contacts: countOf(BusinessEventType.CONTACT),
+  };
 }

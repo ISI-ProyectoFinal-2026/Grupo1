@@ -34,3 +34,28 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
     throw error;
   }
 }
+
+/**
+ * Autenticación opcional: si viene un token válido deja `req.userId` seteado,
+ * y si no viene (o es inválido/expirado) deja pasar igual como visitante
+ * anónimo. Se usa en endpoints públicos que necesitan distinguir al visitante
+ * sin exigirle sesión — por ejemplo el perfil público de un comercio, donde
+ * saber quién mira permite no contabilizar las visitas del propio dueño.
+ */
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    next();
+    return;
+  }
+
+  try {
+    const payload = verifyAccessToken(authHeader.slice("Bearer ".length));
+    req.userId = payload.sub;
+  } catch {
+    // Token inválido o expirado: se trata como visitante anónimo.
+  }
+
+  next();
+}

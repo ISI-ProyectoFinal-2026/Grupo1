@@ -74,6 +74,38 @@ function extractToken(socket: ChatSocket): string | undefined {
   return undefined;
 }
 
+/**
+ * Persiste un mensaje y lo emite a la room del chat. Nunca rechaza: cualquier
+ * error se le devuelve al emisor por el ack y por el evento `error`, para que
+ * la cadena de envíos del socket siga viva después de un mensaje inválido.
+ */
+async function handleSendMessage(
+  io: ChatServer,
+  socket: ChatSocket,
+  payload: { chatId: number; content?: string; imageUrl?: string },
+  ack?: Ack<Message>
+): Promise<void> {
+  try {
+    const { chatId, content, imageUrl } = sendMessageSchema.parse(payload);
+    const chat = await chatsService.assertParticipant(chatId, socket.data.userId);
+    const message = await chatsService.createMessage(chatId, socket.data.userId, { content, imageUrl });
+
+    // Notificación best-effort: no debe tumbar el envío en tiempo real.
+    try {
+      await notificationsService.notifyNewMessage(chat, message);
+    } catch (notifyError) {
+      console.error(`[chat.socket] no se pudo notificar el mensaje del chat ${chatId}:`, notifyError);
+    }
+
+    io.to(chatRoom(chatId)).emit("receive_message", message);
+    ack?.({ ok: true, data: message });
+  } catch (error) {
+    const message = toErrorMessage(error);
+    ack?.({ ok: false, error: message });
+    socket.emit("error", { event: "send_message", message });
+  }
+}
+
 export function initChatSocket(httpServer: HttpServer): ChatServer {
   const io: ChatServer = new Server(httpServer, {
     cors: { origin: process.env.FRONTEND_URL || "http://localhost:5173" },
@@ -122,26 +154,20 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
       }
     });
 
-    socket.on("send_message", async (payload, ack) => {
-      try {
-        const { chatId, content, imageUrl } = sendMessageSchema.parse(payload);
-        const chat = await chatsService.assertParticipant(chatId, socket.data.userId);
-        const message = await chatsService.createMessage(chatId, socket.data.userId, { content, imageUrl });
+    // Socket.io procesa los eventos de un mismo socket en paralelo: no espera a
+    // que termine un handler para arrancar el siguiente. Como enviar un mensaje
+    // hace await del insert antes de emitir, dos envíos rápidos del mismo usuario
+    // se solapaban y emitían en orden de finalización, no de llegada. El
+    // receptor los veía desordenados, y como created_at se asigna en el insert,
+    // el orden guardado también quedaba mezclado: al recargar, la conversación
+    // se reordenaba sola. Encadenando los envíos de este socket, los mensajes de
+    // un mismo emisor se persisten y se emiten en el orden en que los mandó.
+    // El orden entre emisores distintos sigue siendo el de llegada al server,
+    // que es lo correcto.
+    let pendingSends: Promise<void> = Promise.resolve();
 
-        // Notificación best-effort: no debe tumbar el envío en tiempo real.
-        try {
-          await notificationsService.notifyNewMessage(chat, message);
-        } catch (notifyError) {
-          console.error(`[chat.socket] no se pudo notificar el mensaje del chat ${chatId}:`, notifyError);
-        }
-
-        io.to(chatRoom(chatId)).emit("receive_message", message);
-        ack?.({ ok: true, data: message });
-      } catch (error) {
-        const message = toErrorMessage(error);
-        ack?.({ ok: false, error: message });
-        socket.emit("error", { event: "send_message", message });
-      }
+    socket.on("send_message", (payload, ack) => {
+      pendingSends = pendingSends.then(() => handleSendMessage(io, socket, payload, ack));
     });
   });
 

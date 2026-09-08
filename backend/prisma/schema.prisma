@@ -32,6 +32,7 @@ model User {
   chatsAsUserB  Chat[]          @relation("ChatUserB")
   reportFlags   ReportFlag[]
   business      Business?
+  businessEvents BusinessEvent[]
 
   @@map("users")
 }
@@ -244,7 +245,33 @@ model Business {
   planExpiresAt DateTime?        @map("plan_expires_at")
   createdAt     DateTime         @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user   User            @relation(fields: [userId], references: [id])
+  events BusinessEvent[]
 
   @@map("businesses")
+}
+
+enum BusinessEventType {
+  VIEW
+  CONTACT
+
+  @@map("business_event_type")
+}
+
+// Log append-only de interacciones con el perfil publico de un comercio.
+// Es la fuente de verdad de las metricas del dashboard (`getStats`): cada fila
+// es un evento real y persistido, nunca un valor calculado o estimado.
+model BusinessEvent {
+  id         Int               @id @default(autoincrement())
+  businessId Int               @map("business_id")
+  type       BusinessEventType
+  // null = visitante anonimo (sin sesion iniciada)
+  userId     Int?              @map("user_id")
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, type])
+  @@map("business_events")
 }

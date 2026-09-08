@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import Button from '@/components/ui/Button'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import Spinner from '@/components/ui/Spinner'
@@ -29,6 +30,7 @@ const statusLabels: Record<ChatConnectionStatus, string> = {
   connected: 'En línea',
   reconnecting: 'Reconectando…',
   disconnected: 'Sin conexión',
+  unauthorized: 'Sesión expirada',
 }
 
 const statusDotClasses: Record<ChatConnectionStatus, string> = {
@@ -36,6 +38,7 @@ const statusDotClasses: Record<ChatConnectionStatus, string> = {
   connected: 'bg-green-500',
   reconnecting: 'bg-amber-500',
   disconnected: 'bg-gray-400',
+  unauthorized: 'bg-red-500',
 }
 
 function ChatWindow({
@@ -53,6 +56,7 @@ function ChatWindow({
   const [imageError, setImageError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const isUnauthorized = connectionStatus === 'unauthorized'
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' })
@@ -137,6 +141,17 @@ function ChatWindow({
         <div ref={bottomRef} />
       </div>
 
+      {isUnauthorized ? (
+        <div className='border-t border-gray-200 px-4 py-3'>
+          <p className='text-sm text-gray-700'>
+            Tu sesión expiró, por eso el chat dejó de recibir mensajes.{' '}
+            <Link to='/login' className='font-medium text-blue-600 hover:underline'>
+              Iniciá sesión de nuevo
+            </Link>{' '}
+            para seguir la conversación.
+          </p>
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className='border-t border-gray-200 px-4 py-3'>
         {sendError && <ErrorMessage message={sendError} className='mb-2' />}
         {imageError && <ErrorMessage message={imageError} className='mb-2' />}
@@ -180,6 +195,7 @@ function ChatWindow({
           </Button>
         </div>
       </form>
+      )}
     </section>
   )
 }

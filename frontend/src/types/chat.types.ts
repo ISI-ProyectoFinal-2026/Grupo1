@@ -47,4 +47,12 @@ export interface ClientToServerEvents {
   ) => void
 }
 
-export type ChatConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
+// `unauthorized` es terminal: el server rechazó el handshake desde el middleware
+// de auth y socket.io-client ya descartó sus subscripciones, así que no va a
+// reintentar solo. No confundirlo con `reconnecting`, que sí se recupera.
+export type ChatConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
+  | 'unauthorized'

@@ -84,6 +84,18 @@ export function useChatSocket(chatId: number | undefined) {
     }
 
     function handleConnectError(connectError: Error) {
+      // Cuando el rechazo viene del middleware de auth del server, socket.io-client
+      // hace destroy() de sus subscripciones y NO vuelve a reintentar nunca, por
+      // más que reconnectionAttempts sea Infinity (ver Socket#onpacket, caso
+      // CONNECT_ERROR). `active` es justamente lo que distingue ese caso terminal
+      // de una caída de red recuperable. Marcarlo como 'reconnecting' dejaba al
+      // usuario mirando "Reconectando…" para siempre, sin nada reconectando.
+      if (!socket.active) {
+        setStatus('unauthorized')
+        setError(connectError.message)
+        return
+      }
+
       setStatus('reconnecting')
       setError(connectError.message)
     }
