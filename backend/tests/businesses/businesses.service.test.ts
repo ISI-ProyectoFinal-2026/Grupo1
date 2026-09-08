@@ -117,4 +117,131 @@ describe("businesses.service", () => {
   test("getStats() lanza AppError 404 si el usuario no tiene comercio registrado", async () => {
     await expect(businessesService.getStats(otherUserId)).rejects.toMatchObject({ statusCode: 404 });
   });
+
+  test("listPublic() no expone cuit ni userId", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    const list = await businessesService.listPublic({});
+    const found = list.find((item) => item.id === business.id);
+
+    expect(found).toBeDefined();
+    expect(found).not.toHaveProperty("cuit");
+    expect(found).not.toHaveProperty("userId");
+    expect(found!.name).toBe(baseBusinessData.name);
+  });
+
+  test("listPublic() filtra por categoría", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    const sameCategory = await businessesService.listPublic({ category: "VETERINARIA" });
+    const otherCategory = await businessesService.listPublic({ category: "PET_SHOP" });
+
+    expect(sameCategory.some((item) => item.id === business.id)).toBe(true);
+    expect(otherCategory.some((item) => item.id === business.id)).toBe(false);
+  });
+
+  test("getPublicById() no expone cuit ni userId", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    const publicBusiness = await businessesService.getPublicById(business.id);
+
+    expect(publicBusiness.id).toBe(business.id);
+    expect(publicBusiness).not.toHaveProperty("cuit");
+    expect(publicBusiness).not.toHaveProperty("userId");
+  });
+
+  test("getPublicById() lanza AppError 404 si el comercio no existe", async () => {
+    await expect(businessesService.getPublicById(999999999)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test("recordView() persiste el evento y getStats() lo refleja", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    await businessesService.recordView(business.id, otherUserId);
+
+    const stats = await businessesService.getStats(userId);
+    expect(stats).toEqual({ views: 1, contacts: 0 });
+  });
+
+  test("recordView() no registra las visitas del propio dueño", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    await businessesService.recordView(business.id, userId);
+
+    const stats = await businessesService.getStats(userId);
+    expect(stats.views).toBe(0);
+  });
+
+  test("recordView() registra visitas anónimas con userId null", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    await businessesService.recordView(business.id);
+
+    const events = await prisma.businessEvent.findMany({ where: { businessId: business.id } });
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("VIEW");
+    expect(events[0].userId).toBeNull();
+  });
+
+  test("recordView() lanza AppError 404 si el comercio no existe", async () => {
+    await expect(businessesService.recordView(999999999, otherUserId)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  });
+
+  test("recordContact() persiste el evento y getStats() lo refleja", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    await businessesService.recordContact(business.id, otherUserId);
+
+    const stats = await businessesService.getStats(userId);
+    expect(stats).toEqual({ views: 0, contacts: 1 });
+  });
+
+  test("recordContact() lanza AppError 400 si el dueño contacta su propio comercio", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    await expect(businessesService.recordContact(business.id, userId)).rejects.toMatchObject({
+      statusCode: 400,
+    });
+
+    const stats = await businessesService.getStats(userId);
+    expect(stats.contacts).toBe(0);
+  });
+
+  test("recordContact() lanza AppError 404 si el comercio no existe", async () => {
+    await expect(businessesService.recordContact(999999999, otherUserId)).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  });
+
+  test("getStats() agrega los conteos reales de vistas y contactos", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    await businessesService.recordView(business.id, otherUserId);
+    await businessesService.recordView(business.id);
+    await businessesService.recordContact(business.id, otherUserId);
+
+    const stats = await businessesService.getStats(userId);
+    expect(stats).toEqual({ views: 2, contacts: 1 });
+  });
+
+  test("borrar el comercio elimina en cascada sus eventos", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    await businessesService.recordView(business.id, otherUserId);
+
+    await prisma.business.delete({ where: { id: business.id } });
+
+    const events = await prisma.businessEvent.findMany({ where: { businessId: business.id } });
+    expect(events).toHaveLength(0);
+  });
 });

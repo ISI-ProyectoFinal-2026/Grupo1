@@ -16,5 +16,21 @@ export const createBusinessSchema = z.object({
 
 export const updateBusinessSchema = createBusinessSchema.partial();
 
+export const businessIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+export const listBusinessesQuerySchema = z.object({
+  category: z
+    .enum([
+      BusinessCategory.VETERINARIA,
+      BusinessCategory.REFUGIO,
+      BusinessCategory.PET_SHOP,
+      BusinessCategory.OTRO,
+    ])
+    .optional(),
+});
+
 export type CreateBusinessInput = z.infer<typeof createBusinessSchema>;
 export type UpdateBusinessInput = z.infer<typeof updateBusinessSchema>;
+export type ListBusinessesQuery = z.infer<typeof listBusinessesQuerySchema>;
