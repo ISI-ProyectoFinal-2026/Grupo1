@@ -81,6 +81,7 @@ model Report {
   title           String
   description     String?
   imageUrl        String?      @map("image_url")
+  customFlyerUrl  String?      @map("custom_flyer_url")
   // PostGIS point (lat/long). Prisma no modela tipos geométricos de forma
   // nativa: se declara como Unsupported y se maneja con SQL crudo cuando haga
   // falta (ST_DWithin, etc. — ver docs/ARQUITECTURA.md sección 4.3).

@@ -368,6 +368,45 @@ describe("reports.service", () => {
     await expect(reportsService.close(report.id, userId)).rejects.toMatchObject({ statusCode: 409 });
   });
 
+  test("create() deja customFlyerUrl en null cuando el reporte no tiene flyer propio", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    expect(report.customFlyerUrl).toBeNull();
+  });
+
+  test("setCustomFlyer() guarda la URL del flyer propio", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    const updated = await reportsService.setCustomFlyer(report.id, userId, "https://cdn.example.com/mi-flyer.png");
+    expect(updated.customFlyerUrl).toBe("https://cdn.example.com/mi-flyer.png");
+  });
+
+  test("setCustomFlyer() persiste el flyer propio, visible en getById()", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    await reportsService.setCustomFlyer(report.id, userId, "https://cdn.example.com/mi-flyer.png");
+    const found = await reportsService.getById(report.id);
+    expect(found.customFlyerUrl).toBe("https://cdn.example.com/mi-flyer.png");
+  });
+
+  test("setCustomFlyer() lanza AppError 404 si el reporte no existe", async () => {
+    await expect(reportsService.setCustomFlyer(-1, userId, "https://cdn.example.com/mi-flyer.png")).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  });
+
+  test("setCustomFlyer() lanza AppError 403 si el userId no es el autor", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    await expect(
+      reportsService.setCustomFlyer(report.id, userId + 1, "https://cdn.example.com/mi-flyer.png")
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   test("list() ordena por fecha, DESC por defecto y ASC cuando se pide", async () => {
     const first = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(first.id);

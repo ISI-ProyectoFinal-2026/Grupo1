@@ -3,13 +3,15 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
-import { getFlyer } from "@/services/reports.service";
+import { getFlyer, uploadCustomFlyer } from "@/services/reports.service";
 import { createChat, listChats } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
+import ErrorMessage from "@/components/ui/ErrorMessage";
 import PendingBanner from "@/components/reports/PendingBanner";
 import MatchCard from "@/components/reports/MatchCard";
+import ImageUploader from "@/components/reports/ImageUploader";
 
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,10 +23,21 @@ export default function ReportDetailPage() {
     report?.status,
   );
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
+  const [customFlyerError, setCustomFlyerError] = useState<string | null>(null);
   const flyerMutation = useMutation({
     mutationFn: () => getFlyer(Number(id)),
     onSuccess: (data) => setFlyerUrl(data.flyerUrl),
   });
+
+  const handleCustomFlyerUpload = async (publicUrl: string) => {
+    setCustomFlyerError(null);
+    try {
+      await uploadCustomFlyer(Number(id), publicUrl);
+      setFlyerUrl(publicUrl);
+    } catch {
+      setCustomFlyerError("No se pudo guardar el flyer, intentá de nuevo.");
+    }
+  };
 
   const currentUserId = useAuthStore((state) => state.user?.id);
 
@@ -95,6 +108,8 @@ export default function ReportDetailPage() {
       day: "numeric",
     });
   };
+
+  const displayFlyerUrl = flyerUrl ?? report.customFlyerUrl;
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
@@ -176,22 +191,27 @@ export default function ReportDetailPage() {
               <h3 className="text-sm font-semibold text-gray-700 mb-3">
                 Flyer para compartir
               </h3>
-              {!flyerUrl ? (
-                <Button
-                  variant="secondary"
-                  isLoading={flyerMutation.isPending}
-                  onClick={() => flyerMutation.mutate()}
-                >
-                  Generar flyer
-                </Button>
+              {!displayFlyerUrl ? (
+                <div className="flex flex-col gap-4">
+                  <Button
+                    variant="secondary"
+                    isLoading={flyerMutation.isPending}
+                    onClick={() => flyerMutation.mutate()}
+                  >
+                    Generar flyer
+                  </Button>
+                  <p className="text-sm text-gray-500">o subí tu propio flyer</p>
+                  <ImageUploader onSuccess={handleCustomFlyerUpload} onError={setCustomFlyerError} />
+                  {customFlyerError && <ErrorMessage message={customFlyerError} />}
+                </div>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-4 items-start">
-                  <img src={flyerUrl} alt="Flyer del reporte" className="w-40 rounded-md shadow" />
+                  <img src={displayFlyerUrl} alt="Flyer del reporte" className="w-40 rounded-md shadow" />
                   <div className="flex gap-3">
-                    <a href={flyerUrl} download target="_blank" rel="noreferrer">
+                    <a href={displayFlyerUrl} download target="_blank" rel="noreferrer">
                       <Button variant="secondary">Descargar</Button>
                     </a>
-                    <Button variant="primary" onClick={() => shareFlyer(flyerUrl)}>
+                    <Button variant="primary" onClick={() => shareFlyer(displayFlyerUrl)}>
                       Compartir
                     </Button>
                   </div>
