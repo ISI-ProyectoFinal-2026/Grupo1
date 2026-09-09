@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BusinessCategory } from "@prisma/client";
+import { BusinessCategory, BusinessPlan } from "@prisma/client";
 
 export const createBusinessSchema = z.object({
   name: z.string().min(1),
@@ -12,6 +12,8 @@ export const createBusinessSchema = z.object({
     BusinessCategory.PET_SHOP,
     BusinessCategory.OTRO,
   ]),
+  // PRO queda reservado/sin uso: no es seleccionable vía API.
+  plan: z.enum([BusinessPlan.FREE, BusinessPlan.PREMIUM]).optional(),
 });
 
 export const updateBusinessSchema = createBusinessSchema.partial();

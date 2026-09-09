@@ -100,6 +100,27 @@ describe("businesses.service", () => {
     expect(updated.name).toBe("Nuevo nombre");
   });
 
+  test("create() con plan PREMIUM persiste el comercio como premium", async () => {
+    const business = await businessesService.create({
+      userId,
+      ...baseBusinessData,
+      cuit: uniqueCuit(),
+      plan: "PREMIUM",
+    });
+    createdBusinessIds.push(business.id);
+
+    expect(business.plan).toBe("PREMIUM");
+  });
+
+  test("updateByUserId() con plan PREMIUM cambia un comercio FREE a premium", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+    expect(business.plan).toBe("FREE");
+
+    const updated = await businessesService.updateByUserId(userId, { plan: "PREMIUM" });
+    expect(updated.plan).toBe("PREMIUM");
+  });
+
   test("updateByUserId() lanza AppError 404 si el usuario no tiene comercio registrado", async () => {
     await expect(businessesService.updateByUserId(otherUserId, { name: "x" })).rejects.toMatchObject({
       statusCode: 404,
