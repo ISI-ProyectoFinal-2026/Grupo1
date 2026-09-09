@@ -8,7 +8,7 @@ describe("matching.service", () => {
 
   beforeEach(() => {
     fetchMock = jest.fn();
-    // @ts-expect-error -- test double, no necesita implementar el tipo completo de fetch
+    // test double: no necesita implementar el tipo completo de fetch
     global.fetch = fetchMock;
     updateSpy = jest.spyOn(prisma.report, "update").mockResolvedValue({} as never);
   });
@@ -306,7 +306,7 @@ describe("matching.service reconcilePendingReports", () => {
 
   beforeEach(() => {
     fetchMock = jest.fn().mockResolvedValue({ status: 201 });
-    // @ts-expect-error -- test double, no necesita implementar el tipo completo de fetch
+    // test double: no necesita implementar el tipo completo de fetch
     global.fetch = fetchMock;
     // OBLIGATORIO: reconcilePendingReports() barre toda la tabla `reports`, no
     // solo las filas que siembra este test. Sin este mock, un fetch que
