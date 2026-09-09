@@ -231,6 +231,26 @@ describe("PUT /api/reports/:id/flyer/custom", () => {
     expect(res.body.customFlyerUrl).toBe("https://cdn.example.com/mi-flyer.png");
   });
 
+  // El customFlyerUrl se renderiza como `<a href>` y `<img src>` en
+  // ReportDetailPage.tsx, y lo ve cualquier visitante del reporte. Un esquema
+  // `javascript:` persistido acá es XSS almacenado.
+  test.each([
+    ["javascript:", "javascript:fetch('//evil.example')"],
+    ["data:", "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="],
+    ["vbscript:", "vbscript:msgbox(1)"],
+    ["no es una URL", "no-es-una-url"],
+  ])("responde 400 y no persiste un flyerUrl con esquema %s", async (_label, flyerUrl) => {
+    const res = await request(app)
+      .put(`/api/reports/${reportId}/flyer/custom`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ flyerUrl });
+
+    expect(res.status).toBe(400);
+
+    const stored = await request(app).get(`/api/reports/${reportId}`);
+    expect(stored.body.customFlyerUrl).not.toBe(flyerUrl);
+  });
+
   test("GET /:id/flyer devuelve el customFlyerUrl seteado sin regenerar el PNG automático", async () => {
     await request(app)
       .put(`/api/reports/${reportId}/flyer/custom`)

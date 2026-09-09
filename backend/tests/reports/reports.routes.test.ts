@@ -174,6 +174,35 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     expect(res.body.tag.label).toBe("RESUELTO");
   });
 
+  // `update()` solo valida propiedad, no la transición de estado. Si el autor
+  // pudiera enviar `published`, saltearía el gate de moderación del Backend IA.
+  test.each(["published", "pending", "rejected"])(
+    "PUT /api/reports/:id responde 400 al intentar forzar status %s",
+    async (status) => {
+      const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
+      createdReportIds.push(created.body.id);
+
+      const res = await request(app)
+        .put(`/api/reports/${created.body.id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ status });
+
+      expect(res.status).toBe(400);
+
+      const stored = await request(app).get(`/api/reports/${created.body.id}`);
+      expect(stored.body.status).toBe(created.body.status);
+    }
+  );
+
+  test("POST /api/reports responde 400 si imageUrl no es una URL http/https", async () => {
+    const res = await request(app)
+      .post("/api/reports")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ userId, ...baseReportData, imageUrl: "javascript:alert(1)" });
+
+    expect(res.status).toBe(400);
+  });
+
   test("GET /api/reports/:id/matches responde 200 con la lista de matches sugeridos", async () => {
     const lost = await request(app)
       .post("/api/reports").set("Authorization", `Bearer ${token}`)
