@@ -8,6 +8,8 @@ import FeedPage from "./pages/reports/FeedPage";
 import CreateReportPage from "./pages/reports/CreateReportPage";
 import ReportDetailPage from "./pages/reports/ReportDetailPage";
 import ChatPage from "./pages/chat/ChatPage";
+import BusinessRegisterPage from "./pages/business/BusinessRegisterPage";
+import BusinessDashboardPage from "./pages/business/BusinessDashboardPage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -27,6 +29,8 @@ export const router = createBrowserRouter([
           { path: "reports/:id", element: <ReportDetailPage /> },
           { path: "chats", element: <ChatPage /> },
           { path: "chats/:id", element: <ChatPage /> },
+          { path: "businesses/register", element: <BusinessRegisterPage /> },
+          { path: "businesses/dashboard", element: <BusinessDashboardPage /> },
         ],
       },
     ],

@@ -26,6 +26,9 @@ function MainLayout() {
             <Link to="/chats" className="text-gray-600 hover:text-gray-900">
               Chats
             </Link>
+            <Link to="/businesses/dashboard" className="text-gray-600 hover:text-gray-900">
+              Mi comercio
+            </Link>
             <NotificationBell />
             <span className="text-gray-600">{user.email}</span>
             <button

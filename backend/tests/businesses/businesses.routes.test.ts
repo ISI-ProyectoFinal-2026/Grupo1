@@ -77,6 +77,37 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(res.body.error).toBeDefined();
   });
 
+  test("POST /api/businesses con plan PREMIUM crea el comercio como premium", async () => {
+    const res = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), plan: "PREMIUM" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.plan).toBe("PREMIUM");
+    createdBusinessIds.push(res.body.id);
+  });
+
+  test("POST /api/businesses sin plan crea el comercio como FREE", async () => {
+    const res = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+
+    expect(res.status).toBe(201);
+    expect(res.body.plan).toBe("FREE");
+    createdBusinessIds.push(res.body.id);
+  });
+
+  test("POST /api/businesses responde 400 si el plan es PRO", async () => {
+    const res = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), plan: "PRO" });
+
+    expect(res.status).toBe(400);
+  });
+
   test("GET /api/businesses/me retorna los datos del comercio del usuario logueado", async () => {
     const created = await request(app)
       .post("/api/businesses")
@@ -115,6 +146,22 @@ describe("POST/GET/PUT /api/businesses", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.phone).toBe("1199998888");
+  });
+
+  test("PUT /api/businesses/me con plan PREMIUM cambia el plan del comercio", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app)
+      .put("/api/businesses/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ plan: "PREMIUM" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.plan).toBe("PREMIUM");
   });
 
   test("PUT /api/businesses/me responde 404 si el usuario no tiene comercio registrado", async () => {
