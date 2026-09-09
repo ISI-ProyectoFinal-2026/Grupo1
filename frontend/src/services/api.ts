@@ -6,6 +6,7 @@ const DEFAULT_ERROR_MESSAGE = "Error inesperado, intentá de nuevo";
 
 export interface ApiError extends Error {
   details?: ApiErrorDetail[];
+  status?: number;
 }
 
 export const api = axios.create({
@@ -38,6 +39,7 @@ api.interceptors.response.use(
     if (details) {
       apiError.details = details;
     }
+    apiError.status = error.response?.status;
     return Promise.reject(apiError);
   },
 );
@@ -45,6 +47,13 @@ api.interceptors.response.use(
 export function getApiErrorDetails(error: unknown): ApiErrorDetail[] | undefined {
   if (error instanceof Error && "details" in error) {
     return (error as ApiError).details;
+  }
+  return undefined;
+}
+
+export function getApiErrorStatus(error: unknown): number | undefined {
+  if (error instanceof Error && "status" in error) {
+    return (error as ApiError).status;
   }
   return undefined;
 }
