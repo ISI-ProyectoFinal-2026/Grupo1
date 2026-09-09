@@ -1,4 +1,4 @@
-import { Business, BusinessEventType, Prisma } from "@prisma/client";
+import { Business, BusinessEventType, BusinessPlan, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import {
@@ -61,7 +61,18 @@ export async function getByUserId(userId: number): Promise<Business> {
   return business;
 }
 
-export async function updateByUserId(userId: number, data: UpdateBusinessInput): Promise<Business> {
+/**
+ * Datos que acepta el servicio al actualizar un comercio.
+ *
+ * Es a propósito más amplio que `UpdateBusinessInput`, que es lo que acepta la
+ * API: el validador HTTP no deja pasar `plan` para que nadie se auto-otorgue
+ * PREMIUM (ver `businesses.validator.ts`). El servicio sí lo soporta, porque es
+ * el punto por donde va a entrar el futuro flujo de pago, que no pasa por el
+ * body de una request del dueño.
+ */
+export type UpdateBusinessData = UpdateBusinessInput & { plan?: BusinessPlan };
+
+export async function updateByUserId(userId: number, data: UpdateBusinessData): Promise<Business> {
   await getByUserId(userId);
 
   try {
