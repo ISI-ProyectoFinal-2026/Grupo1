@@ -13,6 +13,7 @@ function buildReport(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: "Gato gris perdido en San Telmo",
     description: "Collar rojo, muy asustadizo",
     imageUrl: null,
+    customFlyerUrl: null,
     locationAddress: "San Telmo, CABA",
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -148,12 +148,13 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(res.body.phone).toBe("1199998888");
   });
 
-  test("PUT /api/businesses/me con plan PREMIUM cambia el plan del comercio", async () => {
+  test("PUT /api/businesses/me ignora el plan: no se puede auto-otorgar PREMIUM", async () => {
     const created = await request(app)
       .post("/api/businesses")
       .set("Authorization", `Bearer ${token}`)
       .send({ ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(created.body.id);
+    expect(created.body.plan).toBe("FREE");
 
     const res = await request(app)
       .put("/api/businesses/me")
@@ -161,7 +162,24 @@ describe("POST/GET/PUT /api/businesses", () => {
       .send({ plan: "PREMIUM" });
 
     expect(res.status).toBe(200);
-    expect(res.body.plan).toBe("PREMIUM");
+    expect(res.body.plan).toBe("FREE");
+  });
+
+  test("PUT /api/businesses/me ignora el cuit: la identidad fiscal no es editable", async () => {
+    const originalCuit = uniqueCuit();
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: originalCuit });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app)
+      .put("/api/businesses/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ cuit: uniqueCuit() });
+
+    expect(res.status).toBe(200);
+    expect(res.body.cuit).toBe(originalCuit);
   });
 
   test("PUT /api/businesses/me responde 404 si el usuario no tiene comercio registrado", async () => {
