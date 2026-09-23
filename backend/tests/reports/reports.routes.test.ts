@@ -217,7 +217,7 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
       data: { reportLostId: lost.body.id, reportFoundId: found.body.id, similarityScore: 0.81, status: "pending" },
     });
 
-    const res = await request(app).get(`/api/reports/${lost.body.id}/matches`);
+    const res = await request(app).get(`/api/reports/${lost.body.id}/matches`).set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
     expect(res.body[0]).toMatchObject({
@@ -235,13 +235,21 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
     createdReportIds.push(created.body.id);
 
-    const res = await request(app).get(`/api/reports/${created.body.id}/matches`);
+    const res = await request(app).get(`/api/reports/${created.body.id}/matches`).set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
   });
 
+  test("GET /api/reports/:id/matches responde 401 sin token (no scrapeable por anónimos)", async () => {
+    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
+    createdReportIds.push(created.body.id);
+
+    const res = await request(app).get(`/api/reports/${created.body.id}/matches`);
+    expect(res.status).toBe(401);
+  });
+
   test("GET /api/reports/:id/matches responde 404 si el reporte no existe", async () => {
-    const res = await request(app).get("/api/reports/999999999/matches");
+    const res = await request(app).get("/api/reports/999999999/matches").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(404);
   });
 
