@@ -10,6 +10,8 @@ import ReportDetailPage from "./pages/reports/ReportDetailPage";
 import ChatPage from "./pages/chat/ChatPage";
 import BusinessRegisterPage from "./pages/business/BusinessRegisterPage";
 import BusinessDashboardPage from "./pages/business/BusinessDashboardPage";
+import BusinessDirectoryPage from "./pages/business/BusinessDirectoryPage";
+import BusinessProfilePage from "./pages/business/BusinessProfilePage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -29,8 +31,10 @@ export const router = createBrowserRouter([
           { path: "reports/:id", element: <ReportDetailPage /> },
           { path: "chats", element: <ChatPage /> },
           { path: "chats/:id", element: <ChatPage /> },
+          { path: "businesses", element: <BusinessDirectoryPage /> },
           { path: "businesses/register", element: <BusinessRegisterPage /> },
           { path: "businesses/dashboard", element: <BusinessDashboardPage /> },
+          { path: "businesses/:id", element: <BusinessProfilePage /> },
         ],
       },
     ],

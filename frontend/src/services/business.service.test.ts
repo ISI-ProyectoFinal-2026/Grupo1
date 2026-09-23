@@ -2,12 +2,15 @@ import type { AxiosResponse } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/services/api'
 import {
+  contactBusiness,
   createBusiness,
+  getBusiness,
   getMyBusiness,
   getMyBusinessStats,
+  listBusinesses,
   updateMyBusiness,
 } from '@/services/business.service'
-import type { Business } from '@/types/business.types'
+import type { Business, PublicBusiness } from '@/types/business.types'
 
 vi.mock('@/services/api', () => ({
   api: { get: vi.fn(), post: vi.fn(), put: vi.fn() },
@@ -28,6 +31,19 @@ function comercio(overrides: Partial<Business> = {}): Business {
     category: 'VETERINARIA',
     plan: 'FREE',
     planExpiresAt: null,
+    createdAt: '2026-09-01T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusiness {
+  return {
+    id: 1,
+    name: 'Veterinaria San Roque',
+    address: 'Av. Siempre Viva 123',
+    phone: '1122334455',
+    category: 'VETERINARIA',
+    plan: 'FREE',
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }
@@ -90,5 +106,41 @@ describe('business.service', () => {
 
     expect(api.get).toHaveBeenCalledWith('/businesses/me/stats')
     expect(resultado).toEqual(stats)
+  })
+
+  it('lista el directorio desde GET /businesses sin filtro cuando no hay categoria', async () => {
+    const listado = [comercioPublico()]
+    vi.mocked(api.get).mockResolvedValue(respuesta(listado))
+
+    const resultado = await listBusinesses()
+
+    expect(api.get).toHaveBeenCalledWith('/businesses', { params: undefined })
+    expect(resultado).toEqual(listado)
+  })
+
+  it('filtra el directorio por categoria contra GET /businesses', async () => {
+    vi.mocked(api.get).mockResolvedValue(respuesta([comercioPublico()]))
+
+    await listBusinesses('REFUGIO')
+
+    expect(api.get).toHaveBeenCalledWith('/businesses', { params: { category: 'REFUGIO' } })
+  })
+
+  it('trae el perfil publico desde GET /businesses/:id', async () => {
+    const publico = comercioPublico({ id: 9 })
+    vi.mocked(api.get).mockResolvedValue(respuesta(publico))
+
+    const resultado = await getBusiness(9)
+
+    expect(api.get).toHaveBeenCalledWith('/businesses/9')
+    expect(resultado).toEqual(publico)
+  })
+
+  it('registra el contacto contra POST /businesses/:id/contact', async () => {
+    vi.mocked(api.post).mockResolvedValue(respuesta(undefined))
+
+    await contactBusiness(9)
+
+    expect(api.post).toHaveBeenCalledWith('/businesses/9/contact')
   })
 })

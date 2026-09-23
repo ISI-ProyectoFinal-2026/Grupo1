@@ -1,15 +1,40 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  contactBusiness,
   createBusiness,
+  getBusiness,
   getMyBusiness,
   getMyBusinessStats,
+  listBusinesses,
   updateMyBusiness,
 } from "@/services/business.service";
 import { getApiErrorStatus } from "@/services/api";
-import type { CreateBusinessInput, UpdateBusinessInput } from "@/types/business.types";
+import type { BusinessCategory, CreateBusinessInput, UpdateBusinessInput } from "@/types/business.types";
 
 export const businessQueryKey = ["business", "me"] as const;
 export const businessStatsQueryKey = ["business", "me", "stats"] as const;
+export const businessesQueryKey = ["businesses"] as const;
+
+export function useBusinessesQuery(category?: BusinessCategory) {
+  return useQuery({
+    queryKey: [...businessesQueryKey, category ?? "all"],
+    queryFn: () => listBusinesses(category),
+  });
+}
+
+export function useBusinessQuery(id: number | undefined) {
+  return useQuery({
+    queryKey: [...businessesQueryKey, id],
+    queryFn: () => getBusiness(id!),
+    enabled: id !== undefined,
+  });
+}
+
+export function useContactBusinessMutation() {
+  return useMutation({
+    mutationFn: (id: number) => contactBusiness(id),
+  });
+}
 
 export function hasNoBusiness(error: unknown): boolean {
   return getApiErrorStatus(error) === 404;

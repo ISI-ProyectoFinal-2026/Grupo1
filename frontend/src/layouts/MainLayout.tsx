@@ -1,14 +1,23 @@
 import { Outlet, useNavigate, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
 import NotificationBell from "@/components/notifications/NotificationBell";
 
 function MainLayout() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
   function handleLogout() {
     logout();
+    // Limpiar el caché de queries evita que, en un navegador compartido, el
+    // próximo usuario vea datos cacheados del anterior (['notifications'],
+    // ['business','me'], ['chats']) durante el primer render antes del refetch.
+    // El QueryClient vive una sola vez (main.tsx) y sobrevive al logout; el
+    // camino de 401 ya lo evita con un reload duro (api.ts), pero el botón de
+    // logout no recarga, así que hay que limpiar acá (issue #175).
+    queryClient.clear();
     navigate("/login");
   }
 
@@ -25,6 +34,9 @@ function MainLayout() {
             </Link>
             <Link to="/chats" className="text-gray-600 hover:text-gray-900">
               Chats
+            </Link>
+            <Link to="/businesses" className="text-gray-600 hover:text-gray-900">
+              Comercios
             </Link>
             <Link to="/businesses/dashboard" className="text-gray-600 hover:text-gray-900">
               Mi comercio

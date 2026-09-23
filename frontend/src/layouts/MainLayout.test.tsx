@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MainLayout from '@/layouts/MainLayout'
@@ -54,5 +55,23 @@ describe('MainLayout', () => {
     await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Notificaciones' })).not.toBeInTheDocument()
     expect(notificationsService.listNotifications).not.toHaveBeenCalled()
+  })
+
+  it('limpia el cache de queries al cerrar sesion (navegador compartido, #175)', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    const { Wrapper, client } = createQueryWrapper()
+    const clearSpy = vi.spyOn(client, 'clear')
+
+    render(
+      <Wrapper>
+        <MemoryRouter>
+          <MainLayout />
+        </MemoryRouter>
+      </Wrapper>
+    )
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /cerrar sesión/i }))
+
+    expect(clearSpy).toHaveBeenCalled()
   })
 })
