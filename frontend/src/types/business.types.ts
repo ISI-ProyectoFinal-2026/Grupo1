@@ -18,6 +18,19 @@ export interface Business {
   createdAt: string
 }
 
+// Proyección pública de un comercio (GET /businesses y GET /businesses/:id).
+// El backend deja afuera `cuit` y `userId`: son datos del titular y solo se
+// devuelven al dueño por GET /me (ver businesses.service.ts, publicBusinessSelect).
+export interface PublicBusiness {
+  id: number
+  name: string
+  address: string
+  phone: string
+  category: BusinessCategory
+  plan: BusinessPlan
+  createdAt: string
+}
+
 export interface CreateBusinessInput {
   name: string
   cuit: string
