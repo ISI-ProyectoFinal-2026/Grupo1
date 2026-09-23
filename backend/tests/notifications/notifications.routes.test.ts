@@ -216,6 +216,28 @@ describe("/api/notifications", () => {
       expect(forOtherOwner?.reportId).toBe(reportId);
     });
 
+    test("no duplica notificaciones al llamarse dos veces para el mismo par de reportes", async () => {
+      const body = { lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 };
+
+      const first = await request(app)
+        .post("/api/notifications/internal/match")
+        .set("X-Internal-Key", "test-internal-key")
+        .send(body);
+      expect(first.status).toBe(201);
+      expect(first.body).toHaveLength(2);
+
+      const second = await request(app)
+        .post("/api/notifications/internal/match")
+        .set("X-Internal-Key", "test-internal-key")
+        .send(body);
+      expect(second.status).toBe(201);
+
+      const notifications = await prisma.notification.findMany({
+        where: { type: "match_suggested", userId: { in: [userId, otherUserId] } },
+      });
+      expect(notifications).toHaveLength(2);
+    });
+
     test("responde 400 si el body es inválido", async () => {
       const res = await request(app)
         .post("/api/notifications/internal/match")

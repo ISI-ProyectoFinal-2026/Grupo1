@@ -47,6 +47,13 @@ interface CreateForMatchInput {
  * puede interesarle a ese usuario). Si ambos reportes pertenecen al mismo
  * usuario, se crea una única notificación (no tiene sentido notificarle dos
  * veces el mismo match a la misma persona).
+ *
+ * Idempotente por par (userId, reportId): el par identifica unívocamente "el
+ * otro reporte de este match para este usuario", así que si ya existe una
+ * notificación de match para ese par no se crea otra y se devuelve la
+ * existente. El upsert del Backend IA (matching_service.py) puede reenviar el
+ * mismo match mientras siga "pending" —y la reconciliación puede reprocesar un
+ * reporte—, así que sin este guard el usuario recibiría el mismo aviso repetido.
  */
 export async function createForMatch(data: CreateForMatchInput): Promise<Notification[]> {
   const similarityPercent = Math.round(data.similarityScore * 100);
@@ -66,6 +73,18 @@ export async function createForMatch(data: CreateForMatchInput): Promise<Notific
 
   const notifications: Notification[] = [];
   for (const recipient of recipients) {
+    const existing = await prisma.notification.findFirst({
+      where: {
+        userId: recipient.userId,
+        type: "match_suggested",
+        reportId: recipient.reportId,
+      },
+    });
+    if (existing) {
+      notifications.push(existing);
+      continue;
+    }
+
     const notification = await prisma.notification.create({
       data: {
         userId: recipient.userId,
