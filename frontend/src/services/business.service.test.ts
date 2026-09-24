@@ -64,7 +64,6 @@ describe('business.service', () => {
       address: creado.address,
       phone: creado.phone,
       category: creado.category,
-      plan: 'FREE',
     })
 
     expect(api.post).toHaveBeenCalledWith('/businesses', {
@@ -73,7 +72,6 @@ describe('business.service', () => {
       address: creado.address,
       phone: creado.phone,
       category: creado.category,
-      plan: 'FREE',
     })
     expect(resultado).toEqual(creado)
   })
@@ -89,13 +87,13 @@ describe('business.service', () => {
   })
 
   it('actualiza el comercio propio contra PUT /businesses/me', async () => {
-    const actualizado = comercio({ plan: 'PREMIUM' })
+    const actualizado = comercio({ phone: '1199998888' })
     vi.mocked(api.put).mockResolvedValue(respuesta(actualizado))
 
-    const resultado = await updateMyBusiness({ plan: 'PREMIUM' })
+    const resultado = await updateMyBusiness({ phone: '1199998888' })
 
-    expect(api.put).toHaveBeenCalledWith('/businesses/me', { plan: 'PREMIUM' })
-    expect(resultado.plan).toBe('PREMIUM')
+    expect(api.put).toHaveBeenCalledWith('/businesses/me', { phone: '1199998888' })
+    expect(resultado.phone).toBe('1199998888')
   })
 
   it('trae las estadisticas propias desde GET /businesses/me/stats', async () => {

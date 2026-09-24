@@ -100,16 +100,16 @@ describe("businesses.service", () => {
     expect(updated.name).toBe("Nuevo nombre");
   });
 
-  test("create() con plan PREMIUM persiste el comercio como premium", async () => {
-    const business = await businessesService.create({
-      userId,
-      ...baseBusinessData,
-      cuit: uniqueCuit(),
-      plan: "PREMIUM",
-    });
+  test("create() ignora un plan colado en los datos: todo comercio nace FREE", async () => {
+    // `CreateBusinessInput` ya no declara `plan`; el cast simula un caller que
+    // igual lo cuela (p. ej. un spread de `req.body` sin validar).
+    const data = { userId, ...baseBusinessData, cuit: uniqueCuit(), plan: "PREMIUM" } as Parameters<
+      typeof businessesService.create
+    >[0];
+    const business = await businessesService.create(data);
     createdBusinessIds.push(business.id);
 
-    expect(business.plan).toBe("PREMIUM");
+    expect(business.plan).toBe("FREE");
   });
 
   test("updateByUserId() con plan PREMIUM cambia un comercio FREE a premium", async () => {
