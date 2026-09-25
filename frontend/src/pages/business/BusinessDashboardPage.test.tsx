@@ -69,11 +69,24 @@ describe('BusinessDashboardPage', () => {
     await user.click(screen.getByRole('button', { name: /guardar/i }))
 
     await waitFor(() =>
-      expect(businessService.updateMyBusiness).toHaveBeenCalledWith(
-        expect.objectContaining({ phone: '1199998888' })
-      )
+      expect(businessService.updateMyBusiness).toHaveBeenCalledWith({
+        name: 'Veterinaria San Roque',
+        address: 'Av. Siempre Viva 123',
+        phone: '1199998888',
+        category: 'VETERINARIA',
+      })
     )
     expect(await screen.findByText(/cambios guardados/i)).toBeInTheDocument()
+  })
+
+  it('no ofrece cambiar el plan: la API lo ignora al editar el perfil', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(comercio())
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    renderPage()
+
+    await screen.findByLabelText('Teléfono')
+    expect(screen.queryByLabelText('Plan')).not.toBeInTheDocument()
+    expect(screen.getByTestId('current-plan')).toHaveTextContent('Gratis')
   })
 
   it('redirige al registro si el usuario no tiene comercio', async () => {
