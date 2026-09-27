@@ -323,8 +323,68 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     const feed = await request(app).get("/api/reports");
     expect(feed.body.some((r: { id: number }) => r.id === created.body.id)).toBe(false);
 
-    const queue = await request(app).get("/api/reports?status=pending");
+    const queue = await request(app)
+      .get("/api/reports?status=pending")
+      .set("Authorization", `Bearer ${token}`);
     expect(queue.status).toBe(200);
     expect(queue.body.some((r: { id: number }) => r.id === created.body.id)).toBe(true);
+  });
+
+  describe("visibilidad de pending/rejected (#180)", () => {
+    async function createHiddenReport(status: "pending" | "rejected") {
+      const created = await request(app)
+        .post("/api/reports")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ userId, ...baseReportData, imageUrl: "https://cdn.example.com/hallazgo.jpg" });
+      createdReportIds.push(created.body.id);
+      if (status === "rejected") {
+        await prisma.report.update({ where: { id: created.body.id }, data: { status: "rejected" } });
+      }
+      return created.body.id as number;
+    }
+
+    test.each(["pending", "rejected"] as const)(
+      "GET /api/reports/:id con status %s responde 404 para anonimo",
+      async (status) => {
+        const id = await createHiddenReport(status);
+        const res = await request(app).get(`/api/reports/${id}`);
+        expect(res.status).toBe(404);
+      }
+    );
+
+    test.each(["pending", "rejected"] as const)(
+      "GET /api/reports/:id con status %s responde 404 para otro usuario autenticado",
+      async (status) => {
+        const id = await createHiddenReport(status);
+        const res = await request(app).get(`/api/reports/${id}`).set("Authorization", `Bearer ${otherToken}`);
+        expect(res.status).toBe(404);
+      }
+    );
+
+    test.each(["pending", "rejected"] as const)(
+      "GET /api/reports/:id con status %s responde 200 para el dueño",
+      async (status) => {
+        const id = await createHiddenReport(status);
+        const res = await request(app).get(`/api/reports/${id}`).set("Authorization", `Bearer ${token}`);
+        expect(res.status).toBe(200);
+        expect(res.body.status).toBe(status);
+      }
+    );
+
+    test("GET /api/reports?status=pending responde 200 con [] para anonimo", async () => {
+      const id = await createHiddenReport("pending");
+      const res = await request(app).get("/api/reports?status=pending");
+      expect(res.status).toBe(200);
+      expect(res.body.some((r: { id: number }) => r.id === id)).toBe(false);
+    });
+
+    test("GET /api/reports?status=pending no incluye el pending de otro usuario", async () => {
+      const id = await createHiddenReport("pending");
+      const res = await request(app)
+        .get("/api/reports?status=pending")
+        .set("Authorization", `Bearer ${otherToken}`);
+      expect(res.status).toBe(200);
+      expect(res.body.some((r: { id: number }) => r.id === id)).toBe(false);
+    });
   });
 });
