@@ -5,7 +5,7 @@ import { createReportSchema, type CreateReportFormData } from "@/types/validator
 import { createReport } from "@/services/reports.service";
 import type { ReportLocation } from "@/types/report.types";
 import Button from "@/components/ui/Button";
-import InputBasic from "@/components/ui/InputBasic";
+import Input from "@/components/ui/Input";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import ImageUploader from "./ImageUploader";
 import LocationPicker from "./LocationPicker";
@@ -110,10 +110,8 @@ export default function ReportForm({ initialData }: ReportFormProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="title" className="text-sm font-medium text-gray-900">
-          Título *
-        </label>
-        <InputBasic
+        <Input
+          label="Título *"
           id="title"
           name="title"
           type="text"

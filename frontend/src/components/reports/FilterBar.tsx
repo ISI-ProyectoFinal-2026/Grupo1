@@ -1,5 +1,5 @@
 import type { ReportType } from "@/types/report.types";
-import InputBasic from "@/components/ui/InputBasic";
+import Input from "@/components/ui/Input";
 
 interface FilterBarProps {
   type: ReportType | "";
@@ -42,42 +42,30 @@ export default function FilterBar({
           </select>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label htmlFor="filter-zone" className="text-sm font-medium text-gray-700">
-            Zona
-          </label>
-          <InputBasic
-            id="filter-zone"
-            type="text"
-            placeholder="Ej: San Telmo"
-            value={zone}
-            onChange={(e) => onZoneChange(e.target.value)}
-          />
-        </div>
+        <Input
+          label="Zona"
+          id="filter-zone"
+          type="text"
+          placeholder="Ej: San Telmo"
+          value={zone}
+          onChange={(e) => onZoneChange(e.target.value)}
+        />
 
-        <div className="flex flex-col gap-2">
-          <label htmlFor="filter-date-from" className="text-sm font-medium text-gray-700">
-            Desde
-          </label>
-          <InputBasic
-            id="filter-date-from"
-            type="date"
-            value={dateFrom}
-            onChange={(e) => onDateFromChange(e.target.value)}
-          />
-        </div>
+        <Input
+          label="Desde"
+          id="filter-date-from"
+          type="date"
+          value={dateFrom}
+          onChange={(e) => onDateFromChange(e.target.value)}
+        />
 
-        <div className="flex flex-col gap-2">
-          <label htmlFor="filter-date-to" className="text-sm font-medium text-gray-700">
-            Hasta
-          </label>
-          <InputBasic
-            id="filter-date-to"
-            type="date"
-            value={dateTo}
-            onChange={(e) => onDateToChange(e.target.value)}
-          />
-        </div>
+        <Input
+          label="Hasta"
+          id="filter-date-to"
+          type="date"
+          value={dateTo}
+          onChange={(e) => onDateToChange(e.target.value)}
+        />
       </div>
     </div>
   );

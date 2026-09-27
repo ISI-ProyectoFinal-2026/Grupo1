@@ -6,6 +6,7 @@ reintentos — ver "Fuera de alcance" del slice.
 """
 
 import io
+import logging
 
 import httpx
 from PIL import Image
@@ -15,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ml.pipeline import detect_and_crop, generate_embedding
 from app.models import ReportEmbedding
 from app.services import matching_service
+
+logger = logging.getLogger(__name__)
 
 
 async def process_report_image(report_id: int, image_url: str, session: AsyncSession) -> bool:
@@ -49,6 +52,7 @@ async def process_report_image(report_id: int, image_url: str, session: AsyncSes
     try:
         await matching_service.find_and_store_matches(report_id, session)
     except Exception:  # noqa: BLE001 - no debe propagar, el embedding ya se guardó
+        logger.exception("fallo al buscar matches para report_id=%s", report_id)
         await session.rollback()
 
     return True
