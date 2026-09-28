@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc -p tests/tsconfig.json",
     "dev": "ts-node src/index.ts",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",

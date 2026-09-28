@@ -10,6 +10,24 @@ export default mergeConfig(
       globals: false,
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.{test,spec}.{ts,tsx}'],
+      coverage: {
+        provider: 'v8',
+        reporter: ['text-summary', 'html', 'lcov'],
+        // `include` explicito para que los archivos que ningun test importa
+        // igual cuenten en el porcentaje. Sin esto el reporte solo mide lo que
+        // ya esta cubierto y el numero global queda inflado.
+        include: ['src/**/*.{ts,tsx}'],
+        exclude: [
+          'src/**/*.{test,spec}.{ts,tsx}',
+          'src/test/**',
+          // Bootstrap de React: monta el arbol y nada mas.
+          'src/main.tsx',
+          'src/vite-env.d.ts',
+          // Archivos de tipos puros: no emiten runtime, no hay nada que cubrir.
+          // src/types/validators/ si tiene codigo (zod) y queda incluido.
+          'src/types/*.ts',
+        ],
+      },
     },
   })
 )
