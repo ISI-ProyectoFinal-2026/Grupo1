@@ -7,18 +7,20 @@ import { useAuthStore } from '@/stores/auth.store'
 import * as reportsService from '@/services/reports.service'
 import ReportDetailPage from '@/pages/reports/ReportDetailPage'
 import type { MatchDTO, ReportDTO } from '@/types/report.types'
+import type { AuthUser } from '@/types/auth'
 
 vi.mock('@/services/reports.service')
 vi.mock('@/services/chats.service')
 
 const DUENO_ID = 7
 
-function usuario(id: number) {
+function usuario(id: number): AuthUser {
   return {
     id,
     email: `usuario${id}@patitas.test`,
     fullName: null,
     phone: null,
+    role: 'usuario_regular',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
