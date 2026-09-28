@@ -22,3 +22,6 @@ venv/
 *.pt
 *.pth
 *.onnx
+
+# Claude Code: configuracion local de cada desarrollador
+.claude/settings.local.json
