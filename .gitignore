@@ -25,3 +25,8 @@ venv/
 
 # Claude Code: configuracion local de cada desarrollador
 .claude/settings.local.json
+
+# Reportes de cobertura (jest / vitest / pytest-cov)
+coverage/
+.coverage
+htmlcov/

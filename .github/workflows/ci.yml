@@ -61,7 +61,7 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: npm test -- --coverage --coverageReporters=text-summary
+        run: npm run test:coverage -- --coverageReporters=text-summary
 
   frontend:
     name: Frontend (React)
@@ -89,11 +89,9 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
-      # Sin --coverage: el reporte requiere @vitest/coverage-v8, que hoy no es
-      # dependencia del proyecto. Agregarlo queda para #42 (tests unitarios).
       - name: Run tests
         working-directory: frontend
-        run: npm test
+        run: npm run test:coverage -- --coverage.reporter=text-summary
 
   backend-ia:
     name: Backend IA (Python)
@@ -146,4 +144,4 @@ jobs:
         working-directory: backend-ia
         env:
           DATABASE_URL: postgresql+asyncpg://patitas:patitas@localhost:5432/patitas
-        run: python -m pytest tests/ -v
+        run: python -m pytest tests/ -v --cov=app --cov-report=term-missing

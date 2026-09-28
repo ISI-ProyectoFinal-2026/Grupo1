@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc -p tests/tsconfig.json",
     "dev": "ts-node src/index.ts",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

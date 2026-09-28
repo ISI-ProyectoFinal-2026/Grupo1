@@ -13,4 +13,22 @@ module.exports = {
   transform: {
     "^.+\.ts$": ["ts-jest", { isolatedModules: true }],
   },
+  // Sin `collectCoverageFrom` Jest solo mide los archivos que algún test
+  // importa, lo que infla el porcentaje: un módulo sin tests simplemente no
+  // aparece en el reporte. Con el glob, todo `src/` cuenta aunque nadie lo
+  // toque, que es lo que pide el criterio de "cobertura global".
+  collectCoverageFrom: [
+    "src/**/*.ts",
+    // Entrypoints, no lógica: index.ts solo hace listen() y check-connection.ts
+    // es un script de CLI (`npm run db:check`). No hay nada que testear acá.
+    "!src/index.ts",
+    "!src/db/check-connection.ts",
+  ],
+  coverageDirectory: "coverage",
+  // Criterio de aceptacion de #42. Con esto `npm run test:coverage` falla si
+  // la cobertura baja del piso, en vez de reportarlo y seguir de largo.
+  coverageThreshold: {
+    global: { statements: 70, branches: 70, functions: 70, lines: 70 },
+  },
+  coverageReporters: ["text-summary", "html", "lcov"],
 };
