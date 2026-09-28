@@ -10,11 +10,15 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "db:check": "ts-node src/db/check-connection.ts",
+    "db:seed": "prisma db seed",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc -p tests/tsconfig.json",
     "dev": "ts-node src/index.ts",
     "test": "jest"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",
