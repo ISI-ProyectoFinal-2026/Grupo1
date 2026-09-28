@@ -5,7 +5,7 @@ import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
 import { useMatchActions } from "@/hooks/useMatchActions";
 import { getFlyer, uploadCustomFlyer } from "@/services/reports.service";
-import { createChat, listChats } from "@/services/chats.service";
+import { createChat } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
@@ -45,23 +45,14 @@ export default function ReportDetailPage() {
 
   // Punto de entrada al chat. Sin esto no hay forma de iniciar una conversación
   // desde la app: ChatList sólo muestra chats que ya existen en la base.
+  // El chat es por reporte y POST /api/chats es idempotente: si ya existe el
+  // chat de ESTE reporte con el autor, el backend responde 200 con ese mismo
+  // chat. Por eso no hay fallback: cualquier error es un error real y se
+  // muestra, nunca se abre un chat de otro reporte.
   const contactMutation = useMutation({
     mutationFn: async (ownerId: number) => {
-      try {
-        const chat = await createChat({ reportId: Number(id), participantId: ownerId });
-        return chat.id;
-      } catch (createError) {
-        // El backend responde 409 si ya existe un chat con ese participante: el
-        // par de usuarios es único y no distingue por reporte (schema.prisma,
-        // @@unique([userAId, userBId])). En ese caso el chat ya está, hay que
-        // encontrarlo para poder abrirlo en vez de dejar al usuario trabado.
-        const chats = await listChats();
-        const existing = chats.find(
-          (chat) => chat.userAId === ownerId || chat.userBId === ownerId,
-        );
-        if (!existing) throw createError;
-        return existing.id;
-      }
+      const chat = await createChat({ reportId: Number(id), participantId: ownerId });
+      return chat.id;
     },
     onSuccess: (chatId) => navigate(`/chats/${chatId}`),
   });

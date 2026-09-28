@@ -82,14 +82,49 @@ describe("/api/chats", () => {
   test("POST /api/chats crea el chat y responde 201 con el objeto creado", async () => {
     const res = await request(app)
       .post("/api/chats")
-      .set("Authorization", `Bearer ${tokenA}`)
-      .send({ reportId, participantId: outsiderId });
+      .set("Authorization", `Bearer ${outsiderToken}`)
+      .send({ reportId, participantId: userAId });
 
     expect(res.status).toBe(201);
-    expect(res.body.userAId).toBe(userAId);
-    expect(res.body.userBId).toBe(outsiderId);
+    expect(res.body.userAId).toBe(Math.min(userAId, outsiderId));
+    expect(res.body.userBId).toBe(Math.max(userAId, outsiderId));
     expect(res.body.reportId).toBe(reportId);
     createdChatIds.push(res.body.id);
+  });
+
+  test("POST /api/chats responde 200 con el chat existente si ya hay uno para ese reporte", async () => {
+    const res = await request(app)
+      .post("/api/chats")
+      .set("Authorization", `Bearer ${tokenB}`)
+      .send({ reportId, participantId: userAId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(chatId);
+    expect(res.body.reportId).toBe(reportId);
+  });
+
+  test("POST /api/chats responde 400 si participantId es el propio usuario", async () => {
+    const res = await request(app)
+      .post("/api/chats")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ reportId, participantId: userAId });
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/chats responde 403 si participantId no es el autor del reporte", async () => {
+    const res = await request(app)
+      .post("/api/chats")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ reportId, participantId: outsiderId });
+    expect(res.status).toBe(403);
+  });
+
+  test("POST /api/chats responde 404 si el reporte no existe", async () => {
+    const res = await request(app)
+      .post("/api/chats")
+      .set("Authorization", `Bearer ${outsiderToken}`)
+      .send({ reportId: 999999999, participantId: userAId });
+    expect(res.status).toBe(404);
   });
 
   test("POST /api/chats sin token responde 401", async () => {
@@ -152,6 +187,27 @@ describe("/api/chats", () => {
     expect(forRecipient[0].isRead).toBe(false);
 
     const forSender = await prisma.notification.findMany({ where: { userId: userAId, type: "message" } });
+    expect(forSender).toHaveLength(0);
+  });
+
+  test("la notificación llega al otro participante aunque quien inició el chat quede como userB tras normalizar", async () => {
+    const created = await request(app)
+      .post("/api/chats")
+      .set("Authorization", `Bearer ${outsiderToken}`)
+      .send({ reportId, participantId: userAId });
+    expect(created.status).toBe(201);
+    createdChatIds.push(created.body.id);
+    await prisma.notification.deleteMany({ where: { userId: { in: [userAId, outsiderId] }, type: "message" } });
+
+    const res = await request(app)
+      .post(`/api/chats/${created.body.id}/messages`)
+      .set("Authorization", `Bearer ${outsiderToken}`)
+      .send({ content: "creo que la vi" });
+    expect(res.status).toBe(201);
+
+    const forAuthor = await prisma.notification.findMany({ where: { userId: userAId, type: "message" } });
+    expect(forAuthor).toHaveLength(1);
+    const forSender = await prisma.notification.findMany({ where: { userId: outsiderId, type: "message" } });
     expect(forSender).toHaveLength(0);
   });
 

@@ -181,7 +181,13 @@ model Chat {
   report   Report?   @relation(fields: [reportId], references: [id])
   messages Message[]
 
-  @@unique([userAId, userBId])
+  // El chat es POR REPORTE: el mismo par de usuarios puede tener un chat por
+  // cada reporte. El par se guarda normalizado (userAId = id menor, userBId =
+  // id mayor), así (A,B) y (B,A) caen en la misma fila y la creación
+  // concurrente no duplica chats (ver chats.service.ts#createChat).
+  // reportId es nullable (ON DELETE SET NULL): Postgres trata los NULL como
+  // distintos, así que los chats huérfanos de un reporte borrado no chocan.
+  @@unique([userAId, userBId, reportId])
   @@map("chats")
 }
 
