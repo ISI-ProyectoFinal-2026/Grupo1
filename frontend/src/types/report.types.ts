@@ -44,17 +44,6 @@ export interface CreateReportInput {
   locationAddress?: string
 }
 
-export interface UpdateReportInput {
-  petId?: number
-  reportType?: ReportType
-  title?: string
-  description?: string
-  imageUrl?: string
-  location?: ReportLocation
-  locationAddress?: string
-  status?: ReportStatus
-}
-
 export interface ListReportsQuery {
   type?: ReportType
   status?: ReportStatus

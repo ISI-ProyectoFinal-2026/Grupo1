@@ -67,7 +67,15 @@ export const reportColumns = Prisma.sql`
   r.created_at AS "createdAt", r.updated_at AS "updatedAt", r.published_at AS "publishedAt"
 `;
 
-export async function list(filters: ListReportsQuery = {}): Promise<ReportDTO[]> {
+export async function list(filters: ListReportsQuery = {}, viewerId?: number): Promise<ReportDTO[]> {
+  // pending/rejected son estados de moderacion: solo el dueño puede listar
+  // los propios, un anonimo o un tercero no debe poder scrapearlos pidiendo
+  // el status explicito (ver issue #180).
+  const isPrivateStatus = filters.status === "pending" || filters.status === "rejected";
+  if (isPrivateStatus && viewerId === undefined) {
+    return [];
+  }
+
   const conditions: Prisma.Sql[] = [];
   if (filters.type) conditions.push(Prisma.sql`r.report_type = ${filters.type}::report_type`);
   conditions.push(
@@ -75,6 +83,7 @@ export async function list(filters: ListReportsQuery = {}): Promise<ReportDTO[]>
       ? Prisma.sql`r.status = ${filters.status}::report_status`
       : Prisma.sql`r.status = 'published'::report_status`
   );
+  if (isPrivateStatus) conditions.push(Prisma.sql`r.user_id = ${viewerId}`);
   if (filters.breed) conditions.push(Prisma.sql`p.breed ILIKE ${`%${filters.breed}%`}`);
   if (filters.zone) conditions.push(Prisma.sql`r.location_address ILIKE ${`%${filters.zone}%`}`);
   if (filters.dateFrom) conditions.push(Prisma.sql`r.created_at >= ${filters.dateFrom}`);
@@ -96,6 +105,16 @@ export async function getById(id: number): Promise<ReportDTO> {
     throw new AppError(404, "Reporte no encontrado");
   }
   return toReportDTO(rows[0]);
+}
+
+export async function getVisibleById(id: number, viewerId?: number): Promise<ReportDTO> {
+  const report = await getById(id);
+  const isPublicStatus = report.status === "published" || report.status === "resolved";
+  if (isPublicStatus || report.userId === viewerId) {
+    return report;
+  }
+  // 404 y no 403: no confirmarle a quien no es el dueño que el reporte existe.
+  throw new AppError(404, "Reporte no encontrado");
 }
 
 export async function create(data: CreateReportInput & { userId: number }): Promise<ReportDTO> {

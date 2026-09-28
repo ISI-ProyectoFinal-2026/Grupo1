@@ -12,7 +12,7 @@ import {
 
 export async function list(req: Request, res: Response): Promise<void> {
   const filters = listReportsQuerySchema.parse(req.query);
-  const reports = await reportsService.list(filters);
+  const reports = await reportsService.list(filters, req.userId);
   res.status(200).json(reports);
 }
 
@@ -24,7 +24,7 @@ export async function create(req: Request, res: Response): Promise<void> {
 
 export async function getById(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
-  const report = await reportsService.getById(id);
+  const report = await reportsService.getVisibleById(id, req.userId);
   res.status(200).json(report);
 }
 

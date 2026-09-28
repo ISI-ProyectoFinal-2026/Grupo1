@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useId, useState, useRef } from "react";
 import {
   ALLOWED_UPLOAD_TYPES,
   MAX_UPLOAD_BYTES,
@@ -14,6 +14,7 @@ interface ImageUploaderProps {
 }
 
 export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps) {
+  const inputId = useId();
   const [isLoading, setIsLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,11 +50,13 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
       );
       await uploadToR2(presignData.uploadUrl, file);
       onSuccess(presignData.publicUrl);
+      URL.revokeObjectURL(previewUrl);
       setPreview(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al subir imagen";
       setError(message);
       onError(message);
+      URL.revokeObjectURL(previewUrl);
       setPreview(null);
     } finally {
       setIsLoading(false);
@@ -67,7 +70,7 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-center w-full">
         <label
-          htmlFor="image-input"
+          htmlFor={inputId}
           className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 bg-gray-50"
         >
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -102,7 +105,7 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
           </div>
           <input
             ref={fileInputRef}
-            id="image-input"
+            id={inputId}
             type="file"
             className="hidden"
             accept="image/jpeg,image/png,image/webp"

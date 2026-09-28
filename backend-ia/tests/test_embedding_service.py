@@ -5,6 +5,7 @@ para no depender de los modelos reales; el foco acá es la persistencia
 """
 
 import io
+import logging
 import uuid
 from unittest.mock import AsyncMock
 
@@ -160,6 +161,26 @@ async def test_process_report_image_devuelve_exito_aunque_find_and_store_matches
             text("SELECT COUNT(*) FROM report_embeddings WHERE report_id = :id"), {"id": report_id}
         )
         assert result.scalar_one() == 1
+
+
+@pytest.mark.asyncio
+async def test_process_report_image_loguea_la_excepcion_antes_del_rollback(monkeypatch, report_id, caplog):
+    fake_embedding = [0.001 * i for i in range(512)]
+    monkeypatch.setattr(embedding_service, "detect_and_crop", lambda image: image)
+    monkeypatch.setattr(embedding_service, "generate_embedding", lambda crop: fake_embedding)
+    monkeypatch.setattr(
+        embedding_service.matching_service,
+        "find_and_store_matches",
+        AsyncMock(side_effect=RuntimeError("matching search down")),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="app.services.embedding_service"):
+        async with async_session_factory() as session:
+            await embedding_service.process_report_image(report_id, "https://example.com/foto.jpg", session)
+
+    error_records = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert error_records, "se esperaba un log ERROR antes del rollback"
+    assert any(r.exc_info for r in error_records), "el log debe incluir el traceback (logger.exception)"
 
 
 @pytest.mark.asyncio
