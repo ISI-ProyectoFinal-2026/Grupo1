@@ -8,18 +8,13 @@ import {
   useMyBusinessStatsQuery,
   useUpdateBusinessMutation,
 } from "@/hooks/useBusiness";
-import type { Business, BusinessCategory, SelectableBusinessPlan } from "@/types/business.types";
+import type { Business, BusinessCategory } from "@/types/business.types";
 
 const CATEGORY_OPTIONS: Array<{ value: BusinessCategory; label: string }> = [
   { value: "VETERINARIA", label: "Veterinaria" },
   { value: "REFUGIO", label: "Refugio" },
   { value: "PET_SHOP", label: "Pet shop" },
   { value: "OTRO", label: "Otro" },
-];
-
-const PLAN_OPTIONS: Array<{ value: SelectableBusinessPlan; label: string }> = [
-  { value: "FREE", label: "Gratis" },
-  { value: "PREMIUM", label: "Premium" },
 ];
 
 const PLAN_LABELS: Record<string, string> = { FREE: "Gratis", PRO: "Pro", PREMIUM: "Premium" };
@@ -43,10 +38,6 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
   const [address, setAddress] = useState(business.address);
   const [phone, setPhone] = useState(business.phone);
   const [category, setCategory] = useState<BusinessCategory>(business.category);
-  // El plan solo puede editarse a FREE/PREMIUM: PRO queda excluido del selector.
-  const [plan, setPlan] = useState<SelectableBusinessPlan>(
-    business.plan === "PREMIUM" ? "PREMIUM" : "FREE",
-  );
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
   const [success, setSuccess] = useState(false);
@@ -58,7 +49,8 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
     setSuccess(false);
 
     try {
-      await updateBusiness.mutateAsync({ name, address, phone, category, plan });
+      // Sin `plan`: PUT /businesses/me lo ignora; el cambio de plan pertenece al flujo de pago.
+      await updateBusiness.mutateAsync({ name, address, phone, category });
       setSuccess(true);
     } catch (err) {
       const details = getApiErrorDetails(err);
@@ -147,25 +139,6 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
         </select>
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="plan" className="text-sm font-medium text-gray-700">
-          Plan
-        </label>
-        <select
-          id="plan"
-          value={plan}
-          onChange={(event) => setPlan(event.target.value as SelectableBusinessPlan)}
-          className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-        >
-          {PLAN_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-gray-500">Solo el plan Premium permite publicar anuncios.</p>
-      </div>
-
       {fieldErrors.length > 0 && (
         <ul className="list-inside list-disc text-sm text-red-600">
           {fieldErrors.map((message) => (
@@ -240,6 +213,7 @@ function BusinessDashboardPage() {
           {business.planExpiresAt && (
             <p className="text-sm text-gray-600">Vence: {formatDate(business.planExpiresAt)}</p>
           )}
+          <p className="mt-2 text-xs text-gray-500">Solo el plan Premium permite publicar anuncios.</p>
         </section>
 
         <BusinessEditForm business={business} />

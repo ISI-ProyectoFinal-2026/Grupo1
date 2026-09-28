@@ -77,14 +77,14 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(res.body.error).toBeDefined();
   });
 
-  test("POST /api/businesses con plan PREMIUM crea el comercio como premium", async () => {
+  test("POST /api/businesses ignora el plan: no se puede auto-otorgar PREMIUM", async () => {
     const res = await request(app)
       .post("/api/businesses")
       .set("Authorization", `Bearer ${token}`)
       .send({ ...baseBusinessData, cuit: uniqueCuit(), plan: "PREMIUM" });
 
     expect(res.status).toBe(201);
-    expect(res.body.plan).toBe("PREMIUM");
+    expect(res.body.plan).toBe("FREE");
     createdBusinessIds.push(res.body.id);
   });
 
@@ -99,13 +99,15 @@ describe("POST/GET/PUT /api/businesses", () => {
     createdBusinessIds.push(res.body.id);
   });
 
-  test("POST /api/businesses responde 400 si el plan es PRO", async () => {
+  test("POST /api/businesses ignora el plan PRO y crea el comercio como FREE", async () => {
     const res = await request(app)
       .post("/api/businesses")
       .set("Authorization", `Bearer ${token}`)
       .send({ ...baseBusinessData, cuit: uniqueCuit(), plan: "PRO" });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
+    expect(res.body.plan).toBe("FREE");
+    createdBusinessIds.push(res.body.id);
   });
 
   test("GET /api/businesses/me retorna los datos del comercio del usuario logueado", async () => {

@@ -36,8 +36,11 @@ export interface BusinessStats {
 export type PublicBusiness = Prisma.BusinessGetPayload<{ select: typeof publicBusinessSelect }>;
 
 export async function create(data: CreateBusinessInput & { userId: number }): Promise<Business> {
+  // Campos explícitos en vez de pasar `data` entero: si un caller cuela `plan`
+  // (u otra columna) igual no llega a Prisma. Todo comercio nace FREE.
+  const { userId, name, cuit, address, phone, category } = data;
   try {
-    return await prisma.business.create({ data });
+    return await prisma.business.create({ data: { userId, name, cuit, address, phone, category } });
   } catch (error) {
     if (isPrismaKnownError(error, "P2002")) {
       const prismaError = error as Prisma.PrismaClientKnownRequestError;

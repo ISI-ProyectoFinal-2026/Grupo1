@@ -55,14 +55,15 @@ describe('BusinessRegisterPage', () => {
     expect(screen.getByLabelText('Domicilio')).toBeInTheDocument()
     expect(screen.getByLabelText('Teléfono')).toBeInTheDocument()
     expect(screen.getByLabelText('Rubro')).toBeInTheDocument()
-    expect(screen.getByLabelText('Plan')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Plan')).not.toBeInTheDocument()
+    expect(screen.getByText(/arranca en el plan gratis/i)).toBeInTheDocument()
   })
 
-  it('envia el formulario con el payload esperado incluyendo el plan', async () => {
+  it('envia el formulario sin plan: todo comercio nace FREE', async () => {
     vi.mocked(businessService.getMyBusiness).mockRejectedValue(
       Object.assign(new Error('Comercio no encontrado'), { status: 404 })
     )
-    const creado = comercio({ plan: 'PREMIUM' })
+    const creado = comercio()
     vi.mocked(businessService.createBusiness).mockResolvedValue(creado)
     const user = userEvent.setup()
     renderPage()
@@ -73,7 +74,6 @@ describe('BusinessRegisterPage', () => {
     await user.type(screen.getByLabelText('Domicilio'), 'Av. Siempre Viva 123')
     await user.type(screen.getByLabelText('Teléfono'), '1122334455')
     await user.selectOptions(screen.getByLabelText('Rubro'), 'VETERINARIA')
-    await user.selectOptions(screen.getByLabelText('Plan'), 'PREMIUM')
     await user.click(screen.getByRole('button', { name: /registrar comercio/i }))
 
     await waitFor(() =>
@@ -83,7 +83,6 @@ describe('BusinessRegisterPage', () => {
         address: 'Av. Siempre Viva 123',
         phone: '1122334455',
         category: 'VETERINARIA',
-        plan: 'PREMIUM',
       })
     )
     expect(await screen.findByText('Dashboard de comercio')).toBeInTheDocument()

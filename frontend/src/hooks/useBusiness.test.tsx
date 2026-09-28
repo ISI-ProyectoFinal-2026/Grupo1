@@ -100,7 +100,7 @@ describe('mutaciones', () => {
   })
 
   it('crear comercio deja el resultado disponible para useMyBusinessQuery', async () => {
-    const creado = comercio({ plan: 'PREMIUM' })
+    const creado = comercio()
     vi.mocked(businessService.getMyBusiness).mockRejectedValue(
       Object.assign(new Error('Comercio no encontrado'), { status: 404 })
     )
@@ -119,7 +119,6 @@ describe('mutaciones', () => {
       address: creado.address,
       phone: creado.phone,
       category: creado.category,
-      plan: 'PREMIUM',
     })
 
     await waitFor(() => expect(result.current.crear.isSuccess).toBe(true))

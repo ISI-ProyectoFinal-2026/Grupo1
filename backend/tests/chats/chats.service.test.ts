@@ -125,14 +125,25 @@ describe("chats.service", () => {
   });
 
   describe("createChat()", () => {
+    // userA es el autor de ambos reportes; outsider es quien lo contacta.
     let reportId: number;
+    let otherReportId: number;
     const createdChatIds: number[] = [];
+
+    const trackChat = (id: number) => {
+      if (!createdChatIds.includes(id)) createdChatIds.push(id);
+    };
 
     beforeAll(async () => {
       const report = await prisma.report.create({
         data: { userId: userAId, reportType: "lost", title: "Perro perdido" },
       });
       reportId = report.id;
+
+      const otherReport = await prisma.report.create({
+        data: { userId: userAId, reportType: "found", title: "Gato encontrado" },
+      });
+      otherReportId = otherReport.id;
     });
 
     afterEach(async () => {
@@ -143,39 +154,83 @@ describe("chats.service", () => {
     });
 
     afterAll(async () => {
-      await prisma.report.delete({ where: { id: reportId } });
+      await prisma.report.deleteMany({ where: { id: { in: [reportId, otherReportId] } } });
     });
 
-    test("crea el chat vinculado a los usuarios y al reporte", async () => {
-      const chat = await chatsService.createChat(outsiderId, userAId, reportId);
-      createdChatIds.push(chat.id);
+    test("crea el chat vinculado al reporte, con el par de usuarios normalizado (userAId < userBId)", async () => {
+      const { chat, created } = await chatsService.createChat(outsiderId, userAId, reportId);
+      trackChat(chat.id);
 
-      expect(chat.userAId).toBe(outsiderId);
-      expect(chat.userBId).toBe(userAId);
+      expect(created).toBe(true);
+      expect(chat.userAId).toBe(Math.min(outsiderId, userAId));
+      expect(chat.userBId).toBe(Math.max(outsiderId, userAId));
       expect(chat.reportId).toBe(reportId);
     });
 
-    test("lanza AppError 409 si ya existe un chat entre los mismos usuarios", async () => {
-      const chat = await chatsService.createChat(outsiderId, userAId, reportId);
-      createdChatIds.push(chat.id);
+    test("si ya existe el chat de ese reporte entre los mismos usuarios, lo devuelve sin crear otro", async () => {
+      const first = await chatsService.createChat(outsiderId, userAId, reportId);
+      trackChat(first.chat.id);
 
-      await expect(chatsService.createChat(outsiderId, userAId, reportId)).rejects.toMatchObject({
-        statusCode: 409,
-      });
+      const second = await chatsService.createChat(outsiderId, userAId, reportId);
+
+      expect(second.created).toBe(false);
+      expect(second.chat.id).toBe(first.chat.id);
+      expect(await prisma.chat.count({ where: { reportId } })).toBe(1);
     });
 
-    test("lanza AppError 409 si ya existe un chat entre los mismos usuarios en orden inverso", async () => {
-      const chat = await chatsService.createChat(outsiderId, userAId, reportId);
-      createdChatIds.push(chat.id);
+    test("el mismo par de usuarios tiene un chat distinto por cada reporte", async () => {
+      const first = await chatsService.createChat(outsiderId, userAId, reportId);
+      trackChat(first.chat.id);
+      const second = await chatsService.createChat(outsiderId, userAId, otherReportId);
+      trackChat(second.chat.id);
 
-      await expect(chatsService.createChat(userAId, outsiderId, reportId)).rejects.toMatchObject({
-        statusCode: 409,
-      });
+      expect(second.created).toBe(true);
+      expect(second.chat.id).not.toBe(first.chat.id);
+      expect(first.chat.reportId).toBe(reportId);
+      expect(second.chat.reportId).toBe(otherReportId);
     });
 
-    test("lanza AppError 400 si participantId no corresponde a un usuario existente", async () => {
-      await expect(chatsService.createChat(outsiderId, 999999999, reportId)).rejects.toMatchObject({
+    test("creaciones concurrentes para el mismo reporte terminan en un único chat", async () => {
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => chatsService.createChat(outsiderId, userAId, reportId))
+      );
+      results.forEach(({ chat }) => trackChat(chat.id));
+
+      const ids = new Set(results.map(({ chat }) => chat.id));
+      expect(ids.size).toBe(1);
+      expect(results.filter(({ created }) => created)).toHaveLength(1);
+      expect(await prisma.chat.count({ where: { reportId } })).toBe(1);
+    });
+
+    test("lanza AppError 400 si el usuario intenta abrir un chat consigo mismo", async () => {
+      await expect(chatsService.createChat(userAId, userAId, reportId)).rejects.toMatchObject({
         statusCode: 400,
+      });
+      expect(await prisma.chat.count({ where: { reportId } })).toBe(0);
+    });
+
+    test("lanza AppError 403 si participantId no es el autor del reporte", async () => {
+      await expect(chatsService.createChat(outsiderId, userBId, reportId)).rejects.toMatchObject({
+        statusCode: 403,
+      });
+      expect(await prisma.chat.count({ where: { reportId } })).toBe(0);
+    });
+
+    test("lanza AppError 403 si el autor intenta abrir un chat de su reporte con otro usuario", async () => {
+      await expect(chatsService.createChat(userAId, outsiderId, reportId)).rejects.toMatchObject({
+        statusCode: 403,
+      });
+    });
+
+    test("lanza AppError 403 si participantId no corresponde a un usuario existente", async () => {
+      await expect(chatsService.createChat(outsiderId, 999999999, reportId)).rejects.toMatchObject({
+        statusCode: 403,
+      });
+    });
+
+    test("lanza AppError 404 si el reporte no existe", async () => {
+      await expect(chatsService.createChat(outsiderId, userAId, 999999999)).rejects.toMatchObject({
+        statusCode: 404,
       });
     });
   });

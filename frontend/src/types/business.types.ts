@@ -1,9 +1,9 @@
 export type BusinessCategory = 'VETERINARIA' | 'REFUGIO' | 'PET_SHOP' | 'OTRO'
 
-// El backend conserva PRO en el enum de Prisma pero no lo expone como
-// seleccionable: solo FREE/PREMIUM se pueden crear o actualizar vía API.
-export type SelectableBusinessPlan = 'FREE' | 'PREMIUM'
-export type BusinessPlan = SelectableBusinessPlan | 'PRO'
+// El plan no se elige vía API: todo comercio nace FREE y ni el alta ni la
+// edición aceptan `plan` (#179). El cambio de plan pertenece al futuro flujo de
+// pago. PRO existe en el enum de Prisma pero queda sin uso.
+export type BusinessPlan = 'FREE' | 'PREMIUM' | 'PRO'
 
 export interface Business {
   id: number
@@ -37,7 +37,6 @@ export interface CreateBusinessInput {
   address: string
   phone: string
   category: BusinessCategory
-  plan?: SelectableBusinessPlan
 }
 
 export type UpdateBusinessInput = Partial<CreateBusinessInput>

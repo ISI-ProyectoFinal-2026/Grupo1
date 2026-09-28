@@ -9,12 +9,16 @@ import { businessesRouter } from "./routes/businesses.routes";
 import { chatsRouter } from "./routes/chats.routes";
 import { notificationsRouter } from "./routes/notifications.routes";
 import { errorHandler } from "./middlewares/error-handler";
+import { applyTrustProxy } from "./config/trust-proxy";
 
 if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET no está definida. Configurá la variable de entorno antes de iniciar el servidor.");
 }
 
 export const app = express();
+
+// Antes que cualquier middleware: los rate limiters usan req.ip como key.
+applyTrustProxy(app, process.env.TRUST_PROXY);
 
 app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:5173" }));
 app.use(express.json());

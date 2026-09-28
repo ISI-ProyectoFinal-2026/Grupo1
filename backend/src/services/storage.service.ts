@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AppError } from "../errors/app-error";
 import { PresignUploadInput } from "../validators/uploads.validator";
@@ -78,12 +78,48 @@ export async function createPresignedUpload(data: PresignUploadInput): Promise<P
   return { uploadUrl, publicUrl, key };
 }
 
+export function publicObjectUrl(key: string): string {
+  assertR2Configured();
+  return `${process.env.R2_PUBLIC_URL}/${key}`;
+}
+
+function isNotFoundError(error: unknown): boolean {
+  const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } } | null;
+  return candidate?.name === "NotFound" || candidate?.$metadata?.httpStatusCode === 404;
+}
+
+/**
+ * Devuelve la metadata de usuario de un objeto (HEAD, sin bajar el cuerpo) o
+ * null si el objeto no existe. Cualquier otro error de R2 se propaga: no se
+ * interpreta como "no existe" para no disparar regeneraciones en cadena si
+ * R2 está degradado.
+ */
+export async function getObjectMetadata(key: string): Promise<Record<string, string> | null> {
+  assertR2Configured();
+
+  try {
+    const result = await getS3Client().send(
+      new HeadObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key })
+    );
+    return result.Metadata ?? {};
+  } catch (error) {
+    if (isNotFoundError(error)) return null;
+    throw error;
+  }
+}
+
 /**
  * Sube un buffer generado por el propio backend (ej. un flyer compuesto en
  * canvas) directo a R2, sin pasar por el flujo de presigned URL que usa el
- * cliente para sus propias fotos.
+ * cliente para sus propias fotos. `metadata` viaja como metadata de usuario
+ * del objeto (x-amz-meta-*) y se puede leer después con getObjectMetadata.
  */
-export async function uploadBuffer(key: string, body: Buffer, contentType: string): Promise<string> {
+export async function uploadBuffer(
+  key: string,
+  body: Buffer,
+  contentType: string,
+  metadata: Record<string, string> = {}
+): Promise<string> {
   assertR2Configured();
 
   const client = getS3Client();
@@ -93,8 +129,9 @@ export async function uploadBuffer(key: string, body: Buffer, contentType: strin
       Key: key,
       Body: body,
       ContentType: contentType,
+      Metadata: metadata,
     })
   );
 
-  return `${process.env.R2_PUBLIC_URL}/${key}`;
+  return publicObjectUrl(key);
 }

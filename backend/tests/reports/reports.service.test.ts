@@ -205,7 +205,7 @@ describe("reports.service", () => {
   });
 
   test("create() dispara triggerEmbeddingGeneration cuando el reporte tiene imageUrl", async () => {
-    const spy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {});
+    const spy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue();
 
     const report = await reportsService.create({ userId, ...baseReportDataWithImage });
     createdReportIds.push(report.id);

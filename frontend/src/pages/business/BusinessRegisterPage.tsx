@@ -3,18 +3,13 @@ import type { FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { getApiErrorDetails } from "@/services/api";
 import { useCreateBusinessMutation, useMyBusinessQuery } from "@/hooks/useBusiness";
-import type { BusinessCategory, SelectableBusinessPlan } from "@/types/business.types";
+import type { BusinessCategory } from "@/types/business.types";
 
 const CATEGORY_OPTIONS: Array<{ value: BusinessCategory; label: string }> = [
   { value: "VETERINARIA", label: "Veterinaria" },
   { value: "REFUGIO", label: "Refugio" },
   { value: "PET_SHOP", label: "Pet shop" },
   { value: "OTRO", label: "Otro" },
-];
-
-const PLAN_OPTIONS: Array<{ value: SelectableBusinessPlan; label: string }> = [
-  { value: "FREE", label: "Gratis" },
-  { value: "PREMIUM", label: "Premium" },
 ];
 
 function BusinessRegisterPage() {
@@ -27,7 +22,6 @@ function BusinessRegisterPage() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [category, setCategory] = useState<BusinessCategory>("VETERINARIA");
-  const [plan, setPlan] = useState<SelectableBusinessPlan>("FREE");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
 
@@ -41,7 +35,7 @@ function BusinessRegisterPage() {
     setFieldErrors([]);
 
     try {
-      await createBusiness.mutateAsync({ name, cuit, address, phone, category, plan });
+      await createBusiness.mutateAsync({ name, cuit, address, phone, category });
       navigate("/businesses/dashboard");
     } catch (err) {
       const details = getApiErrorDetails(err);
@@ -135,24 +129,10 @@ function BusinessRegisterPage() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="plan" className="text-sm font-medium text-gray-700">
-              Plan
-            </label>
-            <select
-              id="plan"
-              value={plan}
-              onChange={(event) => setPlan(event.target.value as SelectableBusinessPlan)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-            >
-              {PLAN_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500">Solo el plan Premium permite publicar anuncios.</p>
-          </div>
+          {/* El plan no se elige al registrarse: el backend crea todo comercio en FREE (#179). */}
+          <p className="text-xs text-gray-500">
+            Tu comercio arranca en el plan Gratis. Solo el plan Premium permite publicar anuncios.
+          </p>
 
           {fieldErrors.length > 0 && (
             <ul className="list-inside list-disc text-sm text-red-600">

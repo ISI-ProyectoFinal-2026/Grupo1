@@ -11,8 +11,9 @@ export async function list(req: Request, res: Response): Promise<void> {
 
 export async function create(req: Request, res: Response): Promise<void> {
   const { reportId, participantId } = createChatSchema.parse(req.body);
-  const chat = await chatsService.createChat(req.userId!, participantId, reportId);
-  res.status(201).json(chat);
+  // 201 si se creó, 200 si ya existía el chat de ese reporte (idempotente)
+  const { chat, created } = await chatsService.createChat(req.userId!, participantId, reportId);
+  res.status(created ? 201 : 200).json(chat);
 }
 
 export async function getMessages(req: Request, res: Response): Promise<void> {

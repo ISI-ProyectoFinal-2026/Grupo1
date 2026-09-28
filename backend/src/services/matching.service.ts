@@ -1,4 +1,7 @@
+import { MatchStatus } from "@prisma/client";
 import { prisma } from "../db/client";
+import { AppError } from "../errors/app-error";
+import * as notificationsService from "./notifications.service";
 
 /**
  * Dispara la generación de embedding en el Backend IA para un reporte
@@ -64,11 +67,31 @@ async function fetchWithRetry(url: string, options: RequestInit): Promise<Respon
   throw lastError;
 }
 
-export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): void {
-  const baseUrl = process.env.AI_SERVICE_URL;
-  if (!baseUrl) return;
+// Solo sale de pending una vez: un reintento o la reconciliación no lo pisan ni re-avisan.
+async function applyModerationVerdict(
+  reportId: number,
+  verdict: notificationsService.ModerationVerdict
+): Promise<void> {
+  const { count } = await prisma.report.updateMany({
+    where: { id: reportId, status: "pending" },
+    // publishedAt se sella acá: hasta este momento el reporte nunca estuvo publicado.
+    data: verdict === "published" ? { status: verdict, publishedAt: new Date() } : { status: verdict },
+  });
+  if (count === 0) return;
 
-  fetchWithRetry(`${baseUrl}/reports/${reportId}/embedding`, {
+  try {
+    await notificationsService.createForStatusChange(reportId, verdict);
+  } catch (error) {
+    console.error(`[matching] no se pudo avisar al dueño el cambio de estado del report ${reportId}:`, error);
+  }
+}
+
+// Devuelve la promesa (nunca rechaza) para poder esperarla; los callers la ignoran.
+export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): Promise<void> {
+  const baseUrl = process.env.AI_SERVICE_URL;
+  if (!baseUrl) return Promise.resolve();
+
+  return fetchWithRetry(`${baseUrl}/reports/${reportId}/embedding`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -78,14 +101,9 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
   })
     .then(async (response) => {
       if (response.status === 201) {
-        // publishedAt se sella acá y no en la creación, porque hasta este
-        // momento el reporte nunca estuvo publicado.
-        await prisma.report.update({
-          where: { id: reportId },
-          data: { status: "published", publishedAt: new Date() },
-        });
+        await applyModerationVerdict(reportId, "published");
       } else if (response.status === 422) {
-        await prisma.report.update({ where: { id: reportId }, data: { status: "rejected" } });
+        await applyModerationVerdict(reportId, "rejected");
       } else if (response.status === 401) {
         // Se distingue del resto de los status inconclusos porque no es una
         // falla transitoria: reintentar no lo arregla nunca, hay que tocar
@@ -184,6 +202,7 @@ export function startPendingReportsReconciliation(): NodeJS.Timeout {
 }
 
 export interface MatchDTO {
+  matchId: number;
   reportId: number;
   title: string;
   imageUrl: string | null;
@@ -197,11 +216,12 @@ export interface MatchDTO {
  * Lista los matches sugeridos (generados por el Backend IA, ver
  * matching_service.py) donde `reportId` participa, sea como lost o found.
  * Devuelve los datos básicos del OTRO reporte de cada match, ordenados por
- * similaridad descendente.
+ * similaridad descendente. Los descartados no se sugieren más a ninguna parte.
  */
 export async function listMatches(reportId: number): Promise<MatchDTO[]> {
   return prisma.$queryRaw<MatchDTO[]>`
     SELECT
+      rm.id AS "matchId",
       CASE WHEN rm.report_lost_id = ${reportId} THEN rm.report_found_id ELSE rm.report_lost_id END AS "reportId",
       other.title,
       other.image_url AS "imageUrl",
@@ -212,7 +232,63 @@ export async function listMatches(reportId: number): Promise<MatchDTO[]> {
     FROM report_matches rm
     JOIN reports other
       ON other.id = CASE WHEN rm.report_lost_id = ${reportId} THEN rm.report_found_id ELSE rm.report_lost_id END
-    WHERE rm.report_lost_id = ${reportId} OR rm.report_found_id = ${reportId}
+    WHERE (rm.report_lost_id = ${reportId} OR rm.report_found_id = ${reportId})
+      AND rm.status <> 'rejected'::match_status
     ORDER BY rm.similarity_score DESC
   `;
+}
+
+export interface MatchDecisionDTO {
+  matchId: number;
+  status: MatchStatus;
+  confirmedAt: Date | null;
+}
+
+type MatchDecision = Exclude<MatchStatus, "pending">;
+
+async function decideMatch(
+  reportId: number,
+  matchId: number,
+  userId: number,
+  decision: MatchDecision
+): Promise<MatchDecisionDTO> {
+  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true } });
+  if (!report) {
+    throw new AppError(404, "Reporte no encontrado");
+  }
+  if (report.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para gestionar las coincidencias de este reporte");
+  }
+
+  const match = await prisma.reportMatch.findUnique({
+    where: { id: matchId },
+    select: { reportLostId: true, reportFoundId: true },
+  });
+  if (!match || (match.reportLostId !== reportId && match.reportFoundId !== reportId)) {
+    throw new AppError(404, "Coincidencia no encontrada");
+  }
+
+  // Escritura condicional: si dos decisiones compiten, solo la primera pasa.
+  const confirmedAt = decision === "confirmed" ? new Date() : null;
+  const { count } = await prisma.reportMatch.updateMany({
+    where: { id: matchId, status: "pending" },
+    data: { status: decision, confirmedAt },
+  });
+  if (count === 0) {
+    const current = await prisma.reportMatch.findUnique({ where: { id: matchId }, select: { status: true } });
+    throw new AppError(
+      409,
+      current?.status === "confirmed" ? "La coincidencia ya fue confirmada" : "La coincidencia ya fue rechazada"
+    );
+  }
+
+  return { matchId, status: decision, confirmedAt };
+}
+
+export function confirmMatch(reportId: number, matchId: number, userId: number): Promise<MatchDecisionDTO> {
+  return decideMatch(reportId, matchId, userId, "confirmed");
+}
+
+export function rejectMatch(reportId: number, matchId: number, userId: number): Promise<MatchDecisionDTO> {
+  return decideMatch(reportId, matchId, userId, "rejected");
 }

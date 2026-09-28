@@ -3,8 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
+import { useMatchActions } from "@/hooks/useMatchActions";
 import { getFlyer, uploadCustomFlyer } from "@/services/reports.service";
-import { createChat, listChats } from "@/services/chats.service";
+import { createChat } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
@@ -22,6 +23,7 @@ export default function ReportDetailPage() {
     id ? Number(id) : undefined,
     report?.status,
   );
+  const matchActions = useMatchActions(Number(id));
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
   const [customFlyerError, setCustomFlyerError] = useState<string | null>(null);
   const flyerMutation = useMutation({
@@ -43,23 +45,14 @@ export default function ReportDetailPage() {
 
   // Punto de entrada al chat. Sin esto no hay forma de iniciar una conversación
   // desde la app: ChatList sólo muestra chats que ya existen en la base.
+  // El chat es por reporte y POST /api/chats es idempotente: si ya existe el
+  // chat de ESTE reporte con el autor, el backend responde 200 con ese mismo
+  // chat. Por eso no hay fallback: cualquier error es un error real y se
+  // muestra, nunca se abre un chat de otro reporte.
   const contactMutation = useMutation({
     mutationFn: async (ownerId: number) => {
-      try {
-        const chat = await createChat({ reportId: Number(id), participantId: ownerId });
-        return chat.id;
-      } catch (createError) {
-        // El backend responde 409 si ya existe un chat con ese participante: el
-        // par de usuarios es único y no distingue por reporte (schema.prisma,
-        // @@unique([userAId, userBId])). En ese caso el chat ya está, hay que
-        // encontrarlo para poder abrirlo en vez de dejar al usuario trabado.
-        const chats = await listChats();
-        const existing = chats.find(
-          (chat) => chat.userAId === ownerId || chat.userBId === ownerId,
-        );
-        if (!existing) throw createError;
-        return existing.id;
-      }
+      const chat = await createChat({ reportId: Number(id), participantId: ownerId });
+      return chat.id;
     },
     onSuccess: (chatId) => navigate(`/chats/${chatId}`),
   });
@@ -110,6 +103,7 @@ export default function ReportDetailPage() {
   };
 
   const displayFlyerUrl = flyerUrl ?? report.customFlyerUrl;
+  const isOwner = currentUserId === report.userId;
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
@@ -264,7 +258,15 @@ export default function ReportDetailPage() {
                 ) : matches && matches.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {matches.map((match) => (
-                      <MatchCard key={match.reportId} match={match} />
+                      <MatchCard
+                        key={match.matchId}
+                        match={match}
+                        canManage={isOwner}
+                        onConfirm={matchActions.confirm}
+                        onReject={matchActions.reject}
+                        isBusy={matchActions.isBusy}
+                        error={matchActions.errorFor(match.matchId)}
+                      />
                     ))}
                   </div>
                 ) : (

@@ -35,6 +35,11 @@ export const reportIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
+export const reportMatchParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  matchId: z.coerce.number().int().positive(),
+});
+
 export const listReportsQuerySchema = z.object({
   type: z.enum([ReportType.lost, ReportType.found]).optional(),
   status: z.enum([ReportStatus.pending, ReportStatus.published, ReportStatus.rejected, ReportStatus.resolved]).optional(),
