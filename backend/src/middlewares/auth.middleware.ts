@@ -1,5 +1,7 @@
+import { Role } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { verifyAccessToken } from "../utils/jwt";
 
@@ -58,4 +60,34 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
   }
 
   next();
+}
+
+/**
+ * Autorización por rol: debe usarse DESPUÉS de `requireAuth`, que es quien
+ * deja `req.userId` seteado. El rol se resuelve siempre fresco contra la
+ * base (no viaja en el JWT) para que un cambio de rol tenga efecto
+ * inmediato, sin esperar a que el usuario vuelva a iniciar sesión.
+ */
+export function requireRole(...roles: Role[]) {
+  return async function (req: Request, _res: Response, next: NextFunction): Promise<void> {
+    if (!req.userId) {
+      // Programación defensiva: requireRole asume que requireAuth ya corrió.
+      throw new AppError(401, "Se requiere un token de autenticación");
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true },
+    });
+
+    if (!user) {
+      throw new AppError(401, "Usuario no encontrado");
+    }
+
+    if (!roles.includes(user.role)) {
+      throw new AppError(403, "No tenés permiso para acceder a este recurso");
+    }
+
+    next();
+  };
 }
