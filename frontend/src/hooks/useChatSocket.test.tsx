@@ -6,7 +6,9 @@ import { chatsQueryKey } from '@/hooks/useChatsQuery'
 import { useChatSocket } from '@/hooks/useChatSocket'
 import { sendMessage as sendMessageRest } from '@/services/chats.service'
 import { useAuthStore } from '@/stores/auth.store'
-import { createQueryWrapper, createTestQueryClient } from '@/test/query-wrapper'
+import { QueryClient } from '@tanstack/react-query'
+
+import { createQueryWrapper } from '@/test/query-wrapper'
 import type { MessageDTO } from '@/types/chat.types'
 
 vi.mock('socket.io-client', () => ({ io: vi.fn() }))
@@ -74,7 +76,13 @@ function mensaje(overrides: Partial<MessageDTO> = {}): MessageDTO {
 let falso: ReturnType<typeof crearSocketFalso>
 
 function montar(chatId: number | undefined) {
-  const client = createTestQueryClient()
+  // Cliente propio en vez de createTestQueryClient: aquel usa gcTime 0 y aca
+  // nadie observa la query de mensajes (el hook solo escribe con
+  // setQueryData), asi que la entrada podia recolectarse antes del assert y el
+  // test fallaba de forma intermitente.
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
   const { Wrapper } = createQueryWrapper(client)
   const vista = renderHook(({ id }: { id: number | undefined }) => useChatSocket(id), {
     wrapper: Wrapper,
