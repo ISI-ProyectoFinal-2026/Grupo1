@@ -17,6 +17,7 @@ cp .env.example .env
 | `INTERNAL_API_KEY` | **sí** | Clave compartida con el Backend IA. **Mismo valor que en `../backend-ia/.env`** (ver abajo) |
 | `AI_SERVICE_URL` | no | Backend IA. Si no está seteada, el trigger de generación de embedding no hace nada (no rompe la creación del reporte, ver `src/services/matching.service.ts`) |
 | `FRONTEND_URL` | no | Origen permitido por CORS |
+| `TRUST_PROXY` | no | Cantidad de proxies delante del backend (ej. `1` detrás del proxy de Vite, un túnel o el load balancer). Sin esto, los rate limiters ven la IP del proxy y el límite pasa a ser global. Vacío/`false` = no confiar en ningún proxy. `true` se rechaza a propósito: confiaría en un `X-Forwarded-For` que el cliente puede falsificar |
 | `PORT` | no | Default `3001` |
 | `R2_*` | no | Upload de imágenes. Si faltan, `POST /api/uploads/presign` responde `503` diciendo cuál falta |
 

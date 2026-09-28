@@ -1,8 +1,34 @@
 import request from "supertest";
 import jwt from "jsonwebtoken";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const sendMock = jest.fn();
+
+// Bucket falso en memoria: PutObject guarda la metadata y HeadObject la
+// devuelve, o falla con el mismo shape que el SDK usa para un 404.
+function installFakeBucket(): void {
+  const objects = new Map<string, Record<string, string>>();
+  sendMock.mockImplementation(async (command: unknown) => {
+    if (command instanceof PutObjectCommand) {
+      objects.set(command.input.Key as string, command.input.Metadata ?? {});
+      return {};
+    }
+    if (command instanceof HeadObjectCommand) {
+      const metadata = objects.get(command.input.Key as string);
+      if (!metadata) {
+        throw Object.assign(new Error("NotFound"), { name: "NotFound", $metadata: { httpStatusCode: 404 } });
+      }
+      return { Metadata: metadata };
+    }
+    throw new Error("Comando de S3 inesperado en el test");
+  });
+}
+
+function putCalls(): PutObjectCommand[] {
+  return sendMock.mock.calls
+    .map(([command]) => command)
+    .filter((command): command is PutObjectCommand => command instanceof PutObjectCommand);
+}
 
 jest.mock("@aws-sdk/client-s3", () => {
   const actual = jest.requireActual("@aws-sdk/client-s3");
@@ -87,7 +113,7 @@ describe("GET /api/reports/:id/flyer", () => {
 
   beforeEach(() => {
     sendMock.mockReset();
-    sendMock.mockResolvedValue({});
+    installFakeBucket();
   });
 
   test("responde 404 si el reporte no existe", async () => {
@@ -101,15 +127,48 @@ describe("GET /api/reports/:id/flyer", () => {
     const res = await request(app).get(`/api/reports/${reportId}/flyer`);
 
     expect(res.status).toBe(200);
-    expect(res.body.flyerUrl).toBe(`https://pub-test.r2.dev/flyers/report-${reportId}.png`);
+    const puts = putCalls();
+    const version = puts[0]?.input.Metadata?.["flyer-version"] ?? "";
+    // URL versionada con la huella del contenido: la key es fija, el ?v= evita
+    // que el navegador/CDN muestre un flyer viejo tras regenerarlo.
+    expect(res.body.flyerUrl).toBe(
+      `https://pub-test.r2.dev/flyers/report-${reportId}.png?v=${version.slice(0, 12)}`
+    );
 
-    expect(sendMock).toHaveBeenCalledTimes(1);
-    const command = sendMock.mock.calls[0][0];
-    expect(command).toBeInstanceOf(PutObjectCommand);
+    expect(puts).toHaveLength(1);
+    const command = puts[0];
     expect(command.input.Bucket).toBe("test-bucket");
     expect(command.input.Key).toBe(`flyers/report-${reportId}.png`);
     expect(command.input.ContentType).toBe("image/png");
     expect(Buffer.isBuffer(command.input.Body)).toBe(true);
+    expect(command.input.Metadata?.["flyer-version"]).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  test("cache hit: una segunda request sin cambios en el reporte no vuelve a subir el PNG", async () => {
+    const first = await request(app).get(`/api/reports/${reportId}/flyer`);
+    expect(putCalls()).toHaveLength(1);
+
+    const second = await request(app).get(`/api/reports/${reportId}/flyer`);
+
+    expect(second.status).toBe(200);
+    expect(second.body.flyerUrl).toBe(first.body.flyerUrl);
+    expect(putCalls()).toHaveLength(1);
+  });
+
+  test("cache miss: si el dueño edita el título, la siguiente request regenera el PNG", async () => {
+    await request(app).get(`/api/reports/${reportId}/flyer`);
+    expect(putCalls()).toHaveLength(1);
+
+    const edit = await request(app)
+      .put(`/api/reports/${reportId}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ title: "Gato gris perdido en San Telmo — recompensa" });
+    expect(edit.status).toBe(200);
+
+    const res = await request(app).get(`/api/reports/${reportId}/flyer`);
+
+    expect(res.status).toBe(200);
+    expect(putCalls()).toHaveLength(2);
   });
 
   test("no requiere autenticación (el flyer es de un reporte ya público)", async () => {
@@ -127,6 +186,70 @@ describe("GET /api/reports/:id/flyer", () => {
     expect(sendMock).not.toHaveBeenCalled();
 
     process.env.R2_BUCKET_NAME = savedBucket;
+  });
+
+  // Issue #180: un reporte pending/rejected solo lo ve su dueño. El flyer es
+  // público, así que tiene que aplicar el mismo criterio que el detalle; si no,
+  // cualquiera compone (y difunde) el flyer de un reporte no publicado.
+  describe("visibilidad de reportes no publicados (mismo criterio que GET /api/reports/:id)", () => {
+    let otherUserId: number;
+    let otherToken: string;
+    let privateReportId: number;
+
+    beforeAll(async () => {
+      const otherUser = await prisma.user.create({
+        data: { email: `flyer-routes-test-other-${Date.now()}@example.com`, passwordHash: "test-hash" },
+      });
+      otherUserId = otherUser.id;
+      otherToken = jwt.sign({ sub: otherUser.id, email: otherUser.email }, process.env.JWT_SECRET!, {
+        expiresIn: "1h",
+      });
+
+      const report = await prisma.report.create({
+        data: { userId, reportType: "lost", title: "Perro en moderación", status: "pending" },
+      });
+      privateReportId = report.id;
+    });
+
+    afterAll(async () => {
+      await prisma.report.deleteMany({ where: { id: privateReportId } });
+      await prisma.user.delete({ where: { id: otherUserId } });
+    });
+
+    const PRIVATE_STATUSES = ["pending", "rejected"] as const;
+
+    test.each(PRIVATE_STATUSES)("reporte %s: un anónimo recibe 404 y no se genera nada", async (status) => {
+      await prisma.report.update({ where: { id: privateReportId }, data: { status } });
+
+      const res = await request(app).get(`/api/reports/${privateReportId}/flyer`);
+
+      expect(res.status).toBe(404);
+      expect(sendMock).not.toHaveBeenCalled();
+    });
+
+    test.each(PRIVATE_STATUSES)("reporte %s: otro usuario autenticado recibe 404", async (status) => {
+      await prisma.report.update({ where: { id: privateReportId }, data: { status } });
+
+      const res = await request(app)
+        .get(`/api/reports/${privateReportId}/flyer`)
+        .set("Authorization", `Bearer ${otherToken}`);
+
+      expect(res.status).toBe(404);
+      expect(sendMock).not.toHaveBeenCalled();
+    });
+
+    test.each(PRIVATE_STATUSES)("reporte %s: el dueño sí obtiene su flyer", async (status) => {
+      await prisma.report.update({ where: { id: privateReportId }, data: { status } });
+
+      const res = await request(app)
+        .get(`/api/reports/${privateReportId}/flyer`)
+        .set("Authorization", `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.flyerUrl).toMatch(
+        new RegExp(`^https://pub-test\\.r2\\.dev/flyers/report-${privateReportId}\\.png`)
+      );
+    });
   });
 });
 

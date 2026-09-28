@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import path from "path";
 import { GlobalFonts, Image, createCanvas, loadImage } from "@napi-rs/canvas";
 import { ReportDTO, ReportTag } from "./reports.service";
@@ -172,13 +173,107 @@ function flyerObjectKey(reportId: number): string {
   return `flyers/report-${reportId}.png`;
 }
 
+// Subir este número cuando cambie el diseño de composeFlyer, para invalidar
+// todos los flyers ya generados con el layout anterior.
+const FLYER_LAYOUT_VERSION = 1;
+const FLYER_VERSION_METADATA_KEY = "flyer-version";
+// Presente solo si el flyer se compuso con el placeholder porque la foto del
+// reporte no se pudo bajar. Guarda cuándo (ISO 8601).
+const FLYER_DEGRADED_AT_METADATA_KEY = "flyer-degraded-at";
+// Cuánto se sirve un flyer degradado desde el cache antes de volver a
+// intentar bajar la foto. Evita recomponer y subir a R2 en cada request
+// mientras la foto esté caída, sin dejar el placeholder para siempre.
+const DEGRADED_FLYER_RETRY_MS = 10 * 60 * 1000;
+// Largo del prefijo de la versión que va en el `?v=` de la URL: alcanza para
+// distinguir versiones sin hacer la URL innecesariamente larga.
+const URL_VERSION_LENGTH = 12;
+
 /**
- * Genera (o regenera) el flyer del reporte y lo deja en R2 en una key fija
- * por reporte, así el link es estable y sirve tanto para descargar como para
- * compartir en redes sin necesitar una columna nueva en la tabla de reportes.
+ * Huella de todo lo que el flyer dibuja. Si cambia cualquiera de estos
+ * campos (o el layout), el PNG guardado quedó viejo. Se usa un hash del
+ * contenido y no `updatedAt` a propósito: cambios que el flyer no muestra
+ * (ubicación, customFlyerUrl, etc.) no fuerzan una regeneración, y un UPDATE
+ * por SQL crudo que no toque `updated_at` no deja un flyer desactualizado.
+ */
+function flyerVersion(report: ReportDTO): string {
+  const renderedFields = [
+    FLYER_LAYOUT_VERSION,
+    report.title,
+    report.description,
+    report.locationAddress,
+    report.imageUrl,
+    report.tag.label,
+    report.tag.color,
+  ];
+  return createHash("sha256").update(JSON.stringify(renderedFields)).digest("hex");
+}
+
+/**
+ * Un flyer degradado (con placeholder) se sirve desde el cache hasta que
+ * vence DEGRADED_FLYER_RETRY_MS. Una marca ilegible se trata como vencida.
+ */
+function isDegradedRetryDue(degradedAt: string, now: number): boolean {
+  const degradedAtMs = Date.parse(degradedAt);
+  return Number.isNaN(degradedAtMs) || now - degradedAtMs >= DEGRADED_FLYER_RETRY_MS;
+}
+
+/**
+ * La key en R2 es fija, así que la URL pública sola no cambia al regenerar y
+ * el navegador (o un CDN) puede seguir mostrando el PNG viejo. El `?v=` lleva
+ * la huella del contenido; en un flyer degradado suma además el momento de la
+ * degradación, para que la URL del placeholder nunca coincida con la del
+ * flyer bueno que lo reemplace.
+ */
+function versionedFlyerUrl(publicUrl: string, version: string, degradedAt?: string): string {
+  const shortVersion = version.slice(0, URL_VERSION_LENGTH);
+  const token = degradedAt ? `${shortVersion}-d${Date.parse(degradedAt)}` : shortVersion;
+  return `${publicUrl}?v=${token}`;
+}
+
+/**
+ * Devuelve la URL del flyer del reporte, generándolo solo si hace falta. El
+ * PNG vive en R2 en una key fija por reporte y lleva en su metadata la
+ * versión del contenido con la que se compuso. Si esa versión coincide con
+ * la actual, se devuelve la URL sin recomponer el canvas ni volver a subir
+ * nada; si no, se regenera y se pisa el objeto. Así no hace falta una columna
+ * nueva en la tabla de reportes. La URL devuelta va versionada (`?v=`), ver
+ * versionedFlyerUrl.
+ *
+ * Dos primeras requests concurrentes pueden regenerar el mismo flyer a la
+ * vez: es idempotente (mismo contenido ⇒ mismo PNG y misma key) y, si el
+ * reporte cambió en el medio, la próxima request detecta la versión vieja y
+ * se corrige sola.
  */
 export async function getOrCreateFlyerUrl(report: ReportDTO): Promise<string> {
+  const key = flyerObjectKey(report.id);
+  const version = flyerVersion(report);
+
+  const stored = await storageService.getObjectMetadata(key);
+  if (stored?.[FLYER_VERSION_METADATA_KEY] === version) {
+    const storedDegradedAt = stored[FLYER_DEGRADED_AT_METADATA_KEY];
+    if (!storedDegradedAt) {
+      return versionedFlyerUrl(storageService.publicObjectUrl(key), version);
+    }
+    if (!isDegradedRetryDue(storedDegradedAt, Date.now())) {
+      return versionedFlyerUrl(storageService.publicObjectUrl(key), version, storedDegradedAt);
+    }
+    // flyer degradado con la ventana vencida: se reintenta bajar la foto
+  }
+
   const petImage = await fetchPetImage(report.imageUrl);
   const buffer = composeFlyer(report, petImage);
-  return storageService.uploadBuffer(flyerObjectKey(report.id), buffer, "image/png");
+
+  // Si el reporte tiene foto pero no se pudo bajar, el flyer sale con el
+  // placeholder: se sube igual para no dejar al usuario sin flyer, marcado
+  // como degradado para que se sirva desde el cache solo hasta que venza
+  // DEGRADED_FLYER_RETRY_MS (y no se recomponga en cada request).
+  const photoMissing = Boolean(report.imageUrl) && petImage === null;
+  const degradedAt = photoMissing ? new Date().toISOString() : undefined;
+  const metadata: Record<string, string> = { [FLYER_VERSION_METADATA_KEY]: version };
+  if (degradedAt) {
+    metadata[FLYER_DEGRADED_AT_METADATA_KEY] = degradedAt;
+  }
+
+  const publicUrl = await storageService.uploadBuffer(key, buffer, "image/png", metadata);
+  return versionedFlyerUrl(publicUrl, version, degradedAt);
 }

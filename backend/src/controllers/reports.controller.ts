@@ -69,7 +69,9 @@ export async function rejectMatch(req: Request, res: Response): Promise<void> {
 
 export async function getFlyer(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
-  const report = await reportsService.getById(id); // dispara 404 si no existe
+  // Mismo criterio que el detalle (#180): un reporte pending/rejected solo lo
+  // ve su dueño, así que para cualquier otro el flyer también es 404.
+  const report = await reportsService.getVisibleById(id, req.userId);
   if (report.customFlyerUrl) {
     res.status(200).json({ flyerUrl: report.customFlyerUrl });
     return;
