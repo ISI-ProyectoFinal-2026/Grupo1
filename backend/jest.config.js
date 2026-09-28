@@ -25,5 +25,10 @@ module.exports = {
     "!src/db/check-connection.ts",
   ],
   coverageDirectory: "coverage",
+  // Criterio de aceptacion de #42. Con esto `npm run test:coverage` falla si
+  // la cobertura baja del piso, en vez de reportarlo y seguir de largo.
+  coverageThreshold: {
+    global: { statements: 70, branches: 70, functions: 70, lines: 70 },
+  },
   coverageReporters: ["text-summary", "html", "lcov"],
 };

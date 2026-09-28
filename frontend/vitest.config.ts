@@ -12,6 +12,9 @@ export default mergeConfig(
       include: ['src/**/*.{test,spec}.{ts,tsx}'],
       coverage: {
         provider: 'v8',
+        // Criterio de aceptacion de #42: el piso lo hace cumplir la herramienta,
+        // no la memoria de quien revisa el PR.
+        thresholds: { statements: 70, branches: 70, functions: 70, lines: 70 },
         reporter: ['text-summary', 'html', 'lcov'],
         // `include` explicito para que los archivos que ningun test importa
         // igual cuenten en el porcentaje. Sin esto el reporte solo mide lo que

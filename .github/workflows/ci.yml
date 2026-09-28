@@ -144,4 +144,4 @@ jobs:
         working-directory: backend-ia
         env:
           DATABASE_URL: postgresql+asyncpg://patitas:patitas@localhost:5432/patitas
-        run: python -m pytest tests/ -v
+        run: python -m pytest tests/ -v --cov=app --cov-report=term-missing
