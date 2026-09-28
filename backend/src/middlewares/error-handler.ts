@@ -23,7 +23,7 @@ export function errorHandler(
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
-      error: { message: err.message, details: err.details },
+      error: { message: err.message, code: err.code, details: err.details },
     });
     return;
   }

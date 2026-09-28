@@ -22,12 +22,18 @@ describe("POST/GET/PUT /api/businesses", () => {
   }
 
   beforeAll(async () => {
+    // Registrar un comercio exige el email verificado; el dueño de los tests lo tiene.
     const user = await prisma.user.create({
-      data: { email: `businesses-routes-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
+      data: {
+        email: `businesses-routes-test-${Date.now()}@example.com`,
+        passwordHash: "test-hash",
+        emailVerifiedAt: new Date(),
+      },
     });
     userId = user.id;
     token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
 
+    // Sin verificar a propósito: el resto de la app (ver, contactar) no lo exige.
     const otherUser = await prisma.user.create({
       data: { email: `businesses-routes-test-other-${Date.now()}@example.com`, passwordHash: "test-hash" },
     });
@@ -60,6 +66,22 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(res.body.userId).toBe(userId);
     expect(res.body.name).toBe(baseBusinessData.name);
     createdBusinessIds.push(res.body.id);
+  });
+
+  test("POST /api/businesses con el email sin verificar responde 403 EMAIL_NOT_VERIFIED", async () => {
+    const res = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${otherToken}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toEqual(
+      expect.objectContaining({
+        message: "Tenés que verificar tu email para hacer esto",
+        code: "EMAIL_NOT_VERIFIED",
+      })
+    );
+    expect(await prisma.business.findUnique({ where: { userId: otherUserId } })).toBeNull();
   });
 
   test("POST /api/businesses sin token responde 401", async () => {

@@ -4,7 +4,7 @@ import { Server, Socket } from "socket.io";
 import { AppError } from "../errors/app-error";
 import * as chatsService from "../services/chats.service";
 import * as notificationsService from "../services/notifications.service";
-import { verifyAccessToken } from "../utils/jwt";
+import { authenticateAccessToken } from "../services/session.service";
 import { joinChatSchema, leaveChatSchema, sendMessageSchema } from "../validators/chat-socket.validator";
 
 type AckResponse<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -112,7 +112,9 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
   });
   chatIO = io;
 
-  io.use((socket, next) => {
+  // Misma validación de sesión que requireAuth: un token de un usuario borrado
+  // o de una sesión cerrada (ej. tras restablecer la contraseña) no conecta.
+  io.use(async (socket, next) => {
     const token = extractToken(socket);
     if (!token) {
       next(new Error("Se requiere un token de autenticación"));
@@ -120,11 +122,16 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
     }
 
     try {
-      const payload = verifyAccessToken(token);
-      socket.data.userId = payload.sub;
+      const authUser = await authenticateAccessToken(token);
+      socket.data.userId = authUser.id;
       next();
-    } catch {
-      next(new Error("Token inválido"));
+    } catch (error) {
+      if (error instanceof AppError) {
+        next(new Error(error.message));
+        return;
+      }
+      console.error("[chat.socket] no se pudo validar la sesión del handshake:", error);
+      next(new Error("Error inesperado"));
     }
   });
 

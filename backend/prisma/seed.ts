@@ -19,7 +19,16 @@ async function main() {
       email: ADMIN_EMAIL,
       passwordHash,
       role: "admin",
+      emailVerifiedAt: new Date(),
     },
+  });
+
+  // El admin semilla nunca recibe el mail de verificación: se lo marca como
+  // verificado. Con updateMany y el filtro por null, re-ejecutar el seed no
+  // pisa la fecha original.
+  await prisma.user.updateMany({
+    where: { id: admin.id, emailVerifiedAt: null },
+    data: { emailVerifiedAt: new Date() },
   });
 
   console.log(`Admin inicial listo: ${admin.email} (id ${admin.id}, role ${admin.role})`);

@@ -106,6 +106,44 @@ describe("chat.socket", () => {
     client.on("connect", () => done(new Error("no debería conectar con token inválido")));
   });
 
+  test("rechaza la conexión con un JWT de una versión de sesión vieja", async () => {
+    const stale = await prisma.user.create({
+      data: {
+        email: `chat-socket-test-stale-${Date.now()}@example.com`,
+        passwordHash: "test-hash",
+        tokenVersion: 1,
+      },
+    });
+    // Token emitido antes del cambio de contraseña: sin `tv` cuenta como versión 0.
+    const staleToken = jwt.sign({ sub: stale.id, email: stale.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+
+    try {
+      const client = connect({ auth: { token: staleToken } });
+      const outcome = await new Promise<string>((resolve) => {
+        client.on("connect_error", (err) => resolve(err.message));
+        client.on("connect", () => resolve("conectó"));
+      });
+
+      expect(outcome).toBe("Tu sesión expiró, iniciá sesión de nuevo");
+    } finally {
+      await prisma.user.delete({ where: { id: stale.id } });
+    }
+  });
+
+  test("rechaza la conexión con el JWT de un usuario que ya no existe", async () => {
+    const ghostToken = jwt.sign({ sub: 2_000_000_000, email: "fantasma@example.com" }, process.env.JWT_SECRET!, {
+      expiresIn: "1h",
+    });
+
+    const client = connect({ auth: { token: ghostToken } });
+    const outcome = await new Promise<string>((resolve) => {
+      client.on("connect_error", (err) => resolve(err.message));
+      client.on("connect", () => resolve("conectó"));
+    });
+
+    expect(outcome).toBe("Token inválido");
+  });
+
   test("acepta la conexión con JWT válido en auth.token", (done) => {
     const client = connect({ auth: { token: tokenA } });
     client.on("connect", () => done());
