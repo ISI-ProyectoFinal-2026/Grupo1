@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
+import { useMatchActions } from "@/hooks/useMatchActions";
 import { getFlyer, uploadCustomFlyer } from "@/services/reports.service";
 import { createChat, listChats } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
@@ -22,6 +23,7 @@ export default function ReportDetailPage() {
     id ? Number(id) : undefined,
     report?.status,
   );
+  const matchActions = useMatchActions(Number(id));
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
   const [customFlyerError, setCustomFlyerError] = useState<string | null>(null);
   const flyerMutation = useMutation({
@@ -110,6 +112,7 @@ export default function ReportDetailPage() {
   };
 
   const displayFlyerUrl = flyerUrl ?? report.customFlyerUrl;
+  const isOwner = currentUserId === report.userId;
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
@@ -264,7 +267,15 @@ export default function ReportDetailPage() {
                 ) : matches && matches.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {matches.map((match) => (
-                      <MatchCard key={match.reportId} match={match} />
+                      <MatchCard
+                        key={match.matchId}
+                        match={match}
+                        canManage={isOwner}
+                        onConfirm={matchActions.confirm}
+                        onReject={matchActions.reject}
+                        isBusy={matchActions.isBusy}
+                        error={matchActions.errorFor(match.matchId)}
+                      />
                     ))}
                   </div>
                 ) : (

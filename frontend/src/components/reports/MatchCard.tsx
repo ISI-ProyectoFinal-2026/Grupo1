@@ -1,9 +1,16 @@
 import { Link } from "react-router-dom";
 import type { MatchDTO } from "@/types/report.types";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import ErrorMessage from "@/components/ui/ErrorMessage";
 
 interface MatchCardProps {
   match: MatchDTO;
+  canManage?: boolean;
+  onConfirm?: (matchId: number) => void;
+  onReject?: (matchId: number) => void;
+  isBusy?: boolean;
+  error?: string | null;
 }
 
 const REPORT_TYPE_LABEL: Record<MatchDTO["reportType"], string> = {
@@ -16,15 +23,26 @@ const REPORT_TYPE_COLOR: Record<MatchDTO["reportType"], string> = {
   found: "#3B82F6",
 };
 
-export default function MatchCard({ match }: MatchCardProps) {
+const CONFIRMED_COLOR = "#16A34A";
+
+export default function MatchCard({
+  match,
+  canManage = false,
+  onConfirm,
+  onReject,
+  isBusy = false,
+  error = null,
+}: MatchCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("es-AR", { month: "short", day: "numeric" });
   };
 
+  const showActions = canManage && match.status === "pending";
+
   return (
-    <Link to={`/reports/${match.reportId}`}>
-      <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden flex gap-4 h-32">
+    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      <Link to={`/reports/${match.reportId}`} className="flex gap-4 h-32">
         {match.imageUrl ? (
           <img
             src={match.imageUrl}
@@ -47,6 +65,9 @@ export default function MatchCard({ match }: MatchCardProps) {
                 label={REPORT_TYPE_LABEL[match.reportType]}
                 backgroundColor={REPORT_TYPE_COLOR[match.reportType]}
               />
+              {match.status === "confirmed" && (
+                <Badge label="Coincidencia confirmada" backgroundColor={CONFIRMED_COLOR} />
+              )}
             </div>
           </div>
 
@@ -59,7 +80,31 @@ export default function MatchCard({ match }: MatchCardProps) {
             <p className="text-xs text-gray-400">{formatDate(match.createdAt)}</p>
           </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+
+      {showActions && (
+        <div className="border-t px-4 py-3 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={isBusy}
+              onClick={() => onConfirm?.(match.matchId)}
+            >
+              Confirmar coincidencia
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isBusy}
+              onClick={() => onReject?.(match.matchId)}
+            >
+              Descartar
+            </Button>
+          </div>
+          {error && <ErrorMessage message={error} />}
+        </div>
+      )}
+    </div>
   );
 }

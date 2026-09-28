@@ -1,5 +1,11 @@
 import { api } from "./api";
-import type { ReportDTO, CreateReportInput, ListReportsQuery, MatchDTO } from "@/types/report.types";
+import type {
+  ReportDTO,
+  CreateReportInput,
+  ListReportsQuery,
+  MatchDTO,
+  MatchDecisionDTO,
+} from "@/types/report.types";
 
 export async function listReports(filters?: ListReportsQuery): Promise<ReportDTO[]> {
   const { data } = await api.get<ReportDTO[]>("/reports", { params: filters });
@@ -32,6 +38,16 @@ export async function closeReport(id: number): Promise<ReportDTO> {
 
 export async function getMatches(id: number): Promise<MatchDTO[]> {
   const { data } = await api.get<MatchDTO[]>(`/reports/${id}/matches`);
+  return data;
+}
+
+export async function confirmMatch(reportId: number, matchId: number): Promise<MatchDecisionDTO> {
+  const { data } = await api.post<MatchDecisionDTO>(`/reports/${reportId}/matches/${matchId}/confirm`);
+  return data;
+}
+
+export async function rejectMatch(reportId: number, matchId: number): Promise<MatchDecisionDTO> {
+  const { data } = await api.post<MatchDecisionDTO>(`/reports/${reportId}/matches/${matchId}/reject`);
   return data;
 }
 

@@ -134,6 +134,41 @@ export async function notifyMatch(data: NotifyMatchInput): Promise<Notification[
   });
 }
 
+export type ModerationVerdict = "published" | "rejected";
+
+const STATUS_CHANGE_TEXTS: Record<ModerationVerdict, { title: string; message: (reportTitle: string) => string }> = {
+  published: {
+    title: "Tu reporte fue publicado",
+    message: (reportTitle) => `"${reportTitle}" ya es visible para la comunidad.`,
+  },
+  rejected: {
+    title: "Tu reporte no fue publicado",
+    message: (reportTitle) =>
+      `"${reportTitle}" no pasó la moderación de contenido y no es visible para la comunidad.`,
+  },
+};
+
+export async function createForStatusChange(
+  reportId: number,
+  status: ModerationVerdict
+): Promise<Notification | null> {
+  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true, title: true } });
+  if (!report) {
+    return null;
+  }
+
+  const texts = STATUS_CHANGE_TEXTS[status];
+  return prisma.notification.create({
+    data: {
+      userId: report.userId,
+      type: "report_status_change",
+      title: texts.title,
+      message: texts.message(report.title),
+      reportId,
+    },
+  });
+}
+
 const MESSAGE_PREVIEW_MAX_LENGTH = 80;
 
 /**

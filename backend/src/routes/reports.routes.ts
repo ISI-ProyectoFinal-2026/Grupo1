@@ -15,6 +15,9 @@ reportsRouter.get("/:id", optionalAuth, reportsController.getById);
 // autenticado que mire el reporte (un buen samaritano que ve un "encontrado"
 // puede ver que coincide con un "perdido"), no solo al dueño (issue #175).
 reportsRouter.get("/:id/matches", requireAuth, reportsController.getMatches);
+// Decidir sobre una coincidencia sí exige ser dueño del reporte :id.
+reportsRouter.post("/:id/matches/:matchId/confirm", requireAuth, reportsController.confirmMatch);
+reportsRouter.post("/:id/matches/:matchId/reject", requireAuth, reportsController.rejectMatch);
 reportsRouter.get("/:id/flyer", reportsController.getFlyer);
 reportsRouter.put("/:id", requireAuth, reportsController.update);
 reportsRouter.put("/:id/flyer/custom", requireAuth, reportsController.setCustomFlyer);

@@ -24,14 +24,23 @@ export interface ReportDTO {
   publishedAt: string | null
 }
 
+export type MatchStatus = 'pending' | 'confirmed' | 'rejected'
+
 export interface MatchDTO {
+  matchId: number
   reportId: number
   title: string
   imageUrl: string | null
   reportType: ReportType
   similarityScore: number | null
-  status: 'pending' | 'confirmed' | 'rejected'
+  status: MatchStatus
   createdAt: string
+}
+
+export interface MatchDecisionDTO {
+  matchId: number
+  status: MatchStatus
+  confirmedAt: string | null
 }
 
 export interface CreateReportInput {
