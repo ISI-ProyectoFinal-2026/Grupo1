@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RequireRole from "./components/RequireRole";
 import FeedPage from "./pages/reports/FeedPage";
 import CreateReportPage from "./pages/reports/CreateReportPage";
 import ReportDetailPage from "./pages/reports/ReportDetailPage";
@@ -12,6 +13,7 @@ import BusinessRegisterPage from "./pages/business/BusinessRegisterPage";
 import BusinessDashboardPage from "./pages/business/BusinessDashboardPage";
 import BusinessDirectoryPage from "./pages/business/BusinessDirectoryPage";
 import BusinessProfilePage from "./pages/business/BusinessProfilePage";
+import ModerationPage from "./pages/moderation/ModerationPage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -35,6 +37,14 @@ export const router = createBrowserRouter([
           { path: "businesses/register", element: <BusinessRegisterPage /> },
           { path: "businesses/dashboard", element: <BusinessDashboardPage /> },
           { path: "businesses/:id", element: <BusinessProfilePage /> },
+          // El panel de moderación queda anidado: ProtectedRoute exige sesión y
+          // RequireRole exige el rol. La autorización real la hace cumplir el
+          // backend (`requireRole`); esto solo evita mostrar una pantalla que
+          // responderia 403.
+          {
+            element: <RequireRole roles={["moderador", "admin"]} />,
+            children: [{ path: "moderation", element: <ModerationPage /> }],
+          },
         ],
       },
     ],

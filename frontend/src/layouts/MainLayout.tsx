@@ -2,12 +2,14 @@ import { Outlet, useNavigate, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import { useIsModerator } from "@/hooks/useIsModerator";
 
 function MainLayout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const isModerator = useIsModerator();
 
   function handleLogout() {
     logout();
@@ -41,6 +43,11 @@ function MainLayout() {
             <Link to="/businesses/dashboard" className="text-gray-600 hover:text-gray-900">
               Mi comercio
             </Link>
+            {isModerator && (
+              <Link to="/moderation" className="text-gray-600 hover:text-gray-900">
+                Moderación
+              </Link>
+            )}
             <NotificationBell />
             <span className="text-gray-600">{user.email}</span>
             <button

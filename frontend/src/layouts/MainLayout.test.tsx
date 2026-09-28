@@ -6,14 +6,16 @@ import MainLayout from '@/layouts/MainLayout'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import { useAuthStore } from '@/stores/auth.store'
 import * as notificationsService from '@/services/notifications.service'
+import type { AuthUser } from '@/types/auth'
 
 vi.mock('@/services/notifications.service')
 
-const usuario = {
+const usuario: AuthUser = {
   id: 7,
   email: 'franco@patitas.test',
   fullName: 'Franco',
   phone: null,
+  role: 'usuario_regular',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -55,6 +57,26 @@ describe('MainLayout', () => {
     await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Notificaciones' })).not.toBeInTheDocument()
     expect(notificationsService.listNotifications).not.toHaveBeenCalled()
+  })
+
+  it('ofrece el panel de moderacion a un moderador', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, role: 'moderador' } })
+
+    renderLayout()
+
+    expect(await screen.findByRole('link', { name: 'Moderación' })).toHaveAttribute(
+      'href',
+      '/moderation'
+    )
+  })
+
+  it('no ofrece el panel de moderacion a un usuario regular', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: 'Moderación' })).not.toBeInTheDocument()
   })
 
   it('limpia el cache de queries al cerrar sesion (navegador compartido, #175)', async () => {
