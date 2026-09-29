@@ -2,6 +2,7 @@ import { useId, useState, useRef } from "react";
 import {
   ALLOWED_UPLOAD_TYPES,
   MAX_UPLOAD_BYTES,
+  analyzeImage,
   getPresignedUrl,
   uploadToR2,
   type UploadContentType,
@@ -9,11 +10,32 @@ import {
 import ErrorMessage from "@/components/ui/ErrorMessage";
 
 interface ImageUploaderProps {
-  onSuccess: (publicUrl: string) => void;
+  /**
+   * `hasAnimal` is the screening verdict for the uploaded photo: false means no
+   * animal was detected, null means the analysis was unavailable or not requested.
+   */
+  onSuccess: (publicUrl: string, hasAnimal: boolean | null) => void;
   onError: (error: string) => void;
+  /** Run the animal screening after the upload (report photos, not custom flyers). */
+  screenForAnimals?: boolean;
 }
 
-export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps) {
+// Best-effort: the upload itself already succeeded, so a failed analysis is an
+// unknown verdict (null) rather than an upload error. The backend re-checks the
+// image when the report is created anyway.
+async function analyzeUploadedImage(publicUrl: string): Promise<boolean | null> {
+  try {
+    return await analyzeImage(publicUrl);
+  } catch {
+    return null;
+  }
+}
+
+export default function ImageUploader({
+  onSuccess,
+  onError,
+  screenForAnimals = false,
+}: ImageUploaderProps) {
   const inputId = useId();
   const [isLoading, setIsLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -49,7 +71,8 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
         file.size
       );
       await uploadToR2(presignData.uploadUrl, file);
-      onSuccess(presignData.publicUrl);
+      const hasAnimal = screenForAnimals ? await analyzeUploadedImage(presignData.publicUrl) : null;
+      onSuccess(presignData.publicUrl, hasAnimal);
       URL.revokeObjectURL(previewUrl);
       setPreview(null);
     } catch (err) {

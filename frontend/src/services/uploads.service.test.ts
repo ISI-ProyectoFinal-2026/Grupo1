@@ -4,6 +4,7 @@ import { api } from '@/services/api'
 import {
   ALLOWED_UPLOAD_TYPES,
   MAX_UPLOAD_BYTES,
+  analyzeImage,
   getPresignedUrl,
   uploadToR2,
 } from '@/services/uploads.service'
@@ -100,5 +101,25 @@ describe('uploadToR2', () => {
     await expect(uploadToR2('https://r2/upload?vencida', archivo())).rejects.toThrow(
       /vence a los 5 minutos/
     )
+  })
+})
+
+describe('analyzeImage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('sends the uploaded image URL to POST /uploads/analyze', async () => {
+    vi.mocked(api.post).mockResolvedValue(respuesta({ hasAnimal: true }))
+
+    await analyzeImage('https://cdn/perro.jpg')
+
+    expect(api.post).toHaveBeenCalledWith('/uploads/analyze', { imageUrl: 'https://cdn/perro.jpg' })
+  })
+
+  it.each([true, false, null])('returns hasAnimal=%s as answered by the backend', async (hasAnimal) => {
+    vi.mocked(api.post).mockResolvedValue(respuesta({ hasAnimal }))
+
+    await expect(analyzeImage('https://cdn/foto.jpg')).resolves.toBe(hasAnimal)
   })
 })

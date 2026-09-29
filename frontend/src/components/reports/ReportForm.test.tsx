@@ -31,12 +31,18 @@ vi.mock('@/components/reports/ImageUploader', () => ({
     onSuccess,
     onError,
   }: {
-    onSuccess: (url: string) => void
+    onSuccess: (url: string, hasAnimal: boolean | null) => void
     onError: (error: string) => void
   }) => (
     <>
-      <button type='button' onClick={() => onSuccess('https://cdn/foto.jpg')}>
+      <button type='button' onClick={() => onSuccess('https://cdn/foto.jpg', true)}>
         Simular foto subida
+      </button>
+      <button type='button' onClick={() => onSuccess('https://cdn/paisaje.jpg', false)}>
+        Simular foto sin animales
+      </button>
+      <button type='button' onClick={() => onSuccess('https://cdn/foto.jpg', null)}>
+        Simular analisis no disponible
       </button>
       <button type='button' onClick={() => onError('No se pudo subir la imagen (HTTP 403)')}>
         Simular falla de subida
@@ -269,5 +275,86 @@ describe('ReportForm: envio', () => {
     await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
 
     expect(await screen.findByText('Error al crear el reporte')).toBeInTheDocument()
+  })
+})
+
+describe('ReportForm: animal screening of the uploaded photo', () => {
+  const NO_ANIMAL_MESSAGE =
+    'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM'
+
+  it('allows creating the report when the photo shows an animal', async () => {
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+
+    expect(screen.queryByText(NO_ANIMAL_MESSAGE)).not.toBeInTheDocument()
+    const submit = screen.getByRole('button', { name: 'Crear Reporte' })
+    expect(submit).toBeEnabled()
+
+    await user.click(submit)
+
+    await waitFor(() =>
+      expect(createReport).toHaveBeenCalledWith(
+        expect.objectContaining({ imageUrl: 'https://cdn/foto.jpg' })
+      )
+    )
+  })
+
+  it('warns about SPAM and blocks submission when no animal is detected', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(NO_ANIMAL_MESSAGE)
+    expect(screen.queryByText('✓ Foto subida correctamente')).not.toBeInTheDocument()
+    const submit = screen.getByRole('button', { name: 'Crear Reporte' })
+    expect(submit).toBeDisabled()
+
+    await user.click(submit)
+
+    expect(createReport).not.toHaveBeenCalled()
+  })
+
+  it('unblocks submission once a photo with an animal replaces the rejected one', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+
+    expect(screen.queryByText(NO_ANIMAL_MESSAGE)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear Reporte' })).toBeEnabled()
+  })
+
+  it('allows creating the report when the analysis is unavailable', async () => {
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Simular analisis no disponible' }))
+
+    expect(screen.queryByText(NO_ANIMAL_MESSAGE)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+  })
+
+  it('shows the backend 422 SPAM message when the server rejects the report', async () => {
+    vi.mocked(createReport).mockRejectedValue(new Error(NO_ANIMAL_MESSAGE))
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Simular analisis no disponible' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(NO_ANIMAL_MESSAGE)
+    expect(screen.queryByText('Detalle del reporte')).not.toBeInTheDocument()
   })
 })
