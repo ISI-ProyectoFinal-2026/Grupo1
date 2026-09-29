@@ -19,6 +19,21 @@ _CLIP_PRETRAINED = "laion2b_s34b_b79k"
 # Nombres de clase COCO que nos interesan — evita índices mágicos.
 _PET_LABELS = {"cat", "dog"}
 
+# Every COCO animal class (ids 14-23). Used only to screen uploads: a report
+# image must show some animal, even if matching only embeds cats and dogs.
+_ANIMAL_LABELS = {
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+}
+
 yolo_model = ultralytics.YOLO(_YOLO_WEIGHTS)
 
 clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
@@ -55,6 +70,18 @@ def detect_and_crop(image: Image.Image) -> Image.Image | None:
 
     x1, y1, x2, y2 = (int(v) for v in best_box.xyxy[0])
     return image.crop((x1, y1, x2, y2))
+
+
+def contains_animal(image: Image.Image) -> bool:
+    """Return True if YOLO detects at least one COCO animal in `image`."""
+    for result in yolo_model(image):
+        boxes = result.boxes
+        if boxes is None:
+            continue
+        for box in boxes:
+            if yolo_model.names[int(box.cls[0])] in _ANIMAL_LABELS:
+                return True
+    return False
 
 
 def generate_embedding(image: Image.Image) -> list[float]:

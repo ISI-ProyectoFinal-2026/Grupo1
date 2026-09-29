@@ -98,3 +98,40 @@ def test_generate_embedding_devuelve_512_floats_normalizado():
 
     norm = sum(v * v for v in embedding) ** 0.5
     assert norm == pytest.approx(1.0, abs=1e-4)
+
+
+# --- contains_animal: any COCO animal class, not only cats/dogs -------------
+
+
+def test_contains_animal_true_for_dog():
+    pipeline.yolo_model.names = {16: "dog"}
+    pipeline.yolo_model.return_value = [FakeResult([FakeBox(16, 0.9, (10, 10, 50, 50))])]
+
+    assert pipeline.contains_animal(_image()) is True
+
+
+@pytest.mark.parametrize(
+    ("cls_id", "label"),
+    [(14, "bird"), (15, "cat"), (17, "horse"), (20, "elephant"), (23, "giraffe")],
+)
+def test_contains_animal_true_for_any_coco_animal(cls_id, label):
+    pipeline.yolo_model.names = {cls_id: label}
+    pipeline.yolo_model.return_value = [FakeResult([FakeBox(cls_id, 0.7, (0, 0, 10, 10))])]
+
+    assert pipeline.contains_animal(_image()) is True
+
+
+def test_contains_animal_false_when_only_non_animals_are_detected():
+    pipeline.yolo_model.names = {0: "person", 2: "car"}
+    pipeline.yolo_model.return_value = [
+        FakeResult([FakeBox(0, 0.95, (0, 0, 20, 30)), FakeBox(2, 0.9, (5, 5, 40, 40))])
+    ]
+
+    assert pipeline.contains_animal(_image()) is False
+
+
+def test_contains_animal_false_without_detections():
+    pipeline.yolo_model.names = {}
+    pipeline.yolo_model.return_value = [FakeResult([]), FakeResult(None)]
+
+    assert pipeline.contains_animal(_image()) is False
