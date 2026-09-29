@@ -128,6 +128,51 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
     });
 }
 
+export type ImageAnalysisResult = "animal" | "no_animal" | "unavailable";
+
+// Short and without retries: the user is waiting on this answer (upload screening
+// and report creation). If the AI service is slow or down, the caller falls back
+// to the async moderation pipeline instead of blocking.
+const ANALYZE_TIMEOUT_MS = 15_000;
+
+/**
+ * Synchronously asks the AI service whether an image contains any animal, so
+ * obvious spam (no animal at all) is rejected before a report is created.
+ *
+ * Only a well-formed 200 is a verdict. Anything else (AI service not
+ * configured, network error, timeout, non-2xx, malformed body) is
+ * "unavailable": callers must not block the user on it.
+ */
+export async function analyzeImage(imageUrl: string): Promise<ImageAnalysisResult> {
+  const baseUrl = process.env.AI_SERVICE_URL;
+  if (!baseUrl) return "unavailable";
+
+  try {
+    const response = await fetch(`${baseUrl}/images/analyze`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Key": process.env.INTERNAL_API_KEY ?? "",
+      },
+      body: JSON.stringify({ image_url: imageUrl }),
+      signal: AbortSignal.timeout(ANALYZE_TIMEOUT_MS),
+    });
+    if (response.status !== 200) {
+      console.error(`[matching] image analysis inconclusive (status ${response.status}) for ${imageUrl}`);
+      return "unavailable";
+    }
+    const body = (await response.json()) as { has_animal?: unknown };
+    if (typeof body.has_animal !== "boolean") {
+      console.error(`[matching] image analysis returned a malformed body for ${imageUrl}`);
+      return "unavailable";
+    }
+    return body.has_animal ? "animal" : "no_animal";
+  } catch (error) {
+    console.error(`[matching] image analysis failed for ${imageUrl}:`, error);
+    return "unavailable";
+  }
+}
+
 /**
  * Los reintentos de `triggerEmbeddingGeneration` viven en memoria y se agotan
  * en ~36s. Si el Backend IA estuvo caído más que eso —o si el proceso de Node

@@ -2,6 +2,7 @@ import { Prisma, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import * as matchingService from "./matching.service";
+import { isR2PublicUrl } from "./storage.service";
 import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
@@ -117,7 +118,25 @@ export async function getVisibleById(id: number, viewerId?: number): Promise<Rep
   throw new AppError(404, "Reporte no encontrado");
 }
 
+export const NO_ANIMAL_DETECTED_MESSAGE =
+  "Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM";
+
 export async function create(data: CreateReportInput & { userId: number }): Promise<ReportDTO> {
+  // Upfront screening: an image with no animal at all is rejected before anything
+  // is persisted. The frontend runs the same check right after the upload, but it
+  // is enforced here so the API cannot be used to bypass it. If the AI service
+  // cannot answer, the report is still created as "pending" and the async
+  // moderation pipeline (triggerEmbeddingGeneration + reconciliation) decides.
+  // Only images in our R2 bucket are screened synchronously: answering for an
+  // arbitrary URL would turn this endpoint into an SSRF oracle.
+  if (
+    data.imageUrl &&
+    isR2PublicUrl(data.imageUrl) &&
+    (await matchingService.analyzeImage(data.imageUrl)) === "no_animal"
+  ) {
+    throw new AppError(422, NO_ANIMAL_DETECTED_MESSAGE);
+  }
+
   const reportId = await prisma.$transaction(async (tx) => {
     let created;
     try {
