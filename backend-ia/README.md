@@ -71,7 +71,7 @@ POST /reports/{report_id}/embedding
 
 Internamente (`app/services/embedding_service.py` + `app/services/matching_service.py`), en la misma request:
 
-1. Descarga la imagen y corre **YOLOv8n** (`app/ml/pipeline.py`) para detectar y recortar la mascota (clases `cat`/`dog`).
+1. Descarga la imagen y corre **YOLOv8n** (`app/ml/pipeline.py`) para detectar y recortar el animal (cualquier clase animal de COCO: `bird`, `cat`, `dog`, `horse`, etc.).
 2. Genera el embedding con **OpenCLIP ViT-B-32** (pretrained `laion2b_s34b_b79k` — **no** `openai`, da otra dimensión) y lo guarda en `report_embeddings` (`vector(512)`).
 3. Busca candidatos por similitud coseno (pgvector) entre reportes de tipo opuesto (lost↔found), dentro de 5km / 30 días / publicados, y guarda los que superen `SIMILARITY_THRESHOLD` (0.75, constante documentada en `matching_service.py` — valor provisional, ver `docs/pocs/poc_similitudes.md`) en `report_matches`.
 

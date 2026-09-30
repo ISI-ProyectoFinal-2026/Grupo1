@@ -51,6 +51,18 @@ def test_detect_and_crop_detecta_gato():
     assert crop.size == (20, 30)
 
 
+# Same criterion as contains_animal (the upload screening): a bird accepted when
+# uploading must not end up rejected by the async moderation (PR #195 review).
+def test_detect_and_crop_acepta_cualquier_animal():
+    pipeline.yolo_model.names = {14: "bird"}
+    pipeline.yolo_model.return_value = [FakeResult([FakeBox(14, 0.7, (5, 5, 25, 35))])]
+
+    crop = pipeline.detect_and_crop(_image())
+
+    assert crop is not None
+    assert crop.size == (20, 30)
+
+
 def test_detect_and_crop_sin_mascota_devuelve_none():
     pipeline.yolo_model.names = {0: "person"}
     pipeline.yolo_model.return_value = [FakeResult([FakeBox(0, 0.95, (0, 0, 20, 30))])]
