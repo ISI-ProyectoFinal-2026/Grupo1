@@ -117,9 +117,16 @@ describe('analyzeImage', () => {
     expect(api.post).toHaveBeenCalledWith('/uploads/analyze', { imageUrl: 'https://cdn/perro.jpg' })
   })
 
-  it.each([true, false, null])('returns hasAnimal=%s as answered by the backend', async (hasAnimal) => {
+  it.each([true, null])('returns hasAnimal=%s as answered by the backend', async (hasAnimal) => {
     vi.mocked(api.post).mockResolvedValue(respuesta({ hasAnimal }))
 
-    await expect(analyzeImage('https://cdn/foto.jpg')).resolves.toBe(hasAnimal)
+    await expect(analyzeImage('https://cdn/foto.jpg')).resolves.toEqual({ hasAnimal })
+  })
+
+  it('returns the rejection message sent by the backend when no animal is detected', async () => {
+    const rejection = { hasAnimal: false, message: 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM' }
+    vi.mocked(api.post).mockResolvedValue(respuesta(rejection))
+
+    await expect(analyzeImage('https://cdn/paisaje.jpg')).resolves.toEqual(rejection)
   })
 })

@@ -11,21 +11,28 @@ import ErrorMessage from "@/components/ui/ErrorMessage";
 
 interface ImageUploaderProps {
   /**
-   * `hasAnimal` is the screening verdict for the uploaded photo: false means no
-   * animal was detected, null means the analysis was unavailable or not requested.
+   * `rejection` is the message to show when the screening found no animal in the
+   * uploaded photo; null means it was accepted, or the analysis was unavailable
+   * or not requested.
    */
-  onSuccess: (publicUrl: string, hasAnimal: boolean | null) => void;
+  onSuccess: (publicUrl: string, rejection: string | null) => void;
   onError: (error: string) => void;
+  /**
+   * True from the moment a file is picked until its upload (and screening, when
+   * requested) finishes, so the parent can hold back actions that need the result.
+   */
+  onUploadingChange?: (uploading: boolean) => void;
   /** Run the animal screening after the upload (report photos, not custom flyers). */
   screenForAnimals?: boolean;
 }
 
 // Best-effort: the upload itself already succeeded, so a failed analysis is an
-// unknown verdict (null) rather than an upload error. The backend re-checks the
-// image when the report is created anyway.
-async function analyzeUploadedImage(publicUrl: string): Promise<boolean | null> {
+// unknown verdict (no rejection) rather than an upload error. The backend
+// re-checks the image when the report is created anyway.
+async function getRejection(publicUrl: string): Promise<string | null> {
   try {
-    return await analyzeImage(publicUrl);
+    const analysis = await analyzeImage(publicUrl);
+    return analysis.hasAnimal === false ? analysis.message : null;
   } catch {
     return null;
   }
@@ -34,6 +41,7 @@ async function analyzeUploadedImage(publicUrl: string): Promise<boolean | null> 
 export default function ImageUploader({
   onSuccess,
   onError,
+  onUploadingChange,
   screenForAnimals = false,
 }: ImageUploaderProps) {
   const inputId = useId();
@@ -64,6 +72,7 @@ export default function ImageUploader({
     setPreview(previewUrl);
 
     setIsLoading(true);
+    onUploadingChange?.(true);
     try {
       const presignData = await getPresignedUrl(
         file.name,
@@ -71,8 +80,8 @@ export default function ImageUploader({
         file.size
       );
       await uploadToR2(presignData.uploadUrl, file);
-      const hasAnimal = screenForAnimals ? await analyzeUploadedImage(presignData.publicUrl) : null;
-      onSuccess(presignData.publicUrl, hasAnimal);
+      const rejection = screenForAnimals ? await getRejection(presignData.publicUrl) : null;
+      onSuccess(presignData.publicUrl, rejection);
       URL.revokeObjectURL(previewUrl);
       setPreview(null);
     } catch (err) {
@@ -83,6 +92,7 @@ export default function ImageUploader({
       setPreview(null);
     } finally {
       setIsLoading(false);
+      onUploadingChange?.(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }

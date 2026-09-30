@@ -30,15 +30,26 @@ vi.mock('@/components/reports/ImageUploader', () => ({
   default: ({
     onSuccess,
     onError,
+    onUploadingChange,
   }: {
-    onSuccess: (url: string, hasAnimal: boolean | null) => void
+    onSuccess: (url: string, rejection: string | null) => void
     onError: (error: string) => void
+    onUploadingChange?: (uploading: boolean) => void
   }) => (
     <>
-      <button type='button' onClick={() => onSuccess('https://cdn/foto.jpg', true)}>
+      <button type='button' onClick={() => onUploadingChange?.(true)}>
+        Simular subida en curso
+      </button>
+      <button
+        type='button'
+        onClick={() => {
+          onSuccess('https://cdn/foto.jpg', null)
+          onUploadingChange?.(false)
+        }}
+      >
         Simular foto subida
       </button>
-      <button type='button' onClick={() => onSuccess('https://cdn/paisaje.jpg', false)}>
+      <button type='button' onClick={() => onSuccess('https://cdn/paisaje.jpg', 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM')}>
         Simular foto sin animales
       </button>
       <button type='button' onClick={() => onSuccess('https://cdn/foto.jpg', null)}>
@@ -356,5 +367,33 @@ describe('ReportForm: animal screening of the uploaded photo', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(NO_ANIMAL_MESSAGE)
     expect(screen.queryByText('Detalle del reporte')).not.toBeInTheDocument()
+  })
+})
+
+// The submit used to stay enabled while the photo was uploading/being analyzed:
+// sending then created a report without image, published with no screening at all.
+describe('ReportForm: submission while the photo is uploading', () => {
+  it('disables the submit until the upload and its analysis finish', async () => {
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Simular subida en curso' }))
+
+    const submit = screen.getByRole('button', { name: 'Crear Reporte' })
+    expect(submit).toBeDisabled()
+    await user.click(submit)
+    expect(createReport).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+
+    expect(submit).toBeEnabled()
+    await user.click(submit)
+    await waitFor(() =>
+      expect(createReport).toHaveBeenCalledWith(
+        expect.objectContaining({ imageUrl: 'https://cdn/foto.jpg' })
+      )
+    )
   })
 })

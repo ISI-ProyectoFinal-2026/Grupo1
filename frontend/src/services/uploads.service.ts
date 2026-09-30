@@ -58,21 +58,16 @@ export async function uploadToR2(uploadUrl: string, file: File): Promise<void> {
 }
 
 /**
- * Must match NO_ANIMAL_DETECTED_MESSAGE in backend/src/services/reports.service.ts,
- * which enforces the same rule server-side (422) when the report is created.
+ * `hasAnimal: null` means the AI service could not answer: the user must not be
+ * blocked. A rejection (`hasAnimal: false`) carries the message to show, so its
+ * wording lives only in the backend, next to the 422 it returns for the same rule.
  */
-export const NO_ANIMAL_DETECTED_MESSAGE =
-  "Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM";
+export type ImageAnalysis =
+  | { hasAnimal: true | null }
+  | { hasAnimal: false; message: string };
 
-interface AnalyzeImageResponse {
-  hasAnimal: boolean | null;
-}
-
-/**
- * Asks the backend whether an uploaded image contains any animal.
- * `null` means the AI service could not answer: the user must not be blocked.
- */
-export async function analyzeImage(imageUrl: string): Promise<boolean | null> {
-  const { data } = await api.post<AnalyzeImageResponse>("/uploads/analyze", { imageUrl });
-  return data.hasAnimal;
+/** Asks the backend whether an uploaded image contains any animal. */
+export async function analyzeImage(imageUrl: string): Promise<ImageAnalysis> {
+  const { data } = await api.post<ImageAnalysis>("/uploads/analyze", { imageUrl });
+  return data;
 }
