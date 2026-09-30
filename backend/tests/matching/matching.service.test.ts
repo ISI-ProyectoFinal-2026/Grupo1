@@ -57,7 +57,7 @@ describe("matching.service", () => {
 
     // publishedAt se sella recien acá, no en la creación del reporte.
     expect(updateManySpy).toHaveBeenCalledWith({
-      where: { id: 42, status: "pending" },
+      where: { id: 42, status: "pending", imageUrl: "https://cdn.example.com/foto.jpg" },
       data: { status: "published", publishedAt: expect.any(Date) },
     });
   });
@@ -68,7 +68,26 @@ describe("matching.service", () => {
 
     await triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
 
-    expect(updateManySpy).toHaveBeenCalledWith({ where: { id: 42, status: "pending" }, data: { status: "rejected" } });
+    expect(updateManySpy).toHaveBeenCalledWith({
+      where: { id: 42, status: "pending", imageUrl: "https://cdn.example.com/foto.jpg" },
+      data: { status: "rejected" },
+    });
+  });
+
+  // If the owner swaps the photo while a verdict is in flight, the verdict for
+  // the old photo must not decide the new one (PR #195 review).
+  test("a verdict for a photo the report no longer shows changes nothing", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue({ status: 201 });
+    updateManySpy.mockResolvedValue({ count: 0 });
+    const notifySpy = jest.spyOn(notificationsService, "createForStatusChange");
+
+    await triggerEmbeddingGeneration(42, "https://cdn.example.com/foto-vieja.jpg");
+
+    expect(updateManySpy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ imageUrl: "https://cdn.example.com/foto-vieja.jpg" }) })
+    );
+    expect(notifySpy).not.toHaveBeenCalled();
   });
 
   test("si falla el aviso al dueño se loguea y el pipeline termina igual", async () => {

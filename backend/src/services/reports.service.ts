@@ -121,20 +121,35 @@ export async function getVisibleById(id: number, viewerId?: number): Promise<Rep
 export const NO_ANIMAL_DETECTED_MESSAGE =
   "Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM";
 
-export async function create(data: CreateReportInput & { userId: number }): Promise<ReportDTO> {
-  // Upfront screening: an image with no animal at all is rejected before anything
-  // is persisted. The frontend runs the same check right after the upload, but it
-  // is enforced here so the API cannot be used to bypass it. If the AI service
-  // cannot answer, the report is still created as "pending" and the async
-  // moderation pipeline (triggerEmbeddingGeneration + reconciliation) decides.
-  // Only images in our R2 bucket are screened synchronously: answering for an
-  // arbitrary URL would turn this endpoint into an SSRF oracle.
-  if (
-    data.imageUrl &&
-    isR2PublicUrl(data.imageUrl) &&
-    (await matchingService.analyzeImage(data.imageUrl)) === "no_animal"
-  ) {
+/**
+ * Upfront screening: an image with no animal at all is rejected before anything
+ * is persisted. The frontend runs the same check right after the upload, but it
+ * is enforced here so the API cannot be used to bypass it. If the AI service
+ * cannot answer, the report is still saved as "pending" and the async
+ * moderation pipeline (triggerEmbeddingGeneration + reconciliation) decides.
+ * Only images in our R2 bucket are screened synchronously: answering for an
+ * arbitrary URL would turn this endpoint into an SSRF oracle.
+ */
+async function assertImageHasAnimal(imageUrl: string): Promise<void> {
+  if (isR2PublicUrl(imageUrl) && (await matchingService.analyzeImage(imageUrl)) === "no_animal") {
     throw new AppError(422, NO_ANIMAL_DETECTED_MESSAGE);
+  }
+}
+
+// Fire-and-forget: no se espera la inferencia de ML. Se envuelve en try/catch
+// además del .catch() interno del servicio para que ni siquiera un error
+// síncrono al disparar la llamada haga fallar la operación sobre el reporte.
+function triggerModeration(reportId: number, imageUrl: string): void {
+  try {
+    matchingService.triggerEmbeddingGeneration(reportId, imageUrl);
+  } catch (error) {
+    console.error(`[matching] fallo al disparar la generación de embedding para report ${reportId}:`, error);
+  }
+}
+
+export async function create(data: CreateReportInput & { userId: number }): Promise<ReportDTO> {
+  if (data.imageUrl) {
+    await assertImageHasAnimal(data.imageUrl);
   }
 
   const reportId = await prisma.$transaction(async (tx) => {
@@ -176,15 +191,7 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
 
   const report = await getById(reportId);
   if (report.imageUrl) {
-    // Fire-and-forget: no se espera la inferencia de ML. Se envuelve en
-    // try/catch además del .catch() interno del servicio para que ni
-    // siquiera un error síncrono al disparar la llamada haga fallar la
-    // creación del reporte.
-    try {
-      matchingService.triggerEmbeddingGeneration(report.id, report.imageUrl);
-    } catch (error) {
-      console.error(`[matching] fallo al disparar la generación de embedding para report ${report.id}:`, error);
-    }
+    triggerModeration(report.id, report.imageUrl);
   }
   return report;
 }
@@ -197,9 +204,23 @@ export async function update(id: number, userId: number, data: UpdateReportInput
 
   const { location, ...scalarData } = data;
 
+  // A new photo goes through the same moderation as on create(): otherwise a
+  // report published with a dog photo could be edited to show anything. The
+  // report is hidden again ("pending") until the async pipeline approves it.
+  const newImageUrl = data.imageUrl !== undefined && data.imageUrl !== existing.imageUrl ? data.imageUrl : null;
+  if (newImageUrl) {
+    // Re-moderating a closed report would publish it again, and "resolved"
+    // sent along with the new photo would be overwritten by "pending".
+    if (existing.status === "resolved" || data.status === "resolved") {
+      throw new AppError(409, "No se puede cambiar la foto de un reporte resuelto");
+    }
+    await assertImageHasAnimal(newImageUrl);
+  }
+  const updateData = newImageUrl ? { ...scalarData, status: "pending" as const, publishedAt: null } : scalarData;
+
   await prisma.$transaction(async (tx) => {
     try {
-      await tx.report.update({ where: { id }, data: scalarData });
+      await tx.report.update({ where: { id }, data: updateData });
     } catch (error) {
       if (isPrismaKnownError(error, "P2025")) {
         throw new AppError(404, "Reporte no encontrado");
@@ -218,6 +239,9 @@ export async function update(id: number, userId: number, data: UpdateReportInput
     }
   });
 
+  if (newImageUrl) {
+    triggerModeration(id, newImageUrl);
+  }
   return getById(id);
 }
 

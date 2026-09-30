@@ -68,12 +68,15 @@ async function fetchWithRetry(url: string, options: RequestInit): Promise<Respon
 }
 
 // Solo sale de pending una vez: un reintento o la reconciliación no lo pisan ni re-avisan.
+// El veredicto vale solo para la imagen analizada: si el dueño cambió la foto
+// mientras la inferencia estaba en vuelo, decide el veredicto de la foto nueva.
 async function applyModerationVerdict(
   reportId: number,
+  imageUrl: string,
   verdict: notificationsService.ModerationVerdict
 ): Promise<void> {
   const { count } = await prisma.report.updateMany({
-    where: { id: reportId, status: "pending" },
+    where: { id: reportId, status: "pending", imageUrl },
     // publishedAt se sella acá: hasta este momento el reporte nunca estuvo publicado.
     data: verdict === "published" ? { status: verdict, publishedAt: new Date() } : { status: verdict },
   });
@@ -101,9 +104,9 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
   })
     .then(async (response) => {
       if (response.status === 201) {
-        await applyModerationVerdict(reportId, "published");
+        await applyModerationVerdict(reportId, imageUrl, "published");
       } else if (response.status === 422) {
-        await applyModerationVerdict(reportId, "rejected");
+        await applyModerationVerdict(reportId, imageUrl, "rejected");
       } else if (response.status === 401) {
         // Se distingue del resto de los status inconclusos porque no es una
         // falla transitoria: reintentar no lo arregla nunca, hay que tocar

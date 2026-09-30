@@ -61,13 +61,17 @@ describe("POST /api/uploads/analyze", () => {
     expect(analyzeSpy).toHaveBeenCalledWith("https://pub-test.r2.dev/pets/dog.jpg");
   });
 
-  test("responds hasAnimal=false for an image without animals", async () => {
+  // The frontend shows this message as-is, so the wording lives only in the backend.
+  test("responds hasAnimal=false with the SPAM message for an image without animals", async () => {
     analyzeSpy.mockResolvedValue("no_animal");
 
     const res = await analyze({ imageUrl: "https://pub-test.r2.dev/pets/landscape.jpg" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ hasAnimal: false });
+    expect(res.body).toEqual({
+      hasAnimal: false,
+      message: "Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM",
+    });
   });
 
   test("responds hasAnimal=null when the analysis is unavailable", async () => {
