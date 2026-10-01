@@ -2,6 +2,7 @@ import { useId, useState, useRef } from "react";
 import {
   ALLOWED_UPLOAD_TYPES,
   MAX_UPLOAD_BYTES,
+  analyzeImage,
   getPresignedUrl,
   uploadToR2,
   type UploadContentType,
@@ -9,11 +10,40 @@ import {
 import ErrorMessage from "@/components/ui/ErrorMessage";
 
 interface ImageUploaderProps {
-  onSuccess: (publicUrl: string) => void;
+  /**
+   * `rejection` is the message to show when the screening found no animal in the
+   * uploaded photo; null means it was accepted, or the analysis was unavailable
+   * or not requested.
+   */
+  onSuccess: (publicUrl: string, rejection: string | null) => void;
   onError: (error: string) => void;
+  /**
+   * True from the moment a file is picked until its upload (and screening, when
+   * requested) finishes, so the parent can hold back actions that need the result.
+   */
+  onUploadingChange?: (uploading: boolean) => void;
+  /** Run the animal screening after the upload (report photos, not custom flyers). */
+  screenForAnimals?: boolean;
 }
 
-export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps) {
+// Best-effort: the upload itself already succeeded, so a failed analysis is an
+// unknown verdict (no rejection) rather than an upload error. The backend
+// re-checks the image when the report is created anyway.
+async function getRejection(publicUrl: string): Promise<string | null> {
+  try {
+    const analysis = await analyzeImage(publicUrl);
+    return analysis.hasAnimal === false ? analysis.message : null;
+  } catch {
+    return null;
+  }
+}
+
+export default function ImageUploader({
+  onSuccess,
+  onError,
+  onUploadingChange,
+  screenForAnimals = false,
+}: ImageUploaderProps) {
   const inputId = useId();
   const [isLoading, setIsLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -42,6 +72,7 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
     setPreview(previewUrl);
 
     setIsLoading(true);
+    onUploadingChange?.(true);
     try {
       const presignData = await getPresignedUrl(
         file.name,
@@ -49,7 +80,8 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
         file.size
       );
       await uploadToR2(presignData.uploadUrl, file);
-      onSuccess(presignData.publicUrl);
+      const rejection = screenForAnimals ? await getRejection(presignData.publicUrl) : null;
+      onSuccess(presignData.publicUrl, rejection);
       URL.revokeObjectURL(previewUrl);
       setPreview(null);
     } catch (err) {
@@ -60,6 +92,7 @@ export default function ImageUploader({ onSuccess, onError }: ImageUploaderProps
       setPreview(null);
     } finally {
       setIsLoading(false);
+      onUploadingChange?.(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }

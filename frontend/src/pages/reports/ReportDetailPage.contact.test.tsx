@@ -80,6 +80,7 @@ describe('ReportDetailPage - contactar al autor', () => {
         email: 'viewer@example.com',
         fullName: null,
         phone: null,
+        role: 'usuario_regular',
         createdAt: '2026-09-01T10:00:00.000Z',
         updatedAt: '2026-09-01T10:00:00.000Z',
       },

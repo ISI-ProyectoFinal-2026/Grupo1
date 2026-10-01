@@ -10,6 +10,7 @@ import { QueryClient } from '@tanstack/react-query'
 
 import { createQueryWrapper } from '@/test/query-wrapper'
 import type { MessageDTO } from '@/types/chat.types'
+import type { AuthUser } from '@/types/auth'
 
 vi.mock('socket.io-client', () => ({ io: vi.fn() }))
 vi.mock('@/services/chats.service', () => ({ sendMessage: vi.fn() }))
@@ -52,11 +53,12 @@ function crearSocketFalso() {
   return { socket, disparar, conectar }
 }
 
-const usuario = {
+const usuario: AuthUser = {
   id: 7,
   email: 'franco@patitas.test',
   fullName: null,
   phone: null,
+  role: 'usuario_regular',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }

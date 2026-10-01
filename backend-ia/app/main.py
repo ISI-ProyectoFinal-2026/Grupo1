@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import check_connection, get_db
-from app.services import embedding_service
+from app.services import embedding_service, image_analysis_service
+from app.services.image_analysis_service import ImageUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,10 @@ class EmbeddingRequest(BaseModel):
     image_url: str
 
 
+class ImageAnalysisRequest(BaseModel):
+    image_url: str
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -121,3 +126,21 @@ async def create_report_embedding(
         raise HTTPException(status_code=422, detail="No se detectó una mascota en la imagen")
 
     return {"status": "ok"}
+
+
+@app.post("/images/analyze")
+async def analyze_image(
+    body: ImageAnalysisRequest,
+    _: None = Depends(verify_internal_key),
+) -> dict[str, bool]:
+    """Tell whether an uploaded image contains any animal.
+
+    200 with `has_animal` on success, 422 if the image cannot be downloaded
+    or decoded.
+    """
+    try:
+        has_animal = await image_analysis_service.image_has_animal(body.image_url)
+    except ImageUnavailableError as exc:
+        raise HTTPException(status_code=422, detail="No se pudo procesar la imagen") from exc
+
+    return {"has_animal": has_animal}

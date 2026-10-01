@@ -57,7 +57,7 @@ describe("matching.service", () => {
 
     // publishedAt se sella recien acá, no en la creación del reporte.
     expect(updateManySpy).toHaveBeenCalledWith({
-      where: { id: 42, status: "pending" },
+      where: { id: 42, status: "pending", imageUrl: "https://cdn.example.com/foto.jpg" },
       data: { status: "published", publishedAt: expect.any(Date) },
     });
   });
@@ -68,7 +68,26 @@ describe("matching.service", () => {
 
     await triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
 
-    expect(updateManySpy).toHaveBeenCalledWith({ where: { id: 42, status: "pending" }, data: { status: "rejected" } });
+    expect(updateManySpy).toHaveBeenCalledWith({
+      where: { id: 42, status: "pending", imageUrl: "https://cdn.example.com/foto.jpg" },
+      data: { status: "rejected" },
+    });
+  });
+
+  // If the owner swaps the photo while a verdict is in flight, the verdict for
+  // the old photo must not decide the new one (PR #195 review).
+  test("a verdict for a photo the report no longer shows changes nothing", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue({ status: 201 });
+    updateManySpy.mockResolvedValue({ count: 0 });
+    const notifySpy = jest.spyOn(notificationsService, "createForStatusChange");
+
+    await triggerEmbeddingGeneration(42, "https://cdn.example.com/foto-vieja.jpg");
+
+    expect(updateManySpy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ imageUrl: "https://cdn.example.com/foto-vieja.jpg" }) })
+    );
+    expect(notifySpy).not.toHaveBeenCalled();
   });
 
   test("si falla el aviso al dueño se loguea y el pipeline termina igual", async () => {
@@ -394,6 +413,7 @@ describe("matching.service reconcilePendingReports", () => {
   let recienCreadoId: number;
   let demasiadoViejoId: number;
   let sinImagenId: number;
+  let editadoRecienId: number;
 
   const MINUTO = 60 * 1000;
   const HORA = 60 * MINUTO;
@@ -422,6 +442,8 @@ describe("matching.service reconcilePendingReports", () => {
           title: "Atascado",
           imageUrl: "https://cdn.example.com/atascado.jpg",
           createdAt: new Date(Date.now() - 23 * HORA),
+          // Prisma completa @updatedAt con now() si no se lo pasa explícito.
+          updatedAt: new Date(Date.now() - 23 * HORA),
         },
       })
     ).id;
@@ -442,6 +464,7 @@ describe("matching.service reconcilePendingReports", () => {
           title: "Demasiado viejo",
           imageUrl: "https://cdn.example.com/viejo.jpg",
           createdAt: new Date(Date.now() - 3 * DIA),
+          updatedAt: new Date(Date.now() - 3 * DIA),
         },
       })
     ).id;
@@ -450,14 +473,35 @@ describe("matching.service reconcilePendingReports", () => {
     // cubre igual para que la query no los tome nunca).
     sinImagenId = (
       await prisma.report.create({
-        data: { ...base, title: "Sin imagen", createdAt: new Date(Date.now() - 10 * MINUTO) },
+        data: {
+          ...base,
+          title: "Sin imagen",
+          createdAt: new Date(Date.now() - 10 * MINUTO),
+          updatedAt: new Date(Date.now() - 10 * MINUTO),
+        },
+      })
+    ).id;
+
+    // Creado hace días pero con la foto cambiada después: update() lo volvió a
+    // pending, así que la ventana cuenta desde la edición, no desde la
+    // creación. Se lo siembra a 22h (y no recién editado) para que sea el
+    // segundo más viejo y entre siempre en el batch de la base compartida.
+    editadoRecienId = (
+      await prisma.report.create({
+        data: {
+          ...base,
+          title: "Editado recién",
+          imageUrl: "https://cdn.example.com/editado.jpg",
+          createdAt: new Date(Date.now() - 3 * DIA),
+          updatedAt: new Date(Date.now() - 22 * HORA),
+        },
       })
     ).id;
   });
 
   afterAll(async () => {
     await prisma.report.deleteMany({
-      where: { id: { in: [stuckId, recienCreadoId, demasiadoViejoId, sinImagenId] } },
+      where: { id: { in: [stuckId, recienCreadoId, demasiadoViejoId, sinImagenId, editadoRecienId] } },
     });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.$disconnect();
@@ -488,7 +532,7 @@ describe("matching.service reconcilePendingReports", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test("reencola solo el reporte atascado dentro de la ventana, con su image_url", async () => {
+  test("reencola los reportes atascados dentro de la ventana, contada desde que entraron a pending", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
 
     const reencolados = await reconcilePendingReports();
@@ -499,6 +543,7 @@ describe("matching.service reconcilePendingReports", () => {
     // sobre el total reencolado.
     expect(reencolados).toBeGreaterThanOrEqual(1);
     expect(calledUrls()).toContain(embeddingUrl(stuckId));
+    expect(calledUrls()).toContain(embeddingUrl(editadoRecienId));
     expect(fetchMock).toHaveBeenCalledWith(
       embeddingUrl(stuckId),
       expect.objectContaining({

@@ -19,6 +19,13 @@ export default function ReportForm({ initialData }: ReportFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Set when the screening found no animal in the uploaded photo: the report
+  // cannot be submitted until the user uploads a different one.
+  const [imageRejection, setImageRejection] = useState<string | null>(null);
+  // While the photo uploads and is analyzed there is no imageUrl nor verdict yet:
+  // submitting then would create the report without image, skipping the screening.
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const canSubmit = !imageRejection && !isImageUploading;
 
   const [formData, setFormData] = useState<Partial<CreateReportFormData>>({
     reportType: "lost",
@@ -40,8 +47,9 @@ export default function ReportForm({ initialData }: ReportFormProps) {
     }
   };
 
-  const handleImageUploadSuccess = (publicUrl: string) => {
+  const handleImageUploadSuccess = (publicUrl: string, rejection: string | null) => {
     setFormData((prev) => ({ ...prev, imageUrl: publicUrl }));
+    setImageRejection(rejection);
     setFormError(null);
   };
 
@@ -59,6 +67,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSubmit) return;
     setFormError(null);
     setFieldErrors({});
     setIsLoading(true);
@@ -143,9 +152,15 @@ export default function ReportForm({ initialData }: ReportFormProps) {
         <ImageUploader
           onSuccess={handleImageUploadSuccess}
           onError={handleImageUploadError}
+          onUploadingChange={setIsImageUploading}
+          screenForAnimals
         />
-        {formData.imageUrl && (
-          <p className="text-sm text-green-600">✓ Foto subida correctamente</p>
+        {imageRejection ? (
+          <ErrorMessage message={imageRejection} />
+        ) : (
+          formData.imageUrl && (
+            <p className="text-sm text-green-600">✓ Foto subida correctamente</p>
+          )
         )}
       </div>
 
@@ -160,6 +175,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
         variant="primary"
         size="lg"
         isLoading={isLoading}
+        disabled={!canSubmit}
         className="w-full"
       >
         Crear Reporte

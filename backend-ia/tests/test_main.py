@@ -13,7 +13,8 @@ from fastapi.testclient import TestClient
 from app.config import settings
 from app.db import get_db
 from app.main import app
-from app.services import embedding_service
+from app.services import embedding_service, image_analysis_service
+from app.services.image_analysis_service import ImageUnavailableError
 
 VALID_KEY = "test-internal-key"
 AUTH_HEADERS = {"X-Internal-Key": VALID_KEY}
@@ -125,3 +126,57 @@ def test_health_no_requiere_autenticacion(client):
     y no dispara ningún trabajo ni toca la base.
     """
     assert client.get("/health").status_code == 200
+
+
+# --- POST /images/analyze ---------------------------------------------------
+
+
+@pytest.fixture
+def analyze_mock(monkeypatch):
+    mock = AsyncMock(return_value=True)
+    monkeypatch.setattr(image_analysis_service, "image_has_animal", mock)
+    return mock
+
+
+def test_analyze_returns_has_animal_true_for_an_animal_image(analyze_mock, client):
+    response = client.post(
+        "/images/analyze",
+        json={"image_url": "https://example.com/dog.jpg"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"has_animal": True}
+    analyze_mock.assert_awaited_once_with("https://example.com/dog.jpg")
+
+
+def test_analyze_returns_has_animal_false_for_a_non_animal_image(analyze_mock, client):
+    analyze_mock.return_value = False
+
+    response = client.post(
+        "/images/analyze",
+        json={"image_url": "https://example.com/landscape.jpg"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"has_animal": False}
+
+
+def test_analyze_returns_422_when_the_image_cannot_be_processed(analyze_mock, client):
+    analyze_mock.side_effect = ImageUnavailableError("download failed")
+
+    response = client.post(
+        "/images/analyze",
+        json={"image_url": "https://example.com/broken.jpg"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 422
+
+
+def test_analyze_rejects_with_401_without_the_internal_key(analyze_mock, client):
+    response = client.post("/images/analyze", json={"image_url": "https://example.com/dog.jpg"})
+
+    assert response.status_code == 401
+    analyze_mock.assert_not_awaited()
