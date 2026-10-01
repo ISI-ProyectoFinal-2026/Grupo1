@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as matchingService from "../services/matching.service";
-import { NO_ANIMAL_DETECTED_MESSAGE } from "../services/reports.service";
+import { NO_ANIMAL_DETECTED_MESSAGE } from "../constants/moderation";
 import * as storageService from "../services/storage.service";
 import { analyzeImageSchema, presignUploadSchema } from "../validators/uploads.validator";
 

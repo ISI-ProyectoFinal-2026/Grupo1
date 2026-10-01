@@ -1,6 +1,7 @@
 import { Prisma, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { NO_ANIMAL_DETECTED_MESSAGE } from "../constants/moderation";
 import * as matchingService from "./matching.service";
 import { isR2PublicUrl } from "./storage.service";
 import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
@@ -117,9 +118,6 @@ export async function getVisibleById(id: number, viewerId?: number): Promise<Rep
   // 404 y no 403: no confirmarle a quien no es el dueño que el reporte existe.
   throw new AppError(404, "Reporte no encontrado");
 }
-
-export const NO_ANIMAL_DETECTED_MESSAGE =
-  "Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM";
 
 /**
  * Upfront screening: an image with no animal at all is rejected before anything
