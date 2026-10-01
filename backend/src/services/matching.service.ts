@@ -183,9 +183,14 @@ export async function analyzeImage(imageUrl: string): Promise<ImageAnalysisResul
  * vuelve a mirarlo nunca: no se publica, no genera embedding y no puede
  * matchear. Esta reconciliación periódica es la red de contención para eso.
  *
+ * La ventana se mide desde `updatedAt`, no desde `createdAt`: un reporte entra
+ * en "pending" al crearse, pero también vuelve a "pending" cuando el dueño le
+ * cambia la foto, y en ese caso su `createdAt` puede ser de hace días.
+ *
  * `RECONCILE_GRACE_MS` es más largo que el presupuesto de reintentos para no
  * pisar una generación que todavía está en curso, y `RECONCILE_MAX_AGE_MS`
- * acota la ventana: un reporte que sigue pending después de un día tiene un
+ * acota la ventana: un reporte que sigue pending un día después de haber
+ * entrado (o vuelto) a ese estado tiene un
  * problema que reintentar no arregla (imagen borrada del storage, URL rota),
  * así que se deja de insistir y queda para revisión manual en vez de generar
  * un reintento infinito cada pasada.
@@ -209,13 +214,13 @@ export async function reconcilePendingReports(): Promise<number> {
     where: {
       status: "pending",
       imageUrl: { not: null },
-      createdAt: {
+      updatedAt: {
         lt: new Date(now - RECONCILE_GRACE_MS),
         gt: new Date(now - RECONCILE_MAX_AGE_MS),
       },
     },
     select: { id: true, imageUrl: true },
-    orderBy: { createdAt: "asc" },
+    orderBy: { updatedAt: "asc" },
     take: RECONCILE_BATCH_SIZE,
   });
 
