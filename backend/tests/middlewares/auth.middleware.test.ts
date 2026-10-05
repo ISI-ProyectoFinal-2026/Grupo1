@@ -1,7 +1,17 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { requireAuth } from "../../src/middlewares/auth.middleware";
 import { AppError } from "../../src/errors/app-error";
+
+const userFindUnique = jest.fn();
+
+jest.mock("../../src/db/client", () => ({
+  prisma: {
+    user: { findUnique: (...args: unknown[]) => userFindUnique(...args) },
+  },
+}));
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { requireAuth, requireRole } = require("../../src/middlewares/auth.middleware");
 
 describe("requireAuth", () => {
   const originalSecret = process.env.JWT_SECRET;
@@ -68,5 +78,81 @@ describe("requireAuth", () => {
 
     expect(req.userId).toBe(42);
     expect(next).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("requireRole", () => {
+  function buildReq(userId?: number): Request {
+    return { headers: {}, userId } as unknown as Request;
+  }
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  test("sin req.userId (requireAuth no corrió antes) tira AppError 401", async () => {
+    const req = buildReq(undefined);
+    const next = jest.fn();
+
+    await expect(requireRole("admin")(req, {} as Response, next)).rejects.toThrow(
+      expect.objectContaining({ statusCode: 401 })
+    );
+    expect(userFindUnique).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test("si el usuario no existe en la base tira AppError 401", async () => {
+    userFindUnique.mockResolvedValue(null);
+    const req = buildReq(999);
+    const next = jest.fn();
+
+    await expect(requireRole("admin")(req, {} as Response, next)).rejects.toThrow(
+      expect.objectContaining({ statusCode: 401 })
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test("con rol insuficiente tira AppError 403", async () => {
+    userFindUnique.mockResolvedValue({ role: "usuario_regular" });
+    const req = buildReq(1);
+    const next = jest.fn();
+
+    await expect(requireRole("admin")(req, {} as Response, next)).rejects.toThrow(
+      expect.objectContaining({ statusCode: 403 })
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test("con rol exacto permitido llama a next()", async () => {
+    userFindUnique.mockResolvedValue({ role: "admin" });
+    const req = buildReq(1);
+    const next = jest.fn();
+
+    await requireRole("admin")(req, {} as Response, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  test("con rol incluido entre varios roles permitidos llama a next()", async () => {
+    userFindUnique.mockResolvedValue({ role: "moderador" });
+    const req = buildReq(1);
+    const next = jest.fn();
+
+    await requireRole("moderador", "admin")(req, {} as Response, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  test("resuelve el rol fresco desde la base (no confía en el rol del JWT)", async () => {
+    userFindUnique.mockResolvedValue({ role: "admin" });
+    const req = buildReq(7);
+    const next = jest.fn();
+
+    await requireRole("admin")(req, {} as Response, next);
+
+    expect(userFindUnique).toHaveBeenCalledWith({
+      where: { id: 7 },
+      select: { role: true },
+    });
   });
 });

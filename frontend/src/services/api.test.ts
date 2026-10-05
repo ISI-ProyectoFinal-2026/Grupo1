@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AuthUser } from '@/types/auth'
 
 // Los interceptores son el unico lugar donde el frontend decide que hacer con
 // un 401 y como se ve un error de la API. Para poder ejercitarlos sin red, se
@@ -38,11 +39,12 @@ function errorAxios(status: number, body?: unknown) {
   return { response: { status, data: body } }
 }
 
-const usuario = {
+const usuario: AuthUser = {
   id: 7,
   email: 'franco@patitas.test',
   fullName: null,
   phone: null,
+  role: 'usuario_regular',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }

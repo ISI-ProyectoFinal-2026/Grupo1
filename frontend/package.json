@@ -14,7 +14,9 @@
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
     "preview": "vite preview",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
@@ -29,12 +31,14 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^24.13.3",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
@@ -42,6 +46,7 @@
     "autoprefixer": "^10.5.4",
     "jsdom": "^30.0.1",
     "oxlint": "^1.75.0",
+    "pg": "^8.23.1",
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",
     "react-error-boundary": "^6.1.3",

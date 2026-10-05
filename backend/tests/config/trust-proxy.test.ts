@@ -70,6 +70,9 @@ describe("applyTrustProxy", () => {
 
 describe("src/app.ts toma TRUST_PROXY del entorno", () => {
   const originalTrustProxy = process.env.TRUST_PROXY;
+  // Cargado una sola vez, fuera de isolateModules (ver loadApp).
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const prismaClientModule = require("@prisma/client");
 
   afterEach(() => {
     if (originalTrustProxy === undefined) delete process.env.TRUST_PROXY;
@@ -79,6 +82,11 @@ describe("src/app.ts toma TRUST_PROXY del entorno", () => {
   function loadApp(): express.Express {
     let loaded: express.Express | undefined;
     jest.isolateModules(() => {
+      // Al recargarse, "dotenv/config" (src/db/client.ts) y @prisma/client
+      // vuelven a leer el .env local y reponen TRUST_PROXY, pisando el `delete`
+      // del test. Se reusa el @prisma/client ya cargado y se anula dotenv.
+      jest.doMock("@prisma/client", () => prismaClientModule);
+      jest.doMock("dotenv/config", () => ({}));
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       loaded = require("../../src/app").app;
     });

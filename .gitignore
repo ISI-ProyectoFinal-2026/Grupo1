@@ -30,3 +30,8 @@ venv/
 coverage/
 .coverage
 htmlcov/
+
+# Playwright (frontend/: npm run test:e2e)
+test-results/
+playwright-report/
+blob-report/

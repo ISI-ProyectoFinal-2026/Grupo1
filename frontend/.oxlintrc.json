@@ -4,5 +4,17 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  "overrides": [
+    {
+      // Playwright fixtures: `use` is Playwright's callback, not a React hook,
+      // and `async ({}, use) => ...` is the required shape of a fixture without
+      // dependencies (Playwright parses the destructuring).
+      "files": ["e2e/**/*.ts"],
+      "rules": {
+        "react/rules-of-hooks": "off",
+        "no-empty-pattern": "off"
+      }
+    }
+  ]
 }

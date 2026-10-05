@@ -14,6 +14,7 @@ const usuario: AuthUser = {
   email: 'franco@patitas.test',
   fullName: null,
   phone: null,
+  role: 'usuario_regular',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }

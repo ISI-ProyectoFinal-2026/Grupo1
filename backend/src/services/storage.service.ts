@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AppError } from "../errors/app-error";
-import { PresignUploadInput } from "../validators/uploads.validator";
+import type { PresignUploadInput } from "../validators/uploads.validator";
 
 const PRESIGN_EXPIRY_SECONDS = 300;
 
@@ -81,6 +81,25 @@ export async function createPresignedUpload(data: PresignUploadInput): Promise<P
 export function publicObjectUrl(key: string): string {
   assertR2Configured();
   return `${process.env.R2_PUBLIC_URL}/${key}`;
+}
+
+/**
+ * Whether `url` points inside the public R2 bucket (same origin and under the
+ * R2_PUBLIC_URL path). Used to avoid asking the AI service to fetch arbitrary
+ * user-supplied URLs synchronously (SSRF). False when R2 is not configured.
+ */
+export function isR2PublicUrl(url: string): boolean {
+  const base = process.env.R2_PUBLIC_URL;
+  if (!base) return false;
+  try {
+    const baseUrl = new URL(base);
+    const candidate = new URL(url);
+    if (candidate.origin !== baseUrl.origin) return false;
+    const basePath = baseUrl.pathname.endsWith("/") ? baseUrl.pathname : `${baseUrl.pathname}/`;
+    return candidate.pathname.startsWith(basePath);
+  } catch {
+    return false;
+  }
 }
 
 function isNotFoundError(error: unknown): boolean {

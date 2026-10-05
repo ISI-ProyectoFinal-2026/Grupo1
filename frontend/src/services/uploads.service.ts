@@ -56,3 +56,18 @@ export async function uploadToR2(uploadUrl: string, file: File): Promise<void> {
     );
   }
 }
+
+/**
+ * `hasAnimal: null` means the AI service could not answer: the user must not be
+ * blocked. A rejection (`hasAnimal: false`) carries the message to show, so its
+ * wording lives only in the backend, next to the 422 it returns for the same rule.
+ */
+export type ImageAnalysis =
+  | { hasAnimal: true | null }
+  | { hasAnimal: false; message: string };
+
+/** Asks the backend whether an uploaded image contains any animal. */
+export async function analyzeImage(imageUrl: string): Promise<ImageAnalysis> {
+  const { data } = await api.post<ImageAnalysis>("/uploads/analyze", { imageUrl });
+  return data;
+}
