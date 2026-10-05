@@ -7,6 +7,7 @@ import ChatPage from '@/pages/chat/ChatPage'
 import * as chatsService from '@/services/chats.service'
 import { useAuthStore } from '@/stores/auth.store'
 import { createQueryWrapper } from '@/test/query-wrapper'
+import type { AuthUser } from '@/types/auth'
 import type { ChatDTO, MessageDTO } from '@/types/chat.types'
 
 vi.mock('socket.io-client', () => ({ io: vi.fn() }))
@@ -14,11 +15,12 @@ vi.mock('@/services/chats.service')
 
 const USUARIO_ACTUAL = 7
 
-const usuario = {
+const usuario: AuthUser = {
   id: USUARIO_ACTUAL,
   email: 'franco@patitas.test',
   fullName: null,
   phone: null,
+  role: 'usuario_regular',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }

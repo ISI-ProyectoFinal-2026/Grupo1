@@ -3,6 +3,7 @@ import { createMemoryRouter, Outlet, RouterProvider } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { router } from '@/router'
 import { useAuthStore } from '@/stores/auth.store'
+import type { AuthUser } from '@/types/auth'
 
 // Las paginas y el layout se reemplazan por marcadores: aca solo se prueba la
 // tabla de rutas, no el contenido de cada pantalla.
@@ -33,11 +34,12 @@ vi.mock('@/pages/business/BusinessProfilePage', () => ({
   default: () => <div>pagina perfil comercio</div>,
 }))
 
-const usuario = {
+const usuario: AuthUser = {
   id: 7,
   email: 'franco@patitas.test',
   fullName: null,
   phone: null,
+  role: 'usuario_regular',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }
