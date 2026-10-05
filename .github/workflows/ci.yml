@@ -93,6 +93,74 @@ jobs:
         working-directory: frontend
         run: npm run test:coverage -- --coverage.reporter=text-summary
 
+  e2e-ui:
+    name: E2E UI (Playwright)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://patitas:patitas@localhost:5432/patitas
+      JWT_SECRET: ci-test-secret-not-for-production
+      INTERNAL_API_KEY: ci-e2e-internal-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start PostgreSQL
+        run: |
+          docker build -t patitas-postgres ./docker/postgres
+          docker run -d \
+            --name postgres \
+            -e POSTGRES_USER=patitas \
+            -e POSTGRES_PASSWORD=patitas \
+            -e POSTGRES_DB=patitas \
+            -p 5432:5432 \
+            patitas-postgres
+          until docker exec postgres pg_isready -U patitas; do sleep 2; done
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --legacy-peer-deps
+
+      - name: Run migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts levanta el stub de IA, el backend (NODE_ENV=test)
+      # y `vite preview`; el Backend IA real no participa.
+      - name: Run E2E UI tests
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
   backend-ia:
     name: Backend IA (Python)
     runs-on: ubuntu-latest
