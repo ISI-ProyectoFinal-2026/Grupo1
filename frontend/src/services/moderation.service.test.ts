@@ -1,11 +1,11 @@
 import type { AxiosResponse } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/services/api'
-import { listReportFlags, resolveReportFlag } from '@/services/moderation.service'
-import type { ReportFlagDTO } from '@/types/moderation.types'
+import { createReportFlag, listReportFlags, resolveReportFlag } from '@/services/moderation.service'
+import type { CreatedReportFlagDTO, ReportFlagDTO } from '@/types/moderation.types'
 
 vi.mock('@/services/api', () => ({
-  api: { get: vi.fn(), patch: vi.fn() },
+  api: { get: vi.fn(), patch: vi.fn(), post: vi.fn() },
 }))
 
 function respuesta<T>(data: T): AxiosResponse<T> {
@@ -60,5 +60,22 @@ describe('moderation.service', () => {
     expect(api.patch).toHaveBeenCalledWith('/report-flags/1')
     expect(resultado.status).toBe('reviewed')
     expect(resultado.report.status).toBe('rejected')
+  })
+
+  it('denuncia un reporte contra POST /reports/:id/flags con el motivo', async () => {
+    const creado: CreatedReportFlagDTO = {
+      id: 3,
+      reportId: 5,
+      userId: 7,
+      reason: 'Es una estafa',
+      status: 'pending',
+      createdAt: '2026-09-01T10:00:00.000Z',
+    }
+    vi.mocked(api.post).mockResolvedValue(respuesta(creado))
+
+    const resultado = await createReportFlag(5, 'Es una estafa')
+
+    expect(api.post).toHaveBeenCalledWith('/reports/5/flags', { reason: 'Es una estafa' })
+    expect(resultado).toEqual(creado)
   })
 })

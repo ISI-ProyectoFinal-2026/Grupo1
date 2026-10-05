@@ -19,3 +19,6 @@ export interface ReportFlagDTO {
   createdAt: string
   report: ReportFlagReport
 }
+
+// POST /api/reports/:id/flags devuelve el flag recien creado, sin el reporte
+export type CreatedReportFlagDTO = Omit<ReportFlagDTO, 'report'>

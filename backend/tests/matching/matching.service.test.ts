@@ -34,6 +34,9 @@ describe("matching.service", () => {
 
   test("hace POST a AI_SERVICE_URL/reports/:id/embedding con el body correcto", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
+    // Valor propio del test: no depender de lo que traiga el .env local
+    // (afterEach restaura el entorno original).
+    process.env.INTERNAL_API_KEY = "clave-interna-test";
     fetchMock.mockResolvedValue({ status: 201 });
 
     triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
@@ -41,7 +44,7 @@ describe("matching.service", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/reports/42/embedding", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Internal-Key": "" },
+      headers: { "Content-Type": "application/json", "X-Internal-Key": "clave-interna-test" },
       body: JSON.stringify({ image_url: "https://cdn.example.com/foto.jpg" }),
     });
 

@@ -4,6 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
 import { useMatchActions } from "@/hooks/useMatchActions";
+import { useCloseReport } from "@/hooks/useCloseReport";
+import { useFlagReport } from "@/hooks/useFlagReport";
 import { getFlyer, uploadCustomFlyer } from "@/services/reports.service";
 import { createChat } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
@@ -13,6 +15,8 @@ import ErrorMessage from "@/components/ui/ErrorMessage";
 import PendingBanner from "@/components/reports/PendingBanner";
 import MatchCard from "@/components/reports/MatchCard";
 import ImageUploader from "@/components/reports/ImageUploader";
+import CloseReportButton from "@/components/reports/CloseReportButton";
+import FlagReportForm from "@/components/reports/FlagReportForm";
 
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +28,8 @@ export default function ReportDetailPage() {
     report?.status,
   );
   const matchActions = useMatchActions(Number(id));
+  const closeReport = useCloseReport(Number(id));
+  const flagReport = useFlagReport(Number(id));
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
   const [customFlyerError, setCustomFlyerError] = useState<string | null>(null);
   const flyerMutation = useMutation({
@@ -104,6 +110,11 @@ export default function ReportDetailPage() {
 
   const displayFlyerUrl = flyerUrl ?? report.customFlyerUrl;
   const isOwner = currentUserId === report.userId;
+  // Solo un reporte publicado se cierra o se denuncia: pending todavía está en
+  // moderación automática y rejected ya fue ocultado por un moderador; cerrarlo
+  // lo pasaría a resolved y lo volvería a mostrar.
+  const isPublished = report.status === "published";
+  const canFlag = isPublished && currentUserId !== undefined && !isOwner;
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
@@ -242,6 +253,28 @@ export default function ReportDetailPage() {
               Estado: <span className="font-semibold text-gray-900">{report.status}</span>
             </p>
           </div>
+
+          {isOwner && isPublished && (
+            <div className="border-t pt-6 mt-6">
+              <CloseReportButton
+                onConfirm={closeReport.close}
+                isPending={closeReport.isPending}
+                error={closeReport.error}
+              />
+            </div>
+          )}
+
+          {canFlag && (
+            <div className="border-t pt-6 mt-6">
+              <FlagReportForm
+                onSubmit={flagReport.flag}
+                isPending={flagReport.isPending}
+                isSent={flagReport.isSent}
+                isDone={flagReport.isDone}
+                error={flagReport.error}
+              />
+            </div>
+          )}
 
           <div className="border-t pt-6 mt-6">
             {report.status === "pending" ? (
