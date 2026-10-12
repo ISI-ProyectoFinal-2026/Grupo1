@@ -16,6 +16,7 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
   let owner: E2EUser;
   let reporter: E2EUser;
   let moderator: E2EUser;
+  let bystander: E2EUser;
   let reportId: number;
   let flagId: number;
 
@@ -25,6 +26,7 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     owner = await ctx.registerAndLogin("owner");
     reporter = await ctx.registerAndLogin("reporter");
     moderator = await ctx.registerAndLogin("moderator");
+    bystander = await ctx.registerAndLogin("bystander");
 
     // Sin imagen el reporte nace published: no hace falta el Backend IA.
     const res = await request(app)
@@ -40,6 +42,16 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
   afterAll(async () => {
     await ctx.cleanup();
     await prisma.$disconnect();
+  });
+
+  test("el dueño no puede denunciar su propio reporte (403)", async () => {
+    const res = await request(app)
+      .post(`/api/reports/${reportId}/flags`)
+      .set(auth(owner))
+      .send({ reason: "Me denuncio a mí mismo" });
+
+    expect(res.status).toBe(403);
+    expect(await prisma.reportFlag.count({ where: { reportId } })).toBe(0);
   });
 
   test("otro usuario denuncia el reporte publicado", async () => {
@@ -97,6 +109,15 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     // Y sale de la cola de pendientes.
     const queue = await request(app).get("/api/report-flags").set(auth(moderator));
     expect(queue.body.some((f: { id: number }) => f.id === flagId)).toBe(false);
+  });
+
+  test("un reporte ya rechazado no se puede denunciar (404)", async () => {
+    const res = await request(app)
+      .post(`/api/reports/${reportId}/flags`)
+      .set(auth(bystander))
+      .send({ reason: "Llego tarde" });
+
+    expect(res.status).toBe(404);
   });
 
   test("resolver dos veces el mismo flag responde 409", async () => {

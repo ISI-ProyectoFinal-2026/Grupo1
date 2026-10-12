@@ -133,6 +133,19 @@ describe("E2E: errores del ciclo de vida de un reporte (B6)", () => {
       expect(stored.status).toBe("published");
     });
 
+    // Solo un reporte publicado se puede cerrar (#196). El status se fuerza
+    // con Prisma: pending y rejected los asignan el Backend IA y la moderación.
+    test.each(["pending", "rejected"] as const)("un reporte %s no se puede cerrar (409)", async (status) => {
+      const reportId = await createReport(owner, "lost", `Perro ${status} en Palermo`);
+      await prisma.report.update({ where: { id: reportId }, data: { status } });
+
+      const res = await request(app).post(`/api/reports/${reportId}/close`).set(auth(owner));
+
+      expect(res.status).toBe(409);
+      const stored = await prisma.report.findUniqueOrThrow({ where: { id: reportId } });
+      expect(stored.status).toBe(status);
+    });
+
     test("cerrarlo dos veces responde 409", async () => {
       const first = await request(app).post(`/api/reports/${lostReportId}/close`).set(auth(owner));
       expect(first.status).toBe(200);

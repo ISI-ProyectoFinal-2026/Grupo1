@@ -194,10 +194,27 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
   return report;
 }
 
+const CLOSE_ONLY_PUBLISHED_MESSAGE = "Solo se pueden cerrar reportes publicados";
+
+// Only a published report can move to "resolved". Closing a pending or
+// rejected one would make it visible as resolved without passing moderation.
+function assertCanResolve(status: ReportStatus): void {
+  if (status === "resolved") {
+    throw new AppError(409, "El reporte ya está resuelto");
+  }
+  if (status !== "published") {
+    throw new AppError(409, CLOSE_ONLY_PUBLISHED_MESSAGE);
+  }
+}
+
 export async function update(id: number, userId: number, data: UpdateReportInput): Promise<ReportDTO> {
   const existing = await getById(id);
   if (existing.userId !== userId) {
     throw new AppError(403, "No tenés permiso para modificar este reporte");
+  }
+
+  if (data.status === "resolved") {
+    assertCanResolve(existing.status);
   }
 
   const { location, ...scalarData } = data;
@@ -248,10 +265,16 @@ export async function close(id: number, userId: number): Promise<ReportDTO> {
   if (report.userId !== userId) {
     throw new AppError(403, "No tenés permiso para cerrar este reporte");
   }
-  if (report.status === "resolved") {
-    throw new AppError(409, "El reporte ya está resuelto");
+  assertCanResolve(report.status);
+  // Conditional write: if the moderation pipeline changes the status between
+  // the read above and this update, the close must not publish it anyway.
+  const { count } = await prisma.report.updateMany({
+    where: { id, status: "published" },
+    data: { status: "resolved" },
+  });
+  if (count === 0) {
+    throw new AppError(409, CLOSE_ONLY_PUBLISHED_MESSAGE);
   }
-  await prisma.report.update({ where: { id }, data: { status: "resolved" } });
   return getById(id);
 }
 

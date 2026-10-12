@@ -368,6 +368,38 @@ describe("reports.service", () => {
     await expect(reportsService.close(report.id, userId)).rejects.toMatchObject({ statusCode: 409 });
   });
 
+  // Solo un reporte publicado se puede cerrar: cerrar uno pending o rejected
+  // lo dejaría visible como resuelto sin haber pasado la moderación.
+  test.each(["pending", "rejected"] as const)(
+    "close() lanza AppError 409 si el reporte está %s",
+    async (status) => {
+      const report = await reportsService.create({ userId, ...baseReportData });
+      createdReportIds.push(report.id);
+      await prisma.report.update({ where: { id: report.id }, data: { status } });
+
+      await expect(reportsService.close(report.id, userId)).rejects.toMatchObject(
+        new AppError(409, "Solo se pueden cerrar reportes publicados")
+      );
+      const stored = await prisma.report.findUniqueOrThrow({ where: { id: report.id } });
+      expect(stored.status).toBe(status);
+    }
+  );
+
+  test.each(["pending", "rejected"] as const)(
+    "update() con status resolved lanza AppError 409 si el reporte está %s",
+    async (status) => {
+      const report = await reportsService.create({ userId, ...baseReportData });
+      createdReportIds.push(report.id);
+      await prisma.report.update({ where: { id: report.id }, data: { status } });
+
+      await expect(reportsService.update(report.id, userId, { status: "resolved" })).rejects.toMatchObject(
+        new AppError(409, "Solo se pueden cerrar reportes publicados")
+      );
+      const stored = await prisma.report.findUniqueOrThrow({ where: { id: report.id } });
+      expect(stored.status).toBe(status);
+    }
+  );
+
   test("create() deja customFlyerUrl en null cuando el reporte no tiene flyer propio", async () => {
     const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);

@@ -15,8 +15,14 @@ export type ReportFlagWithReport = Prisma.ReportFlagGetPayload<{ include: typeof
 
 export async function create(reportId: number, data: CreateReportFlagInput & { userId: number }): Promise<ReportFlag> {
   const report = await prisma.report.findUnique({ where: { id: reportId } });
-  if (!report) {
+  // Solo se denuncia lo que está activo en el feed. Un reporte pending o
+  // rejected no es visible para la comunidad, y uno resolved ya salió de
+  // circulación: en ambos casos no hay nada que moderar.
+  if (!report || report.status !== "published") {
     throw new AppError(404, "Reporte no encontrado");
+  }
+  if (report.userId === data.userId) {
+    throw new AppError(403, "No podés denunciar tu propia publicación");
   }
 
   try {

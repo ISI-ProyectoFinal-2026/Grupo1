@@ -11,6 +11,7 @@ describe("report-flags routes", () => {
   let token: string;
   let moderatorToken: string;
   let regularToken: string;
+  let ownerToken: string;
   const createdFlagIds: number[] = [];
 
   beforeAll(async () => {
@@ -18,6 +19,7 @@ describe("report-flags routes", () => {
       data: { email: `report-flags-routes-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
     });
     userId = user.id;
+    ownerToken = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
 
     const reporter = await prisma.user.create({
       data: { email: `report-flags-routes-test-reporter-${Date.now()}@example.com`, passwordHash: "test-hash" },
@@ -110,6 +112,26 @@ describe("report-flags routes", () => {
       .send({ userId: reporterId, reason: "Otra vez" });
     expect(res.status).toBe(409);
   });
+
+  test("POST /api/reports/:id/flags responde 403 si el dueño denuncia su propio reporte", async () => {
+    const res = await request(app)
+      .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${ownerToken}`)
+      .send({ reason: "Publicación falsa" });
+    expect(res.status).toBe(403);
+    expect(res.body.error.message).toBe("No podés denunciar tu propia publicación");
+  });
+
+  test.each(["pending", "rejected", "resolved"] as const)(
+    "POST /api/reports/:id/flags responde 404 si el reporte está %s",
+    async (status) => {
+      await prisma.report.update({ where: { id: reportId }, data: { status } });
+
+      const res = await request(app)
+        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
+        .send({ reason: "Publicación falsa" });
+      expect(res.status).toBe(404);
+    }
+  );
 
   describe("GET /api/report-flags", () => {
     test("responde 401 sin token", async () => {
