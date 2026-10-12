@@ -47,3 +47,24 @@ ALLOW_INSECURE_INTERNAL=true
 ```
 
 Con eso el endpoint atiende sin autenticar y el servicio loguea un warning en cada arranque. La diferencia con el comportamiento anterior es cuál es el default: antes, *no configurar nada* abría la puerta; ahora hay que escribir esa línea a mano.
+
+
+---
+
+## Email — `SMTP_*` y `MAIL_FROM` (solo `backend/.env`)
+
+El backend manda emails de verificación de cuenta y de recuperación de contraseña. Las variables van en `backend/.env`; el detalle de comportamiento está en `backend/README.md`.
+
+```
+# backend/.env
+SMTP_HOST=smtp.ejemplo.com   # vacío en desarrollo: los emails se imprimen en consola
+SMTP_PORT=587                # 587 = STARTTLS (default)
+SMTP_SECURE=false            # true solo con TLS directo (puerto 465)
+SMTP_USER=                   # opcional si el servidor no pide autenticación
+SMTP_PASS=
+MAIL_FROM="PATITAS <no-reply@patitas.local>"
+```
+
+**En producción `SMTP_HOST` es obligatorio** para que funcionen el reenvío de verificación y la recuperación de contraseña: sin él ambos endpoints responden `503` `MAIL_NOT_CONFIGURED`. En desarrollo no hace falta: sin `SMTP_HOST` el backend imprime el email (con el enlace) en su consola; con `NODE_ENV=test` no imprime nada.
+
+`FRONTEND_URL` define la base de los enlaces del email (`/verify-email?token=...`, `/reset-password?token=...`); el default es `http://localhost:5173`.
