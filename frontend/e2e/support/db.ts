@@ -25,6 +25,15 @@ export async function setRole(userId: number, role: Role): Promise<void> {
   await db().query('UPDATE users SET role = $1::role WHERE id = $2', [role, userId])
 }
 
+/**
+ * Marks the email as verified, the way following the mailed link would. Creating
+ * reports, uploading images and chatting require it (EMAIL_NOT_VERIFIED
+ * otherwise), so every user that does those must go through here.
+ */
+export async function markEmailVerified(email: string): Promise<void> {
+  await db().query('UPDATE users SET email_verified_at = now() WHERE email = $1', [email])
+}
+
 /** Same row backend-ia writes when it finds a candidate (matching_service.py). */
 export async function seedMatch(lostReportId: number, foundReportId: number, similarityScore: number): Promise<number> {
   const { rows } = await db().query<{ id: number }>(

@@ -55,3 +55,28 @@ export async function authenticateAccessToken(token: string): Promise<AuthUser> 
 
   return user;
 }
+
+/**
+ * Lee de la base el estado de sesión actual de un usuario ya autenticado. Lo
+ * usan los canales que no pasan por requireAuth en cada acción (el socket, que
+ * autentica una sola vez al conectar) para decidir con datos frescos: sin esto
+ * un usuario que verifica su email a mitad de sesión tendría que reconectar.
+ */
+export async function loadAuthUser(userId: number): Promise<AuthUser> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: AUTH_USER_SELECT });
+  if (!user) {
+    throw new AppError(401, "Token inválido");
+  }
+  return user;
+}
+
+/**
+ * Regla única del gate de email verificado: la comparten el middleware HTTP y
+ * el socket, así el mensaje y el `code` (que el frontend usa para ofrecer el
+ * reenvío del mail en vez de un error genérico) no se pueden desincronizar.
+ */
+export function assertEmailVerified(user: Pick<AuthUser, "emailVerifiedAt">): void {
+  if (!user.emailVerifiedAt) {
+    throw new AppError(403, "Tenés que verificar tu email para hacer esto", undefined, "EMAIL_NOT_VERIFIED");
+  }
+}

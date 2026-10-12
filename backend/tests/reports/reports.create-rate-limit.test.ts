@@ -31,6 +31,8 @@ describe("POST /api/reports — rate limit por usuario", () => {
   let spammerToken: string;
   let otherId: number;
   let otherToken: string;
+  let unverifiedId: number;
+  let unverifiedToken: string;
 
   beforeAll(async () => {
     const spammer = await createTestUser({ prefix: "rate-limit-spammer" });
@@ -39,10 +41,13 @@ describe("POST /api/reports — rate limit por usuario", () => {
     spammerToken = spammer.token;
     otherId = other.user.id;
     otherToken = other.token;
+    const unverified = await createTestUser({ prefix: "rate-limit-unverified", verified: false });
+    unverifiedId = unverified.user.id;
+    unverifiedToken = unverified.token;
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { id: { in: [spammerId, otherId] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [spammerId, otherId, unverifiedId] } } });
     await prisma.$disconnect();
   });
 
@@ -74,5 +79,18 @@ describe("POST /api/reports — rate limit por usuario", () => {
       .send(validReport);
 
     expect(other.status).toBe(201);
+  });
+
+  test("un usuario sin verificar recibe 403 siempre: el gate va antes del limiter y no gasta su cupo", async () => {
+    for (let i = 0; i < REPORT_CREATE_RATE_LIMIT + 1; i += 1) {
+      const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${unverifiedToken}`).send(validReport);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe("EMAIL_NOT_VERIFIED");
+    }
+
+    // Una vez verificado, el cupo está intacto: el primer reporte pasa.
+    await prisma.user.update({ where: { id: unverifiedId }, data: { emailVerifiedAt: new Date() } });
+    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${unverifiedToken}`).send(validReport);
+    expect(res.status).toBe(201);
   });
 });

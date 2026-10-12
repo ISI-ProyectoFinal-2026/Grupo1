@@ -1,5 +1,5 @@
 import request from "supertest";
-import jwt from "jsonwebtoken";
+import { createTestUser } from "../helpers/users";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 const getSignedUrlMock = jest.fn();
@@ -42,11 +42,9 @@ describe("POST /api/uploads/presign", () => {
   let token: string;
 
   beforeAll(async () => {
-    const user = await prisma.user.create({
-      data: { email: `uploads-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    userId = user.id;
-    token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const user = await createTestUser({ prefix: "uploads-test" });
+    userId = user.user.id;
+    token = user.token;
   });
 
   afterAll(async () => {

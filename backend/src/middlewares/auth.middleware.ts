@@ -2,7 +2,7 @@ import { Role } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
-import { authenticateAccessToken, AuthUser } from "../services/session.service";
+import { assertEmailVerified, authenticateAccessToken, AuthUser } from "../services/session.service";
 
 declare global {
   namespace Express {
@@ -104,7 +104,7 @@ export function requireRole(...roles: Role[]) {
 /**
  * Exige el email verificado: debe usarse DESPUÉS de `requireAuth`. Un usuario
  * sin verificar puede usar casi toda la app; esto se aplica solo a las acciones
- * que lo requieren (ej. registrar un comercio). El `code` le permite al
+ * que lo requieren (crear reportes, subir imágenes, chatear). El `code` le permite al
  * frontend ofrecer el reenvío del mail en vez de mostrar un error genérico.
  */
 export function requireVerifiedEmail(req: Request, _res: Response, next: NextFunction): void {
@@ -113,9 +113,7 @@ export function requireVerifiedEmail(req: Request, _res: Response, next: NextFun
     throw new AppError(401, "Se requiere un token de autenticación");
   }
 
-  if (!req.authUser.emailVerifiedAt) {
-    throw new AppError(403, "Tenés que verificar tu email para hacer esto", undefined, "EMAIL_NOT_VERIFIED");
-  }
+  assertEmailVerified(req.authUser);
 
   next();
 }

@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../../src/db/client";
-import { authenticateAccessToken } from "../../src/services/session.service";
+import { assertEmailVerified, authenticateAccessToken, loadAuthUser } from "../../src/services/session.service";
 import { signAccessToken, verifyAccessToken } from "../../src/utils/jwt";
 
 describe("session.service — authenticateAccessToken()", () => {
@@ -94,5 +94,48 @@ describe("session.service — authenticateAccessToken()", () => {
     });
 
     await expect(authenticateAccessToken(token)).rejects.toMatchObject({ statusCode: 401, message: "Token inválido" });
+  });
+});
+
+describe("session.service — assertEmailVerified()", () => {
+  test("con el email sin verificar tira AppError 403 con code EMAIL_NOT_VERIFIED", () => {
+    expect(() => assertEmailVerified({ emailVerifiedAt: null })).toThrow(
+      expect.objectContaining({
+        statusCode: 403,
+        code: "EMAIL_NOT_VERIFIED",
+        message: "Tenés que verificar tu email para hacer esto",
+      })
+    );
+  });
+
+  test("con el email verificado no tira", () => {
+    expect(() => assertEmailVerified({ emailVerifiedAt: new Date() })).not.toThrow();
+  });
+});
+
+describe("session.service — loadAuthUser()", () => {
+  const createdUserIds: number[] = [];
+
+  afterAll(async () => {
+    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    await prisma.$disconnect();
+  });
+
+  test("lee de la base el estado actual de verificación, sin cache", async () => {
+    const user = await prisma.user.create({
+      data: { email: `load-auth-user-${Date.now()}@example.com`, passwordHash: "test-hash" },
+    });
+    createdUserIds.push(user.id);
+
+    await expect(loadAuthUser(user.id)).resolves.toMatchObject({ id: user.id, emailVerifiedAt: null });
+
+    const verifiedAt = new Date("2026-09-01T10:00:00.000Z");
+    await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: verifiedAt } });
+
+    await expect(loadAuthUser(user.id)).resolves.toMatchObject({ id: user.id, emailVerifiedAt: verifiedAt });
+  });
+
+  test("tira 401 si el usuario ya no existe", async () => {
+    await expect(loadAuthUser(2_000_000_000)).rejects.toMatchObject({ statusCode: 401, message: "Token inválido" });
   });
 });

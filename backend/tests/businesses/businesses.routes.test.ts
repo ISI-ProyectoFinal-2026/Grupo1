@@ -68,20 +68,15 @@ describe("POST/GET/PUT /api/businesses", () => {
     createdBusinessIds.push(res.body.id);
   });
 
-  test("POST /api/businesses con el email sin verificar responde 403 EMAIL_NOT_VERIFIED", async () => {
+  test("POST /api/businesses con el email sin verificar también crea el comercio (ya no se gatea)", async () => {
     const res = await request(app)
       .post("/api/businesses")
       .set("Authorization", `Bearer ${otherToken}`)
       .send({ ...baseBusinessData, cuit: uniqueCuit() });
 
-    expect(res.status).toBe(403);
-    expect(res.body.error).toEqual(
-      expect.objectContaining({
-        message: "Tenés que verificar tu email para hacer esto",
-        code: "EMAIL_NOT_VERIFIED",
-      })
-    );
-    expect(await prisma.business.findUnique({ where: { userId: otherUserId } })).toBeNull();
+    expect(res.status).toBe(201);
+    expect(res.body.userId).toBe(otherUserId);
+    createdBusinessIds.push(res.body.id);
   });
 
   test("POST /api/businesses sin token responde 401", async () => {

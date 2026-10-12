@@ -402,8 +402,16 @@ POST /api/auth/refresh
 > Implementados hoy: register, login, me, verify-email (+resend), forgot-password y reset-password.
 > Los links de los mails apuntan a `${FRONTEND_URL}/verify-email?token=…` y
 > `${FRONTEND_URL}/reset-password?token=…` (vencen a las 24 h y a los 30 min).
-> Un email sin verificar no bloquea el login: solo `POST /api/businesses`, que
-> responde 403 con `error.code = "EMAIL_NOT_VERIFIED"`.
+> Un email sin verificar no bloquea el login ni la lectura. Solo exigen el email
+> verificado (403 con `error.code = "EMAIL_NOT_VERIFIED"`, siempre después del 401
+> de sesión): crear reportes (`POST /api/reports`), subir imágenes
+> (`POST /api/uploads/presign` y `/analyze`) y chatear (`POST /api/chats`,
+> `POST /api/chats/:id/messages` y el evento de socket `send_message`).
+> No se gatean los flags, los comercios (registrar uno incluido), las mascotas ni
+> los contactos a comercios. En el socket el handshake y `join_chat` solo piden
+> sesión; `send_message` relee el estado de verificación de la base en cada envío
+> y responde por el ack `{ ok: false, error, code: "EMAIL_NOT_VERIFIED" }`, así
+> verificar a mitad de sesión funciona sin reconectar.
 
 ### Usuarios
 ```http

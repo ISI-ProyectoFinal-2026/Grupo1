@@ -4,12 +4,14 @@ import jwt from "jsonwebtoken";
 import { io as ioc, Socket as ClientSocket } from "socket.io-client";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
+import { createTestUser } from "../helpers/users";
 import { initChatSocket } from "../../src/sockets/chat.socket";
 
 interface AckResponse<T = unknown> {
   ok: boolean;
   data?: T;
   error?: string;
+  code?: string;
 }
 
 describe("chat.socket", () => {
@@ -19,36 +21,37 @@ describe("chat.socket", () => {
   let userAId: number;
   let userBId: number;
   let outsiderId: number;
+  let unverifiedId: number;
+  let unverifiedChatId: number;
   let chatId: number;
   let tokenA: string;
   let tokenB: string;
   let outsiderToken: string;
+  let unverifiedToken: string;
 
   const openSockets: ClientSocket[] = [];
 
   beforeAll(async () => {
-    const userA = await prisma.user.create({
-      data: { email: `chat-socket-test-a-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    userAId = userA.id;
-    tokenA = jwt.sign({ sub: userA.id, email: userA.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const userA = await createTestUser({ prefix: "chat-socket-test-a" });
+    userAId = userA.user.id;
+    tokenA = userA.token;
 
-    const userB = await prisma.user.create({
-      data: { email: `chat-socket-test-b-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    userBId = userB.id;
-    tokenB = jwt.sign({ sub: userB.id, email: userB.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const userB = await createTestUser({ prefix: "chat-socket-test-b" });
+    userBId = userB.user.id;
+    tokenB = userB.token;
 
-    const outsider = await prisma.user.create({
-      data: { email: `chat-socket-test-outsider-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    outsiderId = outsider.id;
-    outsiderToken = jwt.sign({ sub: outsider.id, email: outsider.email }, process.env.JWT_SECRET!, {
-      expiresIn: "1h",
-    });
+    const outsider = await createTestUser({ prefix: "chat-socket-test-outsider" });
+    outsiderId = outsider.user.id;
+    outsiderToken = outsider.token;
+
+    const unverified = await createTestUser({ prefix: "chat-socket-test-unverified", verified: false });
+    unverifiedId = unverified.user.id;
+    unverifiedToken = unverified.token;
 
     const chat = await prisma.chat.create({ data: { userAId, userBId } });
     chatId = chat.id;
+    const unverifiedChat = await prisma.chat.create({ data: { userAId: unverifiedId, userBId } });
+    unverifiedChatId = unverifiedChat.id;
 
     httpServer = createServer(app);
     initChatSocket(httpServer);
@@ -64,9 +67,10 @@ describe("chat.socket", () => {
 
   afterAll(async () => {
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
-    await prisma.message.deleteMany({ where: { chatId } });
-    await prisma.notification.deleteMany({ where: { userId: { in: [userAId, userBId, outsiderId] } } });
-    await prisma.chat.delete({ where: { id: chatId } });
+    await prisma.message.deleteMany({ where: { chatId: { in: [chatId, unverifiedChatId] } } });
+    await prisma.notification.deleteMany({ where: { userId: { in: [userAId, userBId, outsiderId, unverifiedId] } } });
+    await prisma.chat.deleteMany({ where: { id: { in: [chatId, unverifiedChatId] } } });
+    await prisma.user.delete({ where: { id: unverifiedId } });
     await prisma.user.delete({ where: { id: userAId } });
     await prisma.user.delete({ where: { id: userBId } });
     await prisma.user.delete({ where: { id: outsiderId } });
@@ -289,5 +293,70 @@ describe("chat.socket", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 200));
     expect(receivedAfterLeave).toBe(false);
+  });
+
+  describe("send_message con el email sin verificar", () => {
+    test("acepta la conexión y el join_chat (el handshake es solo de sesión)", async () => {
+      const client = connect({ auth: { token: unverifiedToken } });
+      await new Promise<void>((resolve, reject) => {
+        client.on("connect", () => resolve());
+        client.on("connect_error", reject);
+      });
+
+      const joinAck = await emitWithAck(client, "join_chat", { chatId: unverifiedChatId });
+      expect(joinAck.ok).toBe(true);
+    });
+
+    test("rechaza con code EMAIL_NOT_VERIFIED, emite `error`, no persiste ni difunde", async () => {
+      const sender = connect({ auth: { token: unverifiedToken } });
+      const receiver = connect({ auth: { token: tokenB } });
+      await Promise.all([
+        new Promise<void>((resolve) => sender.on("connect", () => resolve())),
+        new Promise<void>((resolve) => receiver.on("connect", () => resolve())),
+      ]);
+      await emitWithAck(receiver, "join_chat", { chatId: unverifiedChatId });
+
+      let broadcasted = false;
+      receiver.on("receive_message", () => {
+        broadcasted = true;
+      });
+      const errorEvent = new Promise<{ event: string; message: string; code?: string }>((resolve) => {
+        sender.on("error", resolve);
+      });
+
+      const ack = await emitWithAck(sender, "send_message", { chatId: unverifiedChatId, content: "hola" });
+
+      expect(ack).toEqual({
+        ok: false,
+        error: "Tenés que verificar tu email para hacer esto",
+        code: "EMAIL_NOT_VERIFIED",
+      });
+      await expect(errorEvent).resolves.toEqual({
+        event: "send_message",
+        message: "Tenés que verificar tu email para hacer esto",
+        code: "EMAIL_NOT_VERIFIED",
+      });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(broadcasted).toBe(false);
+      expect(await prisma.message.count({ where: { chatId: unverifiedChatId } })).toBe(0);
+    });
+
+    test("verificar a mitad de sesión surte efecto en el mismo socket, y la cadena de envíos sigue viva", async () => {
+      const client = connect({ auth: { token: unverifiedToken } });
+      await new Promise<void>((resolve) => client.on("connect", () => resolve()));
+
+      const rejected = await emitWithAck(client, "send_message", { chatId: unverifiedChatId, content: "uno" });
+      expect(rejected.code).toBe("EMAIL_NOT_VERIFIED");
+
+      await prisma.user.update({ where: { id: unverifiedId }, data: { emailVerifiedAt: new Date() } });
+
+      const accepted = await emitWithAck<{ content: string }>(client, "send_message", {
+        chatId: unverifiedChatId,
+        content: "dos",
+      });
+      expect(accepted.ok).toBe(true);
+      expect(accepted.data?.content).toBe("dos");
+      await prisma.user.update({ where: { id: unverifiedId }, data: { emailVerifiedAt: null } });
+    });
   });
 });

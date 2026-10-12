@@ -1,5 +1,5 @@
 import request from "supertest";
-import jwt from "jsonwebtoken";
+import { createTestUser } from "../helpers/users";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 
@@ -19,17 +19,13 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   let otherToken: string;
 
   beforeAll(async () => {
-    const user = await prisma.user.create({
-      data: { email: `reports-routes-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    userId = user.id;
-    token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const user = await createTestUser({ prefix: "reports-routes-test" });
+    userId = user.user.id;
+    token = user.token;
 
-    const otherUser = await prisma.user.create({
-      data: { email: `reports-routes-test-other-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    otherUserId = otherUser.id;
-    otherToken = jwt.sign({ sub: otherUser.id, email: otherUser.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const otherUser = await createTestUser({ prefix: "reports-routes-test-other" });
+    otherUserId = otherUser.user.id;
+    otherToken = otherUser.token;
   });
 
   afterEach(async () => {

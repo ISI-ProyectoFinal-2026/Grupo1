@@ -1,7 +1,7 @@
 import { AddressInfo } from "net";
 import { createServer, Server as HttpServer } from "http";
 import request from "supertest";
-import jwt from "jsonwebtoken";
+import { createTestUser } from "../helpers/users";
 import { io as ioc, Socket as ClientSocket } from "socket.io-client";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
@@ -85,17 +85,13 @@ describe("chat en tiempo real (#141)", () => {
   }
 
   beforeAll(async () => {
-    const userA = await prisma.user.create({
-      data: { email: `${SUITE_TAG}-a@example.com`, passwordHash: "test-hash" },
-    });
-    userAId = userA.id;
-    tokenA = jwt.sign({ sub: userA.id, email: userA.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const userA = await createTestUser({ prefix: SUITE_TAG });
+    userAId = userA.user.id;
+    tokenA = userA.token;
 
-    const userB = await prisma.user.create({
-      data: { email: `${SUITE_TAG}-b@example.com`, passwordHash: "test-hash" },
-    });
-    userBId = userB.id;
-    tokenB = jwt.sign({ sub: userB.id, email: userB.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const userB = await createTestUser({ prefix: SUITE_TAG });
+    userBId = userB.user.id;
+    tokenB = userB.token;
 
     const chat = await prisma.chat.create({ data: { userAId, userBId } });
     chatId = chat.id;
