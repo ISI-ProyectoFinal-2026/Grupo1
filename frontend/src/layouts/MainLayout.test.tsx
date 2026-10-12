@@ -6,9 +6,11 @@ import MainLayout from '@/layouts/MainLayout'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import { useAuthStore } from '@/stores/auth.store'
 import * as notificationsService from '@/services/notifications.service'
+import * as authService from '@/services/auth.service'
 import type { AuthUser } from '@/types/auth'
 
 vi.mock('@/services/notifications.service')
+vi.mock('@/services/auth.service')
 
 const usuario: AuthUser = {
   id: 7,
@@ -16,6 +18,7 @@ const usuario: AuthUser = {
   fullName: 'Franco',
   phone: null,
   role: 'usuario_regular',
+  emailVerifiedAt: '2026-01-01T00:00:00.000Z',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -35,6 +38,7 @@ describe('MainLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(notificationsService.listNotifications).mockResolvedValue([])
+    vi.mocked(authService.getMe).mockResolvedValue(usuario)
   })
 
   afterEach(() => {
@@ -95,5 +99,25 @@ describe('MainLayout', () => {
     await userEvent.setup().click(await screen.findByRole('button', { name: /cerrar sesión/i }))
 
     expect(clearSpy).toHaveBeenCalled()
+  })
+
+  // Cubre al usuario que verificó desde otro dispositivo: el store persistido
+  // dice "sin verificar" hasta que /me lo corrige al abrir la app.
+  it('refresca el usuario contra /auth/me al montar con sesion', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, emailVerifiedAt: null } })
+
+    renderLayout()
+
+    await waitFor(() =>
+      expect(useAuthStore.getState().user?.emailVerifiedAt).toBe('2026-01-01T00:00:00.000Z')
+    )
+    expect(authService.getMe).toHaveBeenCalledTimes(1)
+  })
+
+  it('no consulta /auth/me sin sesion', async () => {
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(authService.getMe).not.toHaveBeenCalled()
   })
 })

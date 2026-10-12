@@ -2,6 +2,7 @@ import { Outlet, useNavigate, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsModerator } from "@/hooks/useIsModerator";
 
 function MainLayout() {
@@ -10,6 +11,8 @@ function MainLayout() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const isModerator = useIsModerator();
+  // Mantiene sincronizado `emailVerifiedAt` con el backend (ver el hook).
+  useCurrentUser();
 
   function handleLogout() {
     logout();
