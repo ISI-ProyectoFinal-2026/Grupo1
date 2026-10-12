@@ -42,6 +42,21 @@ export async function issueAuthToken(userId: number, type: AuthTokenType): Promi
 }
 
 /**
+ * Cuándo se emitió el último token de ese tipo para el usuario (null si nunca
+ * se emitió). Emitir invalida los anteriores pero no los borra, así que el
+ * último token existe aunque ya esté usado o invalidado: es la base del
+ * cooldown del reenvío, que se mide desde la emisión y no desde el uso.
+ */
+export async function latestAuthTokenCreatedAt(userId: number, type: AuthTokenType): Promise<Date | null> {
+  const latest = await prisma.authToken.findFirst({
+    where: { userId, type },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  return latest?.createdAt ?? null;
+}
+
+/**
  * Consume un token dentro de la transacción del llamador y devuelve el id del
  * usuario dueño. El UPDATE condicional es lo que lo hace de un solo uso: si dos
  * requests llegan a la vez con el mismo token, solo una ve `count === 1`. El

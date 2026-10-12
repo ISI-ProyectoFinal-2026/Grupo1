@@ -60,6 +60,31 @@ describe("verificación de email y recuperación de contraseña (/api/auth)", ()
     return { email, password, userId: res.body.id as number, verificationToken: tokenFromLink(link) };
   }
 
+  /** Envejece los tokens de verificación del usuario: simula que pasó ese tiempo desde que se pidió el último. */
+  async function ageVerificationTokens(userId: number, seconds: number): Promise<void> {
+    await prisma.authToken.updateMany({
+      where: { userId, type: "email_verification" },
+      data: { createdAt: new Date(Date.now() - seconds * 1000) },
+    });
+  }
+
+  /** Corre `fn` como si el backend estuviera en producción sin SMTP_HOST (y restaura el entorno). */
+  async function withProductionWithoutSmtp(fn: () => Promise<void>): Promise<void> {
+    const original = { NODE_ENV: process.env.NODE_ENV, SMTP_HOST: process.env.SMTP_HOST };
+    process.env.NODE_ENV = "production";
+    delete process.env.SMTP_HOST;
+    try {
+      await fn();
+    } finally {
+      process.env.NODE_ENV = original.NODE_ENV;
+      if (original.SMTP_HOST === undefined) {
+        delete process.env.SMTP_HOST;
+      } else {
+        process.env.SMTP_HOST = original.SMTP_HOST;
+      }
+    }
+  }
+
   async function loginToken(email: string, password: string): Promise<string> {
     const res = await request(app).post("/api/auth/login").send({ email, password });
     expect(res.status).toBe(200);
@@ -150,8 +175,9 @@ describe("verificación de email y recuperación de contraseña (/api/auth)", ()
 
   describe("POST /api/auth/verify-email/resend", () => {
     test("con email sin verificar manda un mail nuevo e invalida el link anterior", async () => {
-      const { email, password, verificationToken: oldToken } = await registerUser("resend-ok");
+      const { email, password, userId, verificationToken: oldToken } = await registerUser("resend-ok");
       const token = await loginToken(email, password);
+      await ageVerificationTokens(userId, 61);
 
       const res = await request(app).post("/api/auth/verify-email/resend").set("Authorization", `Bearer ${token}`);
 
@@ -185,6 +211,92 @@ describe("verificación de email y recuperación de contraseña (/api/auth)", ()
       const res = await request(app).post("/api/auth/verify-email/resend");
 
       expect(res.status).toBe(401);
+    });
+
+    test("dentro de los 60 s del último token responde 429 RESEND_COOLDOWN, sin token nuevo ni mail", async () => {
+      const { email, password, userId } = await registerUser("resend-cooldown");
+      const token = await loginToken(email, password);
+      await ageVerificationTokens(userId, 30);
+      const tokensBefore = await prisma.authToken.count({ where: { userId } });
+      verificationSpy.mockClear();
+
+      const res = await request(app).post("/api/auth/verify-email/resend").set("Authorization", `Bearer ${token}`);
+
+      expect(res.status).toBe(429);
+      expect(res.body.error.code).toBe("RESEND_COOLDOWN");
+      expect(res.body.error.message).toBe("Esperá un minuto antes de pedir otro email");
+      expect(res.body.error.details.retryAfterSeconds).toBeGreaterThan(0);
+      expect(res.body.error.details.retryAfterSeconds).toBeLessThanOrEqual(30);
+      expect(await prisma.authToken.count({ where: { userId } })).toBe(tokensBefore);
+      expect(verificationSpy).not.toHaveBeenCalled();
+    });
+
+    test("el token del registro cuenta para el cooldown: pedir el reenvío al toque da 429", async () => {
+      const { email, password } = await registerUser("resend-after-register");
+      const token = await loginToken(email, password);
+
+      const res = await request(app).post("/api/auth/verify-email/resend").set("Authorization", `Bearer ${token}`);
+
+      expect(res.status).toBe(429);
+      expect(res.body.error.code).toBe("RESEND_COOLDOWN");
+    });
+
+    test("el segundo pedido seguido también da 429 y pasados 61 s vuelve a dar 200", async () => {
+      const { email, password, userId } = await registerUser("resend-twice");
+      const token = await loginToken(email, password);
+      await ageVerificationTokens(userId, 61);
+
+      const first = await request(app).post("/api/auth/verify-email/resend").set("Authorization", `Bearer ${token}`);
+      const second = await request(app).post("/api/auth/verify-email/resend").set("Authorization", `Bearer ${token}`);
+      await ageVerificationTokens(userId, 61);
+      const third = await request(app).post("/api/auth/verify-email/resend").set("Authorization", `Bearer ${token}`);
+
+      expect([first.status, second.status, third.status]).toEqual([200, 429, 200]);
+    });
+
+    test("con el email ya verificado responde 409 aunque el último token sea reciente", async () => {
+      const { email, password, userId } = await registerUser("resend-verified-recent");
+      await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() } });
+      const token = await loginToken(email, password);
+
+      const res = await request(app).post("/api/auth/verify-email/resend").set("Authorization", `Bearer ${token}`);
+
+      expect(res.status).toBe(409);
+    });
+
+    test("en producción sin SMTP_HOST responde 503 nombrando la variable, sin gastar token ni cooldown", async () => {
+      const { email, password, userId } = await registerUser("resend-no-smtp");
+      const token = await loginToken(email, password);
+      await ageVerificationTokens(userId, 61);
+      const tokensBefore = await prisma.authToken.count({ where: { userId } });
+
+      await withProductionWithoutSmtp(async () => {
+        const res = await request(app).post("/api/auth/verify-email/resend").set("Authorization", `Bearer ${token}`);
+
+        expect(res.status).toBe(503);
+        expect(res.body.error.code).toBe("MAIL_NOT_CONFIGURED");
+        expect(res.body.error.message).toContain("SMTP_HOST");
+        expect(res.body.error.details).toEqual({ missingEnvVars: ["SMTP_HOST"] });
+      });
+
+      expect(await prisma.authToken.count({ where: { userId } })).toBe(tokensBefore);
+    });
+  });
+
+  describe("register con el correo sin configurar en producción", () => {
+    test("igual responde 201 y deja el error logueado (la cuenta ya existe)", async () => {
+      verificationSpy.mockRestore();
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const email = uniqueEmail("register-no-smtp");
+
+      await withProductionWithoutSmtp(async () => {
+        const res = await request(app).post("/api/auth/register").send({ email, password: "Password123" });
+
+        expect(res.status).toBe(201);
+      });
+
+      expect(await prisma.user.findUnique({ where: { email } })).not.toBeNull();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("no se pudo enviar el mail de verificación"), expect.anything());
     });
   });
 
@@ -229,6 +341,28 @@ describe("verificación de email y recuperación de contraseña (/api/auth)", ()
       const res = await request(app).post("/api/auth/forgot-password").send({ email: "no-es-un-email" });
 
       expect(res.status).toBe(400);
+    });
+
+    test("en producción sin SMTP_HOST responde 503 igual para cualquier email (no revela si existe)", async () => {
+      const { email, userId } = await registerUser("forgot-no-smtp");
+
+      await withProductionWithoutSmtp(async () => {
+        const existing = await request(app).post("/api/auth/forgot-password").send({ email });
+        const unknown = await request(app)
+          .post("/api/auth/forgot-password")
+          .send({ email: `nadie-${Date.now()}@example.com` });
+
+        for (const res of [existing, unknown]) {
+          expect(res.status).toBe(503);
+          expect(res.body.error.code).toBe("MAIL_NOT_CONFIGURED");
+          expect(res.body.error.message).toContain("SMTP_HOST");
+        }
+        expect(unknown.body).toEqual(existing.body);
+      });
+
+      // Falló antes de buscar al usuario: no se emitió ningún token de reset.
+      expect(await prisma.authToken.count({ where: { userId, type: "password_reset" } })).toBe(0);
+      expect(resetSpy).not.toHaveBeenCalled();
     });
   });
 

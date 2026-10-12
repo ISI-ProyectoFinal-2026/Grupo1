@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as authService from "../services/auth.service";
+import { assertMailConfigured } from "../services/mail";
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -40,6 +41,12 @@ export async function resendEmailVerification(req: Request, res: Response): Prom
 
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
   const { email } = forgotPasswordSchema.parse(req.body);
+
+  // Antes de buscar al usuario y de responder: el correo mal configurado no
+  // depende de la cuenta, así que el 503 es igual para cualquier email y no
+  // revela cuáles existen. Callarlo con un 200 dejaría al usuario esperando un
+  // mail que nunca va a llegar.
+  assertMailConfigured();
 
   // Sin await a propósito: la respuesta sale igual y al mismo tiempo exista o
   // no la cuenta. Un error (base, SMTP) se loguea y no llega al cliente.

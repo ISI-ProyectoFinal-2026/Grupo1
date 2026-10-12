@@ -5,10 +5,16 @@ import { AppError } from "../errors/app-error";
 import { signAccessToken } from "../utils/jwt";
 import { toPublicUser } from "../utils/public-user";
 import { LoginInput, RegisterInput, ResetPasswordInput } from "../validators/auth.validator";
-import { consumeAuthToken, issueAuthToken } from "./auth-tokens.service";
+import { consumeAuthToken, issueAuthToken, latestAuthTokenCreatedAt } from "./auth-tokens.service";
+import { assertMailConfigured } from "./mail";
 import * as mailService from "./mail.service";
 
 const SALT_ROUNDS = 12;
+
+// Mínimo entre dos mails de verificación del mismo usuario. Se mide contra la
+// base (no con un limiter en memoria) para que valga en todas las instancias y
+// también en los tests.
+const RESEND_COOLDOWN_MS = 60_000;
 
 // Precomputed at module load so login always pays the same bcrypt.compare cost,
 // whether or not the email exists — otherwise the missing-user fast path leaks
@@ -90,12 +96,28 @@ export async function verifyEmail(token: string): Promise<void> {
 }
 
 export async function resendEmailVerification(userId: number): Promise<void> {
+  // Primero: sin correo configurado no se emite ningún token ni se gasta el cooldown.
+  assertMailConfigured();
+
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
     throw new AppError(404, "Usuario no encontrado");
   }
   if (user.emailVerifiedAt) {
     throw new AppError(409, "Tu email ya está verificado");
+  }
+
+  const lastIssuedAt = await latestAuthTokenCreatedAt(userId, "email_verification");
+  if (lastIssuedAt) {
+    const elapsedMs = Date.now() - lastIssuedAt.getTime();
+    if (elapsedMs < RESEND_COOLDOWN_MS) {
+      throw new AppError(
+        429,
+        "Esperá un minuto antes de pedir otro email",
+        { retryAfterSeconds: Math.ceil((RESEND_COOLDOWN_MS - elapsedMs) / 1000) },
+        "RESEND_COOLDOWN"
+      );
+    }
   }
 
   // Acá sí se propaga un error de envío: el usuario lo pidió explícitamente y

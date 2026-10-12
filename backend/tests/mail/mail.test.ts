@@ -7,7 +7,8 @@ jest.mock("nodemailer", () => ({
 
 import { ConsoleMailSender } from "../../src/services/mail/console-mail-sender";
 import * as mailModule from "../../src/services/mail";
-import { createMailSender } from "../../src/services/mail";
+import { AppError } from "../../src/errors/app-error";
+import { assertMailConfigured, createMailSender } from "../../src/services/mail";
 import { SmtpMailSender } from "../../src/services/mail/smtp-mail-sender";
 import * as mailService from "../../src/services/mail.service";
 
@@ -57,6 +58,42 @@ describe("createMailSender", () => {
 
   test("en producción sin SMTP_HOST falla en vez de loguear los enlaces", () => {
     expect(() => createMailSender({ NODE_ENV: "production" })).toThrow(/SMTP_HOST/);
+  });
+
+  test("en producción sin SMTP_HOST el error es un AppError 503 que nombra la variable faltante", () => {
+    expect.assertions(3);
+    try {
+      createMailSender({ NODE_ENV: "production" });
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({
+        statusCode: 503,
+        code: "MAIL_NOT_CONFIGURED",
+        details: { missingEnvVars: ["SMTP_HOST"] },
+      });
+      expect((error as AppError).message).toContain("SMTP_HOST");
+    }
+  });
+});
+
+describe("assertMailConfigured", () => {
+  test("en producción sin SMTP_HOST tira AppError 503 MAIL_NOT_CONFIGURED", () => {
+    expect(() => assertMailConfigured({ NODE_ENV: "production" })).toThrow(
+      expect.objectContaining({
+        statusCode: 503,
+        code: "MAIL_NOT_CONFIGURED",
+        details: { missingEnvVars: ["SMTP_HOST"] },
+      })
+    );
+  });
+
+  test("en producción con SMTP_HOST no tira", () => {
+    expect(() => assertMailConfigured({ NODE_ENV: "production", SMTP_HOST: "smtp.example.com" })).not.toThrow();
+  });
+
+  test("fuera de producción no tira aunque falte SMTP_HOST (el adaptador de consola alcanza)", () => {
+    expect(() => assertMailConfigured({ NODE_ENV: "development" })).not.toThrow();
+    expect(() => assertMailConfigured({ NODE_ENV: "test" })).not.toThrow();
   });
 });
 
