@@ -26,11 +26,16 @@ export interface CreateChatInput {
 }
 
 // respuesta de los ack del socket
-export type SocketAck<T = undefined> = { ok: true; data: T } | { ok: false; error: string }
+// `code` es el código de máquina del backend (p. ej. EMAIL_NOT_VERIFIED), igual que
+// `error.code` en las respuestas HTTP.
+export type SocketAck<T = undefined> =
+  | { ok: true; data: T }
+  | { ok: false; error: string; code?: string }
 
 export interface SocketErrorPayload {
   event: string
   message: string
+  code?: string
 }
 
 export interface ServerToClientEvents {

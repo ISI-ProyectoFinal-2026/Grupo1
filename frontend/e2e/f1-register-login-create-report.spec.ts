@@ -12,7 +12,7 @@ test('F1: a new user registers, logs in through the UI and publishes a report', 
   await page.getByRole('button', { name: 'Crear cuenta' }).click()
 
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByText('Cuenta creada, iniciá sesión')).toBeVisible()
+  await expect(page.getByText('Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión')).toBeVisible()
   // Publishing a report needs a verified email; the mail-link journey has its own spec.
   await markEmailVerified(email)
   await page.getByLabel('Email').fill(email)

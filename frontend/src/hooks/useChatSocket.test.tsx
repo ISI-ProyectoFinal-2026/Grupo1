@@ -346,3 +346,97 @@ describe('useChatSocket: envio de mensajes', () => {
     await waitFor(() => expect(result.current.error).toBe('Chat cerrado'))
   })
 })
+
+describe('useChatSocket: email sin verificar (EMAIL_NOT_VERIFIED)', () => {
+  function ackEnFalla(respuesta: unknown) {
+    falso.socket.emit.mockImplementation(
+      (evento: string, _payload: unknown, ack?: (r: unknown) => void) => {
+        if (evento === 'send_message') ack?.(respuesta)
+      }
+    )
+  }
+
+  it('expone el code del ack en falla y lo propaga en el error rechazado', async () => {
+    const { result } = montar(3)
+    falso.conectar()
+    ackEnFalla({ ok: false, error: 'Verificá tu email', code: 'EMAIL_NOT_VERIFIED' })
+
+    const rechazado = await result.current
+      .sendMessage({ content: 'hola' })
+      .catch((e: unknown) => e as Error & { code?: string })
+
+    expect(rechazado).toBeInstanceOf(Error)
+    expect((rechazado as Error & { code?: string }).code).toBe('EMAIL_NOT_VERIFIED')
+    await waitFor(() => expect(result.current.errorCode).toBe('EMAIL_NOT_VERIFIED'))
+    expect(result.current.error).toBe('Verificá tu email')
+  })
+
+  it('un ack en falla sin code deja errorCode en null', async () => {
+    const { result } = montar(3)
+    falso.conectar()
+    ackEnFalla({ ok: false, error: 'Chat cerrado' })
+
+    await expect(result.current.sendMessage({ content: 'hola' })).rejects.toThrow('Chat cerrado')
+    await waitFor(() => expect(result.current.error).toBe('Chat cerrado'))
+    expect(result.current.errorCode).toBeNull()
+  })
+
+  it('toma el code del evento error que emite el server', () => {
+    const { result } = montar(3)
+    falso.conectar()
+
+    falso.disparar('error', {
+      event: 'send_message',
+      message: 'Verificá tu email',
+      code: 'EMAIL_NOT_VERIFIED',
+    })
+
+    expect(result.current.errorCode).toBe('EMAIL_NOT_VERIFIED')
+    expect(result.current.error).toBe('Verificá tu email')
+  })
+
+  it('expone error y code cuando el fallback REST da 403', async () => {
+    vi.mocked(sendMessageRest).mockRejectedValue(
+      Object.assign(new Error('Verificá tu email'), { status: 403, code: 'EMAIL_NOT_VERIFIED' })
+    )
+    const { result } = montar(3)
+
+    await act(async () => {
+      await result.current.sendMessage({ content: 'hola' }).catch(() => {})
+    })
+
+    expect(result.current.errorCode).toBe('EMAIL_NOT_VERIFIED')
+    expect(result.current.error).toBe('Verificá tu email')
+  })
+
+  // Verificar a mitad de sesion no reconecta el socket: el siguiente envio
+  // exitoso tiene que borrar el aviso viejo.
+  it('un envio exitoso posterior limpia error y code', async () => {
+    const enviado = mensaje({ id: 9, senderId: 7, content: 'hola' })
+    const { result } = montar(3)
+    falso.conectar()
+    ackEnFalla({ ok: false, error: 'Verificá tu email', code: 'EMAIL_NOT_VERIFIED' })
+    await result.current.sendMessage({ content: 'hola' }).catch(() => {})
+    await waitFor(() => expect(result.current.errorCode).toBe('EMAIL_NOT_VERIFIED'))
+
+    ackEnFalla({ ok: true, data: enviado })
+    await act(async () => {
+      await result.current.sendMessage({ content: 'hola' })
+    })
+
+    expect(result.current.errorCode).toBeNull()
+    expect(result.current.error).toBeNull()
+  })
+
+  it('al reconectar limpia el code junto con el error', () => {
+    const { result } = montar(3)
+    falso.conectar()
+    falso.disparar('error', { event: 'send_message', message: 'x', code: 'EMAIL_NOT_VERIFIED' })
+    expect(result.current.errorCode).toBe('EMAIL_NOT_VERIFIED')
+
+    falso.conectar()
+
+    expect(result.current.errorCode).toBeNull()
+    expect(result.current.error).toBeNull()
+  })
+})

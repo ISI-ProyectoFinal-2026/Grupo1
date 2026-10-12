@@ -12,6 +12,9 @@ import { useAuthStore } from "@/stores/auth.store";
 import Button from "@/components/ui/Button";
 import Spinner from "@/components/ui/Spinner";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import EmailNotVerifiedNotice from "@/components/auth/EmailNotVerifiedNotice";
+import { getApiErrorCode } from "@/services/api";
+import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import PendingBanner from "@/components/reports/PendingBanner";
 import MatchCard from "@/components/reports/MatchCard";
 import ImageUploader from "@/components/reports/ImageUploader";
@@ -206,7 +209,13 @@ export default function ReportDetailPage() {
                     Generar flyer
                   </Button>
                   <p className="text-sm text-gray-500">o subí tu propio flyer</p>
-                  <ImageUploader onSuccess={handleCustomFlyerUpload} onError={setCustomFlyerError} />
+                  <ImageUploader
+                    onSuccess={handleCustomFlyerUpload}
+                    onError={(message, code) => {
+                      // El uploader ya muestra el aviso de email sin verificar.
+                      if (code !== EMAIL_NOT_VERIFIED) setCustomFlyerError(message);
+                    }}
+                  />
                   {customFlyerError && <ErrorMessage message={customFlyerError} />}
                 </div>
               ) : (
@@ -240,11 +249,14 @@ export default function ReportDetailPage() {
               >
                 Contactar al autor
               </Button>
-              {contactMutation.isError && (
-                <p className="text-sm text-red-600 mt-2">
-                  No se pudo abrir el chat, intentá de nuevo.
-                </p>
-              )}
+              {contactMutation.isError &&
+                (getApiErrorCode(contactMutation.error) === EMAIL_NOT_VERIFIED ? (
+                  <EmailNotVerifiedNotice className="mt-2" />
+                ) : (
+                  <p className="text-sm text-red-600 mt-2">
+                    No se pudo abrir el chat, intentá de nuevo.
+                  </p>
+                ))}
             </div>
           )}
 

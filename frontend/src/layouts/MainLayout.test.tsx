@@ -120,4 +120,53 @@ describe('MainLayout', () => {
     await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
     expect(authService.getMe).not.toHaveBeenCalled()
   })
+
+  it('muestra el banner de verificacion a un usuario sin verificar', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, emailVerifiedAt: null } })
+    vi.mocked(authService.getMe).mockResolvedValue({ ...usuario, emailVerifiedAt: null })
+
+    renderLayout()
+
+    expect(
+      await screen.findByRole('region', { name: 'Verificación de email' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reenviar email de verificación' })).toBeEnabled()
+  })
+
+  // Verificó desde otro dispositivo: /me corrige el store y el banner se va solo.
+  it('esconde el banner cuando /auth/me confirma que ya esta verificado', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, emailVerifiedAt: null } })
+    let resolverMe: (user: AuthUser) => void = () => {}
+    vi.mocked(authService.getMe).mockReturnValue(
+      new Promise((resolve) => {
+        resolverMe = resolve
+      })
+    )
+
+    renderLayout()
+    expect(screen.getByRole('region', { name: 'Verificación de email' })).toBeInTheDocument()
+
+    resolverMe({ ...usuario, emailVerifiedAt: '2026-01-01T00:00:00.000Z' })
+
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Verificación de email' })).not.toBeInTheDocument()
+    )
+    expect(useAuthStore.getState().user?.emailVerifiedAt).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('no muestra el banner a un usuario verificado', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('region', { name: 'Verificación de email' })).not.toBeInTheDocument()
+  })
+
+  it('no muestra el banner sin sesion', async () => {
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('region', { name: 'Verificación de email' })).not.toBeInTheDocument()
+  })
 })

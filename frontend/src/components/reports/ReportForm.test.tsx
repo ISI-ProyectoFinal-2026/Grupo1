@@ -4,9 +4,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportForm from '@/components/reports/ReportForm'
 import { createReport } from '@/services/reports.service'
+import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ReportDTO } from '@/types/report.types'
+import * as authService from '@/services/auth.service'
 
 vi.mock('@/services/reports.service', () => ({ createReport: vi.fn() }))
+vi.mock('@/services/auth.service')
 
 // LocationPicker y ImageUploader arrastran leaflet y el flujo de subida a R2:
 // nada de eso hace falta para probar la validacion y el envio del formulario.
@@ -33,7 +36,7 @@ vi.mock('@/components/reports/ImageUploader', () => ({
     onUploadingChange,
   }: {
     onSuccess: (url: string, rejection: string | null) => void
-    onError: (error: string) => void
+    onError: (error: string, code?: string) => void
     onUploadingChange?: (uploading: boolean) => void
   }) => (
     <>
@@ -57,6 +60,12 @@ vi.mock('@/components/reports/ImageUploader', () => ({
       </button>
       <button type='button' onClick={() => onError('No se pudo subir la imagen (HTTP 403)')}>
         Simular falla de subida
+      </button>
+      <button
+        type='button'
+        onClick={() => onError('Verificá tu email para continuar', 'EMAIL_NOT_VERIFIED')}
+      >
+        Simular falla por email sin verificar
       </button>
     </>
   ),
@@ -96,13 +105,16 @@ function DetalleFalso() {
 }
 
 function renderForm(initialData?: Parameters<typeof ReportForm>[0]['initialData']) {
+  const { Wrapper } = createQueryWrapper()
   render(
-    <MemoryRouter initialEntries={['/reports/new']}>
-      <Routes>
-        <Route path='/reports/new' element={<ReportForm initialData={initialData} />} />
-        <Route path='/reports/:id' element={<DetalleFalso />} />
-      </Routes>
-    </MemoryRouter>
+    <Wrapper>
+      <MemoryRouter initialEntries={['/reports/new']}>
+        <Routes>
+          <Route path='/reports/new' element={<ReportForm initialData={initialData} />} />
+          <Route path='/reports/:id' element={<DetalleFalso />} />
+        </Routes>
+      </MemoryRouter>
+    </Wrapper>
   )
 }
 
@@ -395,5 +407,82 @@ describe('ReportForm: submission while the photo is uploading', () => {
         expect.objectContaining({ imageUrl: 'https://cdn/foto.jpg' })
       )
     )
+  })
+})
+
+describe('ReportForm: email sin verificar (403 EMAIL_NOT_VERIFIED)', () => {
+  const sinVerificar = () =>
+    Object.assign(new Error('Verificá tu email para continuar'), {
+      status: 403,
+      code: 'EMAIL_NOT_VERIFIED',
+    })
+
+  // El boton queda habilitado a proposito y el 403 no borra nada: el usuario
+  // verifica, vuelve y reenvia sin retipear el reporte.
+  it('muestra el aviso con reenvio, conserva lo cargado y deja el boton habilitado', async () => {
+    vi.mocked(createReport).mockRejectedValue(sinVerificar())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Verificá tu email para poder hacer esto'
+    )
+    expect(screen.getByRole('button', { name: 'Reenviar email de verificación' })).toBeEnabled()
+    expect(screen.queryByText('Verificá tu email para continuar')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Título *')).toHaveValue('Perro perdido en Nueva Córdoba')
+    expect(screen.getByRole('button', { name: 'Crear Reporte' })).toBeEnabled()
+  })
+
+  it('el reenvio del aviso pide otro email', async () => {
+    vi.mocked(createReport).mockRejectedValue(sinVerificar())
+    vi.mocked(authService.resendVerification).mockResolvedValue({ message: 'ok' })
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+    await user.click(await screen.findByRole('button', { name: 'Reenviar email de verificación' }))
+
+    expect(await screen.findByText('Te mandamos un nuevo email')).toBeInTheDocument()
+    expect(authService.resendVerification).toHaveBeenCalledTimes(1)
+  })
+
+  it('reintentar tras verificar crea el reporte y el aviso desaparece', async () => {
+    vi.mocked(createReport).mockRejectedValueOnce(sinVerificar()).mockResolvedValueOnce(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+    await screen.findByRole('alert')
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByText('Detalle del reporte')).toBeInTheDocument()
+    expect(createReport).toHaveBeenCalledTimes(2)
+  })
+
+  // El uploader ya muestra su propio aviso: el formulario no puede repetirlo.
+  it('si la subida de la foto da 403 muestra un solo aviso', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Simular falla por email sin verificar' }))
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('un error comun sigue mostrandose como texto sin aviso de verificacion', async () => {
+    vi.mocked(createReport).mockRejectedValue(new Error('Reporte duplicado'))
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByText('Reporte duplicado')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reenviar email de verificación' })).toBeNull()
   })
 })

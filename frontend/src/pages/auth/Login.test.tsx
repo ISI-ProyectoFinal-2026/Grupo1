@@ -65,13 +65,13 @@ describe('Login', () => {
   it('avisa que la cuenta fue creada cuando viene del registro', () => {
     renderLogin({ registered: true })
 
-    expect(screen.getByText('Cuenta creada, iniciá sesión')).toBeInTheDocument()
+    expect(screen.getByText('Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión')).toBeInTheDocument()
   })
 
   it('no muestra el aviso en un ingreso normal', () => {
     renderLogin()
 
-    expect(screen.queryByText('Cuenta creada, iniciá sesión')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión')).not.toBeInTheDocument()
   })
 
   it('ofrece recuperar la contraseña desde el login', async () => {

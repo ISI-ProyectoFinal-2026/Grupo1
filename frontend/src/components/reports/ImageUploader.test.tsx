@@ -1,8 +1,9 @@
-import { render, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ImageUploader from '@/components/reports/ImageUploader'
 import * as uploadsService from '@/services/uploads.service'
+import { createQueryWrapper } from '@/test/query-wrapper'
 
 vi.mock('@/services/uploads.service', async () => {
   const actual = await vi.importActual<typeof import('@/services/uploads.service')>(
@@ -174,5 +175,58 @@ describe('ImageUploader', () => {
     expect(firstInput.id).not.toBe(secondInput.id)
     expect(firstLabel.getAttribute('for')).toBe(firstInput.id)
     expect(secondLabel.getAttribute('for')).toBe(secondInput.id)
+  })
+})
+
+describe('ImageUploader: email sin verificar (403 EMAIL_NOT_VERIFIED)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+    URL.revokeObjectURL = vi.fn()
+  })
+
+  // El presign es una de las rutas que el backend gatea: el aviso se muestra
+  // aca mismo, con reenvio, y el padre recibe el code para no repetirlo.
+  it('muestra el aviso con reenvio y le pasa el code al padre', async () => {
+    const user = userEvent.setup()
+    vi.mocked(uploadsService.getPresignedUrl).mockRejectedValue(
+      Object.assign(new Error('Verificá tu email para continuar'), {
+        status: 403,
+        code: 'EMAIL_NOT_VERIFIED',
+      })
+    )
+    const onError = vi.fn()
+    const { Wrapper } = createQueryWrapper()
+
+    const { container } = render(
+      <Wrapper>
+        <ImageUploader onSuccess={vi.fn()} onError={onError} />
+      </Wrapper>
+    )
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, makeFile())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Verificá tu email para poder hacer esto'
+    )
+    expect(screen.getByRole('button', { name: 'Reenviar email de verificación' })).toBeEnabled()
+    expect(onError).toHaveBeenCalledWith('Verificá tu email para continuar', 'EMAIL_NOT_VERIFIED')
+  })
+
+  it('un error comun se muestra como texto y no lleva code', async () => {
+    const user = userEvent.setup()
+    vi.mocked(uploadsService.getPresignedUrl).mockRejectedValue(new Error('presign caido'))
+    const onError = vi.fn()
+    const { Wrapper } = createQueryWrapper()
+
+    const { container } = render(
+      <Wrapper>
+        <ImageUploader onSuccess={vi.fn()} onError={onError} />
+      </Wrapper>
+    )
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, makeFile())
+
+    expect(await screen.findByText('presign caido')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reenviar email de verificación' })).toBeNull()
+    expect(onError).toHaveBeenCalledWith('presign caido', undefined)
   })
 })

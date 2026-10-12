@@ -171,4 +171,25 @@ describe('ChatPage: chat seleccionado', () => {
     const lista = await screen.findByText('Voy para allá')
     expect(within(lista.closest('ul') as HTMLElement).getAllByRole('listitem')).toHaveLength(2)
   })
+
+  // El socket inerte de este test manda el envio por REST: el 403 del backend
+  // llega a la ventana como aviso con reenvio, y el borrador no se pierde.
+  it('muestra el aviso de email sin verificar cuando el envio da 403 EMAIL_NOT_VERIFIED', async () => {
+    const user = userEvent.setup()
+    vi.mocked(chatsService.sendMessage).mockRejectedValue(
+      Object.assign(new Error('Verificá tu email para continuar'), {
+        status: 403,
+        code: 'EMAIL_NOT_VERIFIED',
+      })
+    )
+    renderPage('/chats/3')
+    await screen.findByText('Hola, creo que vi a tu perro')
+
+    await user.type(screen.getByLabelText('Mensaje'), 'Voy para allá')
+    await user.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(await screen.findByRole('button', { name: 'Reenviar email de verificación' })).toBeEnabled()
+    expect(screen.getByLabelText('Mensaje')).toHaveValue('Voy para allá')
+    expect(screen.getByRole('button', { name: 'Enviar' })).toBeEnabled()
+  })
 })

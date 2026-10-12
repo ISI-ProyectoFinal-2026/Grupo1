@@ -46,7 +46,7 @@ function Login() {
 
         {registered && (
           <p className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-            Cuenta creada, iniciá sesión
+            Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión
           </p>
         )}
 

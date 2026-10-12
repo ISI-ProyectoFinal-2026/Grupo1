@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
+import UnverifiedEmailBanner from "@/components/auth/UnverifiedEmailBanner";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsModerator } from "@/hooks/useIsModerator";
@@ -63,6 +64,7 @@ function MainLayout() {
           </div>
         )}
       </nav>
+      <UnverifiedEmailBanner />
       <main className="flex-1">
         <Outlet />
       </main>

@@ -7,6 +7,9 @@ import type { ReportLocation } from "@/types/report.types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
+import { getApiErrorCode } from "@/services/api";
+import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import ImageUploader from "./ImageUploader";
 import LocationPicker from "./LocationPicker";
 
@@ -18,6 +21,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [formErrorCode, setFormErrorCode] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   // Set when the screening found no animal in the uploaded photo: the report
   // cannot be submitted until the user uploads a different one.
@@ -53,8 +57,11 @@ export default function ReportForm({ initialData }: ReportFormProps) {
     setFormError(null);
   };
 
-  const handleImageUploadError = (error: string) => {
+  const handleImageUploadError = (error: string, code?: string) => {
+    // El uploader ya muestra el aviso de email sin verificar junto a la foto.
+    if (code === EMAIL_NOT_VERIFIED) return;
     setFormError(error);
+    setFormErrorCode(null);
   };
 
   const handleLocationSelect = (location: ReportLocation, address: string) => {
@@ -69,6 +76,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
     e.preventDefault();
     if (!canSubmit) return;
     setFormError(null);
+    setFormErrorCode(null);
     setFieldErrors({});
     setIsLoading(true);
 
@@ -93,6 +101,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
         setFormError("Por favor, corregí los errores del formulario");
       } else if (err instanceof Error) {
         setFormError(err.message);
+        setFormErrorCode(getApiErrorCode(err) ?? null);
       } else {
         setFormError("Error al crear el reporte");
       }
@@ -103,7 +112,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      {formError && <ErrorMessage message={formError} />}
+      {formError && <ActionErrorMessage message={formError} code={formErrorCode} />}
 
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-gray-900">Tipo de reporte *</label>
