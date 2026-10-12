@@ -7,9 +7,16 @@ import { useAuthStore } from "@/stores/auth.store";
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const registered = Boolean(
-    (location.state as { registered?: boolean } | null)?.registered,
-  );
+  // Los avisos viajan en el state de la navegación de la página anterior
+  // (Register, VerifyEmailPage, ResetPasswordPage), no en la URL.
+  const flash = location.state as {
+    registered?: boolean;
+    emailVerified?: boolean;
+    passwordReset?: boolean;
+  } | null;
+  const registered = Boolean(flash?.registered);
+  const emailVerified = Boolean(flash?.emailVerified);
+  const passwordReset = Boolean(flash?.passwordReset);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,6 +47,18 @@ function Login() {
         {registered && (
           <p className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
             Cuenta creada, iniciá sesión
+          </p>
+        )}
+
+        {emailVerified && (
+          <p className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+            Tu email quedó verificado, iniciá sesión
+          </p>
+        )}
+
+        {passwordReset && (
+          <p className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+            Tu contraseña se actualizó, iniciá sesión con la nueva
           </p>
         )}
 
@@ -84,6 +103,12 @@ function Login() {
         </form>
 
         <p className="mt-4 text-sm text-gray-600">
+          <Link to="/forgot-password" className="font-medium text-gray-900 underline">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
+
+        <p className="mt-2 text-sm text-gray-600">
           ¿No tenés cuenta?{" "}
           <Link to="/register" className="font-medium text-gray-900 underline">
             Registrate

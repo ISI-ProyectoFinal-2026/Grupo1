@@ -3,17 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "@/services/auth.service";
 import { getApiErrorDetails } from "@/services/api";
-
-const PASSWORD_RULES: Array<{ test: (value: string) => boolean; message: string }> = [
-  { test: (value) => value.length >= 8, message: "mínimo 8 caracteres" },
-  { test: (value) => /[a-z]/.test(value), message: "al menos una minúscula" },
-  { test: (value) => /[A-Z]/.test(value), message: "al menos una mayúscula" },
-  { test: (value) => /[0-9]/.test(value), message: "al menos un número" },
-];
-
-function getPasswordErrors(password: string): string[] {
-  return PASSWORD_RULES.filter((rule) => !rule.test(password)).map((rule) => rule.message);
-}
+import { getPasswordErrors } from "@/utils/password-rules";
 
 function Register() {
   const navigate = useNavigate();
