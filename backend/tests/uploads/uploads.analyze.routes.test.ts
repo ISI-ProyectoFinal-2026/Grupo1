@@ -1,14 +1,26 @@
 import request from "supertest";
-import jwt from "jsonwebtoken";
 import { app } from "../../src/app";
+import { prisma } from "../../src/db/client";
+import { createTestUser } from "../helpers/users";
 import * as matchingService from "../../src/services/matching.service";
 
 describe("POST /api/uploads/analyze", () => {
-  const token = jwt.sign({ sub: "1", email: "uploads-analyze-test@example.com" }, process.env.JWT_SECRET!, {
-    expiresIn: "1h",
-  });
   const originalEnv = { ...process.env };
   let analyzeSpy: jest.SpyInstance;
+  // requireAuth valida el token contra la base: el usuario tiene que existir.
+  let userId: number;
+  let token: string;
+
+  beforeAll(async () => {
+    const created = await createTestUser({ prefix: "uploads-analyze-test" });
+    userId = created.user.id;
+    token = created.token;
+  });
+
+  afterAll(async () => {
+    await prisma.user.delete({ where: { id: userId } });
+    await prisma.$disconnect();
+  });
 
   beforeEach(() => {
     process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";

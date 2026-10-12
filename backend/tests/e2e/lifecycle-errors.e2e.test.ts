@@ -60,7 +60,7 @@ describe("E2E: errores del ciclo de vida de un reporte (B6)", () => {
         data: { reportLostId: strangerLostReportId, reportFoundId: foundReportId, similarityScore: 0.75 },
       })
     ).id;
-  });
+  }, 30_000);
 
   afterAll(async () => {
     if (originalInternalKey === undefined) delete process.env.INTERNAL_API_KEY;

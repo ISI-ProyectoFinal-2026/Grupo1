@@ -16,13 +16,21 @@ export const E2E_PASSWORD = "Patitas123";
  * Registra y loguea un usuario a través de los endpoints reales de /api/auth.
  * El email es único por corrida para que las suites no choquen entre sí ni con
  * datos que hayan quedado de una corrida anterior.
+ *
+ * Por defecto deja el email verificado directo en la base: los journeys que
+ * pasan por rutas con gate (reportes, chat) no son sobre la verificación. Con
+ * `{ verified: false }` queda como lo deja el registro real.
  */
-export async function registerAndLogin(label: string): Promise<E2EUser> {
+export async function registerAndLogin(label: string, { verified = true }: { verified?: boolean } = {}): Promise<E2EUser> {
   const email = `e2e-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 
   const register = await request(app).post("/api/auth/register").send({ email, password: E2E_PASSWORD });
   if (register.status !== 201) {
     throw new Error(`register falló (${register.status}): ${JSON.stringify(register.body)}`);
+  }
+
+  if (verified) {
+    await prisma.user.update({ where: { email }, data: { emailVerifiedAt: new Date() } });
   }
 
   const login = await request(app).post("/api/auth/login").send({ email, password: E2E_PASSWORD });
@@ -86,8 +94,8 @@ export function createE2EContext(suite: string) {
   const reportIds: number[] = [];
 
   return {
-    async registerAndLogin(label: string): Promise<E2EUser> {
-      const user = await registerAndLogin(`${suite}-${label}`);
+    async registerAndLogin(label: string, options?: { verified?: boolean }): Promise<E2EUser> {
+      const user = await registerAndLogin(`${suite}-${label}`, options);
       userIds.push(user.id);
       return user;
     },
