@@ -4,6 +4,7 @@
  * backend's Prisma client: no cross-package import, no ts-node spawn per call,
  * and the table names are already fixed by the migrations (@@map).
  */
+import { createHash } from 'node:crypto'
 import pg from 'pg'
 import { DATABASE_URL, E2E_EMAIL_DOMAIN, E2E_EMAIL_PREFIX } from './env.ts'
 
@@ -32,6 +33,57 @@ export async function setRole(userId: number, role: Role): Promise<void> {
  */
 export async function markEmailVerified(email: string): Promise<void> {
   await db().query('UPDATE users SET email_verified_at = now() WHERE email = $1', [email])
+}
+
+export type AuthTokenType = 'email_verification' | 'password_reset'
+
+/**
+ * Seeds a mail-link token whose raw value the test knows. The DB only keeps the
+ * sha256, so the real token (which only travels by mail) can't be recovered:
+ * instead we store the hash of one we chose, exactly as issueAuthToken would.
+ * Issuing a token invalidates the earlier unused ones, so call this AFTER any
+ * resend/forgot request, never before.
+ */
+export async function insertAuthToken(email: string, type: AuthTokenType, rawToken: string): Promise<void> {
+  const tokenHash = createHash('sha256').update(rawToken).digest('hex')
+  const { rowCount } = await db().query(
+    `INSERT INTO auth_tokens (user_id, type, token_hash, expires_at)
+     SELECT id, $2::auth_token_type, $3, now() + interval '30 minutes' FROM users WHERE email = $1`,
+    [email, type, tokenHash],
+  )
+  if (rowCount !== 1) throw new Error(`insertAuthToken: no user with email ${email}`)
+}
+
+/**
+ * Waits until the user has an unused token of that type. forgot-password issues
+ * it in the background after answering, so the response alone doesn't guarantee
+ * it exists yet (and a late insert would invalidate the one seeded by the test).
+ */
+export async function waitForAuthToken(email: string, type: AuthTokenType, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const { rowCount } = await db().query(
+      `SELECT 1 FROM auth_tokens t JOIN users u ON u.id = t.user_id
+       WHERE u.email = $1 AND t.type = $2::auth_token_type AND t.used_at IS NULL`,
+      [email, type],
+    )
+    if (rowCount) return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  throw new Error(`waitForAuthToken: no ${type} token for ${email} after ${timeoutMs}ms`)
+}
+
+/** Pushes the newest token of that type 61s into the past, past the 60s resend cooldown. */
+export async function ageLatestToken(email: string, type: AuthTokenType): Promise<void> {
+  await db().query(
+    `UPDATE auth_tokens SET created_at = created_at - interval '61 seconds'
+     WHERE id = (
+       SELECT t.id FROM auth_tokens t JOIN users u ON u.id = t.user_id
+       WHERE u.email = $1 AND t.type = $2::auth_token_type
+       ORDER BY t.created_at DESC LIMIT 1
+     )`,
+    [email, type],
+  )
 }
 
 /** Same row backend-ia writes when it finds a candidate (matching_service.py). */

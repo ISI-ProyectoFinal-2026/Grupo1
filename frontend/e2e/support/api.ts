@@ -54,6 +54,11 @@ export function login(email: string, password: string): Promise<Session> {
   return expectStatus(200, 'login', call<Session>('POST', '/auth/login', { body: { email, password } }))
 }
 
+/** Raw status, to assert that a stale JWT is rejected. */
+export function getMe(token: string): Promise<{ status: number; body: unknown }> {
+  return call('GET', '/auth/me', { token })
+}
+
 export interface NewReport {
   reportType: 'lost' | 'found'
   title: string
