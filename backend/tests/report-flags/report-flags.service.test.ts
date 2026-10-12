@@ -35,6 +35,7 @@ describe("report-flags.service", () => {
       const id = createdFlagIds.pop()!;
       await prisma.reportFlag.deleteMany({ where: { id } });
     }
+    await prisma.report.update({ where: { id: reportId }, data: { status: "published" } });
   });
 
   afterAll(async () => {
@@ -70,6 +71,23 @@ describe("report-flags.service", () => {
       reportFlagsService.create(reportId, { userId: reporterId, reason: "Otra vez" })
     ).rejects.toMatchObject({ statusCode: 409 });
   });
+
+  test("create() lanza AppError 403 si quien denuncia es el dueño del reporte", async () => {
+    await expect(
+      reportFlagsService.create(reportId, { userId, reason: "Contenido falso" })
+    ).rejects.toMatchObject(new AppError(403, "No podés denunciar tu propia publicación"));
+  });
+
+  test.each(["pending", "rejected", "resolved"] as const)(
+    "create() lanza AppError 404 si el reporte está %s",
+    async (status) => {
+      await prisma.report.update({ where: { id: reportId }, data: { status } });
+
+      await expect(
+        reportFlagsService.create(reportId, { userId: reporterId, reason: "Contenido falso" })
+      ).rejects.toMatchObject(new AppError(404, "Reporte no encontrado"));
+    }
+  );
 
   describe("list()", () => {
     test("por defecto devuelve solo flags pending, con el contexto del reporte", async () => {
