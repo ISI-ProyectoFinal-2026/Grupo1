@@ -311,6 +311,31 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     expect(res.status).toBe(409);
   });
 
+  test.each(["pending", "rejected"] as const)(
+    "POST /api/reports/:id/close responde 409 si el reporte está %s",
+    async (status) => {
+      const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
+      createdReportIds.push(created.body.id);
+      await prisma.report.update({ where: { id: created.body.id }, data: { status } });
+
+      const res = await request(app).post(`/api/reports/${created.body.id}/close`).set("Authorization", `Bearer ${token}`).send({});
+      expect(res.status).toBe(409);
+      expect(res.body.error.message).toBe("Solo se pueden cerrar reportes publicados");
+    }
+  );
+
+  test.each(["pending", "rejected"] as const)(
+    "PUT /api/reports/:id con status resolved responde 409 si el reporte está %s",
+    async (status) => {
+      const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
+      createdReportIds.push(created.body.id);
+      await prisma.report.update({ where: { id: created.body.id }, data: { status } });
+
+      const res = await request(app).put(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${token}`).send({ status: "resolved" });
+      expect(res.status).toBe(409);
+    }
+  );
+
   test("POST /api/reports con imageUrl crea el reporte con status pending y GET /api/reports?status=pending lo incluye", async () => {
     const created = await request(app)
       .post("/api/reports").set("Authorization", `Bearer ${token}`)
