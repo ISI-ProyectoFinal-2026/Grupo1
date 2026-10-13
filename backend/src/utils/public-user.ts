@@ -12,6 +12,7 @@ export interface PublicUser {
   phone: string | null;
   role: Role;
   emailVerifiedAt: string | null;
+  twoFactorEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,6 +25,7 @@ export function toPublicUser(user: User): PublicUser {
     phone: user.phone,
     role: user.role,
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
+    twoFactorEnabled: user.twoFactorEnabledAt !== null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };

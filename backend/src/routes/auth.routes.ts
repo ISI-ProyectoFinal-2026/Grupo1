@@ -1,7 +1,9 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import * as authController from "../controllers/auth.controller";
+import * as twoFactorController from "../controllers/two-factor.controller";
 import { requireAuth } from "../middlewares/auth.middleware";
+import { twoFactorLimiter } from "../middlewares/rate-limit";
 
 export const authRouter = Router();
 
@@ -28,6 +30,7 @@ const accountLimiter = rateLimit({
 
 authRouter.post("/register", authLimiter, authController.register);
 authRouter.post("/login", authLimiter, authController.login);
+authRouter.post("/2fa/login", twoFactorLimiter, twoFactorController.login);
 authRouter.get("/me", requireAuth, authController.me);
 
 authRouter.post("/verify-email", accountLimiter, authController.verifyEmail);

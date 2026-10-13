@@ -29,3 +29,21 @@ export async function sendPasswordReset(to: string, link: string): Promise<void>
   );
   await mail.getMailSender().send({ to, subject: "Restablecé tu contraseña de PATITAS", ...body });
 }
+
+export async function sendTwoFactorRecoveryCodeUsed(to: string, remaining: number): Promise<void> {
+  const left =
+    remaining === 0
+      ? "Ya no te quedan códigos de recuperación: generá un juego nuevo desde la sección de seguridad."
+      : remaining === 1
+        ? "Te queda 1 código de recuperación."
+        : `Te quedan ${remaining} códigos de recuperación.`;
+  const intro = "Iniciaron sesión en tu cuenta de PATITAS con un código de recuperación del segundo factor.";
+  const sessions = "Por seguridad, se cerraron las demás sesiones abiertas.";
+  const warning = "Si no fuiste vos, cambiá tu contraseña y revisá la seguridad de tu cuenta de inmediato.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Se usó un código de recuperación en tu cuenta de PATITAS",
+    text: `${intro} ${left} ${sessions}\n\n${warning}`,
+    html: `<p>${intro} ${left} ${sessions}</p><p>${warning}</p>`,
+  });
+}

@@ -60,6 +60,9 @@ describe("auth.service", () => {
 
       const result = await authService.login({ email, password: "Password123" });
 
+      if (!("token" in result)) {
+        throw new Error("se esperaba una sesión y no un desafío de segundo factor");
+      }
       expect(typeof result.token).toBe("string");
       expect(result.token.length).toBeGreaterThan(0);
       expect(result.token.split(".")).toHaveLength(3);

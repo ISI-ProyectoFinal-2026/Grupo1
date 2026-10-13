@@ -4,7 +4,7 @@ import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 import * as mailService from "../../src/services/mail.service";
 
-const PUBLIC_USER_KEYS = ["createdAt", "email", "emailVerifiedAt", "fullName", "id", "phone", "role", "updatedAt"];
+const PUBLIC_USER_KEYS = ["createdAt", "email", "emailVerifiedAt", "fullName", "id", "phone", "role", "twoFactorEnabled", "updatedAt"];
 
 describe("POST /api/auth/register and /api/auth/login", () => {
   const createdEmails: string[] = [];
@@ -58,6 +58,7 @@ describe("POST /api/auth/register and /api/auth/login", () => {
         phone: null,
         role: "usuario_regular",
         emailVerifiedAt: null,
+        twoFactorEnabled: false,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       });

@@ -11,7 +11,7 @@ const passwordSchema = z
 
 // Los tokens de los links son 32 bytes en base64url (43 caracteres); el tope
 // solo evita hashear strings arbitrariamente largos.
-const linkTokenSchema = z.string().min(1).max(256);
+export const linkTokenSchema = z.string().min(1).max(256);
 
 export const registerSchema = z.object({
   email: z.string().email(),

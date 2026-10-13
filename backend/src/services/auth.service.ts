@@ -3,11 +3,12 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { signAccessToken } from "../utils/jwt";
-import { toPublicUser } from "../utils/public-user";
+import { PublicUser, toPublicUser } from "../utils/public-user";
 import { LoginInput, RegisterInput, ResetPasswordInput } from "../validators/auth.validator";
 import { consumeAuthToken, issueAuthToken, latestAuthTokenCreatedAt } from "./auth-tokens.service";
 import { assertMailConfigured } from "./mail";
 import * as mailService from "./mail.service";
+import { issueLoginChallenge, resetEffectiveAt } from "./two-factor/service";
 
 const SALT_ROUNDS = 12;
 
@@ -62,7 +63,11 @@ export async function register(input: RegisterInput) {
   return toPublicUser(user);
 }
 
-export async function login(input: LoginInput) {
+export type LoginResult =
+  | { token: string; user: PublicUser }
+  | { twoFactorRequired: true; twoFactorToken: string; resetEffectiveAt?: string };
+
+export async function login(input: LoginInput): Promise<LoginResult> {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 
   // Always compare against a real hash (dummy when no user) and use the same
@@ -71,6 +76,19 @@ export async function login(input: LoginInput) {
   const isValidPassword = await bcrypt.compare(input.password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !isValidPassword) {
     throw new AppError(401, "Credenciales inválidas");
+  }
+
+  // Con 2FA activo la contraseña sola no abre sesión: se devuelve un desafío
+  // opaco (no un JWT) que solo sirve en /2fa/login.
+  if (user.twoFactorEnabledAt) {
+    const twoFactorToken = await issueLoginChallenge(user.id);
+    return {
+      twoFactorRequired: true as const,
+      twoFactorToken,
+      ...(user.twoFactorResetRequestedAt
+        ? { resetEffectiveAt: resetEffectiveAt(user.twoFactorResetRequestedAt).toISOString() }
+        : {}),
+    };
   }
 
   return { token: signAccessToken(user), user: toPublicUser(user) };

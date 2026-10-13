@@ -188,6 +188,26 @@ describe("mail.service", () => {
     expect(message.html).toContain("http://front/reset-password?token=abc");
   });
 
+  test("sendTwoFactorRecoveryCodeUsed avisa cuántos códigos quedan, sin incluir ningún código", async () => {
+    await mailService.sendTwoFactorRecoveryCodeUsed("ana@example.com", 9);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const message = send.mock.calls[0][0];
+    expect(message.to).toBe("ana@example.com");
+    expect(message.subject).toMatch(/código de recuperación/i);
+    expect(message.text).toContain("Te quedan 9 códigos de recuperación");
+    expect(message.html).toContain("Te quedan 9 códigos de recuperación");
+    expect(message.text).not.toMatch(/[A-Z2-7]{5}-[A-Z2-7]{5}/);
+  });
+
+  test("sendTwoFactorRecoveryCodeUsed distingue uno y ningún código restante", async () => {
+    await mailService.sendTwoFactorRecoveryCodeUsed("ana@example.com", 1);
+    await mailService.sendTwoFactorRecoveryCodeUsed("ana@example.com", 0);
+
+    expect(send.mock.calls[0][0].text).toContain("Te queda 1 código de recuperación");
+    expect(send.mock.calls[1][0].text).toContain("Ya no te quedan códigos de recuperación");
+  });
+
   test("propaga el error del adaptador para que el llamador decida", async () => {
     send.mockRejectedValue(new Error("smtp caído"));
 
