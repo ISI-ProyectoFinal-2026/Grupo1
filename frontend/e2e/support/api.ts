@@ -3,6 +3,7 @@
  * test goes through the browser, everything else is arranged here.
  */
 import { BACKEND_URL, INTERNAL_API_KEY } from './env.ts'
+import { totpNow } from './totp.ts'
 
 export interface ApiUser {
   id: number
@@ -14,6 +15,13 @@ export interface ApiUser {
 export interface Session {
   token: string
   user: ApiUser
+}
+
+/** What a password login answers when the account has 2FA: no session yet. */
+export interface TwoFactorChallenge {
+  twoFactorRequired: true
+  twoFactorToken: string
+  resetEffectiveAt?: string
 }
 
 export interface ApiReport {
@@ -50,8 +58,48 @@ export function register(email: string, password: string): Promise<ApiUser> {
   return expectStatus(201, 'register', call<ApiUser>('POST', '/auth/register', { body: { email, password } }))
 }
 
-export function login(email: string, password: string): Promise<Session> {
-  return expectStatus(200, 'login', call<Session>('POST', '/auth/login', { body: { email, password } }))
+/** First step of a login: a session, or the challenge when the account has 2FA. */
+export function loginStep(email: string, password: string): Promise<Session | TwoFactorChallenge> {
+  return expectStatus(200, 'login', call<Session | TwoFactorChallenge>('POST', '/auth/login', { body: { email, password } }))
+}
+
+/** Login for accounts without 2FA (every f1-f7 user): a challenge here is a test bug. */
+export async function login(email: string, password: string): Promise<Session> {
+  const response = await loginStep(email, password)
+  if ('twoFactorToken' in response) {
+    throw new Error(`login: ${email} has 2FA on, use loginStep + loginWithTwoFactor`)
+  }
+  return response
+}
+
+export function loginWithTwoFactor(twoFactorToken: string, code: string): Promise<Session> {
+  return expectStatus(200, 'second-factor login', call<Session>('POST', '/auth/2fa/login', { body: { twoFactorToken, code } }))
+}
+
+export interface EnabledTwoFactor {
+  /** The fresh session: enabling bumps tokenVersion, so the one used to enable is dead. */
+  session: Session
+  secret: string
+  recoveryCodes: string[]
+}
+
+/** setup + enable with a code computed from the secret, as the authenticator app would. */
+export async function enableTwoFactor(token: string): Promise<EnabledTwoFactor> {
+  const { secret } = await expectStatus(200, '2fa setup', call<{ secret: string }>('POST', '/auth/2fa/setup', { token }))
+  const enabled = await expectStatus(
+    200,
+    '2fa enable',
+    call<Session & { recoveryCodes: string[] }>('POST', '/auth/2fa/enable', { token, body: { code: totpNow(secret) } }),
+  )
+  return { session: { token: enabled.token, user: enabled.user }, secret, recoveryCodes: enabled.recoveryCodes }
+}
+
+export function requestTwoFactorReset(twoFactorToken: string, password: string): Promise<unknown> {
+  return expectStatus(200, '2fa reset request', call('POST', '/auth/2fa/reset/request', { body: { twoFactorToken, password } }))
+}
+
+export function confirmTwoFactorReset(token: string): Promise<unknown> {
+  return expectStatus(200, '2fa reset confirm', call('POST', '/auth/2fa/reset/confirm', { body: { token } }))
 }
 
 /** Raw status, to assert that a stale JWT is rejected. */
