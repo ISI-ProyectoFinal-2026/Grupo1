@@ -3,6 +3,7 @@ import {
   formatResetDate,
   formatWaitMessage,
   getRetryAfterSeconds,
+  getSecondFactorErrorMessage,
   normalizeSecondFactorCode,
 } from '@/utils/two-factor'
 
@@ -76,5 +77,46 @@ describe('formatResetDate', () => {
 
   it('cambia con la fecha recibida', () => {
     expect(formatResetDate('2026-12-15T12:00:00.000Z')).toMatch(/diciembre de 2026/)
+  })
+})
+
+describe('getSecondFactorErrorMessage', () => {
+  it('con el bloqueo (TWO_FACTOR_LOCKED) y la espera, explica cuanto esperar', () => {
+    const error = Object.assign(new Error('Cuenta bloqueada'), {
+      status: 429,
+      code: 'TWO_FACTOR_LOCKED',
+      details: { retryAfterSeconds: 900 },
+    })
+
+    expect(getSecondFactorErrorMessage(error)).toBe(
+      'Demasiados intentos fallidos. Probá de nuevo en 15 minutos'
+    )
+  })
+
+  it('con el bloqueo pero sin espera, usa el mensaje del backend', () => {
+    const error = Object.assign(new Error('Cuenta bloqueada'), {
+      status: 429,
+      code: 'TWO_FACTOR_LOCKED',
+    })
+
+    expect(getSecondFactorErrorMessage(error)).toBe('Cuenta bloqueada')
+  })
+
+  it('un 429 del limitador por IP muestra su mensaje', () => {
+    const error = Object.assign(new Error('Demasiados intentos, esperá unos minutos'), {
+      status: 429,
+    })
+
+    expect(getSecondFactorErrorMessage(error)).toBe('Demasiados intentos, esperá unos minutos')
+  })
+
+  it('un codigo o contraseña incorrectos muestran el mensaje del backend', () => {
+    const error = Object.assign(new Error('El código es inválido o expiró'), { status: 400 })
+
+    expect(getSecondFactorErrorMessage(error)).toBe('El código es inválido o expiró')
+  })
+
+  it('algo que no es un Error cae en el mensaje generico', () => {
+    expect(getSecondFactorErrorMessage('caida de red')).toBe('Error inesperado, intentá de nuevo')
   })
 })

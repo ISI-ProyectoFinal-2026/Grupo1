@@ -4,8 +4,13 @@ import { api } from '@/services/api'
 import {
   cancelTwoFactorReset,
   confirmTwoFactorReset,
+  disableTwoFactor,
+  enableTwoFactor,
+  getTwoFactorStatus,
   loginWithTwoFactor,
+  regenerateRecoveryCodes,
   requestTwoFactorReset,
+  setupTwoFactor,
 } from '@/services/two-factor.service'
 import type { AuthUser } from '@/types/auth'
 
@@ -132,6 +137,121 @@ describe('two-factor.service', () => {
         token: 'token-de-cancelacion',
       })
       expect(resultado).toEqual({ message: 'Reinicio cancelado' })
+    })
+  })
+
+  describe('getTwoFactorStatus', () => {
+    it('pide GET /auth/2fa/status y devuelve el estado', async () => {
+      vi.mocked(api.get).mockResolvedValue(
+        respuesta({ enabled: true, recoveryCodesRemaining: 8, resetEffectiveAt: null })
+      )
+
+      const resultado = await getTwoFactorStatus()
+
+      expect(api.get).toHaveBeenCalledWith('/auth/2fa/status')
+      expect(resultado).toEqual({ enabled: true, recoveryCodesRemaining: 8, resetEffectiveAt: null })
+    })
+
+    it('conserva la fecha de un reinicio pendiente', async () => {
+      vi.mocked(api.get).mockResolvedValue(
+        respuesta({
+          enabled: true,
+          recoveryCodesRemaining: 2,
+          resetEffectiveAt: '2026-10-20T12:00:00.000Z',
+        })
+      )
+
+      const resultado = await getTwoFactorStatus()
+
+      expect(resultado.resetEffectiveAt).toBe('2026-10-20T12:00:00.000Z')
+    })
+  })
+
+  describe('setupTwoFactor', () => {
+    it('hace POST /auth/2fa/setup sin cuerpo y devuelve secreto y URI', async () => {
+      vi.mocked(api.post).mockResolvedValue(
+        respuesta({ secret: 'JBSWY3DPEHPK3PXP', otpauthUri: 'otpauth://totp/PATITAS:a@b.c?x=1' })
+      )
+
+      const resultado = await setupTwoFactor()
+
+      expect(api.post).toHaveBeenCalledWith('/auth/2fa/setup')
+      expect(resultado).toEqual({
+        secret: 'JBSWY3DPEHPK3PXP',
+        otpauthUri: 'otpauth://totp/PATITAS:a@b.c?x=1',
+      })
+    })
+
+    it('propaga el 403 de email sin verificar con su code', async () => {
+      vi.mocked(api.post).mockRejectedValue(
+        Object.assign(new Error('Verificá tu email'), { status: 403, code: 'EMAIL_NOT_VERIFIED' })
+      )
+
+      await expect(setupTwoFactor()).rejects.toMatchObject({
+        status: 403,
+        code: 'EMAIL_NOT_VERIFIED',
+      })
+    })
+  })
+
+  describe('enableTwoFactor', () => {
+    it('manda el codigo a POST /auth/2fa/enable y devuelve sesion nueva y codigos', async () => {
+      const codigos = ['AAAAA-BBBBB', 'CCCCC-DDDDD']
+      vi.mocked(api.post).mockResolvedValue(
+        respuesta({ token: 'jwt-nuevo', user: usuario, recoveryCodes: codigos })
+      )
+
+      const resultado = await enableTwoFactor({ code: '123456' })
+
+      expect(api.post).toHaveBeenCalledWith('/auth/2fa/enable', { code: '123456' })
+      expect(resultado).toEqual({ token: 'jwt-nuevo', user: usuario, recoveryCodes: codigos })
+    })
+
+    it('propaga el 400 de codigo invalido', async () => {
+      vi.mocked(api.post).mockRejectedValue(
+        Object.assign(new Error('El código es inválido o expiró'), { status: 400 })
+      )
+
+      await expect(enableTwoFactor({ code: '000000' })).rejects.toMatchObject({ status: 400 })
+    })
+  })
+
+  describe('disableTwoFactor', () => {
+    it('manda contraseña y codigo a POST /auth/2fa/disable y devuelve la sesion', async () => {
+      vi.mocked(api.post).mockResolvedValue(respuesta({ token: 'jwt-nuevo', user: usuario }))
+
+      const resultado = await disableTwoFactor({ password: 'Secreta123', code: '123456' })
+
+      expect(api.post).toHaveBeenCalledWith('/auth/2fa/disable', {
+        password: 'Secreta123',
+        code: '123456',
+      })
+      expect(resultado).toEqual({ token: 'jwt-nuevo', user: usuario })
+    })
+
+    it('manda un codigo de recuperacion en el mismo campo', async () => {
+      vi.mocked(api.post).mockResolvedValue(respuesta({ token: 'jwt-nuevo', user: usuario }))
+
+      await disableTwoFactor({ password: 'Secreta123', code: 'ABCDE-FGHIJ' })
+
+      expect(api.post).toHaveBeenCalledWith('/auth/2fa/disable', {
+        password: 'Secreta123',
+        code: 'ABCDE-FGHIJ',
+      })
+    })
+  })
+
+  describe('regenerateRecoveryCodes', () => {
+    it('manda el TOTP a POST /auth/2fa/recovery-codes y devuelve sesion nueva y codigos', async () => {
+      vi.mocked(api.post).mockResolvedValue(
+        respuesta({ token: 'jwt-nuevo', user: usuario, recoveryCodes: ['EEEEE-FFFFF'] })
+      )
+
+      const resultado = await regenerateRecoveryCodes({ code: '654321' })
+
+      expect(api.post).toHaveBeenCalledWith('/auth/2fa/recovery-codes', { code: '654321' })
+      expect(resultado.recoveryCodes).toEqual(['EEEEE-FFFFF'])
+      expect(resultado.token).toBe('jwt-nuevo')
     })
   })
 })

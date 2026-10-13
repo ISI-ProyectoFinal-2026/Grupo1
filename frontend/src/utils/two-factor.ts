@@ -1,4 +1,5 @@
-import { getApiErrorDetails } from '@/services/api'
+import { getApiErrorCode, getApiErrorDetails } from '@/services/api'
+import { TWO_FACTOR_LOCKED } from '@/types/auth'
 
 export type SecondFactorMode = 'totp' | 'recovery'
 
@@ -32,4 +33,19 @@ export function formatWaitMessage(seconds: number): string {
 
 export function formatResetDate(iso: string): string {
   return new Date(iso).toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' })
+}
+
+/**
+ * Texto de un error del segundo factor. El bloqueo por intentos fallidos
+ * explica cuánto esperar; el resto (código o contraseña incorrectos, límite por
+ * IP) ya viene redactado por el backend.
+ */
+export function getSecondFactorErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return 'Error inesperado, intentá de nuevo'
+
+  if (getApiErrorCode(error) === TWO_FACTOR_LOCKED) {
+    const waitSeconds = getRetryAfterSeconds(error)
+    if (waitSeconds) return `Demasiados intentos fallidos. ${formatWaitMessage(waitSeconds)}`
+  }
+  return error.message
 }

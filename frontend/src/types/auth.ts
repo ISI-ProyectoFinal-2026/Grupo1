@@ -64,6 +64,40 @@ export interface TwoFactorResetConfirmResponse extends MessageResponse {
   resetEffectiveAt: string;
 }
 
+export interface TwoFactorStatus {
+  enabled: boolean;
+  recoveryCodesRemaining: number;
+  // ISO: cuándo se completa un reinicio pendiente, o null si no hay.
+  resetEffectiveAt: string | null;
+}
+
+// Se devuelven una sola vez, al iniciar la activación: no se guardan en ningún lado.
+export interface TwoFactorSetup {
+  secret: string;
+  otpauthUri: string;
+}
+
+export interface TwoFactorEnableInput {
+  code: string;
+}
+
+export interface TwoFactorDisableInput {
+  password: string;
+  // TOTP de 6 dígitos o código de recuperación.
+  code: string;
+}
+
+export interface TwoFactorRegenerateInput {
+  // Solo TOTP: un código de recuperación no sirve para generar otros.
+  code: string;
+}
+
+// Enable y regenerate renuevan la sesión (suben tokenVersion) y entregan los
+// códigos de recuperación en claro, una única vez.
+export interface RecoveryCodesResponse extends AuthResponse {
+  recoveryCodes: string[];
+}
+
 export interface ApiErrorDetail {
   path: string;
   message: string;

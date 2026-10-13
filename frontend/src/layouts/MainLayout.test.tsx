@@ -83,6 +83,40 @@ describe('MainLayout', () => {
     expect(screen.queryByRole('link', { name: 'Moderación' })).not.toBeInTheDocument()
   })
 
+  // /me no se resuelve a proposito: si respondiera despues del afterEach, su
+  // setUser pisaria el store del test siguiente.
+  it('el email del usuario lleva a la pagina de seguridad de la cuenta', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout()
+
+    const enlace = await screen.findByRole('link', { name: /franco@patitas\.test/ })
+    expect(enlace).toHaveAttribute('href', '/account/security')
+    expect(enlace).toHaveAccessibleName('Seguridad de la cuenta: franco@patitas.test')
+    expect(enlace).toHaveTextContent('franco@patitas.test')
+  })
+
+  it('muestra el email del usuario que esta logueado, no uno fijo', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, email: 'ana@patitas.test' } })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout()
+
+    expect(await screen.findByRole('link', { name: /ana@patitas\.test/ })).toHaveAttribute(
+      'href',
+      '/account/security'
+    )
+    expect(screen.queryByRole('link', { name: /franco@patitas\.test/ })).not.toBeInTheDocument()
+  })
+
+  it('sin sesion no hay enlace a la pagina de seguridad', async () => {
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: /seguridad de la cuenta/i })).not.toBeInTheDocument()
+  })
+
   it('limpia el cache de queries al cerrar sesion (navegador compartido, #175)', async () => {
     useAuthStore.setState({ token: 'token', user: usuario })
     const { Wrapper, client } = createQueryWrapper()
