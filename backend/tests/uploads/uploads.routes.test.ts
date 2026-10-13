@@ -1,5 +1,5 @@
 import request from "supertest";
-import jwt from "jsonwebtoken";
+import { createTestUser } from "../helpers/users";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 const getSignedUrlMock = jest.fn();
@@ -34,10 +34,22 @@ describe("POST /api/uploads/presign", () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { app } = require("../../src/app");
 
-  // generated after requiring app.ts above, since that's what triggers
-  // dotenv/config to load JWT_SECRET from .env
-  const token = jwt.sign({ sub: "1", email: "uploads-test@example.com" }, process.env.JWT_SECRET!, {
-    expiresIn: "1h",
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { prisma } = require("../../src/db/client");
+
+  // requireAuth valida el token contra la base: el usuario tiene que existir.
+  let userId: number;
+  let token: string;
+
+  beforeAll(async () => {
+    const user = await createTestUser({ prefix: "uploads-test" });
+    userId = user.user.id;
+    token = user.token;
+  });
+
+  afterAll(async () => {
+    await prisma.user.delete({ where: { id: userId } });
+    await prisma.$disconnect();
   });
 
   test("responde 401 sin token de autenticación", async () => {

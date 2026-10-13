@@ -1,7 +1,7 @@
 import { AddressInfo } from "net";
 import { createServer, Server as HttpServer } from "http";
 import request from "supertest";
-import jwt from "jsonwebtoken";
+import { createTestUser } from "../helpers/users";
 import { io as ioc, Socket as ClientSocket } from "socket.io-client";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
@@ -20,25 +20,17 @@ describe("/api/chats", () => {
   const createdChatIds: number[] = [];
 
   beforeAll(async () => {
-    const userA = await prisma.user.create({
-      data: { email: `chats-routes-test-a-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    userAId = userA.id;
-    tokenA = jwt.sign({ sub: userA.id, email: userA.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const userA = await createTestUser({ prefix: "chats-routes-test-a" });
+    userAId = userA.user.id;
+    tokenA = userA.token;
 
-    const userB = await prisma.user.create({
-      data: { email: `chats-routes-test-b-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    userBId = userB.id;
-    tokenB = jwt.sign({ sub: userB.id, email: userB.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const userB = await createTestUser({ prefix: "chats-routes-test-b" });
+    userBId = userB.user.id;
+    tokenB = userB.token;
 
-    const outsider = await prisma.user.create({
-      data: { email: `chats-routes-test-outsider-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    outsiderId = outsider.id;
-    outsiderToken = jwt.sign({ sub: outsider.id, email: outsider.email }, process.env.JWT_SECRET!, {
-      expiresIn: "1h",
-    });
+    const outsider = await createTestUser({ prefix: "chats-routes-test-outsider" });
+    outsiderId = outsider.user.id;
+    outsiderToken = outsider.token;
 
     const report = await prisma.report.create({
       data: { userId: userAId, reportType: "lost", title: "Perro perdido" },

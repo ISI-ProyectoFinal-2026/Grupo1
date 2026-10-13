@@ -1,6 +1,6 @@
 import { test as base, type Page } from '@playwright/test'
 import * as api from './support/api.ts'
-import { closeDb, deleteUsersByEmail } from './support/db.ts'
+import { closeDb, deleteUsersByEmail, markEmailVerified } from './support/db.ts'
 import { E2E_EMAIL_DOMAIN, E2E_EMAIL_PREFIX, E2E_PASSWORD } from './support/env.ts'
 
 /** zustand persist key of frontend/src/stores/auth.store.ts */
@@ -9,7 +9,7 @@ const AUTH_STORAGE_KEY = 'patitas-auth'
 export interface E2EUsers {
   /** Unique, tracked email: whatever ends up registered with it is deleted after the test. */
   email(label: string): string
-  /** Registers + logs in through the API. */
+  /** Registers, marks the email verified (gated actions need it) and logs in through the API. */
   create(label: string): Promise<api.Session & { email: string }>
   /** Logs in again (e.g. after a role change: the role travels in the login response). */
   relogin(email: string): Promise<api.Session>
@@ -59,6 +59,7 @@ export const test = base.extend<Fixtures>({
       async create(label) {
         const email = users.email(label)
         await api.register(email, E2E_PASSWORD)
+        await markEmailVerified(email)
         return { ...(await api.login(email, E2E_PASSWORD)), email }
       },
       relogin: (email) => api.login(email, E2E_PASSWORD),

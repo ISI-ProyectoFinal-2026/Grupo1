@@ -15,17 +15,21 @@ const usuario: AuthUser = {
   fullName: 'Franco Marin',
   phone: null,
   role: 'usuario_regular',
+  emailVerifiedAt: '2026-09-01T10:00:00.000Z',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }
 
-function renderLogin(state?: { registered?: boolean }) {
+function renderLogin(
+  state?: { registered?: boolean; emailVerified?: boolean; passwordReset?: boolean }
+) {
   return render(
     <MemoryRouter initialEntries={[{ pathname: '/login', state }]}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<div>Feed de reportes</div>} />
         <Route path="/register" element={<div>Crear cuenta</div>} />
+        <Route path="/forgot-password" element={<div>Recuperar contraseña</div>} />
       </Routes>
     </MemoryRouter>
   )
@@ -61,13 +65,40 @@ describe('Login', () => {
   it('avisa que la cuenta fue creada cuando viene del registro', () => {
     renderLogin({ registered: true })
 
-    expect(screen.getByText('Cuenta creada, iniciá sesión')).toBeInTheDocument()
+    expect(screen.getByText('Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión')).toBeInTheDocument()
   })
 
   it('no muestra el aviso en un ingreso normal', () => {
     renderLogin()
 
-    expect(screen.queryByText('Cuenta creada, iniciá sesión')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión')).not.toBeInTheDocument()
+  })
+
+  it('ofrece recuperar la contraseña desde el login', async () => {
+    const user = userEvent.setup()
+    renderLogin()
+
+    await user.click(screen.getByRole('link', { name: '¿Olvidaste tu contraseña?' }))
+
+    expect(await screen.findByText('Recuperar contraseña')).toBeInTheDocument()
+  })
+
+  // Cada aviso llega por el state de la navegacion de la pagina anterior
+  // (verificar email, reset de contraseña): solo se muestra el que corresponde.
+  it('avisa que el email quedo verificado cuando viene de /verify-email', () => {
+    renderLogin({ emailVerified: true })
+
+    expect(screen.getByText('Tu email quedó verificado, iniciá sesión')).toBeInTheDocument()
+    expect(screen.queryByText('Tu contraseña se actualizó, iniciá sesión con la nueva')).toBeNull()
+  })
+
+  it('avisa que la contraseña se actualizo cuando viene de /reset-password', () => {
+    renderLogin({ passwordReset: true })
+
+    expect(
+      screen.getByText('Tu contraseña se actualizó, iniciá sesión con la nueva')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Tu email quedó verificado, iniciá sesión')).toBeNull()
   })
 
   it('guarda la sesion y redirige al feed cuando el login es correcto', async () => {

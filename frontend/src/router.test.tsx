@@ -17,6 +17,13 @@ vi.mock('@/layouts/MainLayout', () => ({
 vi.mock('@/pages/Home', () => ({ default: () => <div>pagina home</div> }))
 vi.mock('@/pages/auth/Login', () => ({ default: () => <div>pagina login</div> }))
 vi.mock('@/pages/auth/Register', () => ({ default: () => <div>pagina registro</div> }))
+vi.mock('@/pages/auth/VerifyEmailPage', () => ({ default: () => <div>pagina verificar email</div> }))
+vi.mock('@/pages/auth/ForgotPasswordPage', () => ({
+  default: () => <div>pagina olvide contraseña</div>,
+}))
+vi.mock('@/pages/auth/ResetPasswordPage', () => ({
+  default: () => <div>pagina nueva contraseña</div>,
+}))
 vi.mock('@/pages/reports/FeedPage', () => ({ default: () => <div>pagina feed</div> }))
 vi.mock('@/pages/reports/CreateReportPage', () => ({ default: () => <div>pagina crear reporte</div> }))
 vi.mock('@/pages/reports/ReportDetailPage', () => ({ default: () => <div>pagina detalle reporte</div> }))
@@ -40,6 +47,7 @@ const usuario: AuthUser = {
   fullName: null,
   phone: null,
   role: 'usuario_regular',
+  emailVerifiedAt: '2026-09-01T10:00:00.000Z',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }
@@ -58,7 +66,23 @@ describe('router: rutas publicas', () => {
   it.each([
     ['/login', 'pagina login'],
     ['/register', 'pagina registro'],
+    ['/verify-email', 'pagina verificar email'],
+    ['/forgot-password', 'pagina olvide contraseña'],
+    ['/reset-password', 'pagina nueva contraseña'],
   ])('%s se renderiza sin sesion', (ruta, texto) => {
+    renderRuta(ruta)
+
+    expect(screen.getByText(texto)).toBeInTheDocument()
+  })
+
+  // Un link de email se abre con o sin sesion: no pueden quedar detras de
+  // ProtectedRoute ni rebotar a un usuario ya logueado.
+  it.each([
+    ['/verify-email?token=abc', 'pagina verificar email'],
+    ['/reset-password?token=abc', 'pagina nueva contraseña'],
+  ])('%s tambien se renderiza con sesion', (ruta, texto) => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
+
     renderRuta(ruta)
 
     expect(screen.getByText(texto)).toBeInTheDocument()

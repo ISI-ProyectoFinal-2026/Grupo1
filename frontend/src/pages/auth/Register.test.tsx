@@ -15,6 +15,7 @@ const usuario: AuthUser = {
   fullName: null,
   phone: null,
   role: 'usuario_regular',
+  emailVerifiedAt: '2026-09-01T10:00:00.000Z',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }
@@ -105,7 +106,7 @@ describe('Register: envio', () => {
         password: 'Secreta123',
       })
     )
-    expect(await screen.findByText('Cuenta creada, iniciá sesión')).toBeInTheDocument()
+    expect(await screen.findByText('Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión')).toBeInTheDocument()
   })
 
   it('muestra los errores por campo que devuelve la API', async () => {
@@ -157,6 +158,6 @@ describe('Register: envio', () => {
     expect(await screen.findByRole('button', { name: 'Creando cuenta...' })).toBeDisabled()
 
     resolver(usuario)
-    await screen.findByText('Cuenta creada, iniciá sesión')
+    await screen.findByText('Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión')
   })
 })

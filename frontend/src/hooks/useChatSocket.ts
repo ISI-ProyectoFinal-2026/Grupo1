@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { io, type Socket } from 'socket.io-client'
 import { chatMessagesQueryKey } from '@/hooks/useChatMessagesQuery'
 import { chatsQueryKey } from '@/hooks/useChatsQuery'
+import { getApiErrorCode } from '@/services/api'
 import { sendMessage as sendMessageRest } from '@/services/chats.service'
 import { useAuthStore } from '@/stores/auth.store'
 import type {
@@ -32,6 +33,8 @@ export function useChatSocket(chatId: number | undefined) {
 
   const [status, setStatus] = useState<ChatConnectionStatus>('connecting')
   const [error, setError] = useState<string | null>(null)
+  // código de máquina del último error (p. ej. EMAIL_NOT_VERIFIED); la UI decide con él
+  const [errorCode, setErrorCode] = useState<string | null>(null)
   const [activeToken, setActiveToken] = useState(token)
 
   // reset al cambiar de sesion, sin pasar por un efecto
@@ -39,6 +42,7 @@ export function useChatSocket(chatId: number | undefined) {
     setActiveToken(token)
     setStatus('connecting')
     setError(null)
+    setErrorCode(null)
   }
 
   const socketRef = useRef<ChatClientSocket | null>(null)
@@ -64,6 +68,7 @@ export function useChatSocket(chatId: number | undefined) {
     function handleConnect() {
       setStatus('connected')
       setError(null)
+      setErrorCode(null)
 
       const activeChatId = chatIdRef.current
 
@@ -106,8 +111,9 @@ export function useChatSocket(chatId: number | undefined) {
       )
     }
 
-    function handleServerError(payload: { event: string; message: string }) {
+    function handleServerError(payload: { event: string; message: string; code?: string }) {
       setError(payload.message)
+      setErrorCode(payload.code ?? null)
     }
 
     socket.on('connect', handleConnect)
@@ -135,7 +141,10 @@ export function useChatSocket(chatId: number | undefined) {
     if (!socket || !chatId || !isConnected) return
 
     socket.emit('join_chat', { chatId }, (response) => {
-      if (!response.ok) setError(response.error)
+      if (!response.ok) {
+        setError(response.error)
+        setErrorCode(response.code ?? null)
+      }
     })
 
     return () => {
@@ -154,20 +163,31 @@ export function useChatSocket(chatId: number | undefined) {
       const socket = socketRef.current
       if (!socket?.connected) {
         // sin socket el mensaje igual se persiste por REST
-        const message = await sendMessageRest(chatId, input)
-        queryClient.setQueryData<MessageDTO[]>(chatMessagesQueryKey(chatId), (current) =>
-          appendMessage(current, message)
-        )
-        return message
+        try {
+          const message = await sendMessageRest(chatId, input)
+          queryClient.setQueryData<MessageDTO[]>(chatMessagesQueryKey(chatId), (current) =>
+            appendMessage(current, message)
+          )
+          setError(null)
+          setErrorCode(null)
+          return message
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'No se pudo enviar el mensaje')
+          setErrorCode(getApiErrorCode(err) ?? null)
+          throw err
+        }
       }
 
       return new Promise<MessageDTO>((resolve, reject) => {
         socket.emit('send_message', { chatId, ...input }, (response) => {
           if (!response.ok) {
             setError(response.error)
-            reject(new Error(response.error))
+            setErrorCode(response.code ?? null)
+            reject(Object.assign(new Error(response.error), { code: response.code }))
             return
           }
+          setError(null)
+          setErrorCode(null)
           queryClient.setQueryData<MessageDTO[]>(chatMessagesQueryKey(chatId), (current) =>
             appendMessage(current, response.data)
           )
@@ -179,5 +199,5 @@ export function useChatSocket(chatId: number | undefined) {
   )
 
   // sin sesion no hay socket posible
-  return { status: token ? status : 'disconnected', error, sendMessage }
+  return { status: token ? status : 'disconnected', error, errorCode, sendMessage }
 }

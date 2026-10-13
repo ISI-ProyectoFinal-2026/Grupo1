@@ -4,15 +4,15 @@ import { Server, Socket } from "socket.io";
 import { AppError } from "../errors/app-error";
 import * as chatsService from "../services/chats.service";
 import * as notificationsService from "../services/notifications.service";
-import { verifyAccessToken } from "../utils/jwt";
+import { assertEmailVerified, authenticateAccessToken, loadAuthUser } from "../services/session.service";
 import { joinChatSchema, leaveChatSchema, sendMessageSchema } from "../validators/chat-socket.validator";
 
-type AckResponse<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
+type AckResponse<T = undefined> = { ok: true; data: T } | { ok: false; error: string; code?: string };
 type Ack<T = undefined> = (response: AckResponse<T>) => void;
 
 interface ServerToClientEvents {
   receive_message: (message: Message) => void;
-  error: (payload: { event: string; message: string }) => void;
+  error: (payload: { event: string; message: string; code?: string }) => void;
 }
 
 interface ClientToServerEvents {
@@ -45,14 +45,15 @@ export function getChatIO(): ChatServer | undefined {
   return chatIO;
 }
 
-function toErrorMessage(error: unknown): string {
+/** Traduce un error a lo que viaja por el ack y el evento `error`; el `code` (si hay) es para que el cliente reaccione sin parsear el mensaje. */
+function toAckError(error: unknown): { error: string; code?: string } {
   if (error instanceof AppError) {
-    return error.message;
+    return error.code ? { error: error.message, code: error.code } : { error: error.message };
   }
   if (error instanceof Error) {
-    return "Datos inválidos";
+    return { error: "Datos inválidos" };
   }
-  return "Error inesperado";
+  return { error: "Error inesperado" };
 }
 
 function extractToken(socket: ChatSocket): string | undefined {
@@ -87,6 +88,9 @@ async function handleSendMessage(
 ): Promise<void> {
   try {
     const { chatId, content, imageUrl } = sendMessageSchema.parse(payload);
+    // Lectura fresca por envío: el socket autentica una sola vez al conectar, así
+    // que verificar el email a mitad de sesión tiene efecto sin reconectar.
+    assertEmailVerified(await loadAuthUser(socket.data.userId));
     const chat = await chatsService.assertParticipant(chatId, socket.data.userId);
     const message = await chatsService.createMessage(chatId, socket.data.userId, { content, imageUrl });
 
@@ -100,9 +104,9 @@ async function handleSendMessage(
     io.to(chatRoom(chatId)).emit("receive_message", message);
     ack?.({ ok: true, data: message });
   } catch (error) {
-    const message = toErrorMessage(error);
-    ack?.({ ok: false, error: message });
-    socket.emit("error", { event: "send_message", message });
+    const { error: message, code } = toAckError(error);
+    ack?.({ ok: false, error: message, ...(code ? { code } : {}) });
+    socket.emit("error", { event: "send_message", message, ...(code ? { code } : {}) });
   }
 }
 
@@ -112,7 +116,9 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
   });
   chatIO = io;
 
-  io.use((socket, next) => {
+  // Misma validación de sesión que requireAuth: un token de un usuario borrado
+  // o de una sesión cerrada (ej. tras restablecer la contraseña) no conecta.
+  io.use(async (socket, next) => {
     const token = extractToken(socket);
     if (!token) {
       next(new Error("Se requiere un token de autenticación"));
@@ -120,11 +126,16 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
     }
 
     try {
-      const payload = verifyAccessToken(token);
-      socket.data.userId = payload.sub;
+      const authUser = await authenticateAccessToken(token);
+      socket.data.userId = authUser.id;
       next();
-    } catch {
-      next(new Error("Token inválido"));
+    } catch (error) {
+      if (error instanceof AppError) {
+        next(new Error(error.message));
+        return;
+      }
+      console.error("[chat.socket] no se pudo validar la sesión del handshake:", error);
+      next(new Error("Error inesperado"));
     }
   });
 
@@ -136,7 +147,7 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
         socket.join(chatRoom(chatId));
         ack?.({ ok: true, data: undefined });
       } catch (error) {
-        const message = toErrorMessage(error);
+        const { error: message } = toAckError(error);
         ack?.({ ok: false, error: message });
         socket.emit("error", { event: "join_chat", message });
       }
@@ -148,7 +159,7 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
         socket.leave(chatRoom(chatId));
         ack?.({ ok: true, data: undefined });
       } catch (error) {
-        const message = toErrorMessage(error);
+        const { error: message } = toAckError(error);
         ack?.({ ok: false, error: message });
         socket.emit("error", { event: "leave_chat", message });
       }

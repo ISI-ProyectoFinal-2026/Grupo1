@@ -7,7 +7,8 @@ import {
   uploadToR2,
   type UploadContentType,
 } from "@/services/uploads.service";
-import ErrorMessage from "@/components/ui/ErrorMessage";
+import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
+import { getApiErrorCode } from "@/services/api";
 
 interface ImageUploaderProps {
   /**
@@ -16,7 +17,8 @@ interface ImageUploaderProps {
    * or not requested.
    */
   onSuccess: (publicUrl: string, rejection: string | null) => void;
-  onError: (error: string) => void;
+  /** `code` is the backend machine code (e.g. EMAIL_NOT_VERIFIED) when there is one. */
+  onError: (error: string, code?: string) => void;
   /**
    * True from the moment a file is picked until its upload (and screening, when
    * requested) finishes, so the parent can hold back actions that need the result.
@@ -48,6 +50,7 @@ export default function ImageUploader({
   const [isLoading, setIsLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_SIZE_MB = Math.floor(MAX_UPLOAD_BYTES / 1_000_000);
@@ -57,6 +60,7 @@ export default function ImageUploader({
     if (!file) return;
 
     setError(null);
+    setErrorCode(null);
 
     if (!ALLOWED_UPLOAD_TYPES.includes(file.type as UploadContentType)) {
       setError("Solo se permiten JPG, PNG o WebP");
@@ -86,8 +90,10 @@ export default function ImageUploader({
       setPreview(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al subir imagen";
+      const code = getApiErrorCode(err);
       setError(message);
-      onError(message);
+      setErrorCode(code ?? null);
+      onError(message, code);
       URL.revokeObjectURL(previewUrl);
       setPreview(null);
     } finally {
@@ -147,7 +153,7 @@ export default function ImageUploader({
           />
         </label>
       </div>
-      {error && <ErrorMessage message={error} />}
+      {error && <ActionErrorMessage message={error} code={errorCode} />}
     </div>
   );
 }

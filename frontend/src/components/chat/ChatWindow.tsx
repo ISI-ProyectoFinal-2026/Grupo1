@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/ui/Button'
+import EmailNotVerifiedNotice from '@/components/auth/EmailNotVerifiedNotice'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import Spinner from '@/components/ui/Spinner'
+import { getApiErrorCode } from '@/services/api'
+import { EMAIL_NOT_VERIFIED } from '@/types/auth'
 import {
   ALLOWED_UPLOAD_TYPES,
   MAX_UPLOAD_BYTES,
@@ -20,6 +23,8 @@ interface ChatWindowProps {
   isLoading: boolean
   loadError: string | null
   sendError: string | null
+  /** Código de máquina de `sendError` (p. ej. EMAIL_NOT_VERIFIED). */
+  sendErrorCode?: string | null
   onSend: (input: SendMessageInput) => Promise<void>
 }
 
@@ -48,15 +53,20 @@ function ChatWindow({
   isLoading,
   loadError,
   sendError,
+  sendErrorCode = null,
   onSend,
 }: ChatWindowProps) {
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [imageError, setImageError] = useState<string | null>(null)
+  const [imageErrorCode, setImageErrorCode] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const isUnauthorized = connectionStatus === 'unauthorized'
+  // Un solo aviso aunque lo disparen el envío y la subida de la imagen a la vez.
+  const needsVerification =
+    sendErrorCode === EMAIL_NOT_VERIFIED || imageErrorCode === EMAIL_NOT_VERIFIED
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' })
@@ -84,6 +94,7 @@ function ChatWindow({
     if (!file) return
 
     setImageError(null)
+    setImageErrorCode(null)
 
     if (!ALLOWED_UPLOAD_TYPES.includes(file.type as UploadContentType)) {
       setImageError('Solo se permiten imágenes JPG, PNG o WebP')
@@ -101,6 +112,7 @@ function ChatWindow({
       await onSend({ imageUrl: presign.publicUrl })
     } catch (err) {
       setImageError(err instanceof Error ? err.message : 'No se pudo enviar la imagen')
+      setImageErrorCode(getApiErrorCode(err) ?? null)
     } finally {
       setIsUploadingImage(false)
     }
@@ -153,8 +165,14 @@ function ChatWindow({
         </div>
       ) : (
       <form onSubmit={handleSubmit} className='border-t border-gray-200 px-4 py-3'>
-        {sendError && <ErrorMessage message={sendError} className='mb-2' />}
-        {imageError && <ErrorMessage message={imageError} className='mb-2' />}
+        {needsVerification ? (
+          <EmailNotVerifiedNotice className='mb-2' />
+        ) : (
+          <>
+            {sendError && <ErrorMessage message={sendError} className='mb-2' />}
+            {imageError && <ErrorMessage message={imageError} className='mb-2' />}
+          </>
+        )}
         <div className='flex items-center gap-2'>
           <label htmlFor='chat-image-input' className='sr-only'>
             Adjuntar imagen

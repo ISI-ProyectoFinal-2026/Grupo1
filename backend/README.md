@@ -16,10 +16,24 @@ cp .env.example .env
 | `JWT_SECRET` / `JWT_EXPIRY` | sí | Firma de los tokens de sesión |
 | `INTERNAL_API_KEY` | **sí** | Clave compartida con el Backend IA. **Mismo valor que en `../backend-ia/.env`** (ver abajo) |
 | `AI_SERVICE_URL` | no | Backend IA. Si no está seteada, el trigger de generación de embedding no hace nada (no rompe la creación del reporte, ver `src/services/matching.service.ts`) |
-| `FRONTEND_URL` | no | Origen permitido por CORS |
+| `FRONTEND_URL` | no | Origen permitido por CORS y base de los enlaces `/verify-email` y `/reset-password` de los emails (default `http://localhost:5173`) |
 | `TRUST_PROXY` | no | Cantidad de proxies delante del backend (ej. `1` detrás del proxy de Vite, un túnel o el load balancer). Sin esto, los rate limiters ven la IP del proxy y el límite pasa a ser global. Vacío/`false` = no confiar en ningún proxy. `true` se rechaza a propósito: confiaría en un `X-Forwarded-For` que el cliente puede falsificar |
 | `PORT` | no | Default `3001` |
+| `SMTP_HOST` | en producción | Servidor SMTP. Vacío en desarrollo/test = los emails se imprimen en consola. Vacío en producción = reenviar verificación y recuperar contraseña responden `503` `MAIL_NOT_CONFIGURED` |
+| `SMTP_PORT` / `SMTP_SECURE` | no | Puerto (default `587`, STARTTLS) y `true` solo para TLS directo (puerto `465`) |
+| `SMTP_USER` / `SMTP_PASS` | no | Credenciales del servidor SMTP, si las exige |
+| `MAIL_FROM` | no | Remitente que ven los usuarios (default `PATITAS <no-reply@patitas.local>`) |
 | `R2_*` | no | Upload de imágenes. Si faltan, `POST /api/uploads/presign` responde `503` diciendo cuál falta |
+
+### Emails (verificación de cuenta y recuperación de contraseña)
+
+El backend manda dos tipos de email con un enlace de un solo uso: verificar el email (24 h) y restablecer la contraseña (30 min). Los enlaces apuntan a `FRONTEND_URL`.
+
+- **Desarrollo** (`NODE_ENV` distinto de `production`) sin `SMTP_HOST`: el email se imprime en la consola del backend, con el enlace incluido. No hace falta ningún servidor de correo. Con `NODE_ENV=test` no se imprime nada.
+- **Con `SMTP_HOST`**: se envía por SMTP en cualquier entorno.
+- **Producción sin `SMTP_HOST`**: `POST /api/auth/verify-email/resend` y `POST /api/auth/forgot-password` responden `503` con código `MAIL_NOT_CONFIGURED` y `details.missingEnvVars: ["SMTP_HOST"]`; el reenvío no gasta token ni cooldown. El registro igual responde `201` (el error se loguea) para no bloquear el alta.
+
+El reenvío de verificación tiene un cooldown de 60 s por usuario (`429` `RESEND_COOLDOWN`, con `details.retryAfterSeconds`).
 
 ### `INTERNAL_API_KEY`
 

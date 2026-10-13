@@ -25,7 +25,7 @@ vi.mock('axios', () => ({
   },
 }))
 
-const { getApiErrorDetails, getApiErrorStatus } = await import('@/services/api')
+const { getApiErrorCode, getApiErrorDetails, getApiErrorStatus } = await import('@/services/api')
 const { useAuthStore } = await import('@/stores/auth.store')
 
 const aplicarRequest = capturado.request[0]
@@ -45,6 +45,7 @@ const usuario: AuthUser = {
   fullName: null,
   phone: null,
   role: 'usuario_regular',
+  emailVerifiedAt: '2026-09-01T10:00:00.000Z',
   createdAt: '2026-09-01T10:00:00.000Z',
   updatedAt: '2026-09-01T10:00:00.000Z',
 }
@@ -130,6 +131,47 @@ describe('interceptor de response', () => {
 
     expect(locationFalsa.href).toBe('/reports/5')
   })
+
+  // El codigo de maquina deja decidir la UI sin parsear mensajes en español.
+  it('conserva el code del backend para decidir la UI sin parsear mensajes', async () => {
+    const error = errorAxios(403, {
+      error: { message: 'Verificá tu email', code: 'EMAIL_NOT_VERIFIED' },
+    })
+
+    const rechazado = await alFallar(error).catch((e: unknown) => e)
+
+    expect(getApiErrorCode(rechazado)).toBe('EMAIL_NOT_VERIFIED')
+    expect(getApiErrorStatus(rechazado)).toBe(403)
+  })
+
+  // Un 403 es "estas autenticado pero no podes": cerrar la sesion mandaria al
+  // usuario sin verificar a un login que no le resuelve nada.
+  it('no cierra la sesion ni redirige ante un 403', async () => {
+    useAuthStore.getState().setAuth('jwt-vigente', usuario)
+
+    await alFallar(
+      errorAxios(403, { error: { message: 'Verificá tu email', code: 'EMAIL_NOT_VERIFIED' } })
+    ).catch(() => {})
+
+    expect(useAuthStore.getState().token).toBe('jwt-vigente')
+    expect(locationFalsa.href).toBe('/reports/5')
+  })
+
+  // En los flujos de link (verificar, olvide, reset) una sesion vieja no debe
+  // arrancar la pagina hacia /login: el 401 igual limpia la sesion.
+  it.each(['/verify-email', '/forgot-password', '/reset-password'])(
+    'cierra la sesion pero no redirige ante un 401 en %s',
+    async (ruta) => {
+      locationFalsa.pathname = ruta
+      locationFalsa.href = ruta
+      useAuthStore.getState().setAuth('jwt-vencido', usuario)
+
+      await alFallar(errorAxios(401, { error: { message: 'Token vencido' } })).catch(() => {})
+
+      expect(useAuthStore.getState().token).toBeNull()
+      expect(locationFalsa.href).toBe(ruta)
+    }
+  )
 })
 
 describe('lectores de error', () => {
@@ -141,6 +183,11 @@ describe('lectores de error', () => {
   it('devuelve undefined si el error no tiene status', () => {
     expect(getApiErrorStatus(new Error('otro error'))).toBeUndefined()
     expect(getApiErrorStatus('no es un error')).toBeUndefined()
+  })
+
+  it('devuelve undefined si el error no trae code', () => {
+    expect(getApiErrorCode(new Error('otro error'))).toBeUndefined()
+    expect(getApiErrorCode(null)).toBeUndefined()
   })
 
   it('devuelve undefined si el error no trae details', () => {

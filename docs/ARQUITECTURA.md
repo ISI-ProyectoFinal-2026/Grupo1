@@ -244,9 +244,28 @@ CREATE TABLE users (
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(255),
   phone VARCHAR(20),
+  email_verified_at TIMESTAMP,              -- null = email sin verificar
+  token_version INT NOT NULL DEFAULT 0,     -- viaja en el JWT como `tv`; subirla cierra todas las sesiones
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+```
+
+#### `auth_tokens`
+```sql
+-- Tokens de un solo uso de los links que salen por mail. Solo se guarda el sha256.
+CREATE TYPE auth_token_type AS ENUM ('email_verification', 'password_reset');
+
+CREATE TABLE auth_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type auth_token_type NOT NULL,
+  token_hash TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP,                        -- consumido o invalidado por una reemisión
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX ON auth_tokens (user_id, type);
 ```
 
 #### `pets`
@@ -371,9 +390,28 @@ CREATE TABLE notifications (
 ```http
 POST /api/auth/register
 POST /api/auth/login
+GET  /api/auth/me                    (requiere sesión)
+POST /api/auth/verify-email          { token }
+POST /api/auth/verify-email/resend   (requiere sesión; 409 si ya está verificado)
+POST /api/auth/forgot-password       { email } → siempre 200 con el mismo mensaje
+POST /api/auth/reset-password        { token, password } → cierra todas las sesiones
 POST /api/auth/logout
 POST /api/auth/refresh
 ```
+
+> Implementados hoy: register, login, me, verify-email (+resend), forgot-password y reset-password.
+> Los links de los mails apuntan a `${FRONTEND_URL}/verify-email?token=…` y
+> `${FRONTEND_URL}/reset-password?token=…` (vencen a las 24 h y a los 30 min).
+> Un email sin verificar no bloquea el login ni la lectura. Solo exigen el email
+> verificado (403 con `error.code = "EMAIL_NOT_VERIFIED"`, siempre después del 401
+> de sesión): crear reportes (`POST /api/reports`), subir imágenes
+> (`POST /api/uploads/presign` y `/analyze`) y chatear (`POST /api/chats`,
+> `POST /api/chats/:id/messages` y el evento de socket `send_message`).
+> No se gatean los flags, los comercios (registrar uno incluido), las mascotas ni
+> los contactos a comercios. En el socket el handshake y `join_chat` solo piden
+> sesión; `send_message` relee el estado de verificación de la base en cada envío
+> y responde por el ack `{ ok: false, error, code: "EMAIL_NOT_VERIFIED" }`, así
+> verificar a mitad de sesión funciona sin reconectar.
 
 ### Usuarios
 ```http
@@ -609,7 +647,18 @@ R2_ENDPOINT=https://your-account.r2.cloudflarestorage.com
 # Backend IA (nombre real de la variable en backend/src/services/matching.service.ts)
 AI_SERVICE_URL=http://ia-backend:8000
 
+# Mail (verificación de email y reset de contraseña, vía SMTP con cualquier proveedor).
+# Sin SMTP_HOST los mails no se envían: se imprimen en la consola del backend
+# (útil en desarrollo para copiar los links; bajo NODE_ENV=test no se imprimen).
+SMTP_HOST=smtp.your-provider.com
+SMTP_PORT=587
+SMTP_SECURE=false          # true para el puerto 465 (TLS directo)
+SMTP_USER=your-smtp-user   # opcional: sin usuario se conecta sin autenticación
+SMTP_PASS=your-smtp-password
+MAIL_FROM="PATITAS <no-reply@patitas.app>"
+
 # Other
+# También es la base de los links que salen por mail (/verify-email, /reset-password).
 FRONTEND_URL=https://patitas.app
 ```
 

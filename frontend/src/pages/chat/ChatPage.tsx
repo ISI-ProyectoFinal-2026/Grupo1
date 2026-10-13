@@ -24,7 +24,7 @@ function ChatPage() {
 
   const chatsQuery = useChatsQuery()
   const messagesQuery = useChatMessagesQuery(chatId)
-  const { status, error: socketError, sendMessage } = useChatSocket(chatId)
+  const { status, error: socketError, errorCode: socketErrorCode, sendMessage } = useChatSocket(chatId)
 
   async function handleSend(input: SendMessageInput) {
     await sendMessage(input)
@@ -64,6 +64,7 @@ function ChatPage() {
             isLoading={messagesQuery.isPending}
             loadError={toErrorMessage(messagesQuery.error)}
             sendError={socketError}
+            sendErrorCode={socketErrorCode}
             onSend={handleSend}
           />
         ) : (

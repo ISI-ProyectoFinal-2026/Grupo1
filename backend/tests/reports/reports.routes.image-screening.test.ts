@@ -1,15 +1,26 @@
 import request from "supertest";
-import jwt from "jsonwebtoken";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
+import { createTestUser } from "../helpers/users";
 import * as matchingService from "../../src/services/matching.service";
 
 describe("/api/reports image screening", () => {
-  const token = jwt.sign({ sub: "1", email: "reports-screening-test@example.com" }, process.env.JWT_SECRET!, {
-    expiresIn: "1h",
-  });
+  // requireAuth valida el token contra la base: el usuario tiene que existir.
+  let userId: number;
+  let token: string;
 
   const originalEnv = { ...process.env };
+
+  beforeAll(async () => {
+    const created = await createTestUser({ prefix: "reports-screening-test" });
+    userId = created.user.id;
+    token = created.token;
+  });
+
+  afterAll(async () => {
+    await prisma.user.delete({ where: { id: userId } });
+    await prisma.$disconnect();
+  });
 
   beforeEach(() => {
     process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
@@ -41,16 +52,12 @@ describe("/api/reports image screening", () => {
     expect(transactionSpy).not.toHaveBeenCalled();
   });
 
-  const ownerToken = jwt.sign({ sub: 1, email: "reports-screening-test@example.com" }, process.env.JWT_SECRET!, {
-    expiresIn: "1h",
-  });
-
   test("PUT responds 422 and updates nothing when the new image has no animal", async () => {
     jest.spyOn(matchingService, "analyzeImage").mockResolvedValue("no_animal");
     jest.spyOn(prisma, "$queryRaw").mockResolvedValue([
       {
         id: 5,
-        userId: 1,
+        userId,
         petId: null,
         reportType: "lost",
         status: "published",
@@ -70,8 +77,8 @@ describe("/api/reports image screening", () => {
 
     const res = await request(app)
       .put("/api/reports/5")
-      // Numeric sub, like the real tokens: update() compares it with the owner id.
-      .set("Authorization", `Bearer ${ownerToken}`)
+      // The token's user is the report owner: update() compares it with the owner id.
+      .set("Authorization", `Bearer ${token}`)
       .send({ imageUrl: "https://pub-test.r2.dev/pets/landscape.jpg" });
 
     expect(res.status).toBe(422);

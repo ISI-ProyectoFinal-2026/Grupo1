@@ -5,6 +5,8 @@ import { optionalAuth, requireAuth } from "../middlewares/auth.middleware";
 export const businessesRouter = Router();
 
 // Las rutas /me* van antes que /:id: si no, Express captura "me" como id.
+// Registrar un comercio no exige el email verificado: el gate solo cubre crear
+// reportes, subir imágenes y chatear.
 businessesRouter.post("/", requireAuth, businessesController.create);
 businessesRouter.get("/me", requireAuth, businessesController.getMe);
 businessesRouter.put("/me", requireAuth, businessesController.updateMe);

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatWindow from '@/components/chat/ChatWindow'
 import { getPresignedUrl, uploadToR2 } from '@/services/uploads.service'
+import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ChatConnectionStatus, MessageDTO } from '@/types/chat.types'
 
 vi.mock('@/services/uploads.service', async (importOriginal) => {
@@ -29,19 +30,22 @@ function mensaje(overrides: Partial<MessageDTO> = {}): MessageDTO {
 
 function renderWindow(props: Partial<Parameters<typeof ChatWindow>[0]> = {}) {
   const onSend = vi.fn().mockResolvedValue(undefined)
+  const { Wrapper } = createQueryWrapper()
   render(
-    <MemoryRouter>
-      <ChatWindow
-        messages={[mensaje()]}
-        currentUserId={USUARIO_ACTUAL}
-        connectionStatus='connected'
-        isLoading={false}
-        loadError={null}
-        sendError={null}
-        onSend={onSend}
-        {...props}
-      />
-    </MemoryRouter>
+    <Wrapper>
+      <MemoryRouter>
+        <ChatWindow
+          messages={[mensaje()]}
+          currentUserId={USUARIO_ACTUAL}
+          connectionStatus='connected'
+          isLoading={false}
+          loadError={null}
+          sendError={null}
+          onSend={onSend}
+          {...props}
+        />
+      </MemoryRouter>
+    </Wrapper>
   )
   return { onSend: props.onSend ?? onSend }
 }
@@ -239,5 +243,58 @@ describe('ChatWindow: envio de imagenes', () => {
     await user.upload(screen.getByLabelText('Adjuntar imagen', { selector: 'input' }), archivo())
 
     expect(await screen.findByText('No se pudo subir la imagen (HTTP 403)')).toBeInTheDocument()
+  })
+})
+
+describe('ChatWindow: email sin verificar (EMAIL_NOT_VERIFIED)', () => {
+  it('con sendErrorCode muestra el aviso con reenvio en lugar del mensaje crudo', () => {
+    renderWindow({ sendError: 'Verificá tu email para continuar', sendErrorCode: 'EMAIL_NOT_VERIFIED' })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Verificá tu email para poder hacer esto')
+    expect(screen.getByRole('button', { name: 'Reenviar email de verificación' })).toBeEnabled()
+    expect(screen.queryByText('Verificá tu email para continuar')).not.toBeInTheDocument()
+  })
+
+  // Los botones quedan habilitados: el borrador y el boton de enviar siguen
+  // disponibles para reintentar apenas se verifique.
+  it('el borrador se conserva y Enviar sigue habilitado', async () => {
+    const onSend = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error('Verificá tu email'), { code: 'EMAIL_NOT_VERIFIED' })
+      )
+    const user = userEvent.setup()
+    renderWindow({ onSend, sendError: 'Verificá tu email', sendErrorCode: 'EMAIL_NOT_VERIFIED' })
+
+    await user.type(screen.getByLabelText('Mensaje'), 'no va a salir')
+    await user.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    await waitFor(() => expect(onSend).toHaveBeenCalled())
+    expect(screen.getByLabelText('Mensaje')).toHaveValue('no va a salir')
+    expect(screen.getByRole('button', { name: 'Enviar' })).toBeEnabled()
+  })
+
+  it('un error sin code se sigue mostrando como texto', () => {
+    renderWindow({ sendError: 'No sos participante de este chat', sendErrorCode: null })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('No sos participante de este chat')
+    expect(screen.queryByRole('button', { name: 'Reenviar email de verificación' })).toBeNull()
+  })
+
+  it('si el presign de la imagen da 403 muestra un solo aviso', async () => {
+    vi.mocked(getPresignedUrl).mockRejectedValue(
+      Object.assign(new Error('Verificá tu email para continuar'), {
+        status: 403,
+        code: 'EMAIL_NOT_VERIFIED',
+      })
+    )
+    const file = new File(['x'], 'foto.jpg', { type: 'image/jpeg' })
+    const user = userEvent.setup()
+    renderWindow({ sendError: 'Verificá tu email para continuar', sendErrorCode: 'EMAIL_NOT_VERIFIED' })
+
+    await user.upload(screen.getByLabelText('Adjuntar imagen', { selector: 'input' }), file)
+
+    await waitFor(() => expect(getPresignedUrl).toHaveBeenCalled())
+    expect(await screen.findAllByRole('button', { name: 'Reenviar email de verificación' })).toHaveLength(1)
   })
 })

@@ -22,6 +22,8 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
 
   const auth = (user: E2EUser) => ({ Authorization: `Bearer ${user.token}` });
 
+  // Cada registerAndLogin hace bcrypt (12 rondas) dos veces: con 4 usuarios y las
+  // suites corriendo en paralelo el hook supera los 5s por defecto de Jest.
   beforeAll(async () => {
     owner = await ctx.registerAndLogin("owner");
     reporter = await ctx.registerAndLogin("reporter");
@@ -37,7 +39,7 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(res.body.status).toBe("published");
     reportId = res.body.id;
     ctx.trackReport(reportId);
-  });
+  }, 30_000);
 
   afterAll(async () => {
     await ctx.cleanup();

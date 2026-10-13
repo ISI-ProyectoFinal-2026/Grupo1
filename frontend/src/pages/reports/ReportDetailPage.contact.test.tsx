@@ -81,6 +81,7 @@ describe('ReportDetailPage - contactar al autor', () => {
         fullName: null,
         phone: null,
         role: 'usuario_regular',
+        emailVerifiedAt: '2026-09-01T10:00:00.000Z',
         createdAt: '2026-09-01T10:00:00.000Z',
         updatedAt: '2026-09-01T10:00:00.000Z',
       },
@@ -125,5 +126,48 @@ describe('ReportDetailPage - contactar al autor', () => {
     expect(await screen.findByText(/no se pudo abrir el chat/i)).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('Chat 99')).not.toBeInTheDocument())
     expect(chatsService.listChats).not.toHaveBeenCalled()
+  })
+})
+
+describe('ReportDetailPage - contactar al autor sin email verificado', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte())
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+    useAuthStore.setState({
+      token: 'token',
+      user: {
+        id: VIEWER_ID,
+        email: 'viewer@example.com',
+        fullName: null,
+        phone: null,
+        role: 'usuario_regular',
+        emailVerifiedAt: null,
+        createdAt: '2026-09-01T10:00:00.000Z',
+        updatedAt: '2026-09-01T10:00:00.000Z',
+      },
+    })
+  })
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
+  it('el 403 EMAIL_NOT_VERIFIED muestra el aviso con reenvio y el boton sigue habilitado', async () => {
+    vi.mocked(chatsService.createChat).mockRejectedValue(
+      Object.assign(new Error('Verificá tu email para continuar'), {
+        status: 403,
+        code: 'EMAIL_NOT_VERIFIED',
+      })
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: /contactar al autor/i }))
+
+    expect(await screen.findByText(/Verificá tu email para poder hacer esto/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reenviar email de verificación' })).toBeEnabled()
+    expect(screen.queryByText(/no se pudo abrir el chat/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /contactar al autor/i })).toBeEnabled()
   })
 })

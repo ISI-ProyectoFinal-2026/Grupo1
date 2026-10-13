@@ -6,9 +6,11 @@ import MainLayout from '@/layouts/MainLayout'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import { useAuthStore } from '@/stores/auth.store'
 import * as notificationsService from '@/services/notifications.service'
+import * as authService from '@/services/auth.service'
 import type { AuthUser } from '@/types/auth'
 
 vi.mock('@/services/notifications.service')
+vi.mock('@/services/auth.service')
 
 const usuario: AuthUser = {
   id: 7,
@@ -16,6 +18,7 @@ const usuario: AuthUser = {
   fullName: 'Franco',
   phone: null,
   role: 'usuario_regular',
+  emailVerifiedAt: '2026-01-01T00:00:00.000Z',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
@@ -35,6 +38,7 @@ describe('MainLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(notificationsService.listNotifications).mockResolvedValue([])
+    vi.mocked(authService.getMe).mockResolvedValue(usuario)
   })
 
   afterEach(() => {
@@ -95,5 +99,74 @@ describe('MainLayout', () => {
     await userEvent.setup().click(await screen.findByRole('button', { name: /cerrar sesión/i }))
 
     expect(clearSpy).toHaveBeenCalled()
+  })
+
+  // Cubre al usuario que verificó desde otro dispositivo: el store persistido
+  // dice "sin verificar" hasta que /me lo corrige al abrir la app.
+  it('refresca el usuario contra /auth/me al montar con sesion', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, emailVerifiedAt: null } })
+
+    renderLayout()
+
+    await waitFor(() =>
+      expect(useAuthStore.getState().user?.emailVerifiedAt).toBe('2026-01-01T00:00:00.000Z')
+    )
+    expect(authService.getMe).toHaveBeenCalledTimes(1)
+  })
+
+  it('no consulta /auth/me sin sesion', async () => {
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(authService.getMe).not.toHaveBeenCalled()
+  })
+
+  it('muestra el banner de verificacion a un usuario sin verificar', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, emailVerifiedAt: null } })
+    vi.mocked(authService.getMe).mockResolvedValue({ ...usuario, emailVerifiedAt: null })
+
+    renderLayout()
+
+    expect(
+      await screen.findByRole('region', { name: 'Verificación de email' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reenviar email de verificación' })).toBeEnabled()
+  })
+
+  // Verificó desde otro dispositivo: /me corrige el store y el banner se va solo.
+  it('esconde el banner cuando /auth/me confirma que ya esta verificado', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, emailVerifiedAt: null } })
+    let resolverMe: (user: AuthUser) => void = () => {}
+    vi.mocked(authService.getMe).mockReturnValue(
+      new Promise((resolve) => {
+        resolverMe = resolve
+      })
+    )
+
+    renderLayout()
+    expect(screen.getByRole('region', { name: 'Verificación de email' })).toBeInTheDocument()
+
+    resolverMe({ ...usuario, emailVerifiedAt: '2026-01-01T00:00:00.000Z' })
+
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Verificación de email' })).not.toBeInTheDocument()
+    )
+    expect(useAuthStore.getState().user?.emailVerifiedAt).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('no muestra el banner a un usuario verificado', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('region', { name: 'Verificación de email' })).not.toBeInTheDocument()
+  })
+
+  it('no muestra el banner sin sesion', async () => {
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('region', { name: 'Verificación de email' })).not.toBeInTheDocument()
   })
 })

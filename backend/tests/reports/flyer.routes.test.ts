@@ -1,5 +1,5 @@
 import request from "supertest";
-import jwt from "jsonwebtoken";
+import { createTestUser } from "../helpers/users";
 import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const sendMock = jest.fn();
@@ -85,11 +85,9 @@ describe("GET /api/reports/:id/flyer", () => {
   const { prisma } = require("../../src/db/client");
 
   beforeAll(async () => {
-    const user = await prisma.user.create({
-      data: { email: `flyer-routes-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    userId = user.id;
-    token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const user = await createTestUser({ prefix: "flyer-routes-test" });
+    userId = user.user.id;
+    token = user.token;
 
     const res = await request(app)
       .post("/api/reports")
@@ -197,13 +195,9 @@ describe("GET /api/reports/:id/flyer", () => {
     let privateReportId: number;
 
     beforeAll(async () => {
-      const otherUser = await prisma.user.create({
-        data: { email: `flyer-routes-test-other-${Date.now()}@example.com`, passwordHash: "test-hash" },
-      });
-      otherUserId = otherUser.id;
-      otherToken = jwt.sign({ sub: otherUser.id, email: otherUser.email }, process.env.JWT_SECRET!, {
-        expiresIn: "1h",
-      });
+      const otherUser = await createTestUser({ prefix: "flyer-routes-test-other" });
+    otherUserId = otherUser.user.id;
+    otherToken = otherUser.token;
 
       const report = await prisma.report.create({
         data: { userId, reportType: "lost", title: "Perro en moderación", status: "pending" },
@@ -280,17 +274,13 @@ describe("PUT /api/reports/:id/flyer/custom", () => {
   const { prisma } = require("../../src/db/client");
 
   beforeAll(async () => {
-    const user = await prisma.user.create({
-      data: { email: `custom-flyer-test-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    userId = user.id;
-    token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const user = await createTestUser({ prefix: "custom-flyer-test" });
+    userId = user.user.id;
+    token = user.token;
 
-    const otherUser = await prisma.user.create({
-      data: { email: `custom-flyer-test-other-${Date.now()}@example.com`, passwordHash: "test-hash" },
-    });
-    otherUserId = otherUser.id;
-    otherToken = jwt.sign({ sub: otherUser.id, email: otherUser.email }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    const otherUser = await createTestUser({ prefix: "custom-flyer-test-other" });
+    otherUserId = otherUser.user.id;
+    otherToken = otherUser.token;
 
     const res = await request(app)
       .post("/api/reports")
