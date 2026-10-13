@@ -294,6 +294,57 @@ describe("administración de 2FA", () => {
       expect(console.error).toHaveBeenCalled();
     });
 
+    describe("secreto pendiente que cambia mientras se confirma", () => {
+      /**
+       * Deja que un /2fa/setup del mismo usuario pise el secreto pendiente justo
+       * después de que enable lo leyó y antes de que abra su transacción.
+       */
+      function rotateSecretBeforeEnableTransaction(token: string) {
+        const client = prisma as unknown as { $transaction: (...args: unknown[]) => Promise<unknown> };
+        const original = client.$transaction.bind(prisma);
+        const rotated: { secret?: string } = {};
+        jest.spyOn(client, "$transaction").mockImplementationOnce(async (...args: unknown[]) => {
+          rotated.secret = (await post("setup", token)).body.secret as string;
+          return original(...args);
+        });
+        return rotated;
+      }
+
+      test("responde 409 y no activa el 2FA con un secreto que el código no verificó", async () => {
+        const { user, token, secret } = await pendingSetup("tf-enable-race");
+        const rotated = rotateSecretBeforeEnableTransaction(token);
+        const secretBefore = (await dbUser(user.id)).twoFactorSecretEnc;
+
+        const res = await post("enable", token, { code: codeFor(secret) });
+
+        expect(rotated.secret).toEqual(expect.any(String));
+        expect(rotated.secret).not.toBe(secret);
+        expect(res.status).toBe(409);
+        expect(res.body.error.code).toBe("TWO_FACTOR_NOT_SETUP");
+        const stored = await dbUser(user.id);
+        expect(stored.twoFactorEnabledAt).toBeNull();
+        expect(stored.tokenVersion).toBe(user.tokenVersion);
+        expect(stored.twoFactorSecretEnc).not.toBe(secretBefore);
+        expect(decryptSecret(stored.twoFactorSecretEnc as string, user.id)).toBe(rotated.secret);
+        expect(await prisma.twoFactorRecoveryCode.count({ where: { userId: user.id } })).toBe(0);
+        expect(enabledNotice).not.toHaveBeenCalled();
+      });
+
+      test("el código del secreto nuevo sí activa después de la carrera", async () => {
+        const { user, token, secret } = await pendingSetup("tf-enable-race-retry");
+        const rotated = rotateSecretBeforeEnableTransaction(token);
+        await post("enable", token, { code: codeFor(secret) });
+
+        const retry = await post("enable", token, { code: codeFor(rotated.secret as string) });
+
+        expect(retry.status).toBe(200);
+        const stored = await dbUser(user.id);
+        expect(stored.twoFactorEnabledAt).not.toBeNull();
+        expect(decryptSecret(stored.twoFactorSecretEnc as string, user.id)).toBe(rotated.secret);
+        expect(await prisma.twoFactorRecoveryCode.count({ where: { userId: user.id } })).toBe(10);
+      });
+    });
+
     test("sin code en el body responde 400 de validación", async () => {
       const { token } = await pendingSetup("tf-enable-validation");
 
@@ -633,6 +684,84 @@ describe("administración de 2FA", () => {
       const stored = await dbUser(user.id);
       expect(stored.twoFactorFailedAttempts).toBe(0);
       expect(stored.twoFactorEnabledAt).not.toBeNull();
+    });
+  });
+
+  describe("producción sin SMTP_HOST", () => {
+    const originalEnv = {
+      nodeEnv: process.env.NODE_ENV,
+      key: process.env.TWO_FACTOR_ENCRYPTION_KEY,
+      smtpHost: process.env.SMTP_HOST,
+    };
+
+    function restoreEnv(name: "NODE_ENV" | "TWO_FACTOR_ENCRYPTION_KEY" | "SMTP_HOST", value: string | undefined) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+
+    afterEach(() => {
+      restoreEnv("NODE_ENV", originalEnv.nodeEnv);
+      restoreEnv("TWO_FACTOR_ENCRYPTION_KEY", originalEnv.key);
+      restoreEnv("SMTP_HOST", originalEnv.smtpHost);
+    });
+
+    /** Producción con la clave de 2FA puesta (hace falta) pero sin servidor de correo. */
+    function productionWithoutSmtp() {
+      process.env.NODE_ENV = "production";
+      process.env.TWO_FACTOR_ENCRYPTION_KEY = "ab".repeat(32);
+      delete process.env.SMTP_HOST;
+      // Estos tests usan el mail real: sin los mocks de beforeEach.
+      enabledNotice.mockRestore();
+      disabledNotice.mockRestore();
+    }
+
+    test("el mail real de aviso falla con 503 MAIL_NOT_CONFIGURED en esta configuración", async () => {
+      productionWithoutSmtp();
+
+      await expect(mailService.sendTwoFactorEnabled("alguien@example.com")).rejects.toMatchObject({
+        statusCode: 503,
+        code: "MAIL_NOT_CONFIGURED",
+      });
+      await expect(mailService.sendTwoFactorDisabled("alguien@example.com")).rejects.toMatchObject({
+        statusCode: 503,
+        code: "MAIL_NOT_CONFIGURED",
+      });
+    });
+
+    test("activar responde 200 y deja el 2FA activo: el error del aviso se loguea, no se propaga", async () => {
+      productionWithoutSmtp();
+      const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+      const { user, token } = await newUser("tf-prod-nosmtp-enable");
+      const setup = await post("setup", token);
+      expect(setup.status).toBe(200);
+
+      const res = await post("enable", token, { code: codeFor(setup.body.secret as string) });
+
+      expect(res.status).toBe(200);
+      expect(res.body.recoveryCodes).toHaveLength(10);
+      expect((await dbUser(user.id)).twoFactorEnabledAt).not.toBeNull();
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining("activación"),
+        expect.objectContaining({ statusCode: 503, code: "MAIL_NOT_CONFIGURED" })
+      );
+    });
+
+    test("desactivar responde 200 y deja el 2FA apagado: el error del aviso se loguea, no se propaga", async () => {
+      productionWithoutSmtp();
+      const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+      const { user, token, secret } = await enabledUser("tf-prod-nosmtp-disable");
+
+      const res = await post("disable", token, { password: PASSWORD, code: codeFor(secret) });
+
+      expect(res.status).toBe(200);
+      expect((await dbUser(user.id)).twoFactorEnabledAt).toBeNull();
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining("desactivación"),
+        expect.objectContaining({ statusCode: 503, code: "MAIL_NOT_CONFIGURED" })
+      );
     });
   });
 });

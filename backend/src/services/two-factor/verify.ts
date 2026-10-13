@@ -20,6 +20,12 @@ const RECOVERY_CODE_LENGTH = 10;
 
 export type SecondFactorMethod = "totp" | "recovery";
 
+export interface SecondFactorProof {
+  method: SecondFactorMethod;
+  /** Secreto cifrado contra el que se validó el código, para que el llamador condicione su escritura a él. */
+  secretEnc: string;
+}
+
 export interface SecondFactorOptions {
   /** `pending`: confirma el alta (secreto sin activar). `enabled`: 2FA ya activo. */
   state: "pending" | "enabled";
@@ -161,7 +167,7 @@ export async function verifySecondFactor<T>(
   userId: number,
   code: string,
   opts: SecondFactorOptions,
-  onSuccess: (tx: Prisma.TransactionClient, proof: { method: SecondFactorMethod }) => Promise<T>
+  onSuccess: (tx: Prisma.TransactionClient, proof: SecondFactorProof) => Promise<T>
 ): Promise<T> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -187,7 +193,7 @@ export async function verifySecondFactor<T>(
       if (opts.countFailures) {
         await tx.user.update({ where: { id: userId }, data: { twoFactorFailedAttempts: 0, twoFactorLockedUntil: null } });
       }
-      return onSuccess(tx, proof);
+      return onSuccess(tx, { ...proof, secretEnc: encryptedSecret });
     });
   } catch (error) {
     if (!(error instanceof CodeMismatch)) {

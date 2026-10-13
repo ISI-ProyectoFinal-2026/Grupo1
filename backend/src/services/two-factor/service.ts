@@ -185,11 +185,22 @@ export async function enableTwoFactor(userId: number, input: TwoFactorCodeInput)
     userId,
     input.code,
     { state: "pending", allowRecovery: false, countFailures: false },
-    async (tx) => {
-      const enabled = await tx.user.update({
-        where: { id: userId },
+    async (tx, proof) => {
+      // El WHERE ata la activación al secreto contra el que se validó el código: un
+      // /2fa/setup concurrente que lo haya pisado deja count en 0 y no se activa.
+      const { count } = await tx.user.updateMany({
+        where: { id: userId, twoFactorEnabledAt: null, twoFactorSecretEnc: proof.secretEnc },
         data: { twoFactorEnabledAt: new Date(), tokenVersion: { increment: 1 } },
       });
+      if (count === 0) {
+        throw new AppError(
+          409,
+          "La configuración del segundo factor cambió, iniciala de nuevo",
+          undefined,
+          "TWO_FACTOR_NOT_SETUP"
+        );
+      }
+      const enabled = await tx.user.findUniqueOrThrow({ where: { id: userId } });
       return { user: enabled, recoveryCodes: await replaceRecoveryCodes(tx, userId) };
     }
   );

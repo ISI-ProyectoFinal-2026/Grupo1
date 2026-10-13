@@ -115,7 +115,10 @@ describe("verifySecondFactor() — código TOTP", () => {
 
     expect(result).toBe("resultado");
     expect(onSuccess).toHaveBeenCalledTimes(1);
-    expect(onSuccess).toHaveBeenCalledWith(expect.anything(), { method: "totp" });
+    expect(onSuccess).toHaveBeenCalledWith(expect.anything(), {
+      method: "totp",
+      secretEnc: expect.any(String),
+    });
   });
 
   test("registra el paso aceptado y rechaza el mismo código después (replay)", async () => {
@@ -334,7 +337,10 @@ describe("verifySecondFactor() — códigos de recuperación (A8)", () => {
 
     await verifySecondFactor(user.id, recoveryCodes[0], ENABLED, onSuccess);
 
-    expect(onSuccess).toHaveBeenCalledWith(expect.anything(), { method: "recovery" });
+    expect(onSuccess).toHaveBeenCalledWith(expect.anything(), {
+      method: "recovery",
+      secretEnc: expect.any(String),
+    });
     const used = await prisma.twoFactorRecoveryCode.findMany({ where: { userId: user.id, usedAt: { not: null } } });
     expect(used).toHaveLength(1);
     expect(used[0].codeHash).toBe(hashRecoveryCode(recoveryCodes[0]));
