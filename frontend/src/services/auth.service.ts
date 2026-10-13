@@ -1,15 +1,16 @@
 import { api } from "@/services/api";
 import type {
-  AuthResponse,
   AuthUser,
   LoginInput,
+  LoginResponse,
   MessageResponse,
   RegisterInput,
   ResetPasswordInput,
 } from "@/types/auth";
 
-export function login(input: LoginInput): Promise<AuthResponse> {
-  return api.post<AuthResponse>("/auth/login", input).then((res) => res.data);
+// Una cuenta con 2FA recibe un desafío en vez de la sesión: ver `isTwoFactorChallenge`.
+export function login(input: LoginInput): Promise<LoginResponse> {
+  return api.post<LoginResponse>("/auth/login", input).then((res) => res.data);
 }
 
 export function register(input: RegisterInput): Promise<AuthUser> {

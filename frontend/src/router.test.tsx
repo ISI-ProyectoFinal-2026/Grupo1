@@ -24,6 +24,12 @@ vi.mock('@/pages/auth/ForgotPasswordPage', () => ({
 vi.mock('@/pages/auth/ResetPasswordPage', () => ({
   default: () => <div>pagina nueva contraseña</div>,
 }))
+vi.mock('@/pages/auth/TwoFactorResetConfirmPage', () => ({
+  default: () => <div>pagina confirmar reinicio 2fa</div>,
+}))
+vi.mock('@/pages/auth/TwoFactorResetCancelPage', () => ({
+  default: () => <div>pagina cancelar reinicio 2fa</div>,
+}))
 vi.mock('@/pages/reports/FeedPage', () => ({ default: () => <div>pagina feed</div> }))
 vi.mock('@/pages/reports/CreateReportPage', () => ({ default: () => <div>pagina crear reporte</div> }))
 vi.mock('@/pages/reports/ReportDetailPage', () => ({ default: () => <div>pagina detalle reporte</div> }))
@@ -69,6 +75,8 @@ describe('router: rutas publicas', () => {
     ['/verify-email', 'pagina verificar email'],
     ['/forgot-password', 'pagina olvide contraseña'],
     ['/reset-password', 'pagina nueva contraseña'],
+    ['/two-factor/reset/confirm', 'pagina confirmar reinicio 2fa'],
+    ['/two-factor/reset/cancel', 'pagina cancelar reinicio 2fa'],
   ])('%s se renderiza sin sesion', (ruta, texto) => {
     renderRuta(ruta)
 
@@ -80,6 +88,8 @@ describe('router: rutas publicas', () => {
   it.each([
     ['/verify-email?token=abc', 'pagina verificar email'],
     ['/reset-password?token=abc', 'pagina nueva contraseña'],
+    ['/two-factor/reset/confirm?token=abc', 'pagina confirmar reinicio 2fa'],
+    ['/two-factor/reset/cancel?token=abc', 'pagina cancelar reinicio 2fa'],
   ])('%s tambien se renderiza con sesion', (ruta, texto) => {
     useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
 

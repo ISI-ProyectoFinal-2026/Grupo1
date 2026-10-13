@@ -6,7 +6,13 @@ const DEFAULT_ERROR_MESSAGE = "Error inesperado, intentá de nuevo";
 
 // Páginas de links de email: ahí un 401 de una sesión vieja limpia la sesión
 // pero no debe arrancar al usuario de la página hacia /login.
-const LINK_FLOW_PATHS = ["/verify-email", "/forgot-password", "/reset-password"];
+const LINK_FLOW_PATHS = [
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
+  "/two-factor/reset/confirm",
+  "/two-factor/reset/cancel",
+];
 
 export interface ApiError extends Error {
   code?: string;
