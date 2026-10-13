@@ -1,11 +1,19 @@
+import { Prisma } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { prisma } from "../../db/client";
 import { AppError } from "../../errors/app-error";
 import { signAccessToken } from "../../utils/jwt";
 import { toPublicUser } from "../../utils/public-user";
-import { TwoFactorLoginInput } from "../../validators/two-factor.validator";
-import { consumeAuthToken, findValidAuthToken, issueAuthToken, TokenError } from "../auth-tokens.service";
+import {
+  TwoFactorCodeInput,
+  TwoFactorDisableInput,
+  TwoFactorLoginInput,
+} from "../../validators/two-factor.validator";
+import { consumeAuthToken, findValidAuthToken, invalidateAuthTokens, issueAuthToken, TokenError } from "../auth-tokens.service";
 import * as mailService from "../mail.service";
-import { verifySecondFactor } from "./verify";
+import { encryptSecret } from "./crypto";
+import { buildOtpauthUri, generateTotpSecret } from "./totp";
+import { generateRecoveryCodes, hashRecoveryCode, verifySecondFactor } from "./verify";
 
 export const RESET_WAIT_MS = 72 * 60 * 60 * 1000;
 
@@ -17,6 +25,25 @@ export const CHALLENGE_ERR: TokenError = {
 /** Cuándo se completa un reinicio pedido en `requestedAt`. */
 export function resetEffectiveAt(requestedAt: Date): Date {
   return new Date(requestedAt.getTime() + RESET_WAIT_MS);
+}
+
+/** Los avisos no son críticos: si el mail falla se loguea y el request sigue. */
+async function sendNotice(userId: number, what: string, send: () => Promise<void>): Promise<void> {
+  try {
+    await send();
+  } catch (error) {
+    console.error(`[2fa] no se pudo enviar el aviso de ${what} al usuario ${userId}:`, error);
+  }
+}
+
+/** Reemplaza el juego de códigos de recuperación y devuelve los nuevos en claro. */
+async function replaceRecoveryCodes(tx: Prisma.TransactionClient, userId: number): Promise<string[]> {
+  const codes = generateRecoveryCodes();
+  await tx.twoFactorRecoveryCode.deleteMany({ where: { userId } });
+  await tx.twoFactorRecoveryCode.createMany({
+    data: codes.map((code) => ({ userId, codeHash: hashRecoveryCode(code) })),
+  });
+  return codes;
 }
 
 /** Emite el desafío del primer paso; reemplaza al anterior del mismo usuario. */
@@ -65,12 +92,149 @@ export async function loginWithSecondFactor(input: TwoFactorLoginInput) {
   );
 
   if (recoveryRemaining !== null) {
-    try {
-      await mailService.sendTwoFactorRecoveryCodeUsed(user.email, recoveryRemaining);
-    } catch (error) {
-      console.error(`[2fa] no se pudo enviar el aviso de código de recuperación al usuario ${user.id}:`, error);
-    }
+    await sendNotice(user.id, "código de recuperación", () =>
+      mailService.sendTwoFactorRecoveryCodeUsed(user.email, recoveryRemaining)
+    );
   }
 
   return { token: signAccessToken(user), user: toPublicUser(user) };
+}
+
+export async function getStatus(userId: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { twoFactorEnabledAt: true, twoFactorResetRequestedAt: true },
+  });
+  if (!user) {
+    throw new AppError(404, "Usuario no encontrado");
+  }
+
+  const enabled = user.twoFactorEnabledAt !== null;
+  const recoveryCodesRemaining = enabled
+    ? await prisma.twoFactorRecoveryCode.count({ where: { userId, usedAt: null } })
+    : 0;
+  const resetEffective =
+    enabled && user.twoFactorResetRequestedAt ? resetEffectiveAt(user.twoFactorResetRequestedAt).toISOString() : null;
+
+  return { enabled, recoveryCodesRemaining, resetEffectiveAt: resetEffective };
+}
+
+/**
+ * Inicia el alta: guarda un secreto nuevo cifrado, todavía sin activar. Repetirlo
+ * pisa el secreto pendiente. El secreto en claro solo viaja en esta respuesta.
+ */
+export async function setupTwoFactor(userId: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, twoFactorEnabledAt: true },
+  });
+  if (!user) {
+    throw new AppError(404, "Usuario no encontrado");
+  }
+  const alreadyEnabled = () =>
+    new AppError(409, "El segundo factor ya está activado", undefined, "TWO_FACTOR_ALREADY_ENABLED");
+  if (user.twoFactorEnabledAt) {
+    throw alreadyEnabled();
+  }
+
+  const secret = generateTotpSecret();
+  const encrypted = encryptSecret(secret, userId);
+  // El WHERE cubre la carrera con un enable que termine entre la lectura y acá.
+  const { count } = await prisma.user.updateMany({
+    where: { id: userId, twoFactorEnabledAt: null },
+    data: { twoFactorSecretEnc: encrypted },
+  });
+  if (count === 0) {
+    throw alreadyEnabled();
+  }
+
+  return { secret, otpauthUri: buildOtpauthUri(secret, user.email) };
+}
+
+/**
+ * Confirma el alta con un TOTP vigente. Los fallos no cuentan ni bloquean
+ * (`countFailures: false`); el verificador deja registrado el paso aceptado, así
+ * el mismo código no sirve después en el login.
+ */
+export async function enableTwoFactor(userId: number, input: TwoFactorCodeInput) {
+  const { user, recoveryCodes } = await verifySecondFactor(
+    userId,
+    input.code,
+    { state: "pending", allowRecovery: false, countFailures: false },
+    async (tx) => {
+      const enabled = await tx.user.update({
+        where: { id: userId },
+        data: { twoFactorEnabledAt: new Date(), tokenVersion: { increment: 1 } },
+      });
+      return { user: enabled, recoveryCodes: await replaceRecoveryCodes(tx, userId) };
+    }
+  );
+
+  await sendNotice(userId, "activación", () => mailService.sendTwoFactorEnabled(user.email));
+
+  return { token: signAccessToken(user), user: toPublicUser(user), recoveryCodes };
+}
+
+/**
+ * Desactiva el 2FA. La contraseña se verifica primero y un fallo ahí es 403 sin
+ * tocar el contador: un 401 desloguearía al usuario en el frontend. Limpia todo
+ * rastro (reinicio pendiente, links y desafíos en vuelo) para que nada viejo
+ * reviva el estado.
+ */
+export async function disableTwoFactor(userId: number, input: TwoFactorDisableInput) {
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true, twoFactorEnabledAt: true },
+  });
+  if (!account) {
+    throw new AppError(404, "Usuario no encontrado");
+  }
+  if (!account.twoFactorEnabledAt) {
+    throw new AppError(409, "El segundo factor no está activado", undefined, "TWO_FACTOR_NOT_ENABLED");
+  }
+  if (!(await bcrypt.compare(input.password, account.passwordHash))) {
+    throw new AppError(403, "La contraseña es incorrecta", undefined, "INVALID_PASSWORD");
+  }
+
+  const user = await verifySecondFactor(
+    userId,
+    input.code,
+    { state: "enabled", allowRecovery: true, countFailures: true },
+    async (tx) => {
+      const cleared = await tx.user.update({
+        where: { id: userId },
+        data: {
+          twoFactorSecretEnc: null,
+          twoFactorEnabledAt: null,
+          twoFactorLastStep: null,
+          twoFactorFailedAttempts: 0,
+          twoFactorLockedUntil: null,
+          twoFactorResetRequestedAt: null,
+          tokenVersion: { increment: 1 },
+        },
+      });
+      await tx.twoFactorRecoveryCode.deleteMany({ where: { userId } });
+      await invalidateAuthTokens(tx, userId, ["two_factor_login", "two_factor_reset", "two_factor_reset_cancel"]);
+      return cleared;
+    }
+  );
+
+  await sendNotice(userId, "desactivación", () => mailService.sendTwoFactorDisabled(user.email));
+
+  return { token: signAccessToken(user), user: toPublicUser(user) };
+}
+
+/** Reemplaza los códigos de recuperación. Pide un TOTP: un código de recuperación no vale. */
+export async function regenerateRecoveryCodes(userId: number, input: TwoFactorCodeInput) {
+  const { user, recoveryCodes } = await verifySecondFactor(
+    userId,
+    input.code,
+    { state: "enabled", allowRecovery: false, countFailures: true },
+    async (tx) => {
+      const bumped = await tx.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } });
+      return { user: bumped, recoveryCodes: await replaceRecoveryCodes(tx, userId) };
+    }
+  );
+
+  return { token: signAccessToken(user), user: toPublicUser(user), recoveryCodes };
 }

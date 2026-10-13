@@ -47,3 +47,33 @@ export async function sendTwoFactorRecoveryCodeUsed(to: string, remaining: numbe
     html: `<p>${intro} ${left} ${sessions}</p><p>${warning}</p>`,
   });
 }
+
+export async function sendTwoFactorEnabled(to: string): Promise<void> {
+  const intro = "Se activó la verificación en dos pasos en tu cuenta de PATITAS.";
+  const detail =
+    "A partir de ahora, para iniciar sesión vas a necesitar tu contraseña y un código de tu app de autenticación. Por seguridad, se cerraron las demás sesiones abiertas.";
+  const warning = "Si no fuiste vos, cambiá tu contraseña y revisá la seguridad de tu cuenta de inmediato.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Verificación en dos pasos activada en PATITAS",
+    text: `${intro} ${detail}
+
+${warning}`,
+    html: `<p>${intro} ${detail}</p><p>${warning}</p>`,
+  });
+}
+
+export async function sendTwoFactorDisabled(to: string): Promise<void> {
+  const intro = "Se desactivó la verificación en dos pasos en tu cuenta de PATITAS.";
+  const detail =
+    "Ahora alcanza con tu contraseña para iniciar sesión. Por seguridad, se cerraron las demás sesiones abiertas.";
+  const warning = "Si no fuiste vos, cambiá tu contraseña y revisá la seguridad de tu cuenta de inmediato.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Verificación en dos pasos desactivada en PATITAS",
+    text: `${intro} ${detail}
+
+${warning}`,
+    html: `<p>${intro} ${detail}</p><p>${warning}</p>`,
+  });
+}

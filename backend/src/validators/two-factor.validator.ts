@@ -10,4 +10,15 @@ export const twoFactorLoginSchema = z.object({
   code: codeSchema,
 });
 
+export const twoFactorCodeSchema = z.object({
+  code: codeSchema,
+});
+
+export const twoFactorDisableSchema = z.object({
+  password: z.string().min(1).max(256),
+  code: codeSchema,
+});
+
 export type TwoFactorLoginInput = z.infer<typeof twoFactorLoginSchema>;
+export type TwoFactorCodeInput = z.infer<typeof twoFactorCodeSchema>;
+export type TwoFactorDisableInput = z.infer<typeof twoFactorDisableSchema>;
