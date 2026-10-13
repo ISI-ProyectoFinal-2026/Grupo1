@@ -77,3 +77,60 @@ ${warning}`,
     html: `<p>${intro} ${detail}</p><p>${warning}</p>`,
   });
 }
+
+/** Fecha legible en hora de Argentina; el mail no sabe en qué huso está quien lo lee. */
+function formatArgentinaDate(date: Date): string {
+  const formatted = date.toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  return `${formatted} (hora de Argentina)`;
+}
+
+export async function sendTwoFactorResetLink(to: string, link: string): Promise<void> {
+  const body = linkParagraph(
+    "Pediste reiniciar el segundo factor de tu cuenta de PATITAS porque perdiste el acceso a tu app de autenticación. Para empezar el reinicio confirmalo en este enlace:",
+    link,
+    "El enlace vence en 30 minutos. Después de confirmarlo hay una espera de 72 horas antes de que se desactive el segundo factor, y vas a poder cancelarlo. Si no fuiste vos, ignorá este mensaje: no cambia nada."
+  );
+  await mail.getMailSender().send({ to, subject: "Confirmá el reinicio del segundo factor en PATITAS", ...body });
+}
+
+export async function sendTwoFactorResetPending(to: string, cancelLink: string, effectiveAt: Date): Promise<void> {
+  const when = formatArgentinaDate(effectiveAt);
+  const body = linkParagraph(
+    `Confirmaste el reinicio del segundo factor de tu cuenta de PATITAS. Se completa el ${when}: desde ese momento, el próximo inicio de sesión con tu contraseña entra sin segundo factor. Si no fuiste vos, cancelalo en este enlace:`,
+    cancelLink,
+    "El reinicio también se cancela si iniciás sesión con un código de tu app de autenticación o con un código de recuperación. Si no reconocés este pedido, cambiá tu contraseña."
+  );
+  await mail.getMailSender().send({ to, subject: "Reinicio del segundo factor en curso en PATITAS", ...body });
+}
+
+export async function sendTwoFactorResetCancelled(to: string): Promise<void> {
+  const intro = "Se canceló el reinicio del segundo factor de tu cuenta de PATITAS.";
+  const detail = "Tu verificación en dos pasos sigue activa y para iniciar sesión vas a seguir necesitando el código.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Se canceló el reinicio del segundo factor en PATITAS",
+    text: `${intro} ${detail}`,
+    html: `<p>${intro} ${detail}</p>`,
+  });
+}
+
+export async function sendTwoFactorResetCompleted(to: string): Promise<void> {
+  const intro = "Se completó el reinicio del segundo factor de tu cuenta de PATITAS: la verificación en dos pasos quedó desactivada.";
+  const detail =
+    "Por seguridad, se cerraron las demás sesiones abiertas. Podés volver a activarla desde la sección de seguridad de tu cuenta.";
+  const warning = "Si no fuiste vos, cambiá tu contraseña y revisá la seguridad de tu cuenta de inmediato.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Se desactivó el segundo factor de tu cuenta de PATITAS",
+    text: `${intro} ${detail}\n\n${warning}`,
+    html: `<p>${intro} ${detail}</p><p>${warning}</p>`,
+  });
+}

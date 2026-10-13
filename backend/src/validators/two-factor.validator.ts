@@ -19,6 +19,16 @@ export const twoFactorDisableSchema = z.object({
   code: codeSchema,
 });
 
+export const twoFactorResetRequestSchema = z.object({
+  twoFactorToken: linkTokenSchema,
+  password: z.string().min(1).max(256),
+});
+
+export const twoFactorResetLinkSchema = z.object({
+  token: linkTokenSchema,
+});
+
 export type TwoFactorLoginInput = z.infer<typeof twoFactorLoginSchema>;
 export type TwoFactorCodeInput = z.infer<typeof twoFactorCodeSchema>;
 export type TwoFactorDisableInput = z.infer<typeof twoFactorDisableSchema>;
+export type TwoFactorResetRequestInput = z.infer<typeof twoFactorResetRequestSchema>;

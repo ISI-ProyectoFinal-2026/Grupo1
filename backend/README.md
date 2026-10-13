@@ -43,7 +43,18 @@ Los secretos TOTP se guardan cifrados (AES-256-GCM) con esta clave; en la base n
 - **Formato**: 32 bytes en base64 o 64 caracteres hexadecimales. Generarla con `openssl rand -base64 32`.
 - **Producción**: es obligatoria. Sin ella (o con un valor inválido) activar el 2FA, usar el segundo paso del login, desactivarlo o regenerar los códigos responden `503` `TWO_FACTOR_NOT_CONFIGURED` con `details.missingEnvVars: ["TWO_FACTOR_ENCRYPTION_KEY"]`. El backend arranca igual y el login, el registro y las cuentas sin 2FA no se ven afectados: la clave se exige recién cuando hace falta un secreto.
 - **Desarrollo y test**: si no está seteada, la clave se deriva de `JWT_SECRET`, así que no hace falta configurar nada. Un valor presente pero inválido falla siempre, en cualquier entorno.
-- **Perder o cambiar la clave**: los secretos ya guardados dejan de poder descifrarse y esos usuarios no pueden completar el segundo paso (`503`); la salida es desactivarles el 2FA directo en la base. No hay rotación automática: guardar la clave en el mismo lugar que el resto de los secretos y no cambiarla con usuarios que ya activaron el 2FA.
+- **Perder o cambiar la clave**: los secretos ya guardados dejan de poder descifrarse y esos usuarios no pueden completar el segundo paso (`503`). Pueden recuperar la cuenta con el reinicio por autoservicio de 72 h (más abajo), que no necesita la clave; la otra salida es desactivarles el 2FA directo en la base. No hay rotación automática: guardar la clave en el mismo lugar que el resto de los secretos y no cambiarla con usuarios que ya activaron el 2FA.
+
+#### Reinicio del 2FA por autoservicio (72 h)
+
+Quien perdió el dispositivo y también los códigos de recuperación lo pide desde el segundo paso del login, sin intervención de un admin:
+
+1. `POST /api/auth/2fa/reset/request` con el desafío del login y la contraseña. Manda un mail con un link de confirmación (vence a los 30 min; `429` `TWO_FACTOR_RESET_COOLDOWN` si se pide otro antes de 60 s, `503` `MAIL_NOT_CONFIGURED` en producción sin SMTP).
+2. `POST /api/auth/2fa/reset/confirm` con el token del link (el frontend lo manda solo tras un click explícito). Arranca la espera de 72 h, medida con la hora de la base, y manda un aviso con el link para cancelar.
+3. Durante la espera el reinicio se cancela con `POST /api/auth/2fa/reset/cancel` (link del aviso, sin sesión) o con cualquier login real de segundo factor (código de la app o de recuperación). Ambos caminos mandan el aviso "reinicio cancelado".
+4. Pasadas las 72 h, el próximo login con contraseña correcta apaga el 2FA, borra los códigos de recuperación, cierra las demás sesiones y devuelve la sesión en la misma respuesta (más un aviso por mail). No hay cron: se completa de forma perezosa en el login. No necesita la clave de cifrado y no lo frena el bloqueo por intentos.
+
+Restablecer la contraseña por email no toca el 2FA ni un reinicio pendiente.
 
 ### `INTERNAL_API_KEY`
 

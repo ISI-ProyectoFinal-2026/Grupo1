@@ -36,21 +36,28 @@ export function hashAuthToken(rawToken: string): string {
  * mail). En la misma transacción invalida los tokens pendientes del mismo tipo
  * del usuario, así solo el último link pedido sirve.
  */
-export async function issueAuthToken(userId: number, type: AuthTokenType): Promise<string> {
+export function issueAuthToken(userId: number, type: AuthTokenType): Promise<string> {
+  return prisma.$transaction((tx) => issueAuthTokenIn(tx, userId, type));
+}
+
+/** Igual que `issueAuthToken`, dentro de la transacción del llamador (el token nace o muere con su efecto). */
+export async function issueAuthTokenIn(
+  db: Prisma.TransactionClient,
+  userId: number,
+  type: AuthTokenType
+): Promise<string> {
   const rawToken = randomBytes(32).toString("base64url");
   const now = new Date();
 
-  await prisma.$transaction([
-    prisma.authToken.updateMany({ where: { userId, type, usedAt: null }, data: { usedAt: now } }),
-    prisma.authToken.create({
-      data: {
-        userId,
-        type,
-        tokenHash: hashAuthToken(rawToken),
-        expiresAt: new Date(now.getTime() + AUTH_TOKEN_TTL_MS[type]),
-      },
-    }),
-  ]);
+  await db.authToken.updateMany({ where: { userId, type, usedAt: null }, data: { usedAt: now } });
+  await db.authToken.create({
+    data: {
+      userId,
+      type,
+      tokenHash: hashAuthToken(rawToken),
+      expiresAt: new Date(now.getTime() + AUTH_TOKEN_TTL_MS[type]),
+    },
+  });
 
   return rawToken;
 }

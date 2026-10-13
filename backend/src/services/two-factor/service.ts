@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { AuthTokenType, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../db/client";
 import { AppError } from "../../errors/app-error";
@@ -15,7 +15,11 @@ import { encryptSecret } from "./crypto";
 import { buildOtpauthUri, generateTotpSecret } from "./totp";
 import { generateRecoveryCodes, hashRecoveryCode, verifySecondFactor } from "./verify";
 
-export const RESET_WAIT_MS = 72 * 60 * 60 * 1000;
+export const RESET_WAIT_HOURS = 72;
+export const RESET_WAIT_MS = RESET_WAIT_HOURS * 60 * 60 * 1000;
+
+/** Todos los tokens que dependen de que el 2FA esté activo: mueren al apagarlo. */
+export const TWO_FACTOR_TOKEN_TYPES: AuthTokenType[] = ["two_factor_login", "two_factor_reset", "two_factor_reset_cancel"];
 
 export const CHALLENGE_ERR: TokenError = {
   message: "La verificación expiró, iniciá sesión de nuevo",
@@ -28,12 +32,26 @@ export function resetEffectiveAt(requestedAt: Date): Date {
 }
 
 /** Los avisos no son críticos: si el mail falla se loguea y el request sigue. */
-async function sendNotice(userId: number, what: string, send: () => Promise<void>): Promise<void> {
+export async function sendNotice(userId: number, what: string, send: () => Promise<void>): Promise<void> {
   try {
     await send();
   } catch (error) {
     console.error(`[2fa] no se pudo enviar el aviso de ${what} al usuario ${userId}:`, error);
   }
+}
+
+/**
+ * Limpia un reinicio pendiente y deja sin efecto sus links (confirmar y cancelar).
+ * Devuelve si había algo que cancelar: el UPDATE condicional hace que, con dos
+ * cancelaciones en paralelo, solo una vea `true` y mande el aviso.
+ */
+export async function cancelPendingReset(tx: Prisma.TransactionClient, userId: number): Promise<boolean> {
+  const { count } = await tx.user.updateMany({
+    where: { id: userId, twoFactorResetRequestedAt: { not: null } },
+    data: { twoFactorResetRequestedAt: null },
+  });
+  await invalidateAuthTokens(tx, userId, ["two_factor_reset", "two_factor_reset_cancel"]);
+  return count === 1;
 }
 
 /** Reemplaza el juego de códigos de recuperación y devuelve los nuevos en claro. */
@@ -73,21 +91,24 @@ export async function findValidChallenge(rawToken: string): Promise<number> {
 export async function loginWithSecondFactor(input: TwoFactorLoginInput) {
   const userId = await findValidChallenge(input.twoFactorToken);
 
-  const { user, recoveryRemaining } = await verifySecondFactor(
+  const { user, recoveryRemaining, resetCancelled } = await verifySecondFactor(
     userId,
     input.code,
     { state: "enabled", allowRecovery: true, countFailures: true },
     async (tx, proof) => {
       await consumeAuthToken(tx, input.twoFactorToken, "two_factor_login", CHALLENGE_ERR);
+      // Quien entra con el segundo factor demuestra que la cuenta es suya: si había
+      // un reinicio en espera, se cancela.
+      const cancelled = await cancelPendingReset(tx, userId);
 
       if (proof.method === "recovery") {
         const bumped = await tx.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } });
         const remaining = await tx.twoFactorRecoveryCode.count({ where: { userId, usedAt: null } });
-        return { user: bumped, recoveryRemaining: remaining };
+        return { user: bumped, recoveryRemaining: remaining, resetCancelled: cancelled };
       }
 
       const current = await tx.user.findUniqueOrThrow({ where: { id: userId } });
-      return { user: current, recoveryRemaining: null };
+      return { user: current, recoveryRemaining: null, resetCancelled: cancelled };
     }
   );
 
@@ -95,6 +116,9 @@ export async function loginWithSecondFactor(input: TwoFactorLoginInput) {
     await sendNotice(user.id, "código de recuperación", () =>
       mailService.sendTwoFactorRecoveryCodeUsed(user.email, recoveryRemaining)
     );
+  }
+  if (resetCancelled) {
+    await sendNotice(user.id, "cancelación del reinicio", () => mailService.sendTwoFactorResetCancelled(user.email));
   }
 
   return { token: signAccessToken(user), user: toPublicUser(user) };
@@ -214,7 +238,7 @@ export async function disableTwoFactor(userId: number, input: TwoFactorDisableIn
         },
       });
       await tx.twoFactorRecoveryCode.deleteMany({ where: { userId } });
-      await invalidateAuthTokens(tx, userId, ["two_factor_login", "two_factor_reset", "two_factor_reset_cancel"]);
+      await invalidateAuthTokens(tx, userId, TWO_FACTOR_TOKEN_TYPES);
       return cleared;
     }
   );

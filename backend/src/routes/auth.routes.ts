@@ -36,6 +36,9 @@ authRouter.post("/2fa/setup", requireAuth, requireVerifiedEmail, twoFactorContro
 authRouter.post("/2fa/enable", twoFactorLimiter, requireAuth, requireVerifiedEmail, twoFactorController.enable);
 authRouter.post("/2fa/disable", twoFactorLimiter, requireAuth, twoFactorController.disable);
 authRouter.post("/2fa/recovery-codes", twoFactorLimiter, requireAuth, twoFactorController.regenerateRecoveryCodes);
+authRouter.post("/2fa/reset/request", accountLimiter, twoFactorController.requestReset);
+authRouter.post("/2fa/reset/confirm", accountLimiter, twoFactorController.confirmReset);
+authRouter.post("/2fa/reset/cancel", accountLimiter, twoFactorController.cancelReset);
 authRouter.get("/me", requireAuth, authController.me);
 
 authRouter.post("/verify-email", accountLimiter, authController.verifyEmail);

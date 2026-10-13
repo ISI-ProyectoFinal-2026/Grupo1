@@ -82,4 +82,4 @@ TWO_FACTOR_ENCRYPTION_KEY=   # openssl rand -base64 32
 
 **En producción `TWO_FACTOR_ENCRYPTION_KEY` es obligatoria** (32 bytes en base64 o 64 caracteres hexadecimales): sin ella, activar o usar el 2FA responde `503` `TWO_FACTOR_NOT_CONFIGURED`; el login de cuentas sin 2FA sigue funcionando. En desarrollo y test, si falta, se deriva de `JWT_SECRET`.
 
-Si se pierde o se cambia la clave, los secretos ya cifrados no se pueden descifrar y los usuarios con 2FA quedan sin poder pasar el segundo paso hasta que se les desactive el 2FA directo en la base.
+Si se pierde o se cambia la clave, los secretos ya cifrados no se pueden descifrar y los usuarios con 2FA quedan sin poder pasar el segundo paso. Ellos mismos pueden pedir el reinicio por autoservicio de 72 h desde el login (el mail de confirmación necesita `SMTP_HOST` en producción y los links usan `FRONTEND_URL`); ese reinicio no necesita la clave. La otra salida es desactivarles el 2FA directo en la base.
