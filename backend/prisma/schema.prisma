@@ -36,10 +36,21 @@ model User {
   // Versión de sesión: viaja en el JWT como `tv`. Incrementarla invalida todos
   // los tokens emitidos antes (ej. al restablecer la contraseña).
   tokenVersion Int      @default(0) @map("token_version")
+  // Segundo factor (TOTP). El secreto va cifrado; `twoFactorEnabledAt` null con
+  // secreto presente = alta iniciada y sin confirmar. El contador y el bloqueo
+  // viven en la base para que valgan con requests en paralelo y en todas las
+  // instancias; el reinicio demorado se mide desde `twoFactorResetRequestedAt`.
+  twoFactorSecretEnc        String?   @map("two_factor_secret_enc")
+  twoFactorEnabledAt        DateTime? @map("two_factor_enabled_at")
+  twoFactorLastStep         Int?      @map("two_factor_last_step")
+  twoFactorFailedAttempts   Int       @default(0) @map("two_factor_failed_attempts")
+  twoFactorLockedUntil      DateTime? @map("two_factor_locked_until")
+  twoFactorResetRequestedAt DateTime? @map("two_factor_reset_requested_at")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   authTokens    AuthToken[]
+  twoFactorRecoveryCodes TwoFactorRecoveryCode[]
   pets          Pet[]
   reports       Report[]
   notifications Notification[]
@@ -56,6 +67,9 @@ model User {
 enum AuthTokenType {
   email_verification
   password_reset
+  two_factor_login
+  two_factor_reset
+  two_factor_reset_cancel
 
   @@map("auth_token_type")
 }
@@ -76,6 +90,21 @@ model AuthToken {
 
   @@index([userId, type])
   @@map("auth_tokens")
+}
+
+// Códigos de recuperación del segundo factor. Solo se guarda el sha256 del
+// código normalizado; `usedAt` lo marca como gastado (un solo uso).
+model TwoFactorRecoveryCode {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@map("two_factor_recovery_codes")
 }
 
 model Pet {
