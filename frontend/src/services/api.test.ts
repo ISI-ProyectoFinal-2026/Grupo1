@@ -159,7 +159,13 @@ describe('interceptor de response', () => {
 
   // En los flujos de link (verificar, olvide, reset) una sesion vieja no debe
   // arrancar la pagina hacia /login: el 401 igual limpia la sesion.
-  it.each(['/verify-email', '/forgot-password', '/reset-password'])(
+  it.each([
+    '/verify-email',
+    '/forgot-password',
+    '/reset-password',
+    '/two-factor/reset/confirm',
+    '/two-factor/reset/cancel',
+  ])(
     'cierra la sesion pero no redirige ante un 401 en %s',
     async (ruta) => {
       locationFalsa.pathname = ruta
@@ -172,6 +178,43 @@ describe('interceptor de response', () => {
       expect(locationFalsa.href).toBe(ruta)
     }
   )
+})
+
+// Un codigo de segundo factor incorrecto es 400 y una contraseña incorrecta en
+// un endpoint autenticado es 403: ninguno puede cerrar la sesion, o el usuario
+// perderia la pantalla donde esta corrigiendo el dato.
+describe('errores del segundo factor', () => {
+  let locationFalsa: { pathname: string; href: string }
+
+  beforeEach(() => {
+    locationFalsa = { pathname: '/account/security', href: '/account/security' }
+    Object.defineProperty(window, 'location', {
+      value: locationFalsa,
+      writable: true,
+      configurable: true,
+    })
+  })
+
+  afterEach(() => {
+    useAuthStore.getState().logout()
+  })
+
+  it.each([
+    [400, 'INVALID_TWO_FACTOR_CODE'],
+    [403, 'INVALID_PASSWORD'],
+    [429, 'TWO_FACTOR_LOCKED'],
+  ])('un %i (%s) conserva la sesion y no redirige', async (status, code) => {
+    useAuthStore.getState().setAuth('jwt-vigente', usuario)
+
+    const rechazado = await alFallar(
+      errorAxios(status, { error: { message: 'Error de 2FA', code } })
+    ).catch((e: unknown) => e)
+
+    expect(useAuthStore.getState().token).toBe('jwt-vigente')
+    expect(locationFalsa.href).toBe('/account/security')
+    expect(getApiErrorCode(rechazado)).toBe(code)
+    expect(getApiErrorStatus(rechazado)).toBe(status)
+  })
 })
 
 describe('lectores de error', () => {

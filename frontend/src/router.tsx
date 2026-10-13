@@ -6,6 +6,9 @@ import Register from "./pages/auth/Register";
 import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import TwoFactorResetConfirmPage from "./pages/auth/TwoFactorResetConfirmPage";
+import TwoFactorResetCancelPage from "./pages/auth/TwoFactorResetCancelPage";
+import SecurityPage from "./pages/account/SecurityPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RequireRole from "./components/RequireRole";
 import FeedPage from "./pages/reports/FeedPage";
@@ -31,6 +34,8 @@ export const router = createBrowserRouter([
       { path: "verify-email", element: <VerifyEmailPage /> },
       { path: "forgot-password", element: <ForgotPasswordPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },
+      { path: "two-factor/reset/confirm", element: <TwoFactorResetConfirmPage /> },
+      { path: "two-factor/reset/cancel", element: <TwoFactorResetCancelPage /> },
       {
         element: <ProtectedRoute />,
         children: [
@@ -40,6 +45,7 @@ export const router = createBrowserRouter([
           { path: "reports/:id", element: <ReportDetailPage /> },
           { path: "chats", element: <ChatPage /> },
           { path: "chats/:id", element: <ChatPage /> },
+          { path: "account/security", element: <SecurityPage /> },
           { path: "businesses", element: <BusinessDirectoryPage /> },
           { path: "businesses/register", element: <BusinessRegisterPage /> },
           { path: "businesses/dashboard", element: <BusinessDashboardPage /> },

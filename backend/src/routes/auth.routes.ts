@@ -1,7 +1,9 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import * as authController from "../controllers/auth.controller";
-import { requireAuth } from "../middlewares/auth.middleware";
+import * as twoFactorController from "../controllers/two-factor.controller";
+import { requireAuth, requireVerifiedEmail } from "../middlewares/auth.middleware";
+import { twoFactorLimiter } from "../middlewares/rate-limit";
 
 export const authRouter = Router();
 
@@ -28,6 +30,15 @@ const accountLimiter = rateLimit({
 
 authRouter.post("/register", authLimiter, authController.register);
 authRouter.post("/login", authLimiter, authController.login);
+authRouter.post("/2fa/login", twoFactorLimiter, twoFactorController.login);
+authRouter.get("/2fa/status", requireAuth, twoFactorController.status);
+authRouter.post("/2fa/setup", requireAuth, requireVerifiedEmail, twoFactorController.setup);
+authRouter.post("/2fa/enable", twoFactorLimiter, requireAuth, requireVerifiedEmail, twoFactorController.enable);
+authRouter.post("/2fa/disable", twoFactorLimiter, requireAuth, twoFactorController.disable);
+authRouter.post("/2fa/recovery-codes", twoFactorLimiter, requireAuth, twoFactorController.regenerateRecoveryCodes);
+authRouter.post("/2fa/reset/request", accountLimiter, twoFactorController.requestReset);
+authRouter.post("/2fa/reset/confirm", accountLimiter, twoFactorController.confirmReset);
+authRouter.post("/2fa/reset/cancel", accountLimiter, twoFactorController.cancelReset);
 authRouter.get("/me", requireAuth, authController.me);
 
 authRouter.post("/verify-email", accountLimiter, authController.verifyEmail);

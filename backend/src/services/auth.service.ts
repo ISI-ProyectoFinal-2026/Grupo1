@@ -2,12 +2,15 @@ import { Prisma, User } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { frontendLink } from "../utils/frontend-link";
 import { signAccessToken } from "../utils/jwt";
-import { toPublicUser } from "../utils/public-user";
+import { PublicUser, toPublicUser } from "../utils/public-user";
 import { LoginInput, RegisterInput, ResetPasswordInput } from "../validators/auth.validator";
 import { consumeAuthToken, issueAuthToken, latestAuthTokenCreatedAt } from "./auth-tokens.service";
 import { assertMailConfigured } from "./mail";
 import * as mailService from "./mail.service";
+import { completeMaturedReset } from "./two-factor/reset";
+import { issueLoginChallenge, resetEffectiveAt } from "./two-factor/service";
 
 const SALT_ROUNDS = 12;
 
@@ -23,12 +26,6 @@ const DUMMY_HASH = bcrypt.hashSync("dummy-password-for-timing-safety", SALT_ROUN
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
-}
-
-/** Link a una pantalla del frontend que recibe el token por query string. */
-function frontendLink(path: string, token: string): string {
-  const base = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
-  return `${base}${path}?token=${token}`;
 }
 
 async function sendVerificationEmail(user: Pick<User, "id" | "email">): Promise<void> {
@@ -62,7 +59,11 @@ export async function register(input: RegisterInput) {
   return toPublicUser(user);
 }
 
-export async function login(input: LoginInput) {
+export type LoginResult =
+  | { token: string; user: PublicUser }
+  | { twoFactorRequired: true; twoFactorToken: string; resetEffectiveAt?: string };
+
+export async function login(input: LoginInput): Promise<LoginResult> {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 
   // Always compare against a real hash (dummy when no user) and use the same
@@ -73,7 +74,25 @@ export async function login(input: LoginInput) {
     throw new AppError(401, "Credenciales inválidas");
   }
 
-  return { token: signAccessToken(user), user: toPublicUser(user) };
+  // Un reinicio de 2FA cumplido se completa acá, con la contraseña ya validada. La
+  // fila se relee siempre: si otro login lo completó en paralelo, esta sesión
+  // también sale firmada con la tokenVersion nueva.
+  const account = user.twoFactorEnabledAt && user.twoFactorResetRequestedAt ? await completeMaturedReset(user.id) : user;
+
+  // Con 2FA activo la contraseña sola no abre sesión: se devuelve un desafío
+  // opaco (no un JWT) que solo sirve en /2fa/login.
+  if (account.twoFactorEnabledAt) {
+    const twoFactorToken = await issueLoginChallenge(account.id);
+    return {
+      twoFactorRequired: true as const,
+      twoFactorToken,
+      ...(account.twoFactorResetRequestedAt
+        ? { resetEffectiveAt: resetEffectiveAt(account.twoFactorResetRequestedAt).toISOString() }
+        : {}),
+    };
+  }
+
+  return { token: signAccessToken(account), user: toPublicUser(account) };
 }
 
 export async function getMe(userId: number) {

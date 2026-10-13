@@ -35,7 +35,12 @@ export async function markEmailVerified(email: string): Promise<void> {
   await db().query('UPDATE users SET email_verified_at = now() WHERE email = $1', [email])
 }
 
-export type AuthTokenType = 'email_verification' | 'password_reset'
+export type AuthTokenType =
+  | 'email_verification'
+  | 'password_reset'
+  | 'two_factor_login'
+  | 'two_factor_reset'
+  | 'two_factor_reset_cancel'
 
 /**
  * Seeds a mail-link token whose raw value the test knows. The DB only keeps the
@@ -84,6 +89,68 @@ export async function ageLatestToken(email: string, type: AuthTokenType): Promis
      )`,
     [email, type],
   )
+}
+
+/**
+ * Enabling (and every accepted TOTP) records the step it consumed, so the same
+ * code is rejected as a replay for the rest of its 30 s window. Journeys that
+ * compute a code right after another one cleared it here instead of waiting.
+ */
+export async function resetTwoFactorLastStep(email: string): Promise<void> {
+  await db().query('UPDATE users SET two_factor_last_step = NULL WHERE email = $1', [email])
+}
+
+/**
+ * Moves a pending reset's start 72 h back, so the wait is over without waiting.
+ * The backend compares the column with the DB clock, which is what this shifts.
+ */
+export async function ageTwoFactorReset(email: string): Promise<void> {
+  const { rowCount } = await db().query(
+    `UPDATE users SET two_factor_reset_requested_at = two_factor_reset_requested_at - interval '72 hours'
+     WHERE email = $1 AND two_factor_reset_requested_at IS NOT NULL`,
+    [email],
+  )
+  if (rowCount !== 1) throw new Error(`ageTwoFactorReset: no pending reset for ${email}`)
+}
+
+export interface TwoFactorState {
+  enabled: boolean
+  hasSecret: boolean
+  locked: boolean
+  failedAttempts: number
+  resetPending: boolean
+  unusedRecoveryCodes: number
+}
+
+/** What the journeys assert on directly: nothing here is exposed that way by the API. */
+export async function getTwoFactorState(email: string): Promise<TwoFactorState> {
+  const { rows } = await db().query<{
+    enabled: boolean
+    has_secret: boolean
+    locked: boolean
+    failed_attempts: number
+    reset_pending: boolean
+    unused_codes: string
+  }>(
+    `SELECT u.two_factor_enabled_at IS NOT NULL AS enabled,
+            u.two_factor_secret_enc IS NOT NULL AS has_secret,
+            u.two_factor_locked_until IS NOT NULL AS locked,
+            u.two_factor_failed_attempts AS failed_attempts,
+            u.two_factor_reset_requested_at IS NOT NULL AS reset_pending,
+            (SELECT count(*) FROM two_factor_recovery_codes c WHERE c.user_id = u.id AND c.used_at IS NULL) AS unused_codes
+     FROM users u WHERE u.email = $1`,
+    [email],
+  )
+  const row = rows[0]
+  if (!row) throw new Error(`getTwoFactorState: no user with email ${email}`)
+  return {
+    enabled: row.enabled,
+    hasSecret: row.has_secret,
+    locked: row.locked,
+    failedAttempts: row.failed_attempts,
+    resetPending: row.reset_pending,
+    unusedRecoveryCodes: Number(row.unused_codes),
+  }
 }
 
 /** Same row backend-ia writes when it finds a candidate (matching_service.py). */

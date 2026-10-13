@@ -246,15 +246,36 @@ CREATE TABLE users (
   phone VARCHAR(20),
   email_verified_at TIMESTAMP,              -- null = email sin verificar
   token_version INT NOT NULL DEFAULT 0,     -- viaja en el JWT como `tv`; subirla cierra todas las sesiones
+  two_factor_secret_enc TEXT,               -- secreto TOTP cifrado (AES-256-GCM); null = sin 2FA
+  two_factor_enabled_at TIMESTAMP,          -- null con secreto presente = alta iniciada y sin confirmar
+  two_factor_last_step INT,                 -- último paso TOTP aceptado (anti-replay)
+  two_factor_failed_attempts INT NOT NULL DEFAULT 0,
+  two_factor_locked_until TIMESTAMP,        -- bloqueo del segundo paso
+  two_factor_reset_requested_at TIMESTAMP,  -- inicio de la espera de 72 h del reinicio; null = sin reinicio
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Códigos de recuperación del 2FA: 10 por juego, solo el sha256, de un solo uso.
+CREATE TABLE two_factor_recovery_codes (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  used_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (user_id, code_hash)
 );
 ```
 
 #### `auth_tokens`
 ```sql
 -- Tokens de un solo uso de los links que salen por mail. Solo se guarda el sha256.
-CREATE TYPE auth_token_type AS ENUM ('email_verification', 'password_reset');
+-- Los tres `two_factor_*` son el desafío del login (5 min), el link de confirmar el reinicio
+-- de 2FA (30 min) y el de cancelarlo (7 días, cubre las 72 h de espera).
+CREATE TYPE auth_token_type AS ENUM (
+  'email_verification', 'password_reset',
+  'two_factor_login', 'two_factor_reset', 'two_factor_reset_cancel'
+);
 
 CREATE TABLE auth_tokens (
   id SERIAL PRIMARY KEY,
@@ -389,7 +410,13 @@ CREATE TABLE notifications (
 ### Auth
 ```http
 POST /api/auth/register
-POST /api/auth/login
+POST /api/auth/login                 → { token, user } | { twoFactorRequired, twoFactorToken, resetEffectiveAt? }
+POST /api/auth/2fa/login             { twoFactorToken, code }  → { token, user }
+GET  /api/auth/2fa/status            (requiere sesión)
+POST /api/auth/2fa/setup | enable | disable | recovery-codes   (requieren sesión)
+POST /api/auth/2fa/reset/request     { twoFactorToken, password } → manda el mail de confirmación
+POST /api/auth/2fa/reset/confirm     { token } → arranca la espera de 72 h, { message, resetEffectiveAt }
+POST /api/auth/2fa/reset/cancel      { token } → cancela el reinicio, sin sesión
 GET  /api/auth/me                    (requiere sesión)
 POST /api/auth/verify-email          { token }
 POST /api/auth/verify-email/resend   (requiere sesión; 409 si ya está verificado)
@@ -412,6 +439,43 @@ POST /api/auth/refresh
 > sesión; `send_message` relee el estado de verificación de la base en cada envío
 > y responde por el ack `{ ok: false, error, code: "EMAIL_NOT_VERIFIED" }`, así
 > verificar a mitad de sesión funciona sin reconectar.
+
+### Segundo factor (2FA)
+
+Verificación opcional en dos pasos con TOTP (SHA1, 6 dígitos, 30 s, ventana de ±1 paso).
+El secreto se guarda cifrado con `TWO_FACTOR_ENCRYPTION_KEY` y atado al usuario; el activar
+exige email verificado. Los códigos de recuperación (10, `XXXXX-XXXXX`) se muestran una sola
+vez y se guardan hasheados.
+
+- **Desafío del login.** Con 2FA activo, `POST /api/auth/login` con la contraseña correcta no
+  devuelve un JWT sino un desafío opaco de 5 minutos (un `auth_token` hasheado, no es un JWT ni
+  una sesión: `requireAuth`, `optionalAuth` y el handshake del socket lo rechazan). Un código
+  equivocado o un bloqueo no lo gastan; solo lo consume un segundo factor válido en
+  `POST /api/auth/2fa/login`. Uno nuevo reemplaza al anterior y desactivar el 2FA los invalida.
+- **Bloqueo.** Un contador por usuario en la base, compartido por `/2fa/login`, desactivar y
+  regenerar códigos: se suma antes de evaluar el código, a los 5 fallos la cuenta queda
+  bloqueada 15 minutos y nunca se evalúan más de 5 códigos entre reinicios del contador, ni
+  con requests en paralelo. Activar y pedir el reinicio no lo usan. El control por IP
+  (`twoFactorLimiter`, `accountLimiter`) es secundario.
+- **Sesiones.** Activar, desactivar, regenerar, entrar con un código de recuperación y
+  completar un reinicio suben `token_version`: las demás sesiones mueren y la que actúa recibe
+  un JWT nuevo.
+- **Reinicio demorado de 72 h (autoservicio, sin admin).** Quien perdió el dispositivo y los
+  códigos lo pide desde el segundo paso del login con el desafío y la contraseña (el bloqueo no
+  lo frena); recibe un mail, y recién al confirmar el link (con un click explícito) arranca una
+  espera de 72 h medida con la hora de la base (`two_factor_reset_requested_at`). Durante la
+  espera llega un aviso con el link para cancelar, y cualquier login real de segundo factor
+  (TOTP o código de recuperación) también cancela el reinicio. Restablecer la contraseña por
+  email no lo toca. Cumplidas las 72 h, el próximo login con contraseña correcta lo completa en
+  una sola transacción: apaga el 2FA, borra los códigos, invalida los tokens de 2FA, sube
+  `token_version` y devuelve la sesión en esa misma respuesta. Es una finalización perezosa,
+  que ocurre al iniciar sesión: no hay cron ni jobs. Con logins vencidos en paralelo, uno solo aplica el
+  cambio y manda el aviso; los demás reciben igual una sesión válida. Un reinicio vencido se
+  completa aunque la cuenta esté bloqueada o falte la clave de cifrado.
+- **Limitación aceptada.** Quien conoce la contraseña puede bloquear el segundo paso de la
+  cuenta con intentos fallidos (15 minutos por vez), y con el correo del dueño comprometido
+  puede iniciar un reinicio: el aviso con el link de cancelación y las 72 h de espera son lo
+  que le da tiempo al dueño. No se agregó una defensa adicional contra el bloqueo.
 
 ### Usuarios
 ```http
@@ -636,6 +700,9 @@ REDIS_URL=redis://redis:6379
 # Auth
 JWT_SECRET=your-secret-key
 JWT_EXPIRY=24h
+# Cifra los secretos del 2FA. Obligatoria en producción (openssl rand -base64 32);
+# fuera de producción, si falta, se deriva de JWT_SECRET.
+TWO_FACTOR_ENCRYPTION_KEY=
 
 # External Services
 R2_ACCOUNT_ID=your-account
@@ -658,7 +725,8 @@ SMTP_PASS=your-smtp-password
 MAIL_FROM="PATITAS <no-reply@patitas.app>"
 
 # Other
-# También es la base de los links que salen por mail (/verify-email, /reset-password).
+# También es la base de los links que salen por mail (/verify-email, /reset-password,
+# /two-factor/reset/confirm, /two-factor/reset/cancel).
 FRONTEND_URL=https://patitas.app
 ```
 

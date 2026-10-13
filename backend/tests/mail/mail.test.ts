@@ -188,6 +188,51 @@ describe("mail.service", () => {
     expect(message.html).toContain("http://front/reset-password?token=abc");
   });
 
+  test("sendTwoFactorRecoveryCodeUsed avisa cuántos códigos quedan, sin incluir ningún código", async () => {
+    await mailService.sendTwoFactorRecoveryCodeUsed("ana@example.com", 9);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const message = send.mock.calls[0][0];
+    expect(message.to).toBe("ana@example.com");
+    expect(message.subject).toMatch(/código de recuperación/i);
+    expect(message.text).toContain("Te quedan 9 códigos de recuperación");
+    expect(message.html).toContain("Te quedan 9 códigos de recuperación");
+    expect(message.text).not.toMatch(/[A-Z2-7]{5}-[A-Z2-7]{5}/);
+  });
+
+  test("sendTwoFactorRecoveryCodeUsed distingue uno y ningún código restante", async () => {
+    await mailService.sendTwoFactorRecoveryCodeUsed("ana@example.com", 1);
+    await mailService.sendTwoFactorRecoveryCodeUsed("ana@example.com", 0);
+
+    expect(send.mock.calls[0][0].text).toContain("Te queda 1 código de recuperación");
+    expect(send.mock.calls[1][0].text).toContain("Ya no te quedan códigos de recuperación");
+  });
+
+  test("sendTwoFactorEnabled avisa la activación al destinatario, sin links ni códigos", async () => {
+    await mailService.sendTwoFactorEnabled("ana@example.com");
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const message = send.mock.calls[0][0];
+    expect(message.to).toBe("ana@example.com");
+    expect(message.subject).toMatch(/verificación en dos pasos.*activ/i);
+    expect(message.text).toMatch(/activ/i);
+    expect(message.text).not.toMatch(/https?:\/\//);
+    expect(message.text).not.toMatch(/[A-Z2-7]{5}-[A-Z2-7]{5}/);
+    expect(message.html).not.toMatch(/https?:\/\//);
+  });
+
+  test("sendTwoFactorDisabled avisa la desactivación y distingue su asunto del de activación", async () => {
+    await mailService.sendTwoFactorEnabled("ana@example.com");
+    await mailService.sendTwoFactorDisabled("ana@example.com");
+
+    const [enabled, disabled] = send.mock.calls.map((call) => call[0]);
+    expect(disabled.to).toBe("ana@example.com");
+    expect(disabled.subject).toMatch(/desactiv/i);
+    expect(disabled.subject).not.toBe(enabled.subject);
+    expect(disabled.text).toMatch(/desactiv/i);
+    expect(disabled.text).not.toMatch(/https?:\/\//);
+  });
+
   test("propaga el error del adaptador para que el llamador decida", async () => {
     send.mockRejectedValue(new Error("smtp caído"));
 

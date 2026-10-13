@@ -68,3 +68,18 @@ MAIL_FROM="PATITAS <no-reply@patitas.local>"
 **En producción `SMTP_HOST` es obligatorio** para que funcionen el reenvío de verificación y la recuperación de contraseña: sin él ambos endpoints responden `503` `MAIL_NOT_CONFIGURED`. En desarrollo no hace falta: sin `SMTP_HOST` el backend imprime el email (con el enlace) en su consola; con `NODE_ENV=test` no imprime nada.
 
 `FRONTEND_URL` define la base de los enlaces del email (`/verify-email?token=...`, `/reset-password?token=...`); el default es `http://localhost:5173`.
+
+---
+
+## Segundo factor (2FA) — `TWO_FACTOR_ENCRYPTION_KEY` (solo `backend/.env`)
+
+El backend cifra el secreto TOTP de cada usuario con esta clave. El detalle está en `backend/README.md`.
+
+```
+# backend/.env
+TWO_FACTOR_ENCRYPTION_KEY=   # openssl rand -base64 32
+```
+
+**En producción `TWO_FACTOR_ENCRYPTION_KEY` es obligatoria** (32 bytes en base64 o 64 caracteres hexadecimales): sin ella, activar o usar el 2FA responde `503` `TWO_FACTOR_NOT_CONFIGURED`; el login de cuentas sin 2FA sigue funcionando. En desarrollo y test, si falta, se deriva de `JWT_SECRET`.
+
+Si se pierde o se cambia la clave, los secretos ya cifrados no se pueden descifrar y los usuarios con 2FA quedan sin poder pasar el segundo paso. Ellos mismos pueden pedir el reinicio por autoservicio de 72 h desde el login (el mail de confirmación necesita `SMTP_HOST` en producción y los links usan `FRONTEND_URL`); ese reinicio no necesita la clave. La otra salida es desactivarles el 2FA directo en la base.

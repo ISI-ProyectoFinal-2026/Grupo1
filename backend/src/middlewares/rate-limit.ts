@@ -20,6 +20,20 @@ export const globalLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === "test",
 });
 
+// Segundo factor (login, activar, desactivar, regenerar códigos): el control
+// principal es el bloqueo por usuario en la base; esto frena además el barrido
+// de desafíos desde una misma IP.
+export const TWO_FACTOR_RATE_LIMIT = 20;
+
+export const twoFactorLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  max: TWO_FACTOR_RATE_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: "Demasiados intentos, esperá unos minutos" } },
+  skip: () => process.env.NODE_ENV === "test",
+});
+
 // Va después de requireAuth: el cupo es por usuario y no por IP, para no
 // bloquear a varios usuarios que comparten red (NAT, wifi pública).
 export const reportCreateLimiter = rateLimit({

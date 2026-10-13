@@ -10,7 +10,8 @@ import {
   resetPassword,
   verifyEmail,
 } from '@/services/auth.service'
-import type { AuthResponse, AuthUser } from '@/types/auth'
+import { isTwoFactorChallenge } from '@/types/auth'
+import type { AuthResponse, AuthUser, TwoFactorChallenge } from '@/types/auth'
 
 vi.mock('@/services/api', () => ({
   api: { get: vi.fn(), post: vi.fn() },
@@ -47,6 +48,36 @@ describe('auth.service', () => {
       password: 'secreta123',
     })
     expect(resultado).toEqual(sesion)
+  })
+
+  // Con 2FA activo la contraseña sola no da sesión: el backend devuelve un
+  // desafío opaco, sin token. El resultado es una unión discriminada y el
+  // llamador tiene que resolver las dos ramas para que compile.
+  it('devuelve el desafio de segundo factor, sin token, desde POST /auth/login', async () => {
+    const desafio: TwoFactorChallenge = {
+      twoFactorRequired: true,
+      twoFactorToken: 'desafio-opaco',
+      resetEffectiveAt: '2026-10-20T12:00:00.000Z',
+    }
+    vi.mocked(api.post).mockResolvedValue(respuesta(desafio))
+
+    const resultado = await login({ email: usuario.email, password: 'secreta123' })
+
+    expect(resultado).toEqual(desafio)
+    expect(resultado).not.toHaveProperty('token')
+    if (!isTwoFactorChallenge(resultado)) throw new Error('se esperaba el desafio')
+    expect(resultado.twoFactorToken).toBe('desafio-opaco')
+  })
+
+  it('una cuenta con 2FA sigue recibiendo token y usuario cuando no hay desafio', async () => {
+    const conDosPasos: AuthUser = { ...usuario, twoFactorEnabled: true }
+    vi.mocked(api.post).mockResolvedValue(respuesta({ token: 'jwt', user: conDosPasos }))
+
+    const resultado = await login({ email: usuario.email, password: 'secreta123' })
+
+    expect(isTwoFactorChallenge(resultado)).toBe(false)
+    if (isTwoFactorChallenge(resultado)) throw new Error('se esperaba la sesion')
+    expect(resultado.user.twoFactorEnabled).toBe(true)
   })
 
   // El registro no autentica: devuelve el usuario creado, sin token. Si algun

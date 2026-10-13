@@ -53,7 +53,13 @@ function MainLayout() {
               </Link>
             )}
             <NotificationBell />
-            <span className="text-gray-600">{user.email}</span>
+            <Link
+              to="/account/security"
+              aria-label={`Seguridad de la cuenta: ${user.email}`}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              {user.email}
+            </Link>
             <button
               type="button"
               onClick={handleLogout}
