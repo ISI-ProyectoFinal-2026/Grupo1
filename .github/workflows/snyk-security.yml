@@ -37,11 +37,27 @@ jobs:
       - name: Install Node.js dependencies
         run: cd backend && npm install
 
+      - name: Install Node.js dependencies (frontend)
+        run: cd frontend && npm install
+
       - name: Install Python dependencies
         run: cd backend-ia && pip install -r requirements.txt || true
 
+      # falla el pipeline ante vulnerabilidades críticas
+      - name: Snyk Open Source test (backend)
+        run: cd backend && snyk test --severity-threshold=critical
+
+      - name: Snyk Open Source test (frontend)
+        run: cd frontend && snyk test --severity-threshold=critical
+
       - name: Snyk Code test
         run: cd backend && snyk code test --sarif > snyk-code.sarif || true
+
+      - name: Snyk Code test (frontend)
+        run: cd frontend && snyk code test || true
+
+      - name: Snyk Code test (backend-ia)
+        run: cd backend-ia && snyk code test || true
 
       - name: Snyk monitor all projects
         run: snyk monitor --all-projects || true
