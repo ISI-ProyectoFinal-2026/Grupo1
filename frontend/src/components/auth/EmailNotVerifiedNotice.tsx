@@ -1,4 +1,5 @@
 import ResendVerificationButton from "@/components/auth/ResendVerificationButton";
+import { cn } from "@/lib/cn";
 
 interface EmailNotVerifiedNoticeProps {
   className?: string;
@@ -13,7 +14,10 @@ function EmailNotVerifiedNotice({ className = "" }: EmailNotVerifiedNoticeProps)
   return (
     <div
       role="alert"
-      className={`flex flex-col items-start gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 ${className}`}
+      className={cn(
+        "flex flex-col items-start gap-3 rounded-card border border-signal bg-signal/15 p-4 text-sm text-ink",
+        className,
+      )}
     >
       <p>Verificá tu email para poder hacer esto. Revisá tu casilla o pedí otro email.</p>
       <ResendVerificationButton />

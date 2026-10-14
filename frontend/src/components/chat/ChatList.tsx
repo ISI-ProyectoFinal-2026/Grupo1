@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import Spinner from '@/components/ui/Spinner'
+import { UserIcon } from '@/components/ui/icons'
+import { cn } from '@/lib/cn'
 import type { ChatDTO } from '@/types/chat.types'
 
 interface ChatListProps {
@@ -18,7 +20,7 @@ function formatDate(dateString: string): string {
 function ChatList({ chats, currentUserId, activeChatId, isLoading, error }: ChatListProps) {
   if (isLoading) {
     return (
-      <div className='flex justify-center py-8 text-gray-400'>
+      <div className='flex justify-center py-8 text-ink-muted'>
         <Spinner size='md' />
       </div>
     )
@@ -29,11 +31,11 @@ function ChatList({ chats, currentUserId, activeChatId, isLoading, error }: Chat
   }
 
   if (chats.length === 0) {
-    return <p className='px-4 py-8 text-center text-sm text-gray-500'>No tenés conversaciones.</p>
+    return <p className='px-4 py-10 text-center text-ink-muted'>No tenés conversaciones.</p>
   }
 
   return (
-    <ul className='divide-y divide-gray-100'>
+    <ul className='divide-y divide-line'>
       {chats.map((chat) => {
         const participantId = chat.userAId === currentUserId ? chat.userBId : chat.userAId
         const isActive = chat.id === activeChatId
@@ -43,19 +45,22 @@ function ChatList({ chats, currentUserId, activeChatId, isLoading, error }: Chat
             <Link
               to={`/chats/${chat.id}`}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex items-center justify-between gap-2 px-4 py-3 transition-colors hover:bg-gray-50 ${
-                isActive ? 'bg-blue-50' : ''
-              }`}
+              className={cn(
+                'relative flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-surface',
+                isActive &&
+                  'bg-surface before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-signal'
+              )}
             >
-              <div className='min-w-0'>
-                <p className='truncate text-sm font-medium text-gray-900'>
-                  Usuario #{participantId}
-                </p>
-                <p className='truncate text-xs text-gray-500'>
+              <span className='grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface text-ink-muted ring-1 ring-line'>
+                <UserIcon className='h-5 w-5' />
+              </span>
+              <div className='min-w-0 flex-1'>
+                <p className='truncate font-bold text-ink'>Usuario #{participantId}</p>
+                <p className='truncate text-sm text-ink-muted'>
                   {chat.reportId ? `Reporte #${chat.reportId}` : 'Sin reporte asociado'}
                 </p>
               </div>
-              <time dateTime={chat.createdAt} className='shrink-0 text-xs text-gray-400'>
+              <time dateTime={chat.createdAt} className='shrink-0 self-start text-sm text-ink-muted'>
                 {formatDate(chat.createdAt)}
               </time>
             </Link>

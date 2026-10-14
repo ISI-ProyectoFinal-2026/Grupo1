@@ -1,32 +1,33 @@
 import { useNavigate } from 'react-router-dom'
+import { buttonClasses } from '@/components/ui/buttonClasses'
+import { PawIcon } from '@/components/ui/icons'
 
 export default function NotFound() {
   const navigate = useNavigate()
 
   return (
-    <div className='min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4'>
-      <div className='max-w-md w-full text-center'>
-        <div className='mb-8'>
-          <h1 className='text-9xl font-bold text-gray-200'>404</h1>
-          <h2 className='text-3xl font-bold text-gray-900 mt-4'>Página no encontrada</h2>
-          <p className='mt-2 text-gray-600'>La página que buscas no existe o fue movida.</p>
-        </div>
+    <main className='flex min-h-screen items-center justify-center bg-surface px-4 py-12'>
+      <div className='w-full max-w-sm text-center'>
+        <PawIcon className='mx-auto h-10 w-10 -rotate-12 text-ink-muted' />
+        <p className='tabular mt-4 font-display text-[6rem] font-extrabold leading-none tracking-tight text-ink'>
+          404
+        </p>
+        <h1 className='mt-4 font-display text-display-md'>Página no encontrada</h1>
+        <p className='mt-2 text-ink-muted'>La página que buscas no existe o fue movida.</p>
 
-        <div className='space-y-3'>
+        <div className='mt-8 flex flex-col gap-3'>
+          <button type='button' onClick={() => navigate('/')} className={buttonClasses('primary', 'lg', 'w-full')}>
+            Ir a inicio
+          </button>
           <button
+            type='button'
             onClick={() => navigate(-1)}
-            className='w-full px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-medium'
+            className={buttonClasses('secondary', 'lg', 'w-full')}
           >
             ← Volver atrás
           </button>
-          <button
-            onClick={() => navigate('/')}
-            className='w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium'
-          >
-            Ir a inicio
-          </button>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

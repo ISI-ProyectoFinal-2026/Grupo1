@@ -1,5 +1,8 @@
+import { useState } from "react";
 import type { ReportType } from "@/types/report.types";
 import Input from "@/components/ui/Input";
+import { FilterIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
 
 interface FilterBarProps {
   type: ReportType | "";
@@ -22,51 +25,81 @@ export default function FilterBar({
   onDateFromChange,
   onDateToChange,
 }: FilterBarProps) {
+  // En mobile zona y fechas se pliegan detras de "Más filtros"; en desktop
+  // siempre estan a la vista. Los campos quedan siempre montados.
+  const [isExpanded, setIsExpanded] = useState(false);
+  const extraCount = [zone, dateFrom, dateTo].filter(Boolean).length;
+
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-      <h3 className="font-semibold text-gray-900 mb-4">Filtros</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="flex flex-col gap-2">
-          <label htmlFor="filter-type" className="text-sm font-medium text-gray-700">
-            Tipo
-          </label>
-          <select
-            id="filter-type"
-            value={type}
-            onChange={(e) => onTypeChange((e.target.value as ReportType) || "")}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+    <section aria-label="Filtros" className="card p-3 sm:p-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="flex items-end gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <label htmlFor="filter-type" className="field-label">
+              Tipo
+            </label>
+            <select
+              id="filter-type"
+              value={type}
+              onChange={(e) => onTypeChange((e.target.value as ReportType) || "")}
+              className="field"
+            >
+              <option value="">Todos</option>
+              <option value="lost">Perdidas</option>
+              <option value="found">Encontradas</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-controls="filtros-extra"
+            onClick={() => setIsExpanded((open) => !open)}
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-control border border-line bg-paper px-3 font-bold text-ink transition-colors hover:border-ink-muted md:hidden"
           >
-            <option value="">Todos</option>
-            <option value="lost">Perdidas</option>
-            <option value="found">Encontradas</option>
-          </select>
+            <FilterIcon className="h-5 w-5" />
+            Más filtros
+            {extraCount > 0 && (
+              <span className="tabular grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 text-xs text-white">
+                {extraCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        <Input
-          label="Zona"
-          id="filter-zone"
-          type="text"
-          placeholder="Ej: San Telmo"
-          value={zone}
-          onChange={(e) => onZoneChange(e.target.value)}
-        />
-
-        <Input
-          label="Desde"
-          id="filter-date-from"
-          type="date"
-          value={dateFrom}
-          onChange={(e) => onDateFromChange(e.target.value)}
-        />
-
-        <Input
-          label="Hasta"
-          id="filter-date-to"
-          type="date"
-          value={dateTo}
-          onChange={(e) => onDateToChange(e.target.value)}
-        />
+        <div
+          id="filtros-extra"
+          className={cn(
+            isExpanded ? "grid" : "hidden",
+            "grid-cols-2 gap-3 md:col-span-3 md:grid md:grid-cols-3",
+          )}
+        >
+          <div className="col-span-2 md:col-span-1">
+            <Input
+              label="Zona"
+              id="filter-zone"
+              type="text"
+              autoComplete="off"
+              placeholder="Ej: San Telmo…"
+              value={zone}
+              onChange={(e) => onZoneChange(e.target.value)}
+            />
+          </div>
+          <Input
+            label="Desde"
+            id="filter-date-from"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => onDateFromChange(e.target.value)}
+          />
+          <Input
+            label="Hasta"
+            id="filter-date-to"
+            type="date"
+            value={dateTo}
+            onChange={(e) => onDateToChange(e.target.value)}
+          />
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

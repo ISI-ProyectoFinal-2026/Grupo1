@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  createReportSchema,
-  imageUploadSchema,
-  reportLocationSchema,
-} from '@/types/validators/report.validator'
+import { createReportSchema, reportLocationSchema } from '@/types/validators/report.validator'
 
 function formularioValido(overrides: Record<string, unknown> = {}) {
   return {
@@ -83,19 +79,5 @@ describe('reportLocationSchema', () => {
     ['longitud fuera de rango', { lat: 0, lng: 181 }],
   ])('rechaza %s', (_caso, coordenadas) => {
     expect(reportLocationSchema.safeParse(coordenadas).success).toBe(false)
-  })
-})
-
-describe('imageUploadSchema', () => {
-  it('acepta los tres formatos habilitados', () => {
-    for (const contentType of ['image/jpeg', 'image/png', 'image/webp']) {
-      expect(imageUploadSchema.safeParse({ fileName: 'foto', contentType }).success).toBe(true)
-    }
-  })
-
-  it('rechaza un formato no soportado', () => {
-    expect(
-      imageUploadSchema.safeParse({ fileName: 'animacion', contentType: 'image/gif' }).success
-    ).toBe(false)
   })
 })

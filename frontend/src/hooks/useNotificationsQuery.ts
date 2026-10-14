@@ -6,7 +6,7 @@ import {
 } from '@/services/notifications.service'
 import type { NotificationDTO } from '@/types/notification.types'
 
-export const notificationsQueryKey = ['notifications'] as const
+const notificationsQueryKey = ['notifications'] as const
 
 // el backend no emite evento de socket para notificaciones: el tiempo real va por polling
 export const NOTIFICATIONS_POLL_INTERVAL_MS = 30000

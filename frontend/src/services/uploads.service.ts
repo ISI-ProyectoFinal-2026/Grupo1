@@ -15,7 +15,7 @@ export const ALLOWED_UPLOAD_TYPES: UploadContentType[] = [
   "image/webp",
 ];
 
-export interface PresignedUploadResponse {
+interface PresignedUploadResponse {
   uploadUrl: string;
   publicUrl: string;
   key: string;

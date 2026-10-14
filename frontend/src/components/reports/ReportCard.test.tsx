@@ -45,7 +45,8 @@ describe('ReportCard', () => {
 
     expect(screen.getByText('Perro perdido en Nueva Córdoba')).toBeInTheDocument()
     expect(screen.getByText('Collar rojo, responde a Pepe')).toBeInTheDocument()
-    expect(screen.getByText(/📍/)).toHaveTextContent('Nueva Córdoba')
+    // la zona va junto al icono de pin (SVG decorativo, ya no el emoji 📍)
+    expect(screen.getByText('Nueva Córdoba')).toBeInTheDocument()
     expect(screen.getByText('Perdido')).toBeInTheDocument()
   })
 
@@ -62,13 +63,13 @@ describe('ReportCard', () => {
     renderCard(reporte({ imageUrl: null }))
 
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
-    expect(screen.getByText('🐾')).toBeInTheDocument()
+    expect(screen.getByText('Sin foto')).toBeInTheDocument()
   })
 
   it('usa textos por defecto cuando faltan descripcion y zona', () => {
     renderCard(reporte({ description: null, locationAddress: null }))
 
     expect(screen.getByText('Sin descripción')).toBeInTheDocument()
-    expect(screen.getByText(/📍/)).toHaveTextContent('Ubicación desconocida')
+    expect(screen.getByText('Ubicación desconocida')).toBeInTheDocument()
   })
 })

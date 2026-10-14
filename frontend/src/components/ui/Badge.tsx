@@ -1,14 +1,22 @@
+import { cn } from "@/lib/cn";
+
 interface BadgeProps {
   label: string;
   color?: string;
   backgroundColor?: string;
+  className?: string;
 }
 
-function Badge({ label, color, backgroundColor }: BadgeProps) {
+// Pastilla de estado. El color llega de afuera (la API define los colores de
+// las etiquetas), por eso va inline.
+function Badge({ label, color, backgroundColor, className }: BadgeProps) {
   const bgColor = backgroundColor || color;
   return (
     <span
-      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+      className={cn(
+        "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold leading-none text-white",
+        className,
+      )}
       style={{ backgroundColor: bgColor }}
     >
       {label}

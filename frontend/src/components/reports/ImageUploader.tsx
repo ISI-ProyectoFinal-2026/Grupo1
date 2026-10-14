@@ -8,6 +8,8 @@ import {
   type UploadContentType,
 } from "@/services/uploads.service";
 import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
+import { CameraIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
 import { getApiErrorCode } from "@/services/api";
 
 interface ImageUploaderProps {
@@ -106,53 +108,39 @@ export default function ImageUploader({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-center w-full">
-        <label
-          htmlFor={inputId}
-          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 bg-gray-50"
-        >
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            {preview ? (
-              <>
-                <img src={preview} alt="preview" className="h-20 w-20 object-cover rounded" />
-                <p className="text-xs text-gray-500 mt-2">Subiendo...</p>
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-8 h-8 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                <p className="text-sm text-gray-600 mt-2">
-                  Click aquí o arrastra una imagen
-                </p>
-                    <p className="text-xs text-gray-500">
-                  JPG, PNG o WebP (máx. {MAX_SIZE_MB}MB)
-                </p>
-              </>
-            )}
-          </div>
-          <input
-            ref={fileInputRef}
-            id={inputId}
-            type="file"
-            className="hidden"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleFileSelect}
-            disabled={isLoading}
-          />
-        </label>
-      </div>
+    <div className="flex flex-col gap-3">
+      <label
+        htmlFor={inputId}
+        className={cn(
+          "flex min-h-36 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-card border-2 border-dashed border-line bg-surface px-4 py-6 text-center transition-colors hover:border-ink-muted",
+          "has-[:focus-visible]:border-ink has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ink/25",
+          isLoading && "cursor-progress",
+        )}
+      >
+        {preview ? (
+          <>
+            <img src={preview} alt="preview" width={80} height={80} className="h-20 w-20 rounded-control object-cover" />
+            <p className="mt-2 text-sm text-ink-muted">Subiendo…</p>
+          </>
+        ) : (
+          <>
+            <CameraIcon className="h-8 w-8 text-ink-muted" />
+            <p className="mt-1 font-bold text-ink">Tocá para elegir una foto</p>
+            <p className="text-sm text-ink-muted">
+              JPG, PNG o WebP (máx. {MAX_SIZE_MB}MB)
+            </p>
+          </>
+        )}
+        <input
+          ref={fileInputRef}
+          id={inputId}
+          type="file"
+          className="sr-only"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={handleFileSelect}
+          disabled={isLoading}
+        />
+      </label>
       {error && <ActionErrorMessage message={error} code={errorCode} />}
     </div>
   );

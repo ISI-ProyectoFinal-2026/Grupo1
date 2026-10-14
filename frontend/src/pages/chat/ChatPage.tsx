@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import ChatList from '@/components/chat/ChatList'
 import ChatWindow from '@/components/chat/ChatWindow'
 import { useChatMessagesQuery } from '@/hooks/useChatMessagesQuery'
@@ -6,6 +6,8 @@ import { useChatSocket } from '@/hooks/useChatSocket'
 import { useChatsQuery } from '@/hooks/useChatsQuery'
 import { useAuthStore } from '@/stores/auth.store'
 import type { SendMessageInput } from '@/types/chat.types'
+import { ChatIcon, ChevronLeftIcon } from '@/components/ui/icons'
+import { cn } from '@/lib/cn'
 
 function toErrorMessage(error: unknown): string | null {
   return error instanceof Error ? error.message : null
@@ -32,14 +34,24 @@ function ChatPage() {
 
   if (!currentUserId) return null
 
+  const activeChat = chatsQuery.data?.find((chat) => chat.id === chatId)
+  const participantId = activeChat
+    ? activeChat.userAId === currentUserId
+      ? activeChat.userBId
+      : activeChat.userAId
+    : undefined
+
   return (
-    <div className='mx-auto flex h-[calc(100vh-4rem)] max-w-5xl gap-4 p-4'>
+    // Alto fijo a la pantalla: la lista y la conversacion scrollean por dentro,
+    // y el composer queda siempre a mano sobre la tab bar.
+    <div className='mx-auto flex h-app max-w-6xl md:gap-4 md:p-4 lg:h-dvh lg:p-6'>
       <aside
-        className={`w-full overflow-y-auto rounded-lg border border-gray-200 bg-white md:w-72 md:shrink-0 ${
+        className={cn(
+          'w-full overflow-y-auto bg-paper md:card md:w-80 md:shrink-0',
           chatId ? 'hidden md:block' : ''
-        }`}
+        )}
       >
-        <h1 className='border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-900'>
+        <h1 className='sticky top-0 z-10 border-b border-line bg-paper px-4 py-3 font-display text-display-md'>
           Conversaciones
         </h1>
         <ChatList
@@ -51,10 +63,12 @@ function ChatPage() {
         />
       </aside>
 
-      <main
-        className={`flex-1 overflow-hidden rounded-lg border border-gray-200 bg-white ${
-          chatId ? '' : 'hidden md:block'
-        }`}
+      <section
+        aria-label='Conversación'
+        className={cn(
+          'min-w-0 flex-1 overflow-hidden bg-paper md:card',
+          chatId ? 'flex flex-col' : 'hidden md:flex md:flex-col'
+        )}
       >
         {chatId ? (
           <ChatWindow
@@ -66,13 +80,24 @@ function ChatPage() {
             sendError={socketError}
             sendErrorCode={socketErrorCode}
             onSend={handleSend}
+            title={participantId !== undefined ? `Usuario #${participantId}` : undefined}
+            headerStart={
+              <Link
+                to='/chats'
+                aria-label='Volver a conversaciones'
+                className='grid h-11 w-11 shrink-0 place-items-center rounded-full text-ink transition-colors hover:bg-ink/5 md:hidden'
+              >
+                <ChevronLeftIcon className='h-6 w-6' />
+              </Link>
+            }
           />
         ) : (
-          <p className='flex h-full items-center justify-center px-4 text-center text-sm text-gray-500'>
-            Elegí una conversación para ver los mensajes.
-          </p>
+          <div className='flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-ink-muted'>
+            <ChatIcon className='h-10 w-10' strokeWidth={1.5} />
+            <p>Elegí una conversación para ver los mensajes.</p>
+          </div>
         )}
-      </main>
+      </section>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import ReportFlagList from '@/components/moderation/ReportFlagList'
 import Spinner from '@/components/ui/Spinner'
+import { CheckIcon } from '@/components/ui/icons'
 import { useReportFlagsQuery, useResolveReportFlagMutation } from '@/hooks/useReportFlagsQuery'
 
 function ModerationPage() {
@@ -12,42 +13,47 @@ function ModerationPage() {
   const resolvingId = resolveFlag.isPending ? (resolveFlag.variables ?? null) : null
 
   return (
-    <div className='p-6'>
-      <div className='mx-auto max-w-2xl'>
-        <h1 className='text-2xl font-bold text-gray-900'>Panel de moderación</h1>
-        <p className='mt-1 text-sm text-gray-600'>
-          Publicaciones denunciadas pendientes de revisión. Resolver una denuncia oculta el reporte.
-        </p>
+    <div className='mx-auto max-w-3xl px-4 py-5 sm:px-6 lg:py-8'>
+      <h1 className='font-display text-display-lg'>Panel de moderación</h1>
+      <p className='mt-2 max-w-prose text-ink-muted'>
+        Publicaciones denunciadas pendientes de revisión. Resolver una denuncia oculta el reporte.
+      </p>
 
-        <div className='mt-6'>
-          {flagsQuery.isPending && <Spinner />}
+      <div className='mt-6' aria-live='polite'>
+        {flagsQuery.isPending && (
+          <div className='flex justify-center py-10 text-ink-muted'>
+            <Spinner />
+          </div>
+        )}
 
-          {flagsQuery.isError && <ErrorMessage message='No se pudo cargar la cola de moderación' />}
+        {flagsQuery.isError && <ErrorMessage message='No se pudo cargar la cola de moderación' />}
 
-          {flagsQuery.isSuccess && (
-            <>
-              {resolveFlag.isError && (
-                <ErrorMessage
-                  className='mb-3'
-                  message={
-                    resolveFlag.error instanceof Error
-                      ? resolveFlag.error.message
-                      : 'Error inesperado, intentá de nuevo'
-                  }
-                />
-              )}
-              {resolveFlag.isSuccess && (
-                <p className='mb-3 text-sm text-green-600'>Reporte ocultado y denuncia resuelta</p>
-              )}
-
-              <ReportFlagList
-                flags={flagsQuery.data}
-                onResolve={(id) => resolveFlag.mutate(id)}
-                resolvingId={resolvingId}
+        {flagsQuery.isSuccess && (
+          <>
+            {resolveFlag.isError && (
+              <ErrorMessage
+                className='mb-3'
+                message={
+                  resolveFlag.error instanceof Error
+                    ? resolveFlag.error.message
+                    : 'Error inesperado, intentá de nuevo'
+                }
               />
-            </>
-          )}
-        </div>
+            )}
+            {resolveFlag.isSuccess && (
+              <p className='mb-3 flex items-center gap-2 font-bold text-success-ink'>
+                <CheckIcon className='h-5 w-5' />
+                Reporte ocultado y denuncia resuelta
+              </p>
+            )}
+
+            <ReportFlagList
+              flags={flagsQuery.data}
+              onResolve={(id) => resolveFlag.mutate(id)}
+              resolvingId={resolvingId}
+            />
+          </>
+        )}
       </div>
     </div>
   )

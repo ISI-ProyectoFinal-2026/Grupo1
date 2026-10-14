@@ -5,13 +5,11 @@ import {
   closeReport,
   confirmMatch,
   createReport,
-  deleteReport,
   getFlyer,
   getMatches,
   getReport,
   listReports,
   rejectMatch,
-  updateReport,
   uploadCustomFlyer,
 } from '@/services/reports.service'
 import type { MatchDTO, MatchDecisionDTO, ReportDTO } from '@/types/report.types'
@@ -99,24 +97,6 @@ describe('reports.service escritura', () => {
 
     expect(api.post).toHaveBeenCalledWith('/reports', input)
     expect(resultado).toEqual(creado)
-  })
-
-  it('actualiza parcialmente contra PUT /reports/:id', async () => {
-    const actualizado = reporte({ title: 'Titulo corregido' })
-    vi.mocked(api.put).mockResolvedValue(respuesta(actualizado))
-
-    const resultado = await updateReport(5, { title: 'Titulo corregido' })
-
-    expect(api.put).toHaveBeenCalledWith('/reports/5', { title: 'Titulo corregido' })
-    expect(resultado.title).toBe('Titulo corregido')
-  })
-
-  it('elimina contra DELETE /reports/:id y no devuelve nada', async () => {
-    vi.mocked(api.delete).mockResolvedValue(respuesta(undefined))
-
-    await expect(deleteReport(5)).resolves.toBeUndefined()
-
-    expect(api.delete).toHaveBeenCalledWith('/reports/5')
   })
 
   it('cierra el reporte contra POST /reports/:id/close', async () => {

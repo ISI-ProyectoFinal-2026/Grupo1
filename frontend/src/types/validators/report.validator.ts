@@ -34,10 +34,3 @@ export const createReportSchema = z.object({
 });
 
 export type CreateReportFormData = z.infer<typeof createReportSchema>;
-
-export const imageUploadSchema = z.object({
-  fileName: z.string(),
-  contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
-});
-
-export type ImageUploadData = z.infer<typeof imageUploadSchema>;

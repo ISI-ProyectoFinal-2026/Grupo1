@@ -1,6 +1,8 @@
 import { useState } from "react";
 import LinkFlowExit from "@/components/auth/LinkFlowExit";
+import AuthCard from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
 import { useConfirmTwoFactorReset } from "@/hooks/useConfirmTwoFactorReset";
 import { useUrlToken } from "@/hooks/useUrlToken";
 import { getApiErrorStatus } from "@/services/api";
@@ -40,64 +42,50 @@ function TwoFactorResetConfirmPage() {
 
   if (phase.kind === "invalid") {
     return (
-      <div className="p-6">
-        <div className="mx-auto max-w-sm">
-          <h1 className="text-2xl font-bold text-gray-900">Enlace no válido</h1>
-          <ErrorMessage message={INVALID_LINK_MESSAGE} className="mt-4" />
-          <LinkFlowExit />
-        </div>
-      </div>
+      <AuthCard title="Enlace no válido">
+        <ErrorMessage message={INVALID_LINK_MESSAGE} className="mt-4" />
+        <LinkFlowExit />
+      </AuthCard>
     );
   }
 
   if (phase.kind === "confirmed") {
     return (
-      <div className="p-6">
-        <div className="mx-auto max-w-sm">
-          <h1 className="text-2xl font-bold text-gray-900">Reinicio en curso</h1>
-          <p
-            role="status"
-            className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
-          >
-            El reinicio de la verificación en dos pasos se completa el{" "}
-            {formatResetDate(phase.resetEffectiveAt)}.
-          </p>
-          <p className="mt-4 text-sm text-gray-600">
-            Si no fuiste vos, podés cancelarlo desde el email que te enviamos o iniciando sesión con
-            un código válido.
-          </p>
-          <LinkFlowExit />
-        </div>
-      </div>
+      <AuthCard title="Reinicio en curso">
+        <p role="status" className="mt-5 rounded-card border border-signal bg-signal/15 p-4 text-sm font-bold text-ink">
+          El reinicio de la verificación en dos pasos se completa el{" "}
+          {formatResetDate(phase.resetEffectiveAt)}.
+        </p>
+        <p className="mt-4 text-sm text-ink-muted">
+          Si no fuiste vos, podés cancelarlo desde el email que te enviamos o iniciando sesión con
+          un código válido.
+        </p>
+        <LinkFlowExit />
+      </AuthCard>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Confirmar reinicio de la verificación en dos pasos
-        </h1>
-        <p className="mt-4 text-sm text-gray-600">
-          Al confirmar empieza una espera de 72 horas. Pasado ese tiempo vas a poder iniciar sesión
-          solo con tu contraseña y la verificación en dos pasos queda desactivada. Te mandamos un
-          email con un enlace para cancelarlo.
-        </p>
+    <AuthCard title="Confirmar reinicio de la verificación en dos pasos">
+      <p className="mt-2 text-ink-muted">
+        Al confirmar empieza una espera de 72 horas. Pasado ese tiempo vas a poder iniciar sesión
+        solo con tu contraseña y la verificación en dos pasos queda desactivada. Te mandamos un
+        email con un enlace para cancelarlo.
+      </p>
 
-        {error && <ErrorMessage message={error} className="mt-4" />}
+      {error && <ErrorMessage message={error} className="mt-4" />}
 
-        <button
-          type="button"
-          onClick={handleConfirm}
-          disabled={isPending}
-          className="mt-4 rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isPending ? "Confirmando..." : "Confirmar reinicio"}
-        </button>
+      <button
+        type="button"
+        onClick={handleConfirm}
+        disabled={isPending}
+        className={buttonClasses("danger", "lg", "mt-6 w-full")}
+      >
+        {isPending ? "Confirmando..." : "Confirmar reinicio"}
+      </button>
 
-        <LinkFlowExit />
-      </div>
-    </div>
+      <LinkFlowExit />
+    </AuthCard>
   );
 }
 

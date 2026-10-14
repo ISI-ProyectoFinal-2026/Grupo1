@@ -114,16 +114,19 @@ export default function ReportForm({ initialData }: ReportFormProps) {
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {formError && <ActionErrorMessage message={formError} code={formErrorCode} />}
 
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-gray-900">Tipo de reporte *</label>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="reportType" className="field-label">
+          Tipo de reporte *
+        </label>
         <select
+          id="reportType"
           name="reportType"
           value={formData.reportType}
           onChange={handleInputChange}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="field"
         >
-          <option value="lost">🐾 Mascota Perdida</option>
-          <option value="found">🔔 Mascota Encontrada</option>
+          <option value="lost">Mascota Perdida</option>
+          <option value="found">Mascota Encontrada</option>
         </select>
       </div>
 
@@ -133,31 +136,32 @@ export default function ReportForm({ initialData }: ReportFormProps) {
           id="title"
           name="title"
           type="text"
-          placeholder="Ej: Gato gris perdido en San Telmo"
+          autoComplete="off"
+          placeholder="Ej: Gato gris perdido en San Telmo…"
           value={formData.title || ""}
           onChange={handleInputChange}
-          className={fieldErrors.title ? "border-red-500" : ""}
+          aria-invalid={Boolean(fieldErrors.title)}
         />
         {fieldErrors.title && <ErrorMessage message={fieldErrors.title} />}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="description" className="text-sm font-medium text-gray-900">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="description" className="field-label">
           Descripción
         </label>
         <textarea
           id="description"
           name="description"
-          placeholder="Características adicionales, collar, señas particulares..."
+          placeholder="Características adicionales, collar, señas particulares…"
           value={formData.description || ""}
           onChange={handleInputChange}
           rows={4}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans"
+          className="field resize-y"
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-gray-900">Foto *</label>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="field-label mb-1.5">Foto *</legend>
         <ImageUploader
           onSuccess={handleImageUploadSuccess}
           onError={handleImageUploadError}
@@ -168,16 +172,23 @@ export default function ReportForm({ initialData }: ReportFormProps) {
           <ErrorMessage message={imageRejection} />
         ) : (
           formData.imageUrl && (
-            <p className="text-sm text-green-600">✓ Foto subida correctamente</p>
+            <div className="flex items-center gap-3">
+              <img
+                src={formData.imageUrl}
+                alt="Foto subida"
+                className="size-20 shrink-0 rounded-control border border-line object-cover"
+              />
+              <p className="text-sm font-bold text-success-ink">✓ Foto subida correctamente</p>
+            </div>
           )
         )}
-      </div>
+      </fieldset>
 
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-gray-900">Ubicación *</label>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="field-label mb-1.5">Ubicación *</legend>
         <LocationPicker onLocationSelect={handleLocationSelect} />
         {fieldErrors.location && <ErrorMessage message={fieldErrors.location} />}
-      </div>
+      </fieldset>
 
       <Button
         type="submit"

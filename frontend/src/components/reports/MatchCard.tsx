@@ -3,6 +3,8 @@ import type { MatchDTO } from "@/types/report.types";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { PawIcon } from "@/components/ui/icons";
+import { formatRelativeDate } from "@/lib/format";
 
 interface MatchCardProps {
   match: MatchDTO;
@@ -18,12 +20,13 @@ const REPORT_TYPE_LABEL: Record<MatchDTO["reportType"], string> = {
   found: "Encontrado",
 };
 
+// Tonos con contraste AA contra el texto blanco de la pastilla.
 const REPORT_TYPE_COLOR: Record<MatchDTO["reportType"], string> = {
-  lost: "#EF4444",
-  found: "#3B82F6",
+  lost: "#D93636",
+  found: "#2563EB",
 };
 
-const CONFIRMED_COLOR = "#16A34A";
+const CONFIRMED_COLOR = "#176B47";
 
 export default function MatchCard({
   match,
@@ -33,58 +36,58 @@ export default function MatchCard({
   isBusy = false,
   error = null,
 }: MatchCardProps) {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("es-AR", { month: "short", day: "numeric" });
-  };
-
   const showActions = canManage && match.status === "pending";
 
   return (
-    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-      <Link to={`/reports/${match.reportId}`} className="flex gap-4 h-32">
+    <div className="card overflow-hidden">
+      <Link
+        to={`/reports/${match.reportId}`}
+        className="flex gap-3 p-3 transition-colors hover:bg-surface"
+      >
         {match.imageUrl ? (
           <img
             src={match.imageUrl}
             alt={match.title}
-            className="w-32 h-32 object-cover"
+            width={88}
+            height={88}
+            loading="lazy"
+            className="h-[88px] w-[88px] shrink-0 rounded-[10px] object-cover"
           />
         ) : (
-          <div className="w-32 h-32 bg-gray-200 flex items-center justify-center">
-            <span className="text-4xl">🐾</span>
+          <div className="grid h-[88px] w-[88px] shrink-0 place-items-center rounded-[10px] bg-surface text-ink-muted">
+            <PawIcon className="h-8 w-8" strokeWidth={1.5} />
           </div>
         )}
 
-        <div className="flex-1 p-4 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold text-gray-900 line-clamp-1">
-                {match.title}
-              </h3>
-              <Badge
-                label={REPORT_TYPE_LABEL[match.reportType]}
-                backgroundColor={REPORT_TYPE_COLOR[match.reportType]}
-              />
-              {match.status === "confirmed" && (
-                <Badge label="Coincidencia confirmada" backgroundColor={CONFIRMED_COLOR} />
-              )}
-            </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <h3 className="line-clamp-2 break-words font-display text-base font-bold leading-snug text-ink">
+            {match.title}
+          </h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge
+              label={REPORT_TYPE_LABEL[match.reportType]}
+              backgroundColor={REPORT_TYPE_COLOR[match.reportType]}
+            />
+            {match.status === "confirmed" && (
+              <Badge label="Coincidencia confirmada" backgroundColor={CONFIRMED_COLOR} />
+            )}
           </div>
-
-          <div className="flex items-center justify-between">
+          <div className="mt-auto flex items-center justify-between gap-2 text-sm">
             {match.similarityScore !== null && (
-              <p className="text-xs text-gray-500">
+              <p className="tabular font-bold text-ink">
                 {Math.round(match.similarityScore * 100)}% de coincidencia
               </p>
             )}
-            <p className="text-xs text-gray-400">{formatDate(match.createdAt)}</p>
+            <time dateTime={match.createdAt} className="ml-auto shrink-0 text-ink-muted">
+              {formatRelativeDate(match.createdAt)}
+            </time>
           </div>
         </div>
       </Link>
 
       {showActions && (
-        <div className="border-t px-4 py-3 flex flex-col gap-2">
-          <div className="flex gap-2">
+        <div className="flex flex-col gap-2 border-t border-line p-3">
+          <div className="grid grid-cols-2 gap-2">
             <Button
               variant="primary"
               size="sm"

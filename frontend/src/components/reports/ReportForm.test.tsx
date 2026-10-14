@@ -152,6 +152,20 @@ describe('ReportForm: render', () => {
     expect(screen.getByText('✓ Foto subida correctamente')).toBeInTheDocument()
   })
 
+  it('muestra una miniatura de la foto subida', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(screen.queryByRole('img', { name: 'Foto subida' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+
+    expect(screen.getByRole('img', { name: 'Foto subida' })).toHaveAttribute(
+      'src',
+      'https://cdn/foto.jpg'
+    )
+  })
+
   it('muestra el error que reporta el uploader', async () => {
     const user = userEvent.setup()
     renderForm()

@@ -33,6 +33,6 @@ test('F1: a new user registers, logs in through the UI and publishes a report', 
 
   await expect(page).toHaveURL(/\/reports\/\d+$/)
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
-  await expect(page.getByText('Estado: published')).toBeVisible()
+  await expect(page.getByText('Estado: Publicado')).toBeVisible()
   await expect(page.getByText('Ciudad E2E')).toBeVisible()
 })

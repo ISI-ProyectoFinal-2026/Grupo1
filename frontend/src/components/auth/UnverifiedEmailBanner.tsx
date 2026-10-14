@@ -13,10 +13,10 @@ function UnverifiedEmailBanner() {
   return (
     <section
       aria-label="Verificación de email"
-      className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900"
+      className="flex flex-wrap items-center justify-between gap-3 border-b border-signal bg-signal/15 px-4 py-3 text-sm text-ink sm:px-6"
     >
-      <p>
-        Verificá tu email: te mandamos un enlace a <strong>{user.email}</strong>. Hasta
+      <p className="min-w-0 max-w-prose">
+        Verificá tu email: te mandamos un enlace a <strong className="break-all">{user.email}</strong>. Hasta
         entonces no podés publicar reportes, subir imágenes ni chatear.
       </p>
       <ResendVerificationButton />

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import ErrorMessage from '@/components/ui/ErrorMessage'
+import { FlagIcon } from '@/components/ui/icons'
 
 interface FlagReportFormProps {
   onSubmit: (reason: string) => void
@@ -37,12 +38,13 @@ export default function FlagReportForm({
   return (
     <div className='flex flex-col gap-3'>
       <Button
-        variant='secondary'
-        className='self-start'
+        variant='ghost'
+        className='w-full text-ink-muted hover:text-danger'
         aria-expanded={isOpen && !isDone}
         disabled={isDone}
         onClick={() => setIsOpen(true)}
       >
+        <FlagIcon className='h-5 w-5' />
         Denunciar
       </Button>
 
@@ -57,11 +59,13 @@ export default function FlagReportForm({
             id='flag-reason'
             name='reason'
             label='Motivo de la denuncia'
+            autoComplete='off'
+            placeholder='Ej: la foto no es de una mascota…'
             value={reason}
             error={validationError ?? undefined}
             onChange={(event) => setReason(event.target.value)}
           />
-          <div className='flex gap-3'>
+          <div className='grid grid-cols-2 gap-2'>
             <Button type='submit' variant='danger' isLoading={isPending}>
               Enviar denuncia
             </Button>
@@ -78,7 +82,7 @@ export default function FlagReportForm({
       )}
 
       {isSent && (
-        <p role='status' className='text-sm text-green-700'>
+        <p role='status' className='text-sm font-bold text-success-ink'>
           Recibimos tu denuncia. Gracias por avisar.
         </p>
       )}

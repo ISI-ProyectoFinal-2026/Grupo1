@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import ErrorMessage from '@/components/ui/ErrorMessage'
+import { CheckIcon } from '@/components/ui/icons'
 
 interface CloseReportButtonProps {
   onConfirm: () => void
@@ -21,10 +22,10 @@ export default function CloseReportButton({
     <div className='flex flex-col gap-3'>
       {isConfirming ? (
         <div className='flex flex-col gap-3'>
-          <p className='text-sm text-gray-700'>
+          <p className='text-ink'>
             ¿Seguro que querés cerrar este reporte? Va a quedar como resuelto.
           </p>
-          <div className='flex gap-3'>
+          <div className='grid grid-cols-2 gap-2'>
             <Button variant='danger' isLoading={isPending} onClick={onConfirm}>
               Confirmar cierre
             </Button>
@@ -34,7 +35,8 @@ export default function CloseReportButton({
           </div>
         </div>
       ) : (
-        <Button variant='secondary' className='self-start' onClick={() => setIsConfirming(true)}>
+        <Button variant='primary' className='w-full' onClick={() => setIsConfirming(true)}>
+          <CheckIcon className='h-5 w-5' />
           Cerrar reporte
         </Button>
       )}

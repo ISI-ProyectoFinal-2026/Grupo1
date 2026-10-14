@@ -22,15 +22,6 @@ export async function createReport(input: CreateReportInput): Promise<ReportDTO>
   return data;
 }
 
-export async function updateReport(id: number, input: Partial<CreateReportInput>): Promise<ReportDTO> {
-  const { data } = await api.put<ReportDTO>(`/reports/${id}`, input);
-  return data;
-}
-
-export async function deleteReport(id: number): Promise<void> {
-  await api.delete(`/reports/${id}`);
-}
-
 export async function closeReport(id: number): Promise<ReportDTO> {
   const { data } = await api.post<ReportDTO>(`/reports/${id}/close`);
   return data;

@@ -16,25 +16,24 @@ function MessageBubble({ message, isOwn }: MessageBubbleProps) {
   return (
     <li className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[75%] rounded-2xl px-4 py-2 ${
-          isOwn ? 'rounded-br-sm bg-blue-600 text-white' : 'rounded-bl-sm bg-gray-100 text-gray-900'
+        className={`max-w-[80%] rounded-[18px] px-3.5 py-2 sm:max-w-[70%] ${
+          isOwn ? 'rounded-br-md bg-ink text-white' : 'rounded-bl-md border border-line bg-paper text-ink'
         }`}
       >
         {message.imageUrl && (
-          <a href={message.imageUrl} target='_blank' rel='noreferrer'>
+          <a href={message.imageUrl} target='_blank' rel='noreferrer' className='block'>
             <img
               src={message.imageUrl}
               alt='Imagen enviada en el chat'
-              className='mb-1 max-h-60 max-w-full rounded-lg object-cover'
+              loading='lazy'
+              className='mb-1 max-h-60 max-w-full rounded-control object-cover'
             />
           </a>
         )}
-        {message.content && <p className='whitespace-pre-wrap break-words text-sm'>{message.content}</p>}
+        {message.content && <p className='whitespace-pre-wrap break-words'>{message.content}</p>}
         <time
           dateTime={message.createdAt}
-          className={`mt-1 block text-right text-[11px] ${
-            isOwn ? 'text-blue-100' : 'text-gray-500'
-          }`}
+          className={`mt-0.5 block text-right text-xs ${isOwn ? 'text-white/75' : 'text-ink-muted'}`}
         >
           {formatTime(message.createdAt)}
         </time>

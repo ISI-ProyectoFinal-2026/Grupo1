@@ -100,6 +100,26 @@ describe('router: rutas publicas', () => {
   })
 })
 
+describe('router: rutas solo para invitados', () => {
+  // Con sesion, el login y el registro no tienen sentido: se vuelve al inicio
+  // en vez de mostrar el formulario al lado de la barra lateral logueada.
+  it.each(['/login', '/register'])('%s con sesion redirige a home', (ruta) => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
+
+    const memoria = renderRuta(ruta)
+
+    expect(screen.getByText('pagina home')).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe('/')
+  })
+
+  it('/login sin sesion muestra el formulario y no redirige', () => {
+    const memoria = renderRuta('/login')
+
+    expect(screen.getByText('pagina login')).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe('/login')
+  })
+})
+
 describe('router: rutas protegidas', () => {
   const protegidas = [
     '/',

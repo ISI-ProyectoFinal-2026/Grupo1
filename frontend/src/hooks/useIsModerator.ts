@@ -1,7 +1,7 @@
 import { useAuthStore } from '@/stores/auth.store'
 import type { AuthUser, Role } from '@/types/auth'
 
-export const MODERATOR_ROLES: Role[] = ['moderador', 'admin']
+const MODERATOR_ROLES: Role[] = ['moderador', 'admin']
 
 /**
  * Solo decide que muestra la UI. La autorizacion real vive en el backend

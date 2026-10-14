@@ -2,7 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import AuthCard from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
 import { useResetPassword } from "@/hooks/useResetPassword";
 import { useUrlToken } from "@/hooks/useUrlToken";
 import { getApiErrorDetails, getApiErrorStatus } from "@/services/api";
@@ -13,8 +15,8 @@ const INVALID_LINK_MESSAGE = "El enlace es inválido o expiró";
 
 function RequestNewLink() {
   return (
-    <p className="mt-4 text-sm text-gray-600">
-      <Link to="/forgot-password" className="font-medium text-gray-900 underline">
+    <p className="mt-5 text-sm">
+      <Link to="/forgot-password" className="font-bold text-ink underline underline-offset-4 hover:no-underline">
         Pedir un enlace nuevo
       </Link>
     </p>
@@ -73,75 +75,66 @@ function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="p-6">
-        <div className="mx-auto max-w-sm">
-          <h1 className="text-2xl font-bold text-gray-900">Nueva contraseña</h1>
-          <ErrorMessage message={INVALID_LINK_MESSAGE} className="mt-4" />
-          <RequestNewLink />
-        </div>
-      </div>
+      <AuthCard title="Nueva contraseña">
+        <ErrorMessage message={INVALID_LINK_MESSAGE} className="mt-4" />
+        <RequestNewLink />
+      </AuthCard>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900">Nueva contraseña</h1>
+    <AuthCard title="Nueva contraseña">
+      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="password" className="field-label">
+            Contraseña nueva
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="field"
+          />
+          <p className="text-sm text-ink-muted">
+            Mínimo 8 caracteres, con mayúscula, minúscula y número.
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password" className="text-sm font-medium text-gray-700">
-              Contraseña nueva
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-            />
-            <p className="text-xs text-gray-500">
-              Mínimo 8 caracteres, con mayúscula, minúscula y número.
-            </p>
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="confirmPassword" className="field-label">
+            Confirmar contraseña
+          </label>
+          <input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            className="field"
+          />
+        </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
-              Confirmar contraseña
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-            />
-          </div>
+        {fieldErrors.length > 0 && (
+          <ul className="flex flex-col gap-1 border-l-4 border-danger pl-3 text-sm font-bold text-danger">
+            {fieldErrors.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        )}
 
-          {fieldErrors.length > 0 && (
-            <ul className="list-inside list-disc text-sm text-red-600">
-              {fieldErrors.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          )}
+        {error && <ErrorMessage message={error} />}
 
-          {error && <ErrorMessage message={error} />}
+        <button type="submit" disabled={isPending} className={buttonClasses("primary", "lg", "mt-2 w-full")}>
+          {isPending ? "Guardando..." : "Cambiar contraseña"}
+        </button>
+      </form>
 
-          <button
-            type="submit"
-            disabled={isPending}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isPending ? "Guardando..." : "Cambiar contraseña"}
-          </button>
-        </form>
-
-        {linkRejected && <RequestNewLink />}
-      </div>
-    </div>
+      {linkRejected && <RequestNewLink />}
+    </AuthCard>
   );
 }
 

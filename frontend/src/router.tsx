@@ -10,6 +10,7 @@ import TwoFactorResetConfirmPage from "./pages/auth/TwoFactorResetConfirmPage";
 import TwoFactorResetCancelPage from "./pages/auth/TwoFactorResetCancelPage";
 import SecurityPage from "./pages/account/SecurityPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import GuestOnlyRoute from "./components/GuestOnlyRoute";
 import RequireRole from "./components/RequireRole";
 import FeedPage from "./pages/reports/FeedPage";
 import CreateReportPage from "./pages/reports/CreateReportPage";
@@ -28,8 +29,13 @@ export const router = createBrowserRouter([
     element: <MainLayout />,
     errorElement: <NotFound />,
     children: [
-      { path: "login", element: <Login /> },
-      { path: "register", element: <Register /> },
+      {
+        element: <GuestOnlyRoute />,
+        children: [
+          { path: "login", element: <Login /> },
+          { path: "register", element: <Register /> },
+        ],
+      },
       // Públicas a propósito: los links de los emails se abren con o sin sesión.
       { path: "verify-email", element: <VerifyEmailPage /> },
       { path: "forgot-password", element: <ForgotPasswordPage /> },
