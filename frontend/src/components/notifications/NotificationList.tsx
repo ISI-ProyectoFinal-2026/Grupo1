@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { cn } from '@/lib/cn'
 import type { NotificationDTO } from '@/types/notification.types'
 
-export const NOTIFICATIONS_PAGE_SIZE = 5
+const NOTIFICATIONS_PAGE_SIZE = 5
 
 interface NotificationListProps {
   notifications: NotificationDTO[]
@@ -9,14 +10,19 @@ interface NotificationListProps {
   onDelete: (id: number) => void
 }
 
+const dateFormat = new Intl.DateTimeFormat('es-AR', {
+  day: '2-digit',
+  month: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return dateFormat.format(new Date(value))
 }
+
+const actionClasses =
+  'inline-flex min-h-11 items-center rounded-control px-2 text-sm font-bold transition-colors hover:bg-surface'
 
 function NotificationList({ notifications, onMarkRead, onDelete }: NotificationListProps) {
   const [page, setPage] = useState(0)
@@ -28,30 +34,33 @@ function NotificationList({ notifications, onMarkRead, onDelete }: NotificationL
   const visible = notifications.slice(start, start + NOTIFICATIONS_PAGE_SIZE)
 
   if (notifications.length === 0) {
-    return <p className='px-4 py-6 text-center text-sm text-gray-500'>No tenés notificaciones</p>
+    return <p className='px-4 py-8 text-center text-sm text-ink-muted'>No tenés notificaciones</p>
   }
 
   return (
     <div>
-      <ul className='divide-y divide-gray-100'>
+      <ul className='divide-y divide-line'>
         {visible.map((notification) => (
           <li
             key={notification.id}
-            className={`px-4 py-3 ${notification.isRead ? 'bg-white' : 'bg-blue-50'}`}
-          >
-            <p className='text-sm font-medium text-gray-900'>{notification.title}</p>
-            {notification.message && (
-              <p className='mt-0.5 text-sm text-gray-600'>{notification.message}</p>
+            className={cn(
+              'relative px-4 py-3',
+              !notification.isRead && 'bg-signal/10 before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-signal'
             )}
-            <div className='mt-1 flex items-center gap-3'>
-              <time className='text-xs text-gray-400' dateTime={notification.createdAt}>
+          >
+            <p className='font-bold text-ink'>{notification.title}</p>
+            {notification.message && (
+              <p className='mt-0.5 break-words text-sm text-ink-muted'>{notification.message}</p>
+            )}
+            <div className='mt-1 flex flex-wrap items-center gap-x-1'>
+              <time className='mr-auto text-xs text-ink-muted' dateTime={notification.createdAt}>
                 {formatDate(notification.createdAt)}
               </time>
               {!notification.isRead && (
                 <button
                   type='button'
                   onClick={() => onMarkRead(notification.id)}
-                  className='text-xs text-blue-600 hover:underline'
+                  className={cn(actionClasses, 'text-ink')}
                 >
                   Marcar como leída
                 </button>
@@ -59,7 +68,7 @@ function NotificationList({ notifications, onMarkRead, onDelete }: NotificationL
               <button
                 type='button'
                 onClick={() => onDelete(notification.id)}
-                className='text-xs text-gray-500 hover:underline'
+                className={cn(actionClasses, 'text-ink-muted hover:text-danger')}
               >
                 Eliminar
               </button>
@@ -69,23 +78,23 @@ function NotificationList({ notifications, onMarkRead, onDelete }: NotificationL
       </ul>
 
       {totalPages > 1 && (
-        <div className='flex items-center justify-between border-t border-gray-100 px-4 py-2'>
+        <div className='flex items-center justify-between border-t border-line px-2 py-1'>
           <button
             type='button'
             onClick={() => setPage(currentPage - 1)}
             disabled={currentPage === 0}
-            className='text-xs text-gray-600 disabled:text-gray-300'
+            className={cn(actionClasses, 'text-ink disabled:text-ink-muted/50 disabled:hover:bg-transparent')}
           >
             Anterior
           </button>
-          <span className='text-xs text-gray-400'>
+          <span className='tabular text-sm text-ink-muted'>
             {currentPage + 1} de {totalPages}
           </span>
           <button
             type='button'
             onClick={() => setPage(currentPage + 1)}
             disabled={currentPage >= totalPages - 1}
-            className='text-xs text-gray-600 disabled:text-gray-300'
+            className={cn(actionClasses, 'text-ink disabled:text-ink-muted/50 disabled:hover:bg-transparent')}
           >
             Siguiente
           </button>

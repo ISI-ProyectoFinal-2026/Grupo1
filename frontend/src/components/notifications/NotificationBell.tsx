@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import NotificationList from '@/components/notifications/NotificationList'
+import { BellIcon } from '@/components/ui/icons'
+import { cn } from '@/lib/cn'
 import {
   countUnread,
   useDeleteNotification,
@@ -16,19 +18,28 @@ function NotificationBell() {
   const unread = countUnread(notifications)
 
   return (
-    <div className='relative'>
+    <div
+      className='relative'
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setOpen(false)
+      }}
+    >
       <button
         type='button'
         aria-label='Notificaciones'
         aria-expanded={open}
+        aria-controls='panel-notificaciones'
         onClick={() => setOpen((previous) => !previous)}
-        className='relative text-gray-600 hover:text-gray-900'
+        className={cn(
+          'relative grid h-11 w-11 place-items-center rounded-full text-ink transition-colors hover:bg-ink/5',
+          open && 'bg-ink/5'
+        )}
       >
-        <span aria-hidden='true'>🔔</span>
+        <BellIcon className='h-[22px] w-[22px]' />
         {unread > 0 && (
           <span
             aria-label={`${unread} notificaciones sin leer`}
-            className='absolute -right-2 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-medium text-white'
+            className='tabular absolute right-1 top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold leading-none text-white ring-2 ring-paper'
           >
             {unread}
           </span>
@@ -36,7 +47,15 @@ function NotificationBell() {
       </button>
 
       {open && (
-        <div className='absolute right-0 z-10 mt-2 w-80 rounded-md border border-gray-200 bg-white shadow-lg'>
+        <div
+          id='panel-notificaciones'
+          className={cn(
+            'fixed inset-x-3 top-[calc(var(--header-h)+0.5rem)] z-40 max-h-[70vh] overflow-y-auto overscroll-contain rounded-card border border-line bg-paper shadow-pop',
+            'sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96',
+            'lg:left-0 lg:right-auto'
+          )}
+        >
+          <h2 className='border-b border-line px-4 py-3 font-display text-display-sm'>Notificaciones</h2>
           <NotificationList
             notifications={notifications ?? []}
             onMarkRead={(id) => markRead.mutate(id)}

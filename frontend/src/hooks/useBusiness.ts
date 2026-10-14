@@ -11,9 +11,9 @@ import {
 import { getApiErrorStatus } from "@/services/api";
 import type { BusinessCategory, CreateBusinessInput, UpdateBusinessInput } from "@/types/business.types";
 
-export const businessQueryKey = ["business", "me"] as const;
-export const businessStatsQueryKey = ["business", "me", "stats"] as const;
-export const businessesQueryKey = ["businesses"] as const;
+const businessQueryKey = ["business", "me"] as const;
+const businessStatsQueryKey = ["business", "me", "stats"] as const;
+const businessesQueryKey = ["businesses"] as const;
 
 export function useBusinessesQuery(category?: BusinessCategory) {
   return useQuery({

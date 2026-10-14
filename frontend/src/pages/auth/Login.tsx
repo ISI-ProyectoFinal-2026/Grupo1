@@ -1,8 +1,12 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import TwoFactorChallengeForm from "@/components/auth/TwoFactorChallengeForm";
 import TwoFactorResetRequestForm from "@/components/auth/TwoFactorResetRequestForm";
+import AuthCard from "@/components/ui/AuthCard";
+import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
+import { CheckIcon } from "@/components/ui/icons";
 import { getApiErrorCode } from "@/services/api";
 import { login } from "@/services/auth.service";
 import { loginWithTwoFactor, requestTwoFactorReset } from "@/services/two-factor.service";
@@ -27,6 +31,16 @@ type Step =
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : DEFAULT_ERROR_MESSAGE;
+}
+
+
+function SuccessNotice({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-5 flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink">
+      <CheckIcon className="h-5 w-5 shrink-0" />
+      <span>{children}</span>
+    </p>
+  );
 }
 
 function Login() {
@@ -167,8 +181,8 @@ function Login() {
 
   if (step.kind === "challenge") {
     return (
-      <div className="p-6">
-        <div className="mx-auto max-w-sm">
+      <div className="flex justify-center px-4 pb-12 pt-4 sm:pt-12">
+        <div className="card w-full max-w-sm p-5 sm:p-7">
           <TwoFactorChallengeForm
             mode={mode}
             code={code}
@@ -188,8 +202,8 @@ function Login() {
 
   if (step.kind === "lost") {
     return (
-      <div className="p-6">
-        <div className="mx-auto max-w-sm">
+      <div className="flex justify-center px-4 pb-12 pt-4 sm:pt-12">
+        <div className="card w-full max-w-sm p-5 sm:p-7">
           <TwoFactorResetRequestForm
             password={resetPassword}
             isLoading={isLoading}
@@ -205,82 +219,81 @@ function Login() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900">Iniciar sesión</h1>
-
-        {registered && (
-          <p className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-            Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión
-          </p>
-        )}
-
-        {emailVerified && (
-          <p className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-            Tu email quedó verificado, iniciá sesión
-          </p>
-        )}
-
-        {passwordReset && (
-          <p className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-            Tu contraseña se actualizó, iniciá sesión con la nueva
-          </p>
-        )}
-
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="email" className="text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password" className="text-sm font-medium text-gray-700">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isLoading ? "Ingresando..." : "Ingresar"}
-          </button>
-        </form>
-
-        <p className="mt-4 text-sm text-gray-600">
-          <Link to="/forgot-password" className="font-medium text-gray-900 underline">
-            ¿Olvidaste tu contraseña?
-          </Link>
-        </p>
-
-        <p className="mt-2 text-sm text-gray-600">
+    <AuthCard
+      title="Iniciar sesión"
+      subtitle="Entrá para reportar y seguir tus avisos."
+      footer={
+        <>
           ¿No tenés cuenta?{" "}
-          <Link to="/register" className="font-medium text-gray-900 underline">
+          <Link to="/register" className="font-bold text-ink underline underline-offset-4 hover:no-underline">
             Registrate
           </Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {registered && (
+        <SuccessNotice>
+          Cuenta creada. Te enviamos un email para verificarla, revisá tu casilla e iniciá sesión
+        </SuccessNotice>
+      )}
+
+      {emailVerified && <SuccessNotice>Tu email quedó verificado, iniciá sesión</SuccessNotice>}
+
+      {passwordReset && (
+        <SuccessNotice>Tu contraseña se actualizó, iniciá sesión con la nueva</SuccessNotice>
+      )}
+
+      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="email" className="field-label">
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            spellCheck={false}
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="field"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="password" className="field-label">
+            Contraseña
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="field"
+          />
+        </div>
+
+        {error && <ErrorMessage message={error} />}
+
+        <button type="submit" disabled={isLoading} className={buttonClasses("primary", "lg", "mt-2 w-full")}>
+          {isLoading ? "Ingresando..." : "Ingresar"}
+        </button>
+      </form>
+
+      <p className="mt-5 text-center">
+        <Link
+          to="/forgot-password"
+          className="text-sm font-bold text-ink underline underline-offset-4 hover:no-underline"
+        >
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </p>
+    </AuthCard>
   );
 }
 

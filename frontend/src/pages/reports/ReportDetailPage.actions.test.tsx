@@ -152,7 +152,7 @@ describe('ReportDetailPage cerrar y denunciar', () => {
       await user.click(await screen.findByRole('button', { name: 'Cerrar reporte' }))
       await user.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
 
-      expect(await screen.findByText('resolved')).toBeInTheDocument()
+      expect(await screen.findByText('Resuelto')).toBeInTheDocument()
       expect(reportsService.closeReport).toHaveBeenCalledWith(5)
       expect(cerrar()).not.toBeInTheDocument()
     })

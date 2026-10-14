@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/ui/Button'
 import EmailNotVerifiedNotice from '@/components/auth/EmailNotVerifiedNotice'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import Spinner from '@/components/ui/Spinner'
+import { PaperclipIcon, SendIcon } from '@/components/ui/icons'
 import { getApiErrorCode } from '@/services/api'
 import { EMAIL_NOT_VERIFIED } from '@/types/auth'
 import {
@@ -26,6 +27,10 @@ interface ChatWindowProps {
   /** Código de máquina de `sendError` (p. ej. EMAIL_NOT_VERIFIED). */
   sendErrorCode?: string | null
   onSend: (input: SendMessageInput) => Promise<void>
+  /** Titulo de la conversacion (ej. el otro participante). */
+  title?: string
+  /** Contenido al inicio del header, como el link de volver en mobile. */
+  headerStart?: ReactNode
 }
 
 const MAX_UPLOAD_MB = Math.floor(MAX_UPLOAD_BYTES / 1_000_000)
@@ -39,11 +44,11 @@ const statusLabels: Record<ChatConnectionStatus, string> = {
 }
 
 const statusDotClasses: Record<ChatConnectionStatus, string> = {
-  connecting: 'bg-amber-500',
-  connected: 'bg-green-500',
-  reconnecting: 'bg-amber-500',
-  disconnected: 'bg-gray-400',
-  unauthorized: 'bg-red-500',
+  connecting: 'bg-signal-deep',
+  connected: 'bg-success',
+  reconnecting: 'bg-signal-deep',
+  disconnected: 'bg-ink-muted',
+  unauthorized: 'bg-danger',
 }
 
 function ChatWindow({
@@ -55,6 +60,8 @@ function ChatWindow({
   sendError,
   sendErrorCode = null,
   onSend,
+  title,
+  headerStart,
 }: ChatWindowProps) {
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -119,24 +126,30 @@ function ChatWindow({
   }
 
   return (
-    <section className='flex h-full flex-col'>
-      <header className='flex items-center gap-2 border-b border-gray-200 px-4 py-3'>
-        <span
-          aria-hidden='true'
-          className={`h-2 w-2 rounded-full ${statusDotClasses[connectionStatus]}`}
-        />
-        <span className='text-sm text-gray-600'>{statusLabels[connectionStatus]}</span>
+    <section className='flex h-full min-h-0 flex-col'>
+      <header className='flex min-h-14 items-center gap-2 border-b border-line bg-paper px-2 py-1.5 sm:px-4'>
+        {headerStart}
+        <div className='min-w-0 flex-1 px-1'>
+          {title && <h2 className='truncate font-display text-base font-bold'>{title}</h2>}
+          <p className='flex items-center gap-1.5 text-sm text-ink-muted'>
+            <span
+              aria-hidden='true'
+              className={`h-2 w-2 shrink-0 rounded-full ${statusDotClasses[connectionStatus]}`}
+            />
+            {statusLabels[connectionStatus]}
+          </p>
+        </div>
       </header>
 
-      <div className='flex-1 overflow-y-auto px-4 py-4'>
+      <div className='flex-1 overflow-y-auto overscroll-contain bg-surface px-3 py-4 sm:px-5'>
         {isLoading ? (
-          <div className='flex h-full items-center justify-center text-gray-400'>
+          <div className='flex h-full items-center justify-center text-ink-muted'>
             <Spinner size='md' />
           </div>
         ) : loadError ? (
           <ErrorMessage message={loadError} />
         ) : messages.length === 0 ? (
-          <p className='py-8 text-center text-sm text-gray-500'>
+          <p className='py-10 text-center text-ink-muted'>
             No hay mensajes todavía. Escribí el primero.
           </p>
         ) : (
@@ -154,65 +167,74 @@ function ChatWindow({
       </div>
 
       {isUnauthorized ? (
-        <div className='border-t border-gray-200 px-4 py-3'>
-          <p className='text-sm text-gray-700'>
+        <div className='border-t border-line bg-paper px-4 py-3'>
+          <p className='text-ink'>
             Tu sesión expiró, por eso el chat dejó de recibir mensajes.{' '}
-            <Link to='/login' className='font-medium text-blue-600 hover:underline'>
+            <Link to='/login' className='font-bold text-ink underline underline-offset-4 hover:no-underline'>
               Iniciá sesión de nuevo
             </Link>{' '}
             para seguir la conversación.
           </p>
         </div>
       ) : (
-      <form onSubmit={handleSubmit} className='border-t border-gray-200 px-4 py-3'>
-        {needsVerification ? (
-          <EmailNotVerifiedNotice className='mb-2' />
-        ) : (
-          <>
-            {sendError && <ErrorMessage message={sendError} className='mb-2' />}
-            {imageError && <ErrorMessage message={imageError} className='mb-2' />}
-          </>
-        )}
-        <div className='flex items-center gap-2'>
-          <label htmlFor='chat-image-input' className='sr-only'>
-            Adjuntar imagen
-          </label>
-          <input
-            ref={fileInputRef}
-            id='chat-image-input'
-            type='file'
-            accept={ALLOWED_UPLOAD_TYPES.join(',')}
-            className='hidden'
-            onChange={handleFileSelect}
-            disabled={isUploadingImage}
-          />
-          <Button
-            type='button'
-            variant='secondary'
-            isLoading={isUploadingImage}
-            onClick={() => fileInputRef.current?.click()}
-            aria-label='Adjuntar imagen'
-          >
-            📎
-          </Button>
+        <form onSubmit={handleSubmit} className='border-t border-line bg-paper px-2 py-2 sm:px-4 sm:py-3'>
+          {needsVerification ? (
+            <EmailNotVerifiedNotice className='mb-2' />
+          ) : (
+            <>
+              {sendError && <ErrorMessage message={sendError} className='mb-2 px-1' />}
+              {imageError && <ErrorMessage message={imageError} className='mb-2 px-1' />}
+            </>
+          )}
+          <div className='flex items-center gap-2'>
+            <label htmlFor='chat-image-input' className='sr-only'>
+              Adjuntar imagen
+            </label>
+            <input
+              ref={fileInputRef}
+              id='chat-image-input'
+              type='file'
+              accept={ALLOWED_UPLOAD_TYPES.join(',')}
+              className='hidden'
+              onChange={handleFileSelect}
+              disabled={isUploadingImage}
+            />
+            <Button
+              type='button'
+              variant='ghost'
+              isLoading={isUploadingImage}
+              onClick={() => fileInputRef.current?.click()}
+              aria-label='Adjuntar imagen'
+              className='w-11 shrink-0 px-0'
+            >
+              {!isUploadingImage && <PaperclipIcon className='h-5 w-5' />}
+            </Button>
 
-          <label htmlFor='chat-message-input' className='sr-only'>
-            Mensaje
-          </label>
-          <input
-            id='chat-message-input'
-            type='text'
-            autoComplete='off'
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder='Escribí un mensaje…'
-            className='flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none'
-          />
-          <Button type='submit' variant='primary' isLoading={isSending} disabled={!draft.trim()}>
-            Enviar
-          </Button>
-        </div>
-      </form>
+            <label htmlFor='chat-message-input' className='sr-only'>
+              Mensaje
+            </label>
+            <input
+              id='chat-message-input'
+              type='text'
+              autoComplete='off'
+              enterKeyHint='send'
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder='Escribí un mensaje…'
+              className='field min-w-0 flex-1 rounded-full'
+            />
+            <Button
+              type='submit'
+              variant='primary'
+              isLoading={isSending}
+              disabled={!draft.trim()}
+              className='shrink-0 rounded-full px-3 sm:px-4'
+            >
+              {!isSending && <SendIcon className='h-5 w-5' />}
+              <span className='sr-only sm:not-sr-only'>Enviar</span>
+            </Button>
+          </div>
+        </form>
       )}
     </section>
   )

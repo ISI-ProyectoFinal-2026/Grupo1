@@ -3,6 +3,8 @@ import type { FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { getApiErrorDetails } from "@/services/api";
 import { useCreateBusinessMutation, useMyBusinessQuery } from "@/hooks/useBusiness";
+import { buttonClasses } from "@/components/ui/buttonClasses";
+import ErrorMessage from "@/components/ui/ErrorMessage";
 import type { BusinessCategory } from "@/types/business.types";
 
 const CATEGORY_OPTIONS: Array<{ value: BusinessCategory; label: string }> = [
@@ -50,76 +52,89 @@ function BusinessRegisterPage() {
   const isLoading = createBusiness.isPending;
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900">Registrar comercio</h1>
-
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="name" className="text-sm font-medium text-gray-700">
+    <div className="mx-auto max-w-lg px-4 py-5 sm:px-6 lg:py-8">
+      <h1 className="font-display text-display-lg">Registrar comercio</h1>
+      <p className="mt-2 max-w-prose text-ink-muted">
+        Sumá tu veterinaria, refugio o pet shop al directorio de la comunidad.
+      </p>
+      <div className="mt-6 sm:card sm:p-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="name" className="field-label">
               Nombre
             </label>
             <input
               id="name"
+              name="name"
+              autoComplete="organization"
               type="text"
               required
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+              className="field"
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="cuit" className="text-sm font-medium text-gray-700">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cuit" className="field-label">
               CUIT
             </label>
             <input
               id="cuit"
+              name="cuit"
               type="text"
+              autoComplete="off"
+              spellCheck={false}
               required
               value={cuit}
               onChange={(event) => setCuit(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+              className="field"
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="address" className="text-sm font-medium text-gray-700">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="address" className="field-label">
               Domicilio
             </label>
             <input
               id="address"
+              name="address"
+              autoComplete="street-address"
               type="text"
               required
               value={address}
               onChange={(event) => setAddress(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+              className="field"
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="phone" className="text-sm font-medium text-gray-700">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="phone" className="field-label">
               Teléfono
             </label>
             <input
               id="phone"
-              type="text"
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               required
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+              className="field"
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="category" className="text-sm font-medium text-gray-700">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="category" className="field-label">
               Rubro
             </label>
             <select
               id="category"
+              name="category"
               value={category}
               onChange={(event) => setCategory(event.target.value as BusinessCategory)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+              className="field"
             >
               {CATEGORY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -130,24 +145,24 @@ function BusinessRegisterPage() {
           </div>
 
           {/* El plan no se elige al registrarse: el backend crea todo comercio en FREE (#179). */}
-          <p className="text-xs text-gray-500">
+          <p className="text-sm text-ink-muted">
             Tu comercio arranca en el plan Gratis. Solo el plan Premium permite publicar anuncios.
           </p>
 
           {fieldErrors.length > 0 && (
-            <ul className="list-inside list-disc text-sm text-red-600">
+            <ul role="alert" className="flex flex-col gap-1 border-l-4 border-danger pl-3 text-sm font-bold text-danger">
               {fieldErrors.map((message) => (
                 <li key={message}>{message}</li>
               ))}
             </ul>
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <ErrorMessage message={error} />}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className={buttonClasses("primary", "lg", "mt-2 w-full")}
           >
             {isLoading ? "Registrando..." : "Registrar comercio"}
           </button>

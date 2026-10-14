@@ -1,3 +1,129 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* Tokens de color como canales RGB (Tailwind les aplica la opacidad). */
+    --color-ink: 27 36 48; /* #1B2430 */
+    --color-ink-muted: 91 102 117; /* #5B6675 */
+    --color-line: 221 226 232; /* #DDE2E8 */
+    --color-surface: 243 245 247; /* #F3F5F7 */
+    --color-paper: 255 255 255; /* #FFFFFF */
+    --color-signal: 255 206 58; /* #FFCE3A */
+    --color-signal-deep: 240 184 20; /* hover del signal */
+    --color-danger: 217 54 54; /* #D93636 */
+    --color-danger-soft: 253 236 236;
+    --color-success: 31 138 91; /* #1F8A5B */
+    --color-success-ink: 23 107 71; /* texto chico sobre blanco con contraste AA */
+    --color-success-soft: 230 245 238;
+
+    --header-h: 3.5rem;
+    --tabbar-h: 4rem;
+    --sidebar-w: 16rem;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html {
+    background-color: rgb(var(--color-surface));
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-surface font-sans text-base text-ink antialiased;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  summary {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgb(var(--color-ink));
+    outline-offset: 2px;
+  }
+
+  select {
+    background-color: rgb(var(--color-paper));
+    color: rgb(var(--color-ink));
+  }
+
+  time,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Campo de formulario: 16px minimo para que iOS no haga zoom al enfocar. */
+  .field {
+    @apply block min-h-[44px] w-full rounded-control border border-line bg-paper px-3.5 py-2.5 text-base text-ink transition-colors placeholder:text-ink-muted hover:border-ink-muted focus-visible:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/25 disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-muted aria-[invalid=true]:border-danger;
+  }
+
+  .field-label {
+    @apply text-sm font-bold text-ink;
+  }
+
+  .card {
+    @apply rounded-card border border-line bg-paper;
+  }
+
+  /* La etiqueta de estado del reporte: el "sticker" del afiche. */
+  .tag-sticker {
+    @apply inline-flex items-center rounded-full px-3 py-1.5 font-display text-sm font-bold leading-none text-white;
+    box-shadow: 0 1px 0 rgb(27 36 48 / 0.3);
+  }
+}
+
+@layer utilities {
+  /* Alto util de pantalla descontando header y tab bar (mobile). */
+  .h-app {
+    height: calc(100vh - var(--header-h) - var(--tabbar-h) - var(--safe-bottom));
+    height: calc(100dvh - var(--header-h) - var(--tabbar-h) - var(--safe-bottom));
+  }
+
+  .pb-tabbar {
+    padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
+  }
+
+  .bottom-above-tabbar {
+    bottom: calc(var(--tabbar-h) + var(--safe-bottom));
+  }
+
+  .pb-safe {
+    padding-bottom: var(--safe-bottom);
+  }
+}

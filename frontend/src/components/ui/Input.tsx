@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes } from "react";
+import { cn } from "@/lib/cn";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
@@ -8,25 +9,30 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 function Input({ label, error, hint, id, name, className = "", ...props }: InputProps) {
   const inputId = id ?? name;
+  const messageId = inputId ? `${inputId}-message` : undefined;
+  const hasMessage = Boolean(error || hint);
 
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={inputId} className="text-sm font-medium text-gray-700">
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={inputId} className="field-label">
         {label}
       </label>
       <input
         id={inputId}
         name={name}
         aria-invalid={!!error}
-        className={`rounded-md border px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          error ? "border-red-500" : "border-gray-300"
-        } ${className}`}
+        aria-describedby={hasMessage ? messageId : undefined}
+        className={cn("field", className)}
         {...props}
       />
       {error ? (
-        <span className="text-sm text-red-600">{error}</span>
+        <span id={messageId} className="text-sm font-bold text-danger">
+          {error}
+        </span>
       ) : hint ? (
-        <span className="text-sm text-gray-500">{hint}</span>
+        <span id={messageId} className="text-sm text-ink-muted">
+          {hint}
+        </span>
       ) : null}
     </div>
   );

@@ -7,6 +7,7 @@ import TwoFactorEnabledPanel from "@/components/account/TwoFactorEnabledPanel";
 import TwoFactorSetupPanel from "@/components/account/TwoFactorSetupPanel";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Spinner from "@/components/ui/Spinner";
+import { buttonClasses } from "@/components/ui/buttonClasses";
 import { useDisableTwoFactor } from "@/hooks/useDisableTwoFactor";
 import { useEnableTwoFactor } from "@/hooks/useEnableTwoFactor";
 import { useRegenerateRecoveryCodes } from "@/hooks/useRegenerateRecoveryCodes";
@@ -113,7 +114,7 @@ function SecurityPage() {
             <button
               type="button"
               onClick={() => status.refetch()}
-              className="rounded bg-gray-900 px-4 py-2 text-white"
+              className={buttonClasses("secondary")}
             >
               Reintentar
             </button>
@@ -121,7 +122,7 @@ function SecurityPage() {
         );
       }
       return (
-        <div className="mt-6">
+        <div className="mt-6 flex justify-center py-10 text-ink-muted">
           <Spinner />
         </div>
       );
@@ -174,9 +175,9 @@ function SecurityPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="px-4 py-5 sm:px-6 lg:py-8">
       <div className="mx-auto max-w-xl">
-        <h1 className="text-2xl font-bold text-gray-900">Seguridad de la cuenta</h1>
+        <h1 className="font-display text-display-lg">Seguridad de la cuenta</h1>
         {renderContent()}
       </div>
 

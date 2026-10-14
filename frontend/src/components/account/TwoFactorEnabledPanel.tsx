@@ -1,3 +1,4 @@
+import { ShieldIcon } from "@/components/ui/icons";
 import { formatResetDate } from "@/utils/two-factor";
 
 interface TwoFactorEnabledPanelProps {
@@ -22,17 +23,20 @@ function TwoFactorEnabledPanel({
   return (
     <section
       aria-labelledby="two-factor-enabled-title"
-      className="mt-6 rounded border border-gray-200 p-4"
+      className="card mt-6 p-4 sm:p-5"
     >
-      <h2 id="two-factor-enabled-title" className="text-lg font-semibold text-gray-900">
+      <h2 id="two-factor-enabled-title" className="font-display text-display-sm text-ink">
         Verificación en dos pasos
       </h2>
-      <p className="mt-2 text-sm text-gray-600">La verificación en dos pasos está activada.</p>
+      <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-3 py-1.5 text-sm font-bold text-success-ink">
+        <ShieldIcon className="h-4 w-4 shrink-0" />
+        La verificación en dos pasos está activada.
+      </p>
 
       {resetEffectiveAt && (
         <p
           role="status"
-          className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          className="mt-4 rounded-card border border-signal bg-signal/15 p-4 text-sm text-ink"
         >
           Hay un reinicio de la verificación en dos pasos en curso: se completa el{" "}
           {formatResetDate(resetEffectiveAt)}. Si no lo pediste, cancelalo desde el enlace del email
@@ -40,13 +44,13 @@ function TwoFactorEnabledPanel({
         </p>
       )}
 
-      <p className="mt-4 text-sm font-medium text-gray-900">
+      <p className="tabular mt-4 font-bold text-ink">
         {remainingText(recoveryCodesRemaining)}
       </p>
       {recoveryCodesRemaining <= LOW_CODES_THRESHOLD && (
         <p
           role="status"
-          className="mt-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          className="mt-2 rounded-card border border-signal bg-signal/15 p-4 text-sm text-ink"
         >
           Quedan pocos códigos de recuperación: generá códigos nuevos antes de quedarte sin
           ninguno.

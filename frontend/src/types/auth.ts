@@ -115,8 +115,6 @@ export interface ResetPasswordInput {
 // Códigos de máquina que manda el backend en `error.code`. La UI decide con
 // ellos, nunca parseando el mensaje en español.
 export const EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED";
-export const RESEND_COOLDOWN = "RESEND_COOLDOWN";
-export const MAIL_NOT_CONFIGURED = "MAIL_NOT_CONFIGURED";
 export const TWO_FACTOR_LOCKED = "TWO_FACTOR_LOCKED";
 export const TWO_FACTOR_CHALLENGE_INVALID = "TWO_FACTOR_CHALLENGE_INVALID";
 

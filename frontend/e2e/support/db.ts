@@ -20,7 +20,7 @@ export async function closeDb(): Promise<void> {
   pool = undefined
 }
 
-export type Role = 'usuario_regular' | 'moderador' | 'admin'
+type Role = 'usuario_regular' | 'moderador' | 'admin'
 
 export async function setRole(userId: number, role: Role): Promise<void> {
   await db().query('UPDATE users SET role = $1::role WHERE id = $2', [role, userId])
@@ -35,7 +35,7 @@ export async function markEmailVerified(email: string): Promise<void> {
   await db().query('UPDATE users SET email_verified_at = now() WHERE email = $1', [email])
 }
 
-export type AuthTokenType =
+type AuthTokenType =
   | 'email_verification'
   | 'password_reset'
   | 'two_factor_login'
@@ -113,7 +113,7 @@ export async function ageTwoFactorReset(email: string): Promise<void> {
   if (rowCount !== 1) throw new Error(`ageTwoFactorReset: no pending reset for ${email}`)
 }
 
-export interface TwoFactorState {
+interface TwoFactorState {
   enabled: boolean
   hasSecret: boolean
   locked: boolean

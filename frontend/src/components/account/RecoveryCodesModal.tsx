@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
+import { buttonClasses } from "@/components/ui/buttonClasses";
+import { CheckIcon } from "@/components/ui/icons";
 
 interface RecoveryCodesModalProps {
   codes: string[];
@@ -8,8 +10,7 @@ interface RecoveryCodesModalProps {
 
 const FILE_NAME = "patitas-codigos-de-recuperacion.txt";
 const FOCUSABLE = "button:not(:disabled), input:not(:disabled)";
-const SECONDARY_BUTTON_CLASS =
-  "rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-900 hover:bg-gray-50";
+const SECONDARY_BUTTON_CLASS = buttonClasses("secondary", "sm");
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -70,7 +71,7 @@ function RecoveryCodesModal({ codes, onClose }: RecoveryCodesModalProps) {
   return (
     <div
       data-testid="recovery-codes-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
     >
       <div
         ref={dialogRef}
@@ -79,17 +80,17 @@ function RecoveryCodesModal({ codes, onClose }: RecoveryCodesModalProps) {
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl focus:outline-none"
+        className="max-h-full w-full max-w-md overflow-y-auto overscroll-contain rounded-card bg-paper p-5 shadow-pop focus:outline-none sm:p-6"
       >
-        <h2 id={titleId} className="text-xl font-bold text-gray-900">
+        <h2 id={titleId} className="font-display text-display-md">
           Tus códigos de recuperación
         </h2>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-ink-muted">
           Si perdés tu autenticador, cada código te deja iniciar sesión una vez. Guardalos en un
           lugar seguro: no vas a poder volver a verlos.
         </p>
 
-        <ul className="mt-4 grid grid-cols-2 gap-2 rounded border border-gray-200 bg-gray-50 p-3 font-mono text-sm text-gray-900">
+        <ul className="mt-4 grid grid-cols-2 gap-2 rounded-control border border-line bg-surface p-3 font-mono text-sm tracking-wider text-ink">
           {codes.map((code) => (
             <li key={code}>{code}</li>
           ))}
@@ -103,23 +104,24 @@ function RecoveryCodesModal({ codes, onClose }: RecoveryCodesModalProps) {
             Descargar códigos
           </button>
           {copyState === "copied" && (
-            <span role="status" className="text-sm text-green-700">
+            <span role="status" className="inline-flex items-center gap-1 text-sm font-bold text-success-ink">
+              <CheckIcon className="h-5 w-5 shrink-0 accent-ink" />
               Códigos copiados
             </span>
           )}
           {copyState === "failed" && (
-            <span role="status" className="text-sm text-red-600">
+            <span role="status" className="text-sm font-bold text-danger">
               No pudimos copiar: seleccionalos y copialos a mano
             </span>
           )}
         </div>
 
-        <label className="mt-5 flex items-center gap-2 text-sm font-medium text-gray-900">
+        <label className="mt-5 flex min-h-11 cursor-pointer items-center gap-3 font-bold text-ink">
           <input
             type="checkbox"
             checked={saved}
             onChange={(event) => setSaved(event.target.checked)}
-            className="h-4 w-4"
+            className="h-5 w-5 shrink-0 accent-ink"
           />
           Guardé mis códigos
         </label>
@@ -128,7 +130,7 @@ function RecoveryCodesModal({ codes, onClose }: RecoveryCodesModalProps) {
           type="button"
           onClick={onClose}
           disabled={!saved}
-          className="mt-4 w-full rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className={buttonClasses("primary", "lg", "mt-3 w-full")}
         >
           Cerrar
         </button>

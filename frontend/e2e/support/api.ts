@@ -18,13 +18,13 @@ export interface Session {
 }
 
 /** What a password login answers when the account has 2FA: no session yet. */
-export interface TwoFactorChallenge {
+interface TwoFactorChallenge {
   twoFactorRequired: true
   twoFactorToken: string
   resetEffectiveAt?: string
 }
 
-export interface ApiReport {
+interface ApiReport {
   id: number
   userId: number
   status: string
@@ -67,16 +67,12 @@ export function loginStep(email: string, password: string): Promise<Session | Tw
 export async function login(email: string, password: string): Promise<Session> {
   const response = await loginStep(email, password)
   if ('twoFactorToken' in response) {
-    throw new Error(`login: ${email} has 2FA on, use loginStep + loginWithTwoFactor`)
+    throw new Error(`login: ${email} has 2FA on, use loginStep and complete the second factor`)
   }
   return response
 }
 
-export function loginWithTwoFactor(twoFactorToken: string, code: string): Promise<Session> {
-  return expectStatus(200, 'second-factor login', call<Session>('POST', '/auth/2fa/login', { body: { twoFactorToken, code } }))
-}
-
-export interface EnabledTwoFactor {
+interface EnabledTwoFactor {
   /** The fresh session: enabling bumps tokenVersion, so the one used to enable is dead. */
   session: Session
   secret: string
@@ -107,7 +103,7 @@ export function getMe(token: string): Promise<{ status: number; body: unknown }>
   return call('GET', '/auth/me', { token })
 }
 
-export interface NewReport {
+interface NewReport {
   reportType: 'lost' | 'found'
   title: string
   description?: string

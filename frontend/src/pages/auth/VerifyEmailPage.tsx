@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import ResendVerificationButton from "@/components/auth/ResendVerificationButton";
+import AuthCard from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
+import { CheckIcon } from "@/components/ui/icons";
 import Spinner from "@/components/ui/Spinner";
 import { CURRENT_USER_QUERY_KEY } from "@/hooks/useCurrentUser";
 import { useUrlToken } from "@/hooks/useUrlToken";
@@ -75,8 +78,8 @@ function VerifyEmailPage() {
 
   if (phase === "verifying") {
     return (
-      <div className="p-6">
-        <div className="mx-auto flex max-w-sm items-center gap-3 text-gray-700">
+      <div className="flex justify-center px-4 pb-12 pt-4 sm:pt-12">
+        <div className="card flex w-full max-w-sm items-center gap-3 p-5 sm:p-7 text-ink-muted">
           <Spinner size="sm" />
           <p>Verificando tu email...</p>
         </div>
@@ -86,46 +89,41 @@ function VerifyEmailPage() {
 
   if (phase === "verified") {
     return (
-      <div className="p-6">
-        <div className="mx-auto max-w-sm">
-          <h1 className="text-2xl font-bold text-gray-900">Email verificado</h1>
-          <p className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-            Tu email quedó verificado.
-          </p>
-          <p className="mt-4 text-sm">
-            <Link to="/" className="font-medium text-gray-900 underline">
-              Ir al inicio
-            </Link>
-          </p>
-        </div>
-      </div>
+      <AuthCard title="Email verificado">
+        <p className="mt-5 flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink">
+          <CheckIcon className="h-5 w-5 shrink-0" />
+          <span>Tu email quedó verificado.</span>
+        </p>
+        <p className="mt-6">
+          <Link to="/" className={buttonClasses("primary", "lg", "w-full")}>
+            Ir al inicio
+          </Link>
+        </p>
+      </AuthCard>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900">Enlace no válido</h1>
-        <ErrorMessage message={errorMessage} className="mt-4" />
+    <AuthCard title="Enlace no válido">
+      <ErrorMessage message={errorMessage} className="mt-4" />
 
-        <div className="mt-4 text-sm text-gray-600">
-          {!sessionToken ? (
-            <p>
-              <Link to="/login" className="font-medium text-gray-900 underline">
-                Iniciá sesión
-              </Link>{" "}
-              para pedir un nuevo email de verificación.
-            </p>
-          ) : isEmailUnverified(sessionUser) ? (
-            <ResendVerificationButton />
-          ) : (
-            <Link to="/" className="font-medium text-gray-900 underline">
-              Ir al inicio
-            </Link>
-          )}
-        </div>
+      <div className="mt-5 text-ink-muted">
+        {!sessionToken ? (
+          <p>
+            <Link to="/login" className="font-bold text-ink underline underline-offset-4 hover:no-underline">
+              Iniciá sesión
+            </Link>{" "}
+            para pedir un nuevo email de verificación.
+          </p>
+        ) : isEmailUnverified(sessionUser) ? (
+          <ResendVerificationButton />
+        ) : (
+          <Link to="/" className={buttonClasses("secondary", "md", "w-full")}>
+            Ir al inicio
+          </Link>
+        )}
       </div>
-    </div>
+    </AuthCard>
   );
 }
 

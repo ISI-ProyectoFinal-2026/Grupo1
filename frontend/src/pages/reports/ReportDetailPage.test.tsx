@@ -75,6 +75,22 @@ function renderPage() {
   )
 }
 
+describe('ReportDetailPage estado', () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
+  it('muestra el estado en castellano, no el valor crudo de la API', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ status: 'published' }))
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+    useAuthStore.setState({ token: 'token', user: usuario(DUENO_ID + 1) })
+    renderPage()
+
+    expect(await screen.findByText('Publicado')).toBeInTheDocument()
+    expect(screen.queryByText('published')).not.toBeInTheDocument()
+  })
+})
+
 describe('ReportDetailPage coincidencias', () => {
   beforeEach(() => {
     vi.clearAllMocks()

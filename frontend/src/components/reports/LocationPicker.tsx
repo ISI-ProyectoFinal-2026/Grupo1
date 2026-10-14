@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReportLocation } from "@/types/report.types";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Button from "@/components/ui/Button";
+import { PinIcon } from "@/components/ui/icons";
 
 interface LocationPickerProps {
   onLocationSelect: (location: ReportLocation, address: string) => void;
@@ -78,19 +79,25 @@ export default function LocationPicker({ onLocationSelect }: LocationPickerProps
       <Button
         type="button"
         variant="secondary"
+        size="lg"
         isLoading={isLoading}
         onClick={handleGetCurrentLocation}
+        className="w-full"
       >
-        📍 Usar mi ubicación actual
+        {!isLoading && <PinIcon className="h-5 w-5" />}
+        Usar mi ubicación actual
       </Button>
 
       {location && (
-        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-sm font-medium text-gray-900">Ubicación seleccionada</p>
-          <p className="text-sm text-gray-600">{address}</p>
-          <p className="text-xs text-gray-500">
-            {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-          </p>
+        <div aria-live="polite" className="flex gap-3 rounded-card border border-line bg-surface p-3">
+          <PinIcon className="mt-0.5 h-5 w-5 shrink-0 text-ink" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-ink">Ubicación seleccionada</p>
+            <p className="break-words text-ink">{address}</p>
+            <p className="tabular text-sm text-ink-muted">
+              {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+            </p>
+          </div>
         </div>
       )}
 

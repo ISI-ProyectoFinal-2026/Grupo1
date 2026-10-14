@@ -3,6 +3,9 @@ import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "@/services/auth.service";
 import { getApiErrorDetails } from "@/services/api";
+import AuthCard from "@/components/ui/AuthCard";
+import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
 import { getPasswordErrors } from "@/utils/password-rules";
 
 function Register() {
@@ -48,83 +51,88 @@ function Register() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900">Crear cuenta</h1>
-
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="email" className="text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password" className="text-sm font-medium text-gray-700">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-            />
-            <p className="text-xs text-gray-500">
-              Mínimo 8 caracteres, con mayúscula, minúscula y número.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
-              Confirmar contraseña
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
-            />
-          </div>
-
-          {fieldErrors.length > 0 && (
-            <ul className="list-inside list-disc text-sm text-red-600">
-              {fieldErrors.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          )}
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isLoading ? "Creando cuenta..." : "Crear cuenta"}
-          </button>
-        </form>
-
-        <p className="mt-4 text-sm text-gray-600">
+    <AuthCard
+      title="Crear cuenta"
+      subtitle="Sumate a la red de vecinos que buscan mascotas."
+      footer={
+        <>
           ¿Ya tenés cuenta?{" "}
-          <Link to="/login" className="font-medium text-gray-900 underline">
+          <Link to="/login" className="font-bold text-ink underline underline-offset-4 hover:no-underline">
             Iniciá sesión
           </Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="email" className="field-label">
+            Email
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            spellCheck={false}
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="field"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="password" className="field-label">
+            Contraseña
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            aria-describedby="password-hint"
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className="field"
+          />
+          <p id="password-hint" className="text-sm text-ink-muted">
+            Mínimo 8 caracteres, con mayúscula, minúscula y número.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="confirmPassword" className="field-label">
+            Confirmar contraseña
+          </label>
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            className="field"
+          />
+        </div>
+
+        {fieldErrors.length > 0 && (
+          <ul role="alert" className="flex flex-col gap-1 border-l-4 border-danger pl-3 text-sm font-bold text-danger">
+            {fieldErrors.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+        )}
+
+        {error && <ErrorMessage message={error} />}
+
+        <button type="submit" disabled={isLoading} className={buttonClasses("primary", "lg", "mt-2 w-full")}>
+          {isLoading ? "Creando cuenta..." : "Crear cuenta"}
+        </button>
+      </form>
+    </AuthCard>
   );
 }
 

@@ -9,7 +9,7 @@
 
 // Vite's proxy (vite.config.ts) hardcodes localhost:3001 as the backend, so
 // the backend port is not configurable here on purpose.
-export const BACKEND_PORT = 3001
+const BACKEND_PORT = 3001
 export const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT ?? 4173)
 export const AI_STUB_PORT = Number(process.env.E2E_AI_STUB_PORT ?? 8765)
 

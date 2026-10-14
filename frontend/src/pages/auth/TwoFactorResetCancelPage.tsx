@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import LinkFlowExit from "@/components/auth/LinkFlowExit";
+import AuthCard from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { CheckIcon } from "@/components/ui/icons";
 import Spinner from "@/components/ui/Spinner";
 import { useCancelTwoFactorReset } from "@/hooks/useCancelTwoFactorReset";
 import { useUrlToken } from "@/hooks/useUrlToken";
@@ -48,8 +50,8 @@ function TwoFactorResetCancelPage() {
 
   if (phase === "cancelling") {
     return (
-      <div className="p-6">
-        <div className="mx-auto flex max-w-sm items-center gap-3 text-gray-700">
+      <div className="flex justify-center px-4 pb-12 pt-4 sm:pt-12">
+        <div className="card flex w-full max-w-sm items-center gap-3 p-5 sm:p-7 text-ink-muted">
           <Spinner size="sm" />
           <p>Cancelando el reinicio...</p>
         </div>
@@ -59,29 +61,24 @@ function TwoFactorResetCancelPage() {
 
   if (phase === "cancelled") {
     return (
-      <div className="p-6">
-        <div className="mx-auto max-w-sm">
-          <h1 className="text-2xl font-bold text-gray-900">Reinicio cancelado</h1>
-          <p
-            role="status"
-            className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
-          >
-            La verificación en dos pasos de tu cuenta sigue activa.
-          </p>
-          <LinkFlowExit />
-        </div>
-      </div>
+      <AuthCard title="Reinicio cancelado">
+        <p
+          role="status"
+          className="mt-5 flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink"
+        >
+          <CheckIcon className="h-5 w-5 shrink-0" />
+          <span>La verificación en dos pasos de tu cuenta sigue activa.</span>
+        </p>
+        <LinkFlowExit />
+      </AuthCard>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900">Enlace no válido</h1>
-        <ErrorMessage message={errorMessage} className="mt-4" />
-        <LinkFlowExit />
-      </div>
-    </div>
+    <AuthCard title="Enlace no válido">
+      <ErrorMessage message={errorMessage} className="mt-4" />
+      <LinkFlowExit />
+    </AuthCard>
   );
 }
 

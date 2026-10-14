@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
 import { formatResetDate } from "@/utils/two-factor";
 import type { SecondFactorMode } from "@/utils/two-factor";
 
@@ -17,7 +18,8 @@ interface TwoFactorChallengeFormProps {
   onBack: () => void;
 }
 
-const TEXT_BUTTON_CLASS = "font-medium text-gray-900 underline";
+const TEXT_BUTTON_CLASS =
+  "inline-flex min-h-11 items-center text-left font-bold text-ink underline underline-offset-4 hover:no-underline";
 
 function TwoFactorChallengeForm({
   mode,
@@ -40,12 +42,12 @@ function TwoFactorChallengeForm({
 
   return (
     <>
-      <h1 className="text-2xl font-bold text-gray-900">Verificación en dos pasos</h1>
+      <h1 className="font-display text-display-md">Verificación en dos pasos</h1>
 
       {resetEffectiveAt && (
         <p
           role="status"
-          className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          className="mt-5 rounded-card border border-signal bg-signal/15 p-4 text-sm text-ink"
         >
           Hay un reinicio de la verificación en dos pasos en curso: se completa el{" "}
           {formatResetDate(resetEffectiveAt)}. Si ingresás un código válido ahora, el reinicio se
@@ -53,15 +55,15 @@ function TwoFactorChallengeForm({
         </p>
       )}
 
-      <p className="mt-4 text-sm text-gray-600">
+      <p className="mt-2 text-ink-muted">
         {isRecovery
           ? "Ingresá uno de tus códigos de recuperación. Cada uno se puede usar una sola vez."
           : "Ingresá el código de 6 dígitos que te muestra tu app de autenticación."}
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="twoFactorCode" className="text-sm font-medium text-gray-700">
+      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="twoFactorCode" className="field-label">
             {isRecovery ? "Código de recuperación" : "Código de verificación"}
           </label>
           <input
@@ -75,22 +77,18 @@ function TwoFactorChallengeForm({
             placeholder={isRecovery ? "XXXXX-XXXXX" : "123456"}
             value={code}
             onChange={(event) => onCodeChange(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2 tracking-widest text-gray-900 focus:border-gray-500 focus:outline-none"
+            className="field tabular text-center font-bold tracking-widest"
           />
         </div>
 
         {error && <ErrorMessage message={error} />}
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <button type="submit" disabled={isLoading} className={buttonClasses("primary", "lg", "mt-2 w-full")}>
           {isLoading ? "Verificando..." : "Verificar"}
         </button>
       </form>
 
-      <div className="mt-4 flex flex-col items-start gap-2 text-sm text-gray-600">
+      <div className="mt-5 flex flex-col items-start gap-1 border-t border-line pt-4 text-sm">
         <button
           type="button"
           onClick={() => onModeChange(isRecovery ? "totp" : "recovery")}

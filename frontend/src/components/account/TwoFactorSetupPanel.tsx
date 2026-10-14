@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
 import type { TwoFactorSetup } from "@/types/auth";
 
 interface TwoFactorSetupPanelProps {
@@ -32,28 +33,28 @@ function TwoFactorSetupPanel({
   return (
     <section
       aria-labelledby="two-factor-setup-title"
-      className="mt-6 rounded border border-gray-200 p-4"
+      className="card mt-6 p-4 sm:p-5"
     >
-      <h2 id="two-factor-setup-title" className="text-lg font-semibold text-gray-900">
+      <h2 id="two-factor-setup-title" className="font-display text-display-sm text-ink">
         Activar la verificación en dos pasos
       </h2>
-      <p className="mt-2 text-sm text-gray-600">
+      <p className="mt-1 text-ink-muted">
         Escaneá el código QR con tu app de autenticación y después ingresá el código de 6 dígitos
         que te muestra para confirmar.
       </p>
 
-      <div className="mt-4 flex justify-center rounded border border-gray-200 bg-white p-3">
+      <div className="mt-4 flex justify-center rounded-control border border-line bg-paper p-3">
         <QRCodeSVG value={setup.otpauthUri} size={176} marginSize={2} title={QR_TITLE} />
       </div>
 
-      <p className="mt-4 text-sm text-gray-600">Si no podés escanearlo, ingresá esta clave a mano:</p>
-      <p className="mt-1 break-all rounded bg-gray-50 px-3 py-2 font-mono text-sm tracking-wider text-gray-900">
+      <p className="mt-4 text-sm text-ink-muted">Si no podés escanearlo, ingresá esta clave a mano:</p>
+      <p className="mt-1 select-all break-all rounded-control border border-line bg-surface px-3 py-2.5 font-mono text-sm tracking-wider text-ink">
         {setup.secret}
       </p>
 
       <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="setupCode" className="text-sm font-medium text-gray-700">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="setupCode" className="field-label">
             Código de 6 dígitos
           </label>
           <input
@@ -67,17 +68,17 @@ function TwoFactorSetupPanel({
             placeholder="123456"
             value={code}
             onChange={(event) => onCodeChange(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2 tracking-widest text-gray-900 focus:border-gray-500 focus:outline-none"
+            className="field tabular font-bold tracking-widest"
           />
         </div>
 
         {error && <ErrorMessage message={error} />}
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="submit"
             disabled={isLoading}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className={buttonClasses("primary")}
           >
             {isLoading ? "Activando..." : "Confirmar y activar"}
           </button>
@@ -85,7 +86,7 @@ function TwoFactorSetupPanel({
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="text-sm font-medium text-gray-900 underline disabled:opacity-50"
+            className={buttonClasses("ghost")}
           >
             Cancelar
           </button>

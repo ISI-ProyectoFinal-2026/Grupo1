@@ -14,7 +14,7 @@ const LINK_FLOW_PATHS = [
   "/two-factor/reset/cancel",
 ];
 
-export interface ApiError extends Error {
+interface ApiError extends Error {
   code?: string;
   details?: ApiErrorDetail[];
   status?: number;

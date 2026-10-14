@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // cliente aislado por test, sin reintentos ni cache entre casos
-export function createTestQueryClient() {
+function createTestQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },

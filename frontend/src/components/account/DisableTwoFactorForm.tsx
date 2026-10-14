@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
 import { normalizeSecondFactorCode } from "@/utils/two-factor";
 import type { SecondFactorMode } from "@/utils/two-factor";
 
@@ -29,19 +30,19 @@ function DisableTwoFactorForm({ isLoading, error, onSubmit }: DisableTwoFactorFo
   return (
     <section
       aria-labelledby="disable-two-factor-title"
-      className="mt-6 rounded border border-gray-200 p-4"
+      className="card mt-4 p-4 sm:p-5"
     >
-      <h3 id="disable-two-factor-title" className="text-base font-semibold text-gray-900">
+      <h3 id="disable-two-factor-title" className="font-display text-display-sm text-ink">
         Desactivar la verificación en dos pasos
       </h3>
-      <p className="mt-2 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-ink-muted">
         Vas a volver a entrar solo con tu contraseña y se cierran tus otras sesiones abiertas. Para
         confirmar, ingresá tu contraseña y un código.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="disablePassword" className="text-sm font-medium text-gray-700">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="disablePassword" className="field-label">
             Contraseña
           </label>
           <input
@@ -51,12 +52,12 @@ function DisableTwoFactorForm({ isLoading, error, onSubmit }: DisableTwoFactorFo
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+            className="field"
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="disableCode" className="text-sm font-medium text-gray-700">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="disableCode" className="field-label">
             {isRecovery ? "Código de recuperación" : "Código de tu app"}
           </label>
           <input
@@ -69,24 +70,24 @@ function DisableTwoFactorForm({ isLoading, error, onSubmit }: DisableTwoFactorFo
             placeholder={isRecovery ? "XXXXX-XXXXX" : "123456"}
             value={code}
             onChange={(event) => setCode(event.target.value)}
-            className="rounded border border-gray-300 px-3 py-2 tracking-widest text-gray-900 focus:border-gray-500 focus:outline-none"
+            className="field tabular font-bold tracking-widest"
           />
         </div>
 
         {error && <ErrorMessage message={error} />}
 
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <button
             type="submit"
             disabled={isLoading}
-            className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className={buttonClasses("danger")}
           >
             {isLoading ? "Desactivando..." : "Desactivar verificación en dos pasos"}
           </button>
           <button
             type="button"
             onClick={toggleMode}
-            className="text-sm font-medium text-gray-900 underline"
+            className="inline-flex min-h-11 items-center font-bold text-ink underline underline-offset-4 hover:no-underline text-sm"
           >
             {isRecovery ? "Usar el código de mi app" : "Usar un código de recuperación"}
           </button>

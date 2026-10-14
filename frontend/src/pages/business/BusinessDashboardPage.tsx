@@ -9,6 +9,10 @@ import {
   useUpdateBusinessMutation,
 } from "@/hooks/useBusiness";
 import type { Business, BusinessCategory } from "@/types/business.types";
+import { buttonClasses } from "@/components/ui/buttonClasses";
+import ErrorMessage from "@/components/ui/ErrorMessage";
+import Spinner from "@/components/ui/Spinner";
+import { CheckIcon } from "@/components/ui/icons";
 
 const CATEGORY_OPTIONS: Array<{ value: BusinessCategory; label: string }> = [
   { value: "VETERINARIA", label: "Veterinaria" },
@@ -65,9 +69,9 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
   const isLoading = updateBusiness.isPending;
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="cuit" className="text-sm font-medium text-gray-700">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="cuit" className="field-label">
           CUIT
         </label>
         <input
@@ -75,61 +79,68 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
           type="text"
           value={business.cuit}
           disabled
-          className="rounded border border-gray-300 bg-gray-100 px-3 py-2 text-gray-500"
+          className="field"
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="name" className="text-sm font-medium text-gray-700">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="name" className="field-label">
           Nombre
         </label>
         <input
           id="name"
+          name="name"
+          autoComplete="organization"
           type="text"
           required
           value={name}
           onChange={(event) => setName(event.target.value)}
-          className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+          className="field"
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="address" className="text-sm font-medium text-gray-700">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="address" className="field-label">
           Domicilio
         </label>
         <input
           id="address"
+          name="address"
+          autoComplete="street-address"
           type="text"
           required
           value={address}
           onChange={(event) => setAddress(event.target.value)}
-          className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+          className="field"
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="phone" className="text-sm font-medium text-gray-700">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="phone" className="field-label">
           Teléfono
         </label>
         <input
           id="phone"
-          type="text"
+          name="phone"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
           required
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
-          className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+          className="field"
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label htmlFor="category" className="text-sm font-medium text-gray-700">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="category" className="field-label">
           Rubro
         </label>
         <select
           id="category"
           value={category}
           onChange={(event) => setCategory(event.target.value as BusinessCategory)}
-          className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+          className="field"
         >
           {CATEGORY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -140,20 +151,25 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
       </div>
 
       {fieldErrors.length > 0 && (
-        <ul className="list-inside list-disc text-sm text-red-600">
+        <ul role="alert" className="flex flex-col gap-1 border-l-4 border-danger pl-3 text-sm font-bold text-danger">
           {fieldErrors.map((message) => (
             <li key={message}>{message}</li>
           ))}
         </ul>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {success && <p className="text-sm text-green-600">Cambios guardados</p>}
+      {error && <ErrorMessage message={error} />}
+      {success && (
+        <p role="status" className="flex items-center gap-2 font-bold text-success-ink">
+          <CheckIcon className="h-5 w-5" />
+          Cambios guardados
+        </p>
+      )}
 
       <button
         type="submit"
         disabled={isLoading}
-        className="rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+        className={buttonClasses("primary", "lg", "mt-2 w-full")}
       >
         {isLoading ? "Guardando..." : "Guardar cambios"}
       </button>
@@ -166,14 +182,22 @@ function BusinessDashboardPage() {
   const statsQuery = useMyBusinessStatsQuery(myBusinessQuery.isSuccess);
 
   if (myBusinessQuery.isLoading) {
-    return <div className="p-6">Cargando...</div>;
+    return (
+      <div className="flex justify-center py-16 text-ink-muted">
+        <Spinner />
+      </div>
+    );
   }
 
   if (myBusinessQuery.isError) {
     if (hasNoBusiness(myBusinessQuery.error)) {
       return <Navigate to="/businesses/register" replace />;
     }
-    return <div className="p-6 text-sm text-red-600">No se pudo cargar el comercio</div>;
+    return (
+      <div className="mx-auto max-w-lg px-4 py-8">
+        <ErrorMessage message="No se pudo cargar el comercio" />
+      </div>
+    );
   }
 
   const business = myBusinessQuery.data;
@@ -182,41 +206,46 @@ function BusinessDashboardPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mx-auto max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900">Panel del comercio</h1>
-        <p className="mt-1 text-sm text-gray-600">{business.name}</p>
+    <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 lg:py-8">
+      <h1 className="font-display text-display-lg">Panel del comercio</h1>
+      <p className="mt-1 text-lg text-ink-muted">{business.name}</p>
 
-        <section className="mt-6 rounded border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700">Estadísticas</h2>
-          <dl className="mt-2 grid grid-cols-2 gap-4">
-            <div>
-              <dt className="text-xs text-gray-500">Vistas</dt>
-              <dd data-testid="stat-views" className="text-2xl font-bold text-gray-900">
-                {statsQuery.data?.views ?? "-"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-500">Contactos</dt>
-              <dd data-testid="stat-contacts" className="text-2xl font-bold text-gray-900">
-                {statsQuery.data?.contacts ?? "-"}
-              </dd>
-            </div>
-          </dl>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-start">
+        <div className="flex flex-col gap-4">
+          <section className="card p-4 sm:p-5">
+            <h2 className="font-display text-display-sm">Estadísticas</h2>
+            <dl className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-control bg-surface p-3">
+                <dt className="text-sm text-ink-muted">Vistas</dt>
+                <dd data-testid="stat-views" className="tabular font-display text-display-lg text-ink">
+                  {statsQuery.data?.views ?? "-"}
+                </dd>
+              </div>
+              <div className="rounded-control bg-surface p-3">
+                <dt className="text-sm text-ink-muted">Contactos</dt>
+                <dd data-testid="stat-contacts" className="tabular font-display text-display-lg text-ink">
+                  {statsQuery.data?.contacts ?? "-"}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="card p-4 sm:p-5">
+            <h2 className="font-display text-display-sm">Suscripción</h2>
+            <p className="mt-2 text-ink">
+              Plan: <span data-testid="current-plan" className="font-bold">{PLAN_LABELS[business.plan] ?? business.plan}</span>
+            </p>
+            {business.planExpiresAt && (
+              <p className="text-ink-muted">Vence: {formatDate(business.planExpiresAt)}</p>
+            )}
+            <p className="mt-2 text-sm text-ink-muted">Solo el plan Premium permite publicar anuncios.</p>
+          </section>
+        </div>
+
+        <section className="sm:card sm:p-5">
+          <h2 className="mb-4 font-display text-display-sm">Datos del comercio</h2>
+          <BusinessEditForm business={business} />
         </section>
-
-        <section className="mt-4 rounded border border-gray-200 p-4">
-          <h2 className="text-sm font-semibold text-gray-700">Suscripción</h2>
-          <p className="mt-2 text-sm text-gray-900">
-            Plan: <span data-testid="current-plan">{PLAN_LABELS[business.plan] ?? business.plan}</span>
-          </p>
-          {business.planExpiresAt && (
-            <p className="text-sm text-gray-600">Vence: {formatDate(business.planExpiresAt)}</p>
-          )}
-          <p className="mt-2 text-xs text-gray-500">Solo el plan Premium permite publicar anuncios.</p>
-        </section>
-
-        <BusinessEditForm business={business} />
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 import type { FormEvent } from "react";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { buttonClasses } from "@/components/ui/buttonClasses";
+import { CheckIcon } from "@/components/ui/icons";
 
 interface TwoFactorResetRequestFormProps {
   password: string;
@@ -28,9 +30,9 @@ function TwoFactorResetRequestForm({
 
   return (
     <>
-      <h1 className="text-2xl font-bold text-gray-900">Recuperar el acceso</h1>
+      <h1 className="font-display text-display-md">Recuperar el acceso</h1>
 
-      <p className="mt-4 text-sm text-gray-600">
+      <p className="mt-2 text-ink-muted">
         Si no tenés tu autenticador ni tus códigos de recuperación, podés pedir un reinicio. Te
         mandamos un email para confirmarlo y, al confirmarlo, empieza una espera de 72 horas: pasado
         ese tiempo vas a poder entrar solo con tu contraseña, con la verificación en dos pasos
@@ -41,14 +43,15 @@ function TwoFactorResetRequestForm({
       {sentMessage ? (
         <p
           role="status"
-          className="mt-4 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
+          className="mt-5 flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink"
         >
-          {sentMessage}
+          <CheckIcon className="h-5 w-5 shrink-0" />
+          <span>{sentMessage}</span>
         </p>
       ) : (
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="resetPassword" className="text-sm font-medium text-gray-700">
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="resetPassword" className="field-label">
               Contraseña
             </label>
             <input
@@ -58,24 +61,24 @@ function TwoFactorResetRequestForm({
               autoComplete="current-password"
               value={password}
               onChange={(event) => onPasswordChange(event.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-gray-500 focus:outline-none"
+              className="field"
             />
           </div>
 
           {error && <ErrorMessage message={error} />}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <button type="submit" disabled={isLoading} className={buttonClasses("primary", "lg", "mt-2 w-full")}>
             {isLoading ? "Enviando..." : "Enviar email de confirmación"}
           </button>
         </form>
       )}
 
-      <p className="mt-4 text-sm">
-        <button type="button" onClick={onBack} className="font-medium text-gray-900 underline">
+      <p className="mt-5 border-t border-line pt-4 text-sm">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex min-h-11 items-center font-bold text-ink underline underline-offset-4 hover:no-underline"
+        >
           Volver a ingresar el código
         </button>
       </p>
