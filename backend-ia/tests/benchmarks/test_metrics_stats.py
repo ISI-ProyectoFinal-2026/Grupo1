@@ -11,6 +11,7 @@ from benchmarks.metrics import (
     latency_stats,
     per_class_recall,
     top_k_accuracy,
+    top_k_hits,
 )
 
 # One-dimensional "embeddings": similarity = -distance, so rankings are easy to check by hand.
@@ -213,3 +214,24 @@ def test_group_rates_reject_bad_input(function):
 def test_balanced_accuracy_rejects_bad_input():
     with pytest.raises(ValueError, match="same length"):
         balanced_accuracy([1, 0], [1])
+
+
+# --- top_k_hits and the similarity floor -------------------------------------------
+
+
+def test_top_k_hits_returns_the_counts_behind_the_accuracy():
+    assert top_k_hits(SIMILARITY, IDENTITIES, k=1) == (7, 8)
+    assert top_k_hits(SIMILARITY, IDENTITIES, k=3) == (8, 8)
+
+
+def test_top_k_hits_counts_only_queries_that_have_a_partner():
+    points = np.append(POINTS, 9.0)
+    similarity = -np.abs(points[:, None] - points[None, :])
+    assert top_k_hits(similarity, IDENTITIES + ["E"], k=1) == (7, 8)
+
+
+def test_a_similarity_floor_turns_far_partners_into_misses():
+    # D1 and D2 are 0.65 apart (similarity -0.65): found in the top 3, but below the floor.
+    assert top_k_accuracy(SIMILARITY, IDENTITIES, k=3, min_similarity=-0.2) == pytest.approx(6 / 8)
+    assert top_k_hits(SIMILARITY, IDENTITIES, k=3, min_similarity=-0.2) == (6, 8)
+    assert top_k_accuracy(SIMILARITY, IDENTITIES, k=3, min_similarity=-1.0) == pytest.approx(1.0)

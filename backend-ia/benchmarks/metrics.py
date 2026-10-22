@@ -158,12 +158,15 @@ def confusion_matrix(y_true: Sequence, y_pred: Sequence, labels: Sequence) -> np
     return matrix
 
 
-def top_k_accuracy(similarity: np.ndarray, identities: Sequence, k: int) -> float:
-    """Leave-one-out top-k: share of queries with a same-identity sample among their k nearest others.
+def top_k_hits(
+    similarity: np.ndarray, identities: Sequence, k: int, min_similarity: float | None = None
+) -> tuple[int, int]:
+    """Leave-one-out top-k as (hits, queries): queries with a same-identity sample among their k
+    nearest others. With `min_similarity`, that sample must also score at least that much.
 
     `similarity[i, j]` is higher for closer samples; the diagonal (the query itself) is ignored and
     ties keep the lower index first. Queries whose identity has no other sample cannot hit, so they
-    are left out of the denominator.
+    are not counted as queries.
     """
     if k < 1:
         raise ValueError("k must be at least 1")
@@ -179,8 +182,18 @@ def top_k_accuracy(similarity: np.ndarray, identities: Sequence, k: int) -> floa
         raise ValueError("no identity has two samples, so there is nothing to find")
     masked = np.where(np.eye(len(ids), dtype=bool), -np.inf, matrix)
     nearest = np.argsort(-masked, axis=1, kind="stable")[:, : min(k, len(ids) - 1)]
-    hit = (ids[nearest] == ids[:, None]).any(axis=1)
-    return float(hit[has_partner].mean())
+    found = ids[nearest] == ids[:, None]
+    if min_similarity is not None:
+        found &= np.take_along_axis(masked, nearest, axis=1) >= min_similarity
+    return int(found.any(axis=1)[has_partner].sum()), int(has_partner.sum())
+
+
+def top_k_accuracy(
+    similarity: np.ndarray, identities: Sequence, k: int, min_similarity: float | None = None
+) -> float:
+    """Share of queries that `top_k_hits` counts as found."""
+    hits, queries = top_k_hits(similarity, identities, k, min_similarity)
+    return hits / queries
 
 
 def bootstrap_ci(
