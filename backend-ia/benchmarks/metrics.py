@@ -5,11 +5,15 @@ Scores are "higher means positive". A sample is predicted positive when
 candidates with `similarity < SIMILARITY_THRESHOLD`.
 """
 
-from typing import NamedTuple, Sequence
+from typing import Callable, Hashable, Iterable, NamedTuple, Sequence
 
 import numpy as np
 
 FAR_EPSILON = 1e-12
+DEFAULT_SEED = 42
+DEFAULT_RESAMPLES = 1000
+DEFAULT_CONFIDENCE = 0.95
+LATENCY_TAIL_PERCENTILE = 95
 
 
 class PrecisionRecall(NamedTuple):
@@ -31,6 +35,23 @@ class ThresholdSweep(NamedTuple):
     f1: np.ndarray
     best_threshold: float
     best_f1: float
+
+
+class ConfidenceInterval(NamedTuple):
+    estimate: float
+    low: float
+    high: float
+
+
+class LatencyStats(NamedTuple):
+    median: float
+    p95: float
+    mean: float
+
+
+def _rng(seed: int) -> np.random.Generator:
+    """The only place random numbers are drawn, so one seed fixes every resample."""
+    return np.random.default_rng(seed)
 
 
 def _as_arrays(y_true: Sequence, scores: Sequence) -> tuple[np.ndarray, np.ndarray]:
@@ -135,3 +156,107 @@ def confusion_matrix(y_true: Sequence, y_pred: Sequence, labels: Sequence) -> np
                 raise ValueError(f"label {label!r} is not in labels {list(labels)}")
         matrix[index[actual], index[predicted]] += 1
     return matrix
+
+
+def top_k_accuracy(similarity: np.ndarray, identities: Sequence, k: int) -> float:
+    """Leave-one-out top-k: share of queries with a same-identity sample among their k nearest others.
+
+    `similarity[i, j]` is higher for closer samples; the diagonal (the query itself) is ignored and
+    ties keep the lower index first. Queries whose identity has no other sample cannot hit, so they
+    are left out of the denominator.
+    """
+    if k < 1:
+        raise ValueError("k must be at least 1")
+    matrix = np.asarray(similarity, dtype=float)
+    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+        raise ValueError("similarity must be a square matrix")
+    ids = np.asarray(identities)
+    if ids.shape != (matrix.shape[0],):
+        raise ValueError("identities needs one identity per row of similarity")
+    _, inverse, counts = np.unique(ids, return_inverse=True, return_counts=True)
+    has_partner = counts[inverse] > 1
+    if not has_partner.any():
+        raise ValueError("no identity has two samples, so there is nothing to find")
+    masked = np.where(np.eye(len(ids), dtype=bool), -np.inf, matrix)
+    nearest = np.argsort(-masked, axis=1, kind="stable")[:, : min(k, len(ids) - 1)]
+    hit = (ids[nearest] == ids[:, None]).any(axis=1)
+    return float(hit[has_partner].mean())
+
+
+def bootstrap_ci(
+    statistic: Callable[..., float],
+    groups: Sequence,
+    *arrays: Sequence,
+    n_resamples: int = DEFAULT_RESAMPLES,
+    confidence: float = DEFAULT_CONFIDENCE,
+    seed: int = DEFAULT_SEED,
+) -> ConfidenceInterval:
+    """Percentile bootstrap CI of `statistic(*arrays)`, resampling whole `groups` with replacement.
+
+    Resampling by group (for example one identity) keeps correlated samples together. Resamples on
+    which `statistic` raises `ValueError` (such as a single class for AUC) are dropped.
+    """
+    columns = [np.asarray(column) for column in arrays]
+    group_ids = np.asarray(groups)
+    if any(len(column) != len(group_ids) for column in columns):
+        raise ValueError("groups and every array must have the same length")
+    _, inverse = np.unique(group_ids, return_inverse=True)
+    members = [np.flatnonzero(inverse == group) for group in range(inverse.max() + 1)]
+    estimate = float(statistic(*columns))
+    rng = _rng(seed)
+    values = []
+    for _ in range(n_resamples):
+        chosen = rng.integers(0, len(members), size=len(members))
+        index = np.concatenate([members[group] for group in chosen])
+        try:
+            values.append(float(statistic(*(column[index] for column in columns))))
+        except ValueError:
+            continue
+    if not values:
+        raise ValueError("every bootstrap resample was degenerate")
+    tail = (1 - confidence) / 2 * 100
+    low, high = np.percentile(values, [tail, 100 - tail])
+    return ConfidenceInterval(estimate, float(low), float(high))
+
+
+def latency_stats(latencies_ms: Iterable[float]) -> LatencyStats:
+    """Median, p95 and mean. p95 uses numpy's linear interpolation between the closest ranks:
+    position 0.95 * (n - 1), so for 1..100 it is 95 + 0.05 * (96 - 95) = 95.05."""
+    values = np.asarray(list(latencies_ms), dtype=float)
+    if values.size == 0:
+        raise ValueError("latency_stats needs at least one sample")
+    return LatencyStats(
+        float(np.median(values)),
+        float(np.percentile(values, LATENCY_TAIL_PERCENTILE)),
+        float(values.mean()),
+    )
+
+
+def _rate_by_group(groups: Sequence[Hashable], flags: Sequence[bool]) -> dict:
+    """Share of True flags in each group, with groups in sorted order."""
+    if len(groups) != len(flags):
+        raise ValueError("groups and flags must have the same length")
+    if not len(groups):
+        raise ValueError("at least one sample is required")
+    return {
+        group: float(np.mean([flag for member, flag in zip(groups, flags) if member == group]))
+        for group in sorted(set(groups))
+    }
+
+
+def per_class_recall(classes: Sequence[Hashable], correct: Sequence[bool]) -> dict:
+    """Recall of each class: the share of its samples that were classified correctly."""
+    return _rate_by_group(classes, correct)
+
+
+def false_accept_rate(subclasses: Sequence[Hashable], accepted: Sequence[bool]) -> dict:
+    """Share of negative samples wrongly accepted, per negative subclass (for example plush)."""
+    return _rate_by_group(subclasses, accepted)
+
+
+def balanced_accuracy(y_true: Sequence, y_pred: Sequence) -> float:
+    """Mean of the per-class recalls, so a rare class weighs as much as a common one."""
+    if len(y_true) != len(y_pred):
+        raise ValueError("y_true and y_pred must have the same length")
+    correct = [actual == predicted for actual, predicted in zip(y_true, y_pred)]
+    return float(np.mean(list(per_class_recall(y_true, correct).values())))
