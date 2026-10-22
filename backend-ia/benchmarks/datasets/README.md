@@ -24,6 +24,18 @@ Fuentes que descarga:
 
 Las imágenes cargadas a mano (propias o de la web) conviven con las descargadas: usan prefijos distintos (`oi_` para Open Images, `dog_dfn_` para DogFaceNet) y se registran en `SOURCES.md`.
 
+### Imágenes cargadas a mano en `moderation/`
+
+El cargador solo lee `manifest.csv`, y la descarga lo reescribe con las imágenes que bajó. Para que las imágenes manuales formen parte del benchmark, ejecutá después de la descarga:
+
+```bash
+python -m benchmarks.register_manual
+```
+
+- Registra toda imagen de `moderation/` que no empiece con `oi_` (jpg, jpeg, png, webp), con fuente `Manual (recolección web)`, licencia `No registrada`, autor `Matías Alvarado` y la etiqueta de su carpeta.
+- Es idempotente: las filas manuales se reconstruyen desde los archivos y el manifiesto queda ordenado por ruta.
+- No cubre `matching/`: las fotos propias de individuos no se registran con este paso.
+
 ## 1. `matching/` — Matching por similitud
 
 Mide si el sistema reconoce **al mismo animal** en fotos distintas.
