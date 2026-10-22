@@ -1,0 +1,8 @@
+# images are not versioned (size and dataset licenses); only structure and docs
+*
+!*/
+!.gitignore
+!.gitkeep
+!README.md
+!SOURCES.md
+!manifest.csv
