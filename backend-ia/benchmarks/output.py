@@ -17,6 +17,8 @@ LIMITATION = (
     "(b) the no_animal/screenshot class is empty and is excluded."
 )
 COMMENT_PREFIX = "# "
+EVALUATED = "evaluado"
+NOT_EVALUATED = "no evaluado"
 
 
 @contextmanager

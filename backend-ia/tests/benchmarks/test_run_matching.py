@@ -1,9 +1,16 @@
 """Matching runner driven by fake embeddings: pairs, scores and metrics checked against hand-computed values."""
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pytest
 
-from benchmarks.run_matching import evaluate
+from benchmarks import output, run_matching
+from benchmarks.dataset import Sample
+from benchmarks.embedders import ModelUnavailable
+from benchmarks.output import LIMITATION, read_csv
+from benchmarks.run_matching import evaluate, run
 
 RESAMPLES = 40
 
@@ -142,3 +149,190 @@ def test_the_confidence_interval_resamples_identities_not_pairs():
 def test_no_genuine_pair_raises_instead_of_reporting_a_number():
     with pytest.raises(ValueError, match="both classes"):
         evaluate(["A", "B", "C"], [np.array([1.0, 0.0]), np.array([0.0, 1.0]), np.array([1.0, 1.0])])
+
+
+# --- run: adapters, profiling and the result files ---------------------------------
+
+
+class FakeEmbedder:
+    name = "fake"
+    model_ids = {"fake": "fake-model"}
+
+    def __init__(self, vectors, fail_on=None, unavailable=None):
+        self.vectors = vectors
+        self.fail_on = fail_on
+        self.unavailable = unavailable
+        self.loads = 0
+
+    def load(self):
+        self.loads += 1
+        if self.unavailable:
+            raise ModelUnavailable(self.unavailable)
+
+    def embed(self, path):
+        if path == self.fail_on:
+            raise RuntimeError("embedding exploded")
+        return self.vectors[path]
+
+    def model_size_mb(self):
+        return 12.5
+
+
+def fake_run_inputs(undetected=()):
+    """Samples and the vectors their fake embedder answers; `undetected` photos get None."""
+    labels = OVERLAP["ids"] + list(undetected)
+    paths = [Path(f"matching/{label}/{n}.jpg") for n, label in enumerate(labels)]
+    samples = [Sample(path, "matching", label) for path, label in zip(paths, labels)]
+    vectors = {path: np.array(vector) for path, vector in zip(paths, OVERLAP["vectors"])}
+    vectors.update({path: None for path in paths[len(OVERLAP["vectors"]):]})
+    return samples, vectors
+
+
+@pytest.fixture(autouse=True)
+def fixed_provenance(monkeypatch):
+    monkeypatch.setattr(output, "collect", lambda models, seed: {"commit": "abc123", "models": models, "seed": seed})
+
+
+def test_run_writes_the_summary_curves_pairs_and_environment(tmp_path):
+    samples, vectors = fake_run_inputs()
+    embedder = FakeEmbedder(vectors)
+
+    summary = run(embedder, samples, tmp_path / "fake", n_resamples=RESAMPLES)
+
+    written = json.loads((tmp_path / "fake" / "summary.json").read_text(encoding="utf-8"))
+    assert written == json.loads(json.dumps(summary))
+    assert {path.name for path in (tmp_path / "fake").iterdir()} == {
+        "summary.json", "roc.csv", "threshold_sweep.csv", "environment.json", "raw",
+    }
+    assert (written["variant"], written["status"], written["models"]) == ("fake", "evaluado", {"fake": "fake-model"})
+    assert written["auc"]["estimate"] == pytest.approx(0.75)
+    assert written["model_size_mb"] == 12.5
+    assert set(written["performance"]) == {"latency_ms", "rss_after_load_mb", "peak_rss_mb"}
+    assert set(written["performance"]["latency_ms"]) == {"median", "p95", "mean"}
+    assert len(read_csv(tmp_path / "fake" / "raw" / "pairs.csv")) == 6
+    assert embedder.loads == 1
+
+
+def test_every_output_states_the_dataset_limitation(tmp_path):
+    samples, vectors = fake_run_inputs()
+
+    run(FakeEmbedder(vectors), samples, tmp_path / "fake", n_resamples=RESAMPLES)
+
+    for name in ("summary.json", "environment.json"):
+        saved = json.loads((tmp_path / "fake" / name).read_text(encoding="utf-8"))
+        assert saved["limitation"] == LIMITATION
+    for name in ("roc.csv", "threshold_sweep.csv", "raw/pairs.csv"):
+        assert (tmp_path / "fake" / name).read_text(encoding="utf-8").startswith(f"# {LIMITATION}\n")
+
+
+def test_curves_are_thinned_but_keep_both_ends(tmp_path, monkeypatch):
+    monkeypatch.setattr(run_matching, "MAX_CURVE_POINTS", 4)
+    samples, vectors = fake_run_inputs()
+
+    run(FakeEmbedder(vectors), samples, tmp_path / "fake", n_resamples=RESAMPLES)
+
+    roc = read_csv(tmp_path / "fake" / "roc.csv")
+    assert len(roc) == 4
+    assert (roc[0]["fpr"], roc[0]["tpr"], roc[0]["threshold"]) == ("0.0", "0.0", "inf")
+    assert (roc[-1]["fpr"], roc[-1]["tpr"]) == ("1.0", "1.0")
+    assert len(read_csv(tmp_path / "fake" / "threshold_sweep.csv")) == 4
+
+
+def test_undetected_images_show_up_in_the_summary(tmp_path):
+    samples, vectors = fake_run_inputs(undetected=["A"])
+
+    summary = run(FakeEmbedder(vectors), samples, tmp_path / "fake", n_resamples=RESAMPLES)
+
+    assert summary["images"]["detection_rate"] == 0.8
+    assert summary["at_production_threshold"]["recall_end_to_end"] == pytest.approx(0.5)
+
+
+def test_the_same_inputs_give_the_same_files_apart_from_timings(tmp_path):
+    samples, vectors = fake_run_inputs()
+
+    run(FakeEmbedder(vectors), samples, tmp_path / "first", n_resamples=RESAMPLES)
+    run(FakeEmbedder(vectors), samples, tmp_path / "second", n_resamples=RESAMPLES)
+
+    def comparable(folder):
+        summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
+        summary.pop("performance")
+        return summary
+
+    assert comparable(tmp_path / "first") == comparable(tmp_path / "second")
+    for name in ("roc.csv", "threshold_sweep.csv", "raw/pairs.csv"):
+        assert (tmp_path / "first" / name).read_bytes() == (tmp_path / "second" / name).read_bytes()
+
+
+def test_an_error_mid_run_leaves_no_partial_directory(tmp_path):
+    samples, vectors = fake_run_inputs()
+    embedder = FakeEmbedder(vectors, fail_on=samples[2].path)
+
+    with pytest.raises(RuntimeError, match="exploded"):
+        run(embedder, samples, tmp_path / "results" / "fake", n_resamples=RESAMPLES)
+
+    assert list((tmp_path / "results").iterdir()) == []
+
+
+def test_unavailable_weights_are_reported_as_not_evaluated_and_the_run_continues(tmp_path):
+    samples, vectors = fake_run_inputs()
+
+    summary = run(FakeEmbedder(vectors, unavailable="no network"), samples, tmp_path / "dino", n_resamples=RESAMPLES)
+
+    written = json.loads((tmp_path / "dino" / "summary.json").read_text(encoding="utf-8"))
+    assert written == {
+        "variant": "fake", "task": "matching", "limitation": LIMITATION, "models": {"fake": "fake-model"},
+        "status": "no evaluado", "reason": "no network",
+    }
+    assert summary == written
+    assert {path.name for path in (tmp_path / "dino").iterdir()} == {"summary.json", "environment.json"}
+
+
+# --- main: command line -----------------------------------------------------------
+
+
+def write_manifest(root, rows):
+    lines = ["path,task,label"] + [f"{path},matching,{label}" for path, label in rows]
+    (root / "manifest.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return root / "manifest.csv"
+
+
+def test_main_runs_the_chosen_variant_on_the_manifest_images(tmp_path, monkeypatch):
+    root = tmp_path / "datasets"
+    rows = [("matching/A/1.jpg", "A"), ("matching/A/2.jpg", "A"), ("matching/B/1.jpg", "B"), ("matching/B/2.jpg", "B")]
+    for path, _ in rows:
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        (root / path).write_bytes(b"x")
+    manifest = write_manifest(root, rows)
+    vectors = {root / path: np.array(vector) for (path, _), vector in zip(rows, OVERLAP["vectors"])}
+    monkeypatch.setattr(run_matching, "EMBEDDERS", {"fake": lambda: FakeEmbedder(vectors)})
+
+    run_matching.main(["--variant", "fake", "--manifest", str(manifest), "--output-dir", str(tmp_path / "out"), "--resamples", "40"])
+
+    assert json.loads((tmp_path / "out" / "summary.json").read_text(encoding="utf-8"))["images"]["total"] == 4
+
+
+def test_main_limit_keeps_only_the_first_images_in_path_order(tmp_path, monkeypatch):
+    root = tmp_path / "datasets"
+    rows = [("matching/A/1.jpg", "A"), ("matching/A/2.jpg", "A"), ("matching/B/1.jpg", "B"), ("matching/B/2.jpg", "B")]
+    for path, _ in rows:
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        (root / path).write_bytes(b"x")
+    manifest = write_manifest(root, rows)
+    vectors = {root / path: np.array(vector) for (path, _), vector in zip(rows, OVERLAP["vectors"])}
+    monkeypatch.setattr(run_matching, "EMBEDDERS", {"fake": lambda: FakeEmbedder(vectors)})
+
+    run_matching.main(["--variant", "fake", "--manifest", str(manifest), "--output-dir", str(tmp_path / "out"), "--limit", "3", "--resamples", "40"])
+
+    summary = json.loads((tmp_path / "out" / "summary.json").read_text(encoding="utf-8"))
+    assert summary["images"]["total"] == 3
+    assert summary["pairs"] == {"total": 3, "genuine": 1, "impostor": 2}
+
+
+def test_main_stops_before_running_when_images_are_missing(tmp_path, monkeypatch):
+    manifest = write_manifest(tmp_path, [("matching/A/1.jpg", "A")])
+    monkeypatch.setattr(run_matching, "EMBEDDERS", {"fake": lambda: pytest.fail("must not be built")})
+
+    with pytest.raises(SystemExit, match="download_datasets.py"):
+        run_matching.main(["--variant", "fake", "--manifest", str(manifest), "--output-dir", str(tmp_path / "out"), "--resamples", "40"])
+
+    assert not (tmp_path / "out").exists()

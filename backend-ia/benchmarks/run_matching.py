@@ -4,11 +4,15 @@
 profiling and the atomic result files.
 """
 
+import argparse
 from collections import Counter
+from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
 
+from benchmarks.dataset import DEFAULT_MANIFEST, DatasetMissingError, Sample, load_samples
+from benchmarks.embedders import EMBEDDERS, ModelUnavailable
 from benchmarks.metrics import (
     DEFAULT_RESAMPLES,
     DEFAULT_SEED,
@@ -21,14 +25,27 @@ from benchmarks.metrics import (
     roc_curve,
     tar_at_far,
     threshold_sweep,
+    latency_stats,
     top_k_hits,
 )
+from benchmarks.output import (
+    EVALUATED,
+    LIMITATION,
+    NOT_EVALUATED,
+    RESULTS_DIR,
+    atomic_directory,
+    write_csv,
+    write_environment,
+    write_json,
+)
+from benchmarks.profiling import profile
 
 # Mirrors production (`matching_service`): a candidate counts only above this similarity and within the
 # 5 nearest. tests/benchmarks/test_guards.py fails if the threshold drifts.
 PRODUCTION_THRESHOLD = 0.75
 PRODUCTION_TOP_K = 5
 TOP_1 = 1
+MAX_CURVE_POINTS = 1000  # the full per-pair scores go to raw/ (ignored); committed curves are thinned
 
 
 class Evaluation(NamedTuple):
@@ -134,3 +151,96 @@ def evaluate(
         (int(embedded[r]), int(embedded[c]), bool(g), float(s)) for r, c, g, s in zip(rows, cols, genuine, scores)
     ]
     return Evaluation(summary, pairs, roc_curve(genuine, scores), sweep)
+
+
+def _thin(length: int) -> np.ndarray:
+    """At most MAX_CURVE_POINTS evenly spaced positions, always including the first and the last."""
+    if length <= MAX_CURVE_POINTS:
+        return np.arange(length)
+    return np.unique(np.linspace(0, length - 1, MAX_CURVE_POINTS).round().astype(int))
+
+
+def _write_curves(folder: Path, samples: list[Sample], evaluation: Evaluation) -> None:
+    fpr, tpr, thresholds = evaluation.roc
+    keep = _thin(len(thresholds))
+    write_csv(folder / "roc.csv", ["fpr", "tpr", "threshold"], list(zip(fpr[keep], tpr[keep], thresholds[keep])))
+    sweep = evaluation.sweep
+    keep = _thin(len(sweep.thresholds))
+    columns = (sweep.thresholds, sweep.precision, sweep.recall, sweep.f1)
+    write_csv(folder / "threshold_sweep.csv", ["threshold", "precision", "recall", "f1"], list(zip(*(c[keep] for c in columns))))
+    (folder / "raw").mkdir()
+    name = [f"{sample.label}/{sample.path.name}" for sample in samples]
+    write_csv(
+        folder / "raw" / "pairs.csv",
+        ["image_a", "image_b", "genuine", "similarity"],
+        [(name[i], name[j], genuine, score) for i, j, genuine, score in evaluation.pairs],
+    )
+
+
+def run(
+    embedder, samples: list[Sample], output_dir: Path, *, seed: int = DEFAULT_SEED, n_resamples: int = DEFAULT_RESAMPLES
+) -> dict:
+    """Embed every sample (timed), evaluate, and publish the result files atomically.
+
+    Weights that cannot load produce a "no evaluado" summary instead of an error, so the other
+    variants still run.
+    """
+    header = {"variant": embedder.name, "task": "matching", "limitation": LIMITATION, "models": embedder.model_ids}
+    embeddings: dict[Path, object] = {}
+
+    def embed(sample: Sample) -> None:
+        embeddings[sample.path] = embedder.embed(sample.path)
+
+    with atomic_directory(output_dir) as staging:
+        try:
+            profiled = profile(embedder.load, embed, samples)
+        except ModelUnavailable as error:
+            summary = {**header, "status": NOT_EVALUATED, "reason": str(error)}
+        else:
+            evaluation = evaluate(
+                [sample.label for sample in samples],
+                [embeddings[sample.path] for sample in samples],
+                n_resamples=n_resamples,
+                seed=seed,
+            )
+            summary = {
+                **header,
+                "status": EVALUATED,
+                "seed": seed,
+                "n_resamples": n_resamples,
+                "model_size_mb": embedder.model_size_mb(),
+                **evaluation.summary,
+                "performance": {
+                    "latency_ms": latency_stats(profiled.latencies_ms)._asdict(),
+                    "rss_after_load_mb": profiled.rss_after_load_mb,
+                    "peak_rss_mb": profiled.peak_rss_mb,
+                },
+            }
+            _write_curves(staging, samples, evaluation)
+        write_json(staging / "summary.json", summary)
+        write_environment(staging, embedder.model_ids, seed)
+    return summary
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run the matching benchmark for one embedding variant.")
+    parser.add_argument("--variant", required=True, choices=sorted(EMBEDDERS))
+    parser.add_argument("--limit", type=int, help="use only the first N images in path order (smoke runs)")
+    parser.add_argument("--resamples", type=int, default=DEFAULT_RESAMPLES, help="bootstrap resamples")
+    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--output-dir", type=Path, help="default: results/matching/<variant>")
+    args = parser.parse_args(argv)
+
+    try:
+        samples = load_samples(args.manifest, task="matching")
+    except DatasetMissingError as error:
+        raise SystemExit(f"error: {error}") from error
+    if args.limit:
+        samples = samples[: args.limit]
+    output_dir = args.output_dir or RESULTS_DIR / "matching" / args.variant
+    summary = run(EMBEDDERS[args.variant](), samples, output_dir, n_resamples=args.resamples)
+    print(f"{args.variant}: {summary['status']} -> {output_dir}")
+
+
+if __name__ == "__main__":
+    main()

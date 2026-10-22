@@ -1,1 +1,3 @@
 .cache/
+# per-pair scores are regenerable (about 50k rows); the aggregate files are versioned
+results/**/raw/
