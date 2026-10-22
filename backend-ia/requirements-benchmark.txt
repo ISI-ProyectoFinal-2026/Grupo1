@@ -1,0 +1,6 @@
+# Benchmark-only dependencies, installed on top of the service requirements.
+# Nothing under app/ imports them and requirements.txt (used by the CI job) stays unchanged.
+-r requirements.txt
+timm==1.0.30
+matplotlib==3.11.2
+psutil==7.2.2
