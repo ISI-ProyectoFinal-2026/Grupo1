@@ -1,6 +1,6 @@
 # ADR-0013: Dimensión del embedding de 512
 
-- **Estado:** Pendiente
+- **Estado:** Aceptada
 - **Responsables:** Agustín Díaz (corrección); Matías Alvarado (especificación inicial) y Gabriel Valdivieso (esquema inicial)
 
 ## Decisión
@@ -18,4 +18,4 @@ Los embeddings se almacenan con 512 dimensiones, la salida del modelo OpenCLIP V
 
 ## Referencias
 
-[Issue #18](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/18), [PR #56](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/56); resultados del benchmark: No disponible (el ADR pasa a Aceptada cuando exista el enlace).
+[Issue #18](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/18), [PR #56](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/56).

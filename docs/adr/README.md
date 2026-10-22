@@ -29,7 +29,7 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0009](0009-mapas-leaflet-osm-nominatim-postgis.md) | Mapas con Leaflet y OpenStreetMap, Nominatim y PostGIS | Aceptada | Gabriel Valdivieso; Agustín Díaz; Matías Alvarado | C09 | — |
 | [ADR-0010](0010-flujo-git-ramas-personales.md) | Flujo de trabajo con Git, ramas personales y revisión obligatoria | Aceptada | Matías Alvarado | C10 | — |
 | [ADR-0011](0011-imagen-docker-postgres.md) | Imagen Docker de PostgreSQL con base oficial y PGDG | Aceptada | Gabriel Valdivieso | C11 | — |
-| [ADR-0013](0013-dimension-embedding-512.md) | Dimensión del embedding de 512 | Pendiente | Agustín Díaz; Matías Alvarado; Gabriel Valdivieso | C13 | — |
+| [ADR-0013](0013-dimension-embedding-512.md) | Dimensión del embedding de 512 | Aceptada | Agustín Díaz; Matías Alvarado; Gabriel Valdivieso | C13 | — |
 | [ADR-0014](0014-parametros-matching.md) | Parámetros del matching | Pendiente | Agustín Díaz; Gabriel Valdivieso; Matías Alvarado | C14 | — |
 | [ADR-0016](0016-moderacion-hibrida.md) | Moderación híbrida con filtro automático por IA y denuncias de usuarios | Aceptada | Franco Marín; Agustín Díaz; Matías Alvarado; Gabriel Valdivieso | C16 | — |
 | [ADR-0017](0017-flyers-canvas.md) | Flyers con plantilla fija dibujada con canvas | Aceptada | Matías Alvarado; Agustín Díaz | C17 | — |
@@ -38,4 +38,4 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 ## Pendientes
 
 - C12 (pipeline de IA para matching) y C15 (moderación de imágenes): sin archivo todavía; se escriben con los resultados del benchmark de `backend-ia/benchmarks/`.
-- ADR-0013 y ADR-0014 (IA): el texto está aprobado, pero pasan a `Aceptada` cuando enlacen un resultado de `backend-ia/benchmarks/results/` y `backend-ia/benchmarks/README.md`.
+- ADR-0014 (parámetros del matching): el texto está aprobado, pero pasa a `Aceptada` cuando enlace el resultado de calibración del umbral en `backend-ia/benchmarks/results/` y `backend-ia/benchmarks/README.md`.
