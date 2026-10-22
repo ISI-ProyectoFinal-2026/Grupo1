@@ -226,7 +226,7 @@ def test_every_output_states_the_dataset_limitation(tmp_path):
 
 
 def test_curves_are_thinned_but_keep_both_ends(tmp_path, monkeypatch):
-    monkeypatch.setattr(run_matching, "MAX_CURVE_POINTS", 4)
+    monkeypatch.setattr(output, "MAX_CURVE_POINTS", 4)
     samples, vectors = fake_run_inputs()
 
     run(FakeEmbedder(vectors), samples, tmp_path / "fake", n_resamples=RESAMPLES)

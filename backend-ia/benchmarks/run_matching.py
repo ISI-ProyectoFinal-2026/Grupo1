@@ -35,6 +35,7 @@ from benchmarks.output import (
     RESULTS_DIR,
     atomic_directory,
     write_csv,
+    write_curve_csv,
     write_environment,
     write_json,
 )
@@ -45,7 +46,6 @@ from benchmarks.profiling import profile
 PRODUCTION_THRESHOLD = 0.75
 PRODUCTION_TOP_K = 5
 TOP_1 = 1
-MAX_CURVE_POINTS = 1000  # the full per-pair scores go to raw/ (ignored); committed curves are thinned
 
 
 class Evaluation(NamedTuple):
@@ -153,21 +153,15 @@ def evaluate(
     return Evaluation(summary, pairs, roc_curve(genuine, scores), sweep)
 
 
-def _thin(length: int) -> np.ndarray:
-    """At most MAX_CURVE_POINTS evenly spaced positions, always including the first and the last."""
-    if length <= MAX_CURVE_POINTS:
-        return np.arange(length)
-    return np.unique(np.linspace(0, length - 1, MAX_CURVE_POINTS).round().astype(int))
-
-
 def _write_curves(folder: Path, samples: list[Sample], evaluation: Evaluation) -> None:
     fpr, tpr, thresholds = evaluation.roc
-    keep = _thin(len(thresholds))
-    write_csv(folder / "roc.csv", ["fpr", "tpr", "threshold"], list(zip(fpr[keep], tpr[keep], thresholds[keep])))
+    write_curve_csv(folder / "roc.csv", ["fpr", "tpr", "threshold"], fpr, tpr, thresholds)
     sweep = evaluation.sweep
-    keep = _thin(len(sweep.thresholds))
-    columns = (sweep.thresholds, sweep.precision, sweep.recall, sweep.f1)
-    write_csv(folder / "threshold_sweep.csv", ["threshold", "precision", "recall", "f1"], list(zip(*(c[keep] for c in columns))))
+    write_curve_csv(
+        folder / "threshold_sweep.csv",
+        ["threshold", "precision", "recall", "f1"],
+        sweep.thresholds, sweep.precision, sweep.recall, sweep.f1,
+    )
     (folder / "raw").mkdir()
     name = [f"{sample.label}/{sample.path.name}" for sample in samples]
     write_csv(

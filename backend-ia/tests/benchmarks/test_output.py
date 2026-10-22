@@ -2,6 +2,7 @@
 
 import json
 
+import numpy as np
 import pytest
 
 from benchmarks import output
@@ -10,6 +11,7 @@ from benchmarks.output import (
     atomic_directory,
     read_csv,
     write_csv,
+    write_curve_csv,
     write_environment,
     write_json,
 )
@@ -85,6 +87,22 @@ def test_csv_starts_with_the_limitation_and_reads_back_as_rows(tmp_path):
 
     assert path.read_text(encoding="utf-8").splitlines()[0] == f"# {LIMITATION}"
     assert read_csv(path) == [{"fpr": "0.0", "tpr": "0.0"}, {"fpr": "0.5", "tpr": "1.0"}]
+
+
+def test_a_long_curve_is_thinned_evenly_keeping_both_ends(tmp_path, monkeypatch):
+    monkeypatch.setattr(output, "MAX_CURVE_POINTS", 4)
+
+    write_curve_csv(tmp_path / "curve.csv", ["x", "y"], np.arange(10.0), np.arange(10.0) * 2)
+
+    assert read_csv(tmp_path / "curve.csv") == [
+        {"x": "0.0", "y": "0.0"}, {"x": "3.0", "y": "6.0"}, {"x": "6.0", "y": "12.0"}, {"x": "9.0", "y": "18.0"},
+    ]
+
+
+def test_a_short_curve_keeps_every_point(tmp_path):
+    write_curve_csv(tmp_path / "curve.csv", ["x", "y"], np.array([0.0, 0.5, 1.0]), np.array([1.0, 2.0, 3.0]))
+
+    assert [row["x"] for row in read_csv(tmp_path / "curve.csv")] == ["0.0", "0.5", "1.0"]
 
 
 def test_csv_with_a_comma_in_a_cell_survives_the_round_trip(tmp_path):
