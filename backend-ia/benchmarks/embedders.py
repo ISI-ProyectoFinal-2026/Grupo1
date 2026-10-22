@@ -39,8 +39,8 @@ def _production_pipeline():
     return importlib.import_module("app.ml.pipeline")
 
 
-class _PipelineEmbedder:
-    """Shared loading for the variants that delegate to `app.ml.pipeline` (injectable for tests)."""
+class PipelineAdapter:
+    """Shared loading for the adapters that delegate to `app.ml.pipeline` (injectable for tests)."""
 
     def __init__(self, pipeline: Any = None) -> None:
         self._injected = pipeline
@@ -50,7 +50,7 @@ class _PipelineEmbedder:
         self._pipeline = self._injected if self._injected is not None else _production_pipeline()
 
 
-class ClipFull(_PipelineEmbedder):
+class ClipFull(PipelineAdapter):
     """OpenCLIP alone on the full image."""
 
     name = "clip_full"
@@ -63,7 +63,7 @@ class ClipFull(_PipelineEmbedder):
         return parameters_mb(self._pipeline.clip_model)
 
 
-class YoloClip(_PipelineEmbedder):
+class YoloClip(PipelineAdapter):
     """Production path: YOLO crop, then OpenCLIP on the crop. None when no animal is detected."""
 
     name = "yolo_clip"
