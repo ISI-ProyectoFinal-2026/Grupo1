@@ -196,3 +196,13 @@ Detectadas al recorrer los flujos punta a punta contra el código. Se cruzaron c
 | #226 | [CHORE] Historias cerradas sin implementación verificable | Medium |
 
 Todos agregados a "Patitas-Project-G1" en Status = Backlog, sin label de prioridad (el usuario la asigna en el Project). Comentario publicado en #208.
+
+## Hallazgos del slice 16 (2026-10-24, aprobados por el usuario)
+
+| Issue / comentario | Hallazgo | Milestone |
+|---|---|---|
+| #228 | [BUG] La opción de subir un flyer propio se muestra a usuarios que no son el dueño | Sprint 5 – QA |
+| #229 | [BUG] Seguridad: las URLs de imagen de reportes, chat y flyer propio aceptan cualquier dominio | Sprint 5 – QA |
+| Comentario en #225 | Falta la pantalla "Mis reportes" | — |
+| Comentario en #220 | Un reporte en `pending` después de 24 h queda sin salida; la espera de 30 s de los reintentos nunca se ejecuta | — |
+| Comentario en #223 | Resolver una denuncia deja pendientes las demás del mismo reporte y puede pasar un reporte `resolved` a `rejected` | — |
