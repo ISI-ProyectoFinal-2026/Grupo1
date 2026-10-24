@@ -81,3 +81,118 @@ Drafts only. Issues are created on GitHub after the user approves them. Labels f
 | #218 | [FEATURE] Ocultamiento automático de reportes por acumulación de denuncias | Medium |
 
 Todos agregados a "Patitas-Project-G1" en Status = Backlog. El campo Priority del Project no tiene opciones configuradas (pendiente).
+
+---
+
+# Brechas funcionales (relevamiento de flujos para 1.2.2, 2026-10-24)
+
+Detectadas al recorrer los flujos punta a punta contra el código. Se cruzaron con los issues abiertos: la navegación sin login ya está en #187, el selector de ubicación en mapa en #208, los pines por color en #209, el cierre de casos inactivos en #210 y la restauración de reportes ocultados automáticamente en #218.
+
+---
+
+## [BUG] La foto del reporte figura como obligatoria pero es opcional
+
+- **Origen:** relevamiento del flujo de alta de reporte (2026-10-24).
+- **Labels sugeridos:** `type: bug`, `epic: mascotas`, `priority: medium`, `area: frontend`, `area: backend`
+- **Descripción:** El formulario muestra "Foto *" (`frontend/src/components/reports/ReportForm.tsx:164`), pero la foto es opcional en el validador del frontend (`frontend/src/types/validators/report.validator.ts:26`) y en el del backend (`backend/src/validators/reports.validator.ts:15`). Un reporte sin foto se publica directo, sin moderación de IA y sin embedding, así que nunca participa del matching.
+- **Propuesta:** el equipo define si la foto es obligatoria y después alinea la etiqueta y los dos validadores con esa decisión.
+- **Criterio de aceptación:** la etiqueta, el validador del frontend y el del backend coinciden. Si la foto queda opcional, la interfaz avisa que el reporte no entra al matching automático.
+
+---
+
+## [CHORE] Sin `AI_SERVICE_URL`, los reportes con foto quedan en `pending` indefinidamente
+
+- **Origen:** relevamiento del flujo de moderación por IA (2026-10-24).
+- **Labels sugeridos:** `type: chore`, `epic: infra`, `priority: low`, `area: backend`
+- **Descripción:** La variable es opcional por diseño (`backend/README.md:18`). Si no está, `triggerEmbeddingGeneration` no hace nada (`backend/src/services/matching.service.ts:94-95`) y la reconciliación tampoco (`:210`). Un reporte con foto se crea en `pending` y no sale nunca de ese estado, sin ningún aviso al usuario ni al operador.
+- **Propuesta:** registrar una advertencia al arrancar cuando falte la variable y exponer en `/health` si el backend de IA está configurado y responde.
+- **Criterio de aceptación:** con la variable ausente, el arranque registra una advertencia y `/health` informa el servicio de IA como no configurado.
+
+---
+
+## [FEATURE] Confirmar una coincidencia debería avisar a la otra parte y ofrecer el cierre del reporte
+
+- **Origen:** relevamiento del flujo de matching (2026-10-24).
+- **Labels sugeridos:** `type: story`, `epic: matching`, `priority: medium`, `area: backend`, `area: frontend`
+- **Descripción:** `decideMatch` (`backend/src/services/matching.service.ts:302`) solo cambia el estado del match a `confirmed` o `rejected`. No notifica al autor del otro reporte ni cambia el estado de ninguno de los dos reportes. Además, `listMatches` (`:274`) no filtra por el estado del otro reporte, de modo que sigue mostrando coincidencias con reportes que después se rechazaron.
+- **Propuesta:** al confirmar, crear una notificación para el autor del otro reporte, ofrecer al dueño cerrar su reporte y excluir de `listMatches` los reportes que no estén `published` ni `resolved`.
+- **Criterio de aceptación:** confirmar una coincidencia genera la notificación a la otra parte, y el listado no muestra coincidencias con reportes rechazados.
+- **Relación:** #210 (cierre de reportes).
+
+---
+
+## [FEATURE] Las notificaciones deberían enlazar al reporte que mencionan
+
+- **Origen:** relevamiento del flujo de notificaciones (2026-10-24).
+- **Labels sugeridos:** `type: story`, `epic: notificaciones`, `priority: low`, `area: frontend`
+- **Descripción:** La notificación ya guarda `reportId` (`backend/prisma/schema.prisma:284`), pero `frontend/src/components/notifications/NotificationList.tsx` no lo usa. El usuario recibe "posible coincidencia" y tiene que buscar el reporte a mano.
+- **Propuesta:** que cada notificación con `reportId` navegue a `/reports/:id` y quede marcada como leída.
+- **Criterio de aceptación:** un clic en una notificación de coincidencia abre el reporte correspondiente.
+
+---
+
+## [FEATURE] Moderación manual: descartar una denuncia sin ocultar el reporte
+
+- **Origen:** relevamiento del flujo de moderación comunitaria (2026-10-24).
+- **Labels sugeridos:** `type: story`, `epic: moderación`, `priority: medium`, `area: backend`, `area: frontend`
+- **Descripción:** Resolver una denuncia (`backend/src/services/report-flags.service.ts:62-87`) siempre la marca `reviewed` y pasa el reporte a `rejected`. El moderador no puede descartar una denuncia infundada, y el autor no recibe aviso cuando su reporte se oculta. #218 cubre la restauración y el aviso solo para el ocultamiento automático.
+- **Propuesta:** dos acciones en el panel (aceptar, que oculta, y descartar, que mantiene el reporte publicado) y una notificación `report_status_change` al autor cuando la denuncia se acepta. La restauración manual se alinea con la de #218.
+- **Criterio de aceptación:** el moderador puede descartar sin ocultar, y el autor recibe una notificación cuando su reporte se oculta por una denuncia.
+- **Relación:** #218 (ocultamiento automático), #38 (suspensión de cuentas).
+
+---
+
+## [FEATURE] Gestión de roles: asignar moderadores y definir los permisos de `admin`
+
+- **Origen:** relevamiento de roles y permisos (2026-10-24).
+- **Labels sugeridos:** `type: story`, `epic: auth`, `priority: low`, `area: backend`
+- **Descripción:** No existe ningún endpoint ni procedimiento documentado para asignar el rol `moderador`. El único `admin` se crea en `backend/prisma/seed.ts`. En el código, `admin` solo aparece en `requireRole("moderador", "admin")` (`backend/src/routes/report-flags.routes.ts:10-11`), así que tiene exactamente los mismos permisos que `moderador`.
+- **Propuesta:** un endpoint exclusivo de `admin` para asignar y quitar el rol `moderador`, o documentar el procedimiento manual si el equipo decide postergarlo.
+- **Criterio de aceptación:** un `admin` puede asignar el rol `moderador` sin editar la base a mano, y un `moderador` no puede hacerlo.
+- **Relación:** #31 (roles y autorización).
+
+---
+
+## [FEATURE] Interfaz para mascotas y para editar o eliminar un reporte
+
+- **Origen:** relevamiento de flujos (2026-10-24).
+- **Labels sugeridos:** `type: story`, `epic: mascotas`, `priority: low`, `area: frontend`
+- **Descripción:** El backend implementa el CRUD de mascotas (`backend/src/routes/pets.routes.ts`) y la edición y eliminación de reportes (`backend/src/services/reports.service.ts:210`, `:290`), pero el frontend no tiene páginas ni servicios que los usen. `ReportForm` nunca envía `petId`, así que el filtro por raza del backend no tiene uso real. Además, `GET /api/pets` devuelve todas las mascotas sin autenticación (`backend/src/services/pets.service.ts:10`).
+- **Propuesta:** páginas "Mis mascotas" y "Editar reporte", y restringir el listado de mascotas al dueño.
+- **Criterio de aceptación:** el dueño puede crear, editar y eliminar sus mascotas y sus reportes desde la interfaz, y el listado de mascotas solo muestra las propias.
+- **Relación:** #13 (CRUD, cerrado), #12.
+
+---
+
+## [CHORE] Historias cerradas sin implementación verificable
+
+- **Origen:** relevamiento de flujos (2026-10-24).
+- **Labels sugeridos:** `type: chore`, `epic: qa`, `priority: medium`
+- **Descripción:** Dos historias están cerradas aunque sus criterios de aceptación no se cumplen en el código:
+  - #33 (preferencias de notificación): no hay modelo, endpoint ni pantalla de preferencias (una búsqueda de "preferen" en `backend/` y `frontend/src` no devuelve resultados).
+  - #13 (CRUD de mascotas): no tiene frontend.
+- **Propuesta:** reabrirlas o dividirlas en una parte hecha y otra pendiente, para que el estado del tablero coincida con el código. El informe (1.2.2.2) toma el estado del código, no el del issue.
+- **Criterio de aceptación:** cada historia cerrada tiene sus criterios de aceptación cumplidos o una nota que explica el alcance parcial.
+
+---
+
+## Comentario sugerido en #208 (no es un issue nuevo)
+
+> El backend ya expone `GET /api/geo/nearby` (radio en km) y `GET /api/geo/map` (bounding box), en `backend/src/services/geo.service.ts`, pero el frontend no los usa: el mapa del feed dibuja la misma lista del feed. Además, `MapView` arranca centrado en Buenos Aires (`frontend/src/components/reports/MapView.tsx:18`, `[-34.6037, -58.3816]`), no en la zona del piloto. Conviene incluir ambos puntos en el alcance de este issue.
+
+---
+
+## Creados en GitHub (2026-10-24, aprobados por el usuario)
+
+| Issue | Borrador | Prioridad propuesta (campo Priority del Project) |
+|---|---|---|
+| #219 | [BUG] La foto del reporte figura como obligatoria pero es opcional | Medium |
+| #220 | [CHORE] Sin `AI_SERVICE_URL`, los reportes con foto quedan en `pending` | Low |
+| #221 | [FEATURE] Confirmar una coincidencia: avisar a la otra parte y ofrecer el cierre | Medium |
+| #222 | [FEATURE] Las notificaciones deberían enlazar al reporte | Low |
+| #223 | [FEATURE] Moderación manual: descartar una denuncia sin ocultar el reporte | Medium |
+| #224 | [FEATURE] Gestión de roles: asignar moderadores y permisos de `admin` | Low |
+| #225 | [FEATURE] Interfaz para mascotas y para editar o eliminar un reporte | Low |
+| #226 | [CHORE] Historias cerradas sin implementación verificable | Medium |
+
+Todos agregados a "Patitas-Project-G1" en Status = Backlog, sin label de prioridad (el usuario la asigna en el Project). Comentario publicado en #208.
