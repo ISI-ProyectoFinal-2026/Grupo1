@@ -44,9 +44,8 @@ Las tareas son los issues con la etiqueta `type: task`: `gh issue list --repo IS
 | Sprint 2 – Desarrollo Core | 2026-08-14 | 2 | 2 | 0 |
 | Sprint 3 - Features | 2026-08-26 | 12 | 12 | 0 |
 | Sprint 4 – Desarrollo + Notificaciones | 2026-09-09 | 2 | 2 | 0 |
-| Sprint 5 – QA | 2026-10-07 | 4 | 2 | 2 |
-| Sprint 6 – Cierre de features | 2026-10-20 | 0 | 0 | 0 |
-| Sin milestone | — | 1 | 0 | 1 |
+| Sprint 5 – QA | 2026-11-02 | 5 | 2 | 3 |
+| Sprint 6 – Cierre de features | 2026-10-30 | 0 | 0 | 0 |
 | **Total** | | **23** | **20** | **3** |
 
 Tabla 1.2.2-20. Tareas por milestone. Fuente: los dos comandos `gh` de esta sección.
@@ -75,7 +74,7 @@ Tabla 1.2.2-20. Tareas por milestone. Fuente: los dos comandos `gh` de esta secc
 | Sprint 5 | [#40](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/40) | Tests de carga y performance | Abierto |
 | Sprint 5 | [#41](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/41) | Análisis de vulnerabilidades | Abierto |
 | Sprint 5 | [#42](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/42) | Tests unitarios | Cerrado |
-| Sin milestone | [#215](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/215) | Mover el JWT de `localStorage` a una cookie httpOnly | Abierto |
+| Sprint 5 | [#215](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/215) | Mover el JWT de `localStorage` a una cookie httpOnly | Abierto |
 
 Tabla 1.2.2-21. Tareas por milestone. Fuente: `gh issue list --repo ISI-ProyectoFinal-2026/Grupo1 --state all --label "type: task" --limit 200 --json number,title,state,milestone`.
 
