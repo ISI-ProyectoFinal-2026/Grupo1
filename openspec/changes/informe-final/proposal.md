@@ -16,6 +16,7 @@ On 2026-11-04 the professor will review the architecture and the technology choi
   - A moderation runner comparing YOLO with 10 COCO labels against CLIP zero-shot.
 - Measured quality metrics: coverage per package, Snyk before/after, e2e.
 - The Phase A chapters of `docs/informe/` (see the map below).
+- How the app works, end to end: scope (1.2.1), functional model with per-module user stories, step-by-step flows and sequence/state diagrams (1.2.2), and screens, palette and fonts (1.2.3). Added 2026-10-24.
 - `docs-review` extended to cover `docs/informe/` and `docs/adr/`.
 - Every drifted doc updated to match the code: `docs/ARQUITECTURA.md`, `README.md`, `docs/githubactions/README.md`, and any other doc found stale.
 
@@ -33,9 +34,10 @@ Evidence sources: R = repo artifact, I = interview with Matías (PM), N = not av
 | Template section | Phase | Evidence |
 |---|---|---|
 | 1.1 Competitors, 1.1.3 | B | I / N |
-| 1.1.4, 1.2.1 Objectives and scope | B | R (PDD) |
-| 1.2.2 Use cases, user stories, tasks | B | R (PDD, issues) |
-| 1.2.3 Screens, palette, fonts | B | R (frontend) |
+| 1.1.4 Preliminary objectives and scope | B | R (PDD) |
+| 1.2.1 Final objectives and scope | A | R (PDD, code, issues) |
+| 1.2.2 Use cases, requirements, user stories, flows, tasks | A | R (PDD, issues, code) |
+| 1.2.3 Screens, palette, fonts | A | R (frontend) |
 | 1.2.4 Data model | A | R (`schema.prisma`, migrations) |
 | 1.3.1 Programming and documentation | A | R, ADRs |
 | 1.3.2 Training; 1.3.4 Manuals; 1.3.5 Implementation | B | I |
@@ -94,6 +96,7 @@ None (`openspec/specs/` is empty).
     10. Report section 2.3.2.2.
     11. Report sections 1.2.4, 1.3.1 and 1.3.3.
     12. Drift updates; split into two PRs if over budget.
+    13. Report sections 1.2.1, 1.2.2 and 1.2.3 (functional flows). Since 2026-10-24 these go before the remaining benchmark slices.
   - Freeze on 2026-11-03.
   - Phase B: docx generation, with pandoc `--reference-doc` after a spike and a python-docx fallback. Then the remaining sections.
 
@@ -141,6 +144,7 @@ All changes are additive docs, an isolated benchmark folder, and doc text update
 - [ ] ADRs C01–C17 are accepted with rationale from interviews, or explicitly listed as pending.
 - [ ] One command regenerates the benchmark results. The metric tests pass in CI. The dataset limitation is stated wherever results are cited.
 - [ ] The Phase A sections are written in `docs/informe/` by 2026-11-03.
+- [ ] For each module, the report answers what the user does, where the data goes, which states it passes through and what happens on failure, with every step cited against the code.
 - [ ] No technical doc contradicts the code (React 19, PG 16, Node 24 CI, no Redis, no Dependabot, compose with only Postgres, 4 CI jobs).
 - [ ] Every number traces to a repo artifact or command output. Gaps are marked "No disponible".
 - [ ] Each PR has at most 400 authored lines. Generated files (manifest, PNG) are counted separately.
@@ -155,3 +159,4 @@ All changes are additive docs, an isolated benchmark folder, and doc text update
 | 4 | The benchmark runs on the current face-crop data, and the limitation is declared. |
 | 5 | All stale docs are updated to match the code (Phase A). |
 | 6 | The `screenshot` class is excluded and the report says so; Annex 11 is rewritten for Prisma (Phase B). |
+| 7 | (2026-10-24) Sections 1.2.1-1.2.3 move to Phase A and take priority over the remaining benchmark slices, because reviewers ask how the app works end to end. Functional gaps found while tracing the flows became issues #219-#226. |

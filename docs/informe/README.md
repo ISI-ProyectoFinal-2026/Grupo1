@@ -15,7 +15,9 @@ Evidencia: **R** repositorio, **I** entrevista, **N** no disponible todavía.
 | Sección de la plantilla | Archivo | Fase | Evidencia |
 |---|---|---|---|
 | 1.1 Definición de requerimientos | — | B | I / N |
-| 1.2.1-1.2.3 Alcances, modelo funcional, pantallas | — | B | R (PDD, issues, frontend) |
+| 1.2.1 Objetivos y alcances definitivos | `1-2-1-objetivos-y-alcances.md` | A | R (PDD, código, issues) |
+| 1.2.2 Modelo funcional (casos de uso, requerimientos, historias de usuario y flujos por módulo, tareas) | `1-2-2-modelo-funcional.md` | A | R (PDD, issues, código) |
+| 1.2.3 Pantallas y reportes (paleta, fuentes, pantallas) | `1-2-3-pantallas.md` | A | R (frontend) |
 | 1.2.4 Modelo de datos | `1-2-4-modelo-de-datos.md` | A | R |
 | 1.3.1 Programación y documentación | `1-3-1-programacion-y-documentacion.md` | A | R, ADR |
 | 1.3.2, 1.3.4, 1.3.5 Capacitación, manuales, implementación | — | B | I |
