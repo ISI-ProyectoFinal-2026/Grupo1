@@ -29,7 +29,7 @@ Tabla 2.2.3-1. Prácticas de ramas e integración. Fuente: [`WORKFLOW.md`](../WO
 
 Ramas del repositorio remoto: cuatro personales (`matias/features`, `dbeagus/features`, `gabriel/features`, `franco/features`) y dos cortas (`matias/feat-208-mapas`, `matias/fix-179-business-plan`). Fuente: `git branch -r`.
 
-La configuración de protección de la rama `main` en GitHub es `No disponible`: la consulta `gh api repos/ISI-ProyectoFinal-2026/Grupo1/branches/main/protection` responde 404 con los permisos del equipo, y `gh api repos/ISI-ProyectoFinal-2026/Grupo1/rulesets` devuelve una lista vacía.
+La rama `main` no tiene protección configurada en GitHub: `gh api repos/ISI-ProyectoFinal-2026/Grupo1/branches/main` devuelve `"protected": false`, y `gh api repos/ISI-ProyectoFinal-2026/Grupo1/rulesets` devuelve una lista vacía. La revisión por PR es una regla del equipo ([`WORKFLOW.md`](../WORKFLOW.md)), no una restricción técnica.
 
 ### Identificación de versiones
 
