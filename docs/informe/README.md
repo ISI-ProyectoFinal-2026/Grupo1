@@ -14,8 +14,7 @@ Evidencia: **R** repositorio, **I** entrevista, **N** no disponible todavía.
 
 | Sección de la plantilla | Archivo | Fase | Evidencia |
 |---|---|---|---|
-| 1.1.1-1.1.2 Competidores A y B | `1-1-1-competidores.md` | A | Capturas del equipo |
-| 1.1.3-1.1.4 Resumen de funcionalidades, objetivos y alcances preliminares | `1-1-1-competidores.md` | B | I / N |
+| 1.1 Definición de requerimientos (1.1.1-1.1.4) | `1-1-1-competidores.md` | A | Capturas del equipo, PDD |
 | 1.2.1 Objetivos y alcances definitivos | `1-2-1-objetivos-y-alcances.md` | A | R (PDD, código, issues) |
 | 1.2.2 Modelo funcional (casos de uso, requerimientos, tareas) | `1-2-2-modelo-funcional.md` | A | R (PDD, issues, código) |
 | 1.2.2.2 Historias de usuario y flujos por módulo | `1-2-2-2-historias-y-flujos.md` | A | R (issues, código) |
@@ -97,6 +96,9 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Figura 1.1-6 | Figura | Publicación de mascota encontrada pendiente de aprobación | 1.1.2.2.1 ([`1-1-1-competidores.md`](1-1-1-competidores.md)) | `docs/informe/img/1-1/facebook-publicacion-pendiente.png` |
 | Figura 1.1-7 | Figura | Modelo lógico del grupo Perritos Perdidos | 1.1.2.2.2 ([`1-1-1-competidores.md`](1-1-1-competidores.md)) | Figuras 1.1-4 a 1.1-6 |
 | Tabla 1.1-8 | Tabla | Problemas y necesidades de los grupos de Facebook | 1.1.2.2.3 ([`1-1-1-competidores.md`](1-1-1-competidores.md)) | Figuras 1.1-4 a 1.1-6, PDD v1.0 |
+| Tabla 1.1-9 | Tabla | Resumen de funcionalidades de los sistemas relevados | 1.1.3 ([`1-1-1-competidores.md`](1-1-1-competidores.md)) | Figuras 1.1-1 a 1.1-6 |
+| Tabla 1.1-10 | Tabla | Objetivos específicos preliminares | 1.1.4.1 ([`1-1-1-competidores.md`](1-1-1-competidores.md)) | `docs/pdd/PDD v1.0.docx`, Tablas 1.1-4, 1.1-8, 1.1-9 |
+| Tabla 1.1-11 | Tabla | Alcance preliminar del nuevo sistema | 1.1.4.2 ([`1-1-1-competidores.md`](1-1-1-competidores.md)) | `docs/pdd/PDD v1.0.docx` |
 | Figura 1.2.2-1 | Figura | Componentes del sistema y cómo se comunican | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | `backend/src/app.ts`, `backend/src/index.ts`, servicios citados en el pie |
 | Tabla 1.2.2-1 | Tabla | Perfiles de usuario y permisos | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | `backend/prisma/schema.prisma:18-24`, rutas citadas |
 | Tabla 1.2.2-2 | Tabla | Historias del módulo de autenticación | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | `gh issue list --label "type: story"` |

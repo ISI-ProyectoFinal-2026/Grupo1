@@ -13,7 +13,7 @@ Esta sección releva los dos sistemas que hoy cubren la búsqueda de mascotas pe
 
 - **Evidencia.** Capturas de pantalla aportadas por el equipo (`docs/informe/img/1-1/`). La fecha de captura no se registró.
 - **Datos públicos.** La búsqueda en internet no devolvió información sobre ninguno de los competidores; los enlaces a cada perfil y grupo los aportó el equipo. Lo que no surge de las capturas figura como `No disponible`.
-- 1.1.3 y 1.1.4 quedan `Pendiente (Fase B)`.
+- 1.1.4 transcribe los objetivos y el alcance del PDD v1.0, que son los preliminares del proyecto.
 
 ## 1.1.1 Competidor A: InfoAnimal SR
 
@@ -182,8 +182,54 @@ Tabla 1.1-8. Problemas y necesidades de los grupos de Facebook. Fuente: Figuras 
 
 ## 1.1.3 Resumen funcionalidades de los sistemas relevados
 
-Pendiente (Fase B).
+*Observada*: la función aparece en las capturas. *No observada*: no aparece en las capturas; no implica que el sistema carezca de ella.
+
+| Funcionalidad | A: InfoAnimal SR | B: grupos de Facebook | Evidencia |
+|---|---|---|---|
+| Publicación de contenido sobre animales | Observada (la cuenta publica contenido propio) | Observada (los miembros publican texto y fotos) | Figuras 1.1-1, 1.1-6 |
+| Publicación de casos por parte de terceros | No disponible | Observada | Figura 1.1-6 |
+| Aprobación previa de publicaciones | No observada | Observada (cola `Pending`, manual) | Figura 1.1-6 |
+| Filtro de contenido ajeno a mascotas | No observada | No observada; hay avisos comerciales publicados | Figuras 1.1-4, 1.1-5 |
+| Sitio web propio | Observada, fuera de servicio (`503`) | No aplica | Figura 1.1-2 |
+| Estado del caso (perdido, encontrado, resuelto) | No observada | No observada | Figuras 1.1-1, 1.1-4 a 1.1-6 |
+| Búsqueda o filtrado de casos | No observada | No observada | Figuras 1.1-1, 1.1-4 a 1.1-6 |
+| Ubicación en mapa | No observada | No observada; la ubicación se indica en texto libre | Figura 1.1-6 |
+| Comparación automática de fotos | No observada | No observada | Figuras 1.1-1, 1.1-4 a 1.1-6 |
+| Contacto entre usuarios | No observada | Por fuera del grupo (WhatsApp, en un aviso comercial) | Figura 1.1-5 |
+
+Tabla 1.1-9. Resumen de funcionalidades de los sistemas relevados. Fuente: Figuras 1.1-1 a 1.1-6.
 
 ## 1.1.4 Objetivos y alcances preliminares del nuevo sistema
 
-Pendiente (Fase B).
+Objetivos y alcance tomados del documento de definición del proyecto ([`PDD v1.0.docx`](../pdd/PDD%20v1.0.docx), secciones "Objetivo Principal", "Objetivos Específicos" y "Alcance"). Su contraste con lo implementado está en [1.2.1 Objetivos y alcances definitivos](1-2-1-objetivos-y-alcances.md).
+
+### 1.1.4.1 Objetivos
+
+**Objetivo principal.** Desarrollar una plataforma web integral dirigida a todo el ecosistema de mascotas para la gestión y optimización de la búsqueda de mascotas perdidas, mediante la centralización de información y el uso de tecnologías avanzadas como geolocalización, inteligencia artificial y mecanismos de participación comunitaria, para aumentar significativamente la eficiencia en la localización y recuperación de animales extraviados.
+
+| Objetivo específico | Problema relevado que atiende |
+|---|---|
+| Centralizar y estructurar toda la información de casos de mascotas perdidas y encontradas | Sitio fuera de servicio (Tabla 1.1-4); información repartida entre grupos y casos sin estado (Tabla 1.1-8) |
+| Implementar un sistema de matching automático que conecte reportes de pérdidas con avistamientos | Sin comparación automática de fotos en los sistemas relevados (Tabla 1.1-9) |
+| Facilitar la comunicación entre dueños, voluntarios y rescatistas | Contacto por fuera de la plataforma (Tabla 1.1-9) |
+| Crear una comunidad activa y comprometida con el bienestar animal | No surge del relevamiento |
+| Validar un modelo de negocio sostenible basado en suscripciones de comercios | No surge del relevamiento |
+
+Tabla 1.1-10. Objetivos específicos preliminares. Fuente: PDD v1.0, "Objetivos Específicos"; Tablas 1.1-4, 1.1-8 y 1.1-9.
+
+### 1.1.4.2 Alcances preliminares
+
+| Incluido | No incluido |
+|---|---|
+| Sistema de gestión de mascotas y publicaciones (CRUD completo) | Desarrollo de aplicación móvil nativa (iOS/Android) |
+| Motor de reconocimiento y matching de imágenes | Integración con entidades gubernamentales o servicios de vigilancia |
+| Sistema de geolocalización y mapas interactivos | Servicios de rescate o transporte de animales |
+| Moderación automática de publicaciones | Acuerdos de asociación con organizaciones externas (puede hacerse post-MVP) |
+| Generador automático de flyers | |
+| Sistema de comunicación interna (chat) | |
+| Sistema de notificaciones | |
+| Módulo de gamificación | |
+| Dashboard de comercios | |
+| Sistema de publicidad segmentada | |
+
+Tabla 1.1-11. Alcance preliminar del nuevo sistema. Fuente: PDD v1.0, "Alcance".
