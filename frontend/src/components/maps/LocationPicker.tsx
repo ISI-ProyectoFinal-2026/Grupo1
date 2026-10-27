@@ -118,7 +118,7 @@ export default function LocationPicker({
           <PinIcon className="mt-0.5 h-5 w-5 shrink-0 text-ink" />
           <div className="min-w-0">
             <p className="text-sm font-bold text-ink">Ubicación seleccionada</p>
-            <p className="break-words text-ink">{address}</p>
+            {address !== formatCoords(location) && <p className="break-words text-ink">{address}</p>}
             <p className="tabular text-sm text-ink-muted">{formatCoords(location)}</p>
           </div>
         </div>

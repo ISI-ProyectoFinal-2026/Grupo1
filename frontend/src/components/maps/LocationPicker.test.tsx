@@ -113,7 +113,7 @@ describe('LocationPicker: mapa', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
     expect(onLocationSelect).toHaveBeenCalledTimes(1)
-    expect(screen.getAllByText('-34.6100, -68.3300').length).toBeGreaterThan(0)
+    expect(screen.getByText('-34.6100, -68.3300')).toBeInTheDocument()
   })
 
   it('sin resolveAddress no consulta Nominatim', () => {
@@ -124,6 +124,8 @@ describe('LocationPicker: mapa', () => {
 
     expect(fetchMock).not.toHaveBeenCalled()
     expect(onLocationSelect).toHaveBeenCalledWith({ lat: -34.61, lng: -68.33 }, '-34.6100, -68.3300')
+    // sin zona resuelta las coordenadas no se repiten
+    expect(screen.getAllByText('-34.6100, -68.3300')).toHaveLength(1)
   })
 
   it('acerca el mapa al pin si quedo lejos o con poco zoom', () => {
