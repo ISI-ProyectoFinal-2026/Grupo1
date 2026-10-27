@@ -119,4 +119,5 @@ nav:
       - adr/0017-flyers-canvas.md
       - adr/0018-criterio-evolucion-tecnologica.md
       - adr/0019-comercio-perfil-no-rol.md
+      - adr/0020-sitio-web-del-informe.md
   - Registro: informe/README.md

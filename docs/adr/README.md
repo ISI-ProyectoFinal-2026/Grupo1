@@ -35,6 +35,7 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0017](0017-flyers-canvas.md) | Flyers con plantilla fija dibujada con canvas | Aceptada | Matías Alvarado; Agustín Díaz | C17 | — |
 | [ADR-0018](0018-criterio-evolucion-tecnologica.md) | Criterio de evolución tecnológica | Aceptada | Equipo (Matías Alvarado, PM) | CX01 | — |
 | [ADR-0019](0019-comercio-perfil-no-rol.md) | El comercio es un perfil del usuario y no un rol | Aceptada | Agustín Díaz; Matías Alvarado | C28 (parte) | — |
+| [ADR-0020](0020-sitio-web-del-informe.md) | Sitio web del informe con Material for MkDocs en GitHub Pages | Pendiente | Matías Alvarado | — | — |
 
 ## Pendientes
 
