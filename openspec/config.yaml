@@ -1,0 +1,70 @@
+schema: spec-driven
+
+context: |
+  Project: Patitas (Grupo1) - lost/found pets platform. Monorepo, GitHub: ISI-ProyectoFinal-2026/Grupo1 (main).
+  backend/    Node 24 + Express 5 + Prisma 5 (PostgreSQL) + Socket.IO + zod 4, TypeScript strict. Tests: Jest 30 + ts-jest + supertest.
+  frontend/   React 19 + Vite 8 + TypeScript 6, Tailwind 3, TanStack Query, zustand, react-router 6, Leaflet. Tests: Vitest 4 + Testing Library; E2E: Playwright (chromium).
+  backend-ia/ Python 3.11 + FastAPI + SQLAlchemy async + pgvector + torch/YOLOv8/OpenCLIP. Tests: pytest + pytest-asyncio + pytest-cov.
+  Infra: docker-compose (Postgres + pgvector), GitHub Actions CI (backend, frontend, e2e-ui, backend-ia) + Snyk.
+  Language: SDD artifacts and code in English; end-user documentation under docs/ is written in neutral professional Spanish.
+  Architecture decisions are recorded as ADRs in docs/adr/ (template docs/adr/0000-plantilla.md); team roles in docs/equipo/ROLES.md.
+  Final report source lives in docs/informe/ (Markdown mirroring docs/Template Presentacion Final (1).docx); SDD change informe-final owns docs/, docs/adr/, docs/informe/ and backend-ia/benchmarks/.
+
+strict_tdd: true
+
+testing:
+  strict_tdd: true
+  runner:
+    backend:
+      command: "npm test"
+      cwd: backend
+      framework: jest
+    frontend:
+      command: "npm test"
+      cwd: frontend
+      framework: vitest
+    backend-ia:
+      command: "python -m pytest tests/ -v"
+      cwd: backend-ia
+      framework: pytest
+  layers:
+    unit: true
+    integration: true   # supertest + real Postgres (backend), pytest + Postgres (backend-ia), Testing Library (frontend)
+    e2e: true           # backend: jest tests/e2e; frontend: Playwright (frontend/e2e)
+  coverage:
+    available: true
+    threshold: "70% global (statements/branches/functions/lines) in backend and frontend"
+    commands:
+      backend: "npm run test:coverage"
+      frontend: "npm run test:coverage"
+      backend-ia: "python -m pytest tests/ --cov=app --cov-report=term-missing"
+  quality:
+    linter: "frontend: npm run lint (oxlint); backend/backend-ia: none"
+    type_checker: "backend: npm run typecheck && npm run typecheck:tests; frontend: npm run typecheck (tsc -b); backend-ia: none"
+    formatter: "frontend: prettier (npm run format:check); backend/backend-ia: none"
+  notes:
+    - "Backend and backend-ia tests need PostgreSQL (docker compose up -d; CI uses localhost:5432, compose maps host 5433) and prisma migrate deploy."
+    - "backend-ia/tests/test_pipeline_real_model.py loads real ML models (slow, heavy)."
+    - "Frontend E2E needs Postgres migrated; Playwright boots ai-stub, backend (NODE_ENV=test) and vite preview."
+
+rules:
+  proposal:
+    - Include rollback plan and affected packages (backend, frontend, backend-ia, docs).
+  specs:
+    - Use Given/When/Then scenarios; RFC 2119 keywords for requirements.
+  design:
+    - Record architectural decisions that warrant an ADR in docs/adr/ (written in Spanish by the team); never invent the team's rationale.
+  tasks:
+    - "Differentiated review budget: code slices (Python, tests, scripts) max 400 authored lines; documentation-only slices (ADRs, docs/informe, docs-consistency, WORKFLOW.md, openspec planning docs, issue/notebook housekeeping) max 800 authored lines. Generated files are counted separately. Delivery strategy is auto-chain."
+  apply:
+    - Strict TDD: write the failing test first, then implement, then refactor.
+    - Follow existing conventions per package; never edit an accepted ADR (supersede it) and do not modify .claude/ unless the task says so.
+  verify:
+    - Run package-level tests, typecheck and lint for every touched package; coverage must stay at or above 70% in backend and frontend.
+  archive:
+    - Merge delta specs into openspec/specs before moving the change to openspec/changes/archive.
+
+review_budget_lines: 400        # code slices
+review_budget_docs_lines: 800   # documentation-only slices
+delivery_strategy: auto-chain
+artifact_store: hybrid

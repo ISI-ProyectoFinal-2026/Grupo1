@@ -2,7 +2,7 @@
 
 ## Metodología de trabajo
 
-Cada miembro del equipo tiene una rama personal permanente donde realiza todo su trabajo en paralelo. Las PRs se revisan antes de integrar a main.
+Cada miembro del equipo tiene una rama personal permanente donde realiza su trabajo en paralelo. Las PRs se revisan antes de integrar a main, y el autor integra su PR después de la aprobación. Cuando conviene aislar un cambio, se puede usar una rama corta por tarea (ver [ADR-0010](adr/0010-flujo-git-ramas-personales.md)).
 
 ---
 
@@ -59,7 +59,7 @@ O manualmente en GitHub:
 ### 5. Code review
 - Espera a que un compañero revise el PR
 - Responde feedback si hay
-- Reviewer aprueba y mergea a `main`
+- El reviewer aprueba y el autor mergea a `main` después de la aprobación
 
 ### 6. Después del merge
 Sincroniza tu rama con los cambios nuevos en `main`:
@@ -102,7 +102,8 @@ Closes #14"
 |-------|-------------|
 | ✅ Una rama por persona | Tu rama personal (`{tu-nombre}/features`) es permanente |
 | ✅ Todos los commits en tu rama | Jamás commitear directamente a `main` |
-| ✅ PRs hacia `main` | Siempre review antes de merge |
+| ✅ PRs hacia `main` | Siempre review antes de merge; el autor mergea tras la aprobación |
+| ✅ Ramas cortas por tarea | Permitidas para aislar un cambio. La rama personal sigue siendo la opción por defecto |
 | ✅ Sincronizar después de merge | `git pull origin main` después que el PR se mergee |
 | ✅ Reusable | La misma rama se usa para múltiples issues consecutivas |
 
@@ -161,7 +162,7 @@ git push origin {tu-nombre}/features
 R: Puedes usar `git commit --amend` para editar el último commit, o crear un nuevo commit de corrección.
 
 **P: ¿La rama se elimina después del merge?**  
-R: No. Tu rama es permanente. Seguirás usándola para todas tus issues futuras.
+R: No. Tu rama personal es permanente. Seguirás usándola para todas tus issues futuras.
 
 **P: ¿Puedo trabajar en múltiples issues en paralelo?**  
 R: Sí, commitea todo en tu rama personal. Luego haz PRs separados cuando cada tarea esté lista.
