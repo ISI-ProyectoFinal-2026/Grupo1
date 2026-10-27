@@ -5,6 +5,7 @@ Versión web del informe final del proyecto Patitas (Grupo 1, Proyecto Final 202
 ## Guía de lectura
 
 - **1 Desarrollo**: secciones del informe que ya tienen archivo, en el orden de la plantilla.
+- **2 Planificación**: secciones del capítulo 2 que ya tienen archivo.
 - **Decisiones**: registro de decisiones de arquitectura (ADR), con su índice.
 - **Registro**: convenciones del informe y registro de figuras y tablas.
 - Los enlaces a código, pruebas o configuración abren el archivo en GitHub, en la versión publicada.
@@ -26,7 +27,7 @@ Fase y archivo de cada sección según el [registro del informe](informe/README.
 | 1.3.2, 1.3.4, 1.3.5 Capacitación, manuales, implementación | B | Pendiente (Fase B) |
 | 1.3.3 Pruebas | A | [Publicada](informe/1-3-3-pruebas.md) |
 | 2.1 Actividades e hitos | B | Pendiente (Fase B) |
-| 2.2.1 Equipo de trabajo | A | Sin archivo todavía |
+| 2.2.1 Equipo de trabajo | A | [Publicada](informe/2-2-1-equipo-de-trabajo.md) |
 | 2.2.2.1-2.2.2.3 Comunicación, avance, devoluciones | B | Pendiente (Fase B) |
 | 2.2.2.4 Decisiones | A | Sin archivo todavía |
 | 2.2.3 Gestión de configuración | A | Sin archivo todavía |

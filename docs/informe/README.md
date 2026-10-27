@@ -123,3 +123,6 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 1.2.2-23 | Tabla | Requerimientos funcionales del PDD con su trazabilidad | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `docs/pdd/PDD v1.0.docx`, `gh issue list`, código y pruebas citados |
 | Tabla 1.2.2-24 | Tabla | Requerimientos funcionales agregados durante el desarrollo | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | issues, código y pruebas citados |
 | Tabla 1.2.2-25 | Tabla | Requerimientos no funcionales del PDD | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `gh run view 40526775901 --log`, archivos citados |
+| Tabla 2.2.1-1 | Tabla | Integrantes y roles asignados | 2.2.1.1 ([`2-2-1-equipo-de-trabajo.md`](2-2-1-equipo-de-trabajo.md)) | `docs/equipo/ROLES.md`, sección 1 |
+| Tabla 2.2.1-2 | Tabla | Puestos y tareas registradas | 2.2.1.2 ([`2-2-1-equipo-de-trabajo.md`](2-2-1-equipo-de-trabajo.md)) | `docs/equipo/ROLES.md`, sección 2 |
+| Tabla 2.2.1-3 | Tabla | Asignación de puestos con su evidencia | 2.2.1.3 ([`2-2-1-equipo-de-trabajo.md`](2-2-1-equipo-de-trabajo.md)) | `docs/equipo/ROLES.md`, sección 2 |
