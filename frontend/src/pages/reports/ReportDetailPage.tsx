@@ -22,6 +22,7 @@ import MatchCard from "@/components/reports/MatchCard";
 import ImageUploader from "@/components/reports/ImageUploader";
 import CloseReportButton from "@/components/reports/CloseReportButton";
 import FlagReportForm from "@/components/reports/FlagReportForm";
+import LocationMap from "@/components/maps/LocationMap";
 import { cn } from "@/lib/cn";
 import { REPORT_STATUS_LABELS } from "@/lib/report-status";
 
@@ -192,6 +193,15 @@ export default function ReportDetailPage() {
               </div>
             </div>
           </dl>
+
+          {report.location && (
+            <section aria-label="Mapa de la ubicación" className="mt-5">
+              <LocationMap
+                location={report.location}
+                label={report.locationAddress || report.title}
+              />
+            </section>
+          )}
 
           {report.description && (
             <section className="mt-6">
