@@ -101,3 +101,17 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 1.2.2-19 | Tabla | Reglas del módulo de comercios | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | código citado en la tabla |
 | Tabla 1.2.2-20 | Tabla | Tareas por milestone (conteo) | 1.2.2.3 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `gh issue list --label "type: task"`, `gh api .../milestones` |
 | Tabla 1.2.2-21 | Tabla | Tareas por milestone (detalle) | 1.2.2.3 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `gh issue list --label "type: task"` |
+| Tabla 1.2.1-1 | Tabla | Objetivos del PDD contrastados con el código | 1.2.1 ([`1-2-1-objetivos-y-alcances.md`](1-2-1-objetivos-y-alcances.md)) | `docs/pdd/PDD v1.0.docx`, código citado |
+| Tabla 1.2.1-2 | Tabla | Alcance incluido en el PDD contrastado con el código | 1.2.1.1 ([`1-2-1-objetivos-y-alcances.md`](1-2-1-objetivos-y-alcances.md)) | `docs/pdd/PDD v1.0.docx`, código e issues citados |
+| Tabla 1.2.1-3 | Tabla | Alcance excluido en el PDD | 1.2.1.1 ([`1-2-1-objetivos-y-alcances.md`](1-2-1-objetivos-y-alcances.md)) | `docs/pdd/PDD v1.0.docx`, `git ls-files` |
+| Tabla 1.2.1-4 | Tabla | Desvíos del alcance respecto del PDD | 1.2.1.1 ([`1-2-1-objetivos-y-alcances.md`](1-2-1-objetivos-y-alcances.md)) | `docs/pdd/PDD v1.0.docx`, código e issues citados |
+| Tabla 1.2.2-22 | Tabla | Actores del sistema | 1.2.2.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `backend/prisma/schema.prisma:18-24`, rutas citadas |
+| Figura 1.2.2-8 | Figura | Actores y subsistemas | 1.2.2.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | Tabla 1.2.2-22 y figuras 1.2.2-9 a 1.2.2-13 |
+| Figura 1.2.2-9 | Figura | Casos de uso de cuenta y seguridad | 1.2.2.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `backend/src/routes/auth.routes.ts` |
+| Figura 1.2.2-10 | Figura | Casos de uso de reportes | 1.2.2.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `backend/src/routes/reports.routes.ts`, `backend/src/routes/uploads.routes.ts` |
+| Figura 1.2.2-11 | Figura | Casos de uso de IA, matching y moderación | 1.2.2.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `backend/src/services/matching.service.ts`, `backend-ia/app/services/` |
+| Figura 1.2.2-12 | Figura | Casos de uso de comunicación | 1.2.2.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `backend/src/services/chats.service.ts`, `backend/src/services/notifications.service.ts` |
+| Figura 1.2.2-13 | Figura | Casos de uso de comercios | 1.2.2.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `backend/src/routes/businesses.routes.ts` |
+| Tabla 1.2.2-23 | Tabla | Requerimientos funcionales del PDD con su trazabilidad | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `docs/pdd/PDD v1.0.docx`, `gh issue list`, código y pruebas citados |
+| Tabla 1.2.2-24 | Tabla | Requerimientos funcionales agregados durante el desarrollo | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | issues, código y pruebas citados |
+| Tabla 1.2.2-25 | Tabla | Requerimientos no funcionales del PDD | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `gh run view 40526775901 --log`, archivos citados |
