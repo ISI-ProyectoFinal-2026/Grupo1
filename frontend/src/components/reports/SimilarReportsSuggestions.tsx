@@ -91,9 +91,9 @@ export default function SimilarReportsSuggestions({
       className='flex flex-col gap-2'
       aria-busy={isPlaceholderData}
     >
-      <h3 id='similar-reports-title' className='font-bold text-ink'>
+      <h2 id='similar-reports-title' className='font-bold text-ink'>
         ¿Alguno de estos coincide con tu avistamiento?
-      </h3>
+      </h2>
       <p className='text-sm text-ink-muted'>
         Si es el mismo caso, abrilo en lugar de crear otro reporte.
       </p>

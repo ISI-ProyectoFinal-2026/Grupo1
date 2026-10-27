@@ -107,6 +107,7 @@ interface NewReport {
   reportType: 'lost' | 'found'
   title: string
   description?: string
+  location?: { lat: number; lng: number }
 }
 
 /** Without image: the backend publishes it right away, no AI involved. */
@@ -116,7 +117,7 @@ export function createReport(token: string, report: NewReport): Promise<ApiRepor
     'create report',
     call<ApiReport>('POST', '/reports', {
       token,
-      body: { ...report, location: { lat: -34.6037, lng: -58.3816 }, locationAddress: 'Buenos Aires' },
+      body: { location: { lat: -34.6037, lng: -58.3816 }, locationAddress: 'Buenos Aires', ...report },
     }),
   )
 }
