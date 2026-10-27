@@ -102,6 +102,23 @@ export function isR2PublicUrl(url: string): boolean {
   }
 }
 
+// "\", espacios y control: otro parser (httpx) puede leer otro host
+export function hasAmbiguousUrlChars(url: string): boolean {
+  return /[\\\x00-\x20\x7f]/.test(url);
+}
+
+// href normalizado si la URL es del bucket R2 y no es ambigua (ni credenciales); si no, null
+export function normalizeR2PublicUrl(url: string): string | null {
+  if (hasAmbiguousUrlChars(url)) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password) return null;
+    return isR2PublicUrl(parsed.href) ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function isNotFoundError(error: unknown): boolean {
   const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } } | null;
   return candidate?.name === "NotFound" || candidate?.$metadata?.httpStatusCode === 404;

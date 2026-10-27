@@ -132,6 +132,71 @@ describe("chat en tiempo real (#141)", () => {
       "vbscript:msgbox(1)",
       "file:///etc/passwd",
     ];
+    // http(s) válidas pero fuera del bucket R2 del proyecto (#229)
+    const fueraDelBucket = [
+      "https://evil.com/foto.jpg",
+      "https://pub-test.r2.dev.evil.com/chat/foto.jpg",
+      "https://pub-test.r2.dev\\@evil.com/chat/foto.jpg",
+      "https://evil.com@pub-test.r2.dev/chat/foto.jpg",
+    ];
+    const originalEnv = { ...process.env };
+
+    beforeEach(() => {
+      process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
+    });
+
+    afterEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    test.each(fueraDelBucket)("el socket rechaza imageUrl fuera del bucket %s", async (imageUrl) => {
+      const client = connect({ auth: { token: tokenA } });
+      await waitForConnect(client);
+      const errorEvent = waitForEvent<{ event: string; message: string }>(client, "error");
+
+      const ack = await emitWithAck(client, "send_message", { chatId, imageUrl });
+
+      expect(ack).toEqual({ ok: false, error: "Datos inválidos" });
+      expect(await errorEvent).toEqual({ event: "send_message", message: "Datos inválidos" });
+      const persistido = await prisma.message.findFirst({ where: { chatId, imageUrl } });
+      expect(persistido).toBeNull();
+    });
+
+    test.each(fueraDelBucket)("POST /api/chats/:id/messages rechaza imageUrl fuera del bucket %s", async (imageUrl) => {
+      const res = await request(app)
+        .post(`/api/chats/${chatId}/messages`)
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ imageUrl });
+
+      expect(res.status).toBe(400);
+      const persistido = await prisma.message.findFirst({ where: { chatId, imageUrl } });
+      expect(persistido).toBeNull();
+    });
+
+    test("el socket persiste la imageUrl normalizada", async () => {
+      const client = connect({ auth: { token: tokenA } });
+      await waitForConnect(client);
+
+      const ack = await emitWithAck<{ id: number; imageUrl: string }>(client, "send_message", {
+        chatId,
+        imageUrl: `HTTPS://PUB-TEST.r2.dev/chat/${SUITE_TAG}-socket.jpg`,
+      });
+
+      expect(ack.ok).toBe(true);
+      const persistido = await prisma.message.findUnique({ where: { id: ack.data!.id } });
+      expect(persistido?.imageUrl).toBe(`https://pub-test.r2.dev/chat/${SUITE_TAG}-socket.jpg`);
+    });
+
+    test("POST /api/chats/:id/messages persiste la imageUrl normalizada", async () => {
+      const res = await request(app)
+        .post(`/api/chats/${chatId}/messages`)
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ imageUrl: `HTTPS://PUB-TEST.r2.dev/chat/${SUITE_TAG}-rest.jpg` });
+
+      expect(res.status).toBe(201);
+      const persistido = await prisma.message.findUnique({ where: { id: res.body.id } });
+      expect(persistido?.imageUrl).toBe(`https://pub-test.r2.dev/chat/${SUITE_TAG}-rest.jpg`);
+    });
 
     test.each(peligrosas)("el socket rechaza imageUrl con esquema %s", async (imageUrl) => {
       const client = connect({ auth: { token: tokenA } });

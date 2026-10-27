@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasAmbiguousUrlChars, normalizeR2PublicUrl } from "../services/storage.service";
 
 const SAFE_URL_PROTOCOLS = ["http:", "https:"];
 
@@ -24,3 +25,20 @@ export const safeHttpUrlSchema = z
       return false;
     }
   }, "La URL debe usar http o https");
+
+const R2_IMAGE_MESSAGE = "La imagen debe haber sido subida a PATITAS";
+
+// solo imágenes del bucket R2 propio, devueltas normalizadas (SSRF, #229)
+export const r2ImageUrlSchema = z
+  .string()
+  // sobre el texto crudo: url() recorta los espacios de los bordes
+  .refine((value) => !hasAmbiguousUrlChars(value), R2_IMAGE_MESSAGE)
+  .pipe(safeHttpUrlSchema)
+  .transform((value, ctx) => {
+    const normalized = normalizeR2PublicUrl(value);
+    if (!normalized) {
+      ctx.addIssue({ code: "custom", message: R2_IMAGE_MESSAGE });
+      return z.NEVER;
+    }
+    return normalized;
+  });
