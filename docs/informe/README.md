@@ -67,6 +67,14 @@ actualizado: 2026-10-22
 - Enlaces relativos (`../adr/…`, `../equipo/ROLES.md`, `../../backend-ia/benchmarks/results/…`).
 - Cada pie de figura o tabla termina con `Fuente:` y el comando que la reproduce.
 
+## Vista web
+
+El informe y los ADR se publican como sitio web ([ADR-0020](../adr/0020-sitio-web-del-informe.md)).
+
+- Vista previa local, desde la raíz del repositorio: `pip install -r requirements-docs.txt` y luego `mkdocs serve`.
+- Publicar: en Actions, workflow `Publish report`, `Run workflow` desde `main`, indicando en `ref` la rama, tag o SHA a publicar; o bien `gh workflow run publish-report.yml -f ref=<rama>`.
+- Un archivo nuevo del informe necesita su entrada en `nav` de `mkdocs.yml`; si falta, el build falla.
+
 ## Registro de figuras y tablas
 
 Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro alimenta los índices 5 y 6 de la Fase B.

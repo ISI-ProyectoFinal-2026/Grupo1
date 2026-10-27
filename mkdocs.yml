@@ -1,0 +1,123 @@
+# sitio web del informe final (Material for MkDocs)
+site_name: Patitas - Informe final
+site_url: https://isi-proyectofinal-2026.github.io/Grupo1/
+site_description: Informe final y decisiones de arquitectura del proyecto Patitas
+repo_name: ISI-ProyectoFinal-2026/Grupo1
+repo_url: https://github.com/ISI-ProyectoFinal-2026/Grupo1
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+# solo se publican index.md, informe/ y adr/ (assets/ son los archivos del tema)
+exclude_docs: |
+  /*
+  !/index.md
+  !/assets/
+  !/informe/
+  !/adr/
+  /adr/0000-plantilla.md
+
+hooks:
+  - tools/informe-site/informe_site.py
+
+theme:
+  name: material
+  language: es
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro
+
+plugins:
+  - search:
+      lang: es
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  # anclas con acentos, igual que GitHub
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+# build --strict falla ante cualquiera de estas advertencias
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    absolute_links: warn
+    unrecognized_links: warn
+    anchors: warn
+
+# cada archivo nuevo del informe necesita su entrada aca
+nav:
+  - Inicio: index.md
+  - 1 Desarrollo:
+      - informe/1-2-1-objetivos-y-alcances.md
+      - informe/1-2-2-modelo-funcional.md
+      - informe/1-2-2-2-historias-y-flujos.md
+      # 1.2.3 Pantallas: - informe/1-2-3-pantallas.md
+      - informe/1-2-4-modelo-de-datos.md
+      - informe/1-3-1-programacion-y-documentacion.md
+      - informe/1-3-3-pruebas.md
+  # secciones 2, 3 y 4: agregar aca a medida que existan sus archivos
+  - Decisiones:
+      - adr/README.md
+      - adr/0001-monorepo-y-dos-backends.md
+      - adr/0002-express-5-typescript-zod.md
+      - adr/0003-postgresql-postgis-pgvector.md
+      - adr/0004-prisma-5-orm.md
+      - adr/0005-fastapi-servicio-ia.md
+      - adr/0006-stack-frontend.md
+      - adr/0007-estado-y-datos-frontend.md
+      - adr/0008-cloudflare-r2-urls-prefirmadas.md
+      - adr/0009-mapas-leaflet-osm-nominatim-postgis.md
+      - adr/0010-flujo-git-ramas-personales.md
+      - adr/0011-imagen-docker-postgres.md
+      - adr/0013-dimension-embedding-512.md
+      - adr/0014-parametros-matching.md
+      - adr/0016-moderacion-hibrida.md
+      - adr/0017-flyers-canvas.md
+      - adr/0018-criterio-evolucion-tecnologica.md
+      - adr/0019-comercio-perfil-no-rol.md
+      - adr/0020-sitio-web-del-informe.md
+  - Registro: informe/README.md
