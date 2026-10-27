@@ -18,7 +18,7 @@ Evidencia: **R** repositorio, **I** entrevista, **N** no disponible todavía.
 | 1.2.1 Objetivos y alcances definitivos | `1-2-1-objetivos-y-alcances.md` | A | R (PDD, código, issues) |
 | 1.2.2 Modelo funcional (casos de uso, requerimientos, tareas) | `1-2-2-modelo-funcional.md` | A | R (PDD, issues, código) |
 | 1.2.2.2 Historias de usuario y flujos por módulo | `1-2-2-2-historias-y-flujos.md` | A | R (issues, código) |
-| 1.2.3 Pantallas y reportes (paleta, fuentes, pantallas) | `1-2-3-pantallas.md` | A | R (frontend) |
+| 1.2.3 Pantallas y reportes (paleta, fuentes, pantallas) | `1-2-3-pantallas.md` | A | R (frontend, backend del flyer); capturas pendientes de #208 y #211 |
 | 1.2.4 Modelo de datos | `1-2-4-modelo-de-datos.md` | A | R |
 | 1.3.1 Programación y documentación | `1-3-1-programacion-y-documentacion.md` | A | R, ADR |
 | 1.3.2, 1.3.4, 1.3.5 Capacitación, manuales, implementación | — | B | I |
@@ -131,3 +131,7 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 2.2.3-2 | Tabla | Elementos de configuración del software | 2.2.3.1 ([`2-2-3-gestion-de-configuracion.md`](2-2-3-gestion-de-configuracion.md)) | `.github/workflows/ci.yml`, `.gitignore`, `backend-ia/requirements.txt`, ADR-0004, ADR-0011 |
 | Tabla 2.2.3-3 | Tabla | Workflows de GitHub Actions | 2.2.3.1 ([`2-2-3-gestion-de-configuracion.md`](2-2-3-gestion-de-configuracion.md)) | `.github/workflows/` |
 | Tabla 2.2.3-4 | Tabla | Identificación de versiones de la documentación | 2.2.3.2 ([`2-2-3-gestion-de-configuracion.md`](2-2-3-gestion-de-configuracion.md)) | encabezados de los documentos citados, `.claude/CLAUDE.md` |
+| Tabla 1.2.3-1 | Tabla | Tokens de color del frontend | 1.2.3.1 ([`1-2-3-pantallas.md`](1-2-3-pantallas.md)) | `frontend/src/index.css`, `frontend/tailwind.config.ts` |
+| Tabla 1.2.3-2 | Tabla | Colores fuera de los tokens | 1.2.3.1 ([`1-2-3-pantallas.md`](1-2-3-pantallas.md)) | `rg` sobre `frontend/src`, `frontend/index.html`, `backend/src` |
+| Tabla 1.2.3-3 | Tabla | Familias tipográficas | 1.2.3.2 ([`1-2-3-pantallas.md`](1-2-3-pantallas.md)) | `frontend/tailwind.config.ts`, `frontend/index.html`, `backend/src/services/flyer.service.ts` |
+| Tabla 1.2.3-4 | Tabla | Escala tipográfica usada en el frontend | 1.2.3.2 ([`1-2-3-pantallas.md`](1-2-3-pantallas.md)) | `frontend/tailwind.config.ts`, `tailwindcss/defaultTheme` |

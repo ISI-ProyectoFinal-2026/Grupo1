@@ -95,7 +95,7 @@ nav:
       - informe/1-2-1-objetivos-y-alcances.md
       - informe/1-2-2-modelo-funcional.md
       - informe/1-2-2-2-historias-y-flujos.md
-      # 1.2.3 Pantallas: - informe/1-2-3-pantallas.md
+      - informe/1-2-3-pantallas.md
       - informe/1-2-4-modelo-de-datos.md
       - informe/1-3-1-programacion-y-documentacion.md
       - informe/1-3-3-pruebas.md

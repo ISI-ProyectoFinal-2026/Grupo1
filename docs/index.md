@@ -21,7 +21,7 @@ Fase y archivo de cada sección según el [registro del informe](informe/README.
 | 1.2.1 Objetivos y alcances definitivos | A | [Publicada](informe/1-2-1-objetivos-y-alcances.md) |
 | 1.2.2 Modelo funcional (casos de uso, requerimientos, tareas) | A | [Publicada](informe/1-2-2-modelo-funcional.md) |
 | 1.2.2.2 Historias de usuario y flujos por módulo | A | [Publicada](informe/1-2-2-2-historias-y-flujos.md) |
-| 1.2.3 Pantallas y reportes | A | Sin archivo todavía |
+| 1.2.3 Pantallas y reportes | A | [Publicada](informe/1-2-3-pantallas.md); capturas pendientes |
 | 1.2.4 Modelo de datos | A | [Publicada](informe/1-2-4-modelo-de-datos.md) |
 | 1.3.1 Programación y documentación | A | [Publicada](informe/1-3-1-programacion-y-documentacion.md) |
 | 1.3.2, 1.3.4, 1.3.5 Capacitación, manuales, implementación | B | Pendiente (Fase B) |
