@@ -257,9 +257,9 @@ Verify: every `file:line` cited resolves with `rg`, the Mermaid diagrams render 
 ## Slice 15 (docs, ~600): 1.2.1 scope + 1.2.2.1 use cases and requirements
 Verify: each scope item has a verdict (Implementado, Parcial, Fuera de alcance) with a citation, and every NFR marked "Medido" has evidence.
 
-- [ ] 15.1 Extract and review the 6 use-case images in `docs/pdd/PDD v1.0.docx`. Reuse them only if they match the code.
-- [ ] 15.2 `1-2-1-objetivos-y-alcances.md`: PDD objectives and scope checked against the code, with the PDD drift stated (role `comercio`, gamification, paid plans, advertising, suspension, WhatsApp).
-- [ ] 15.3 1.2.2.1: Mermaid use-case diagram with the real actors, plus the FR/NFR list with requirement → issue → code → test traceability.
+- [x] 15.1 Extract and review the 6 use-case images in `docs/pdd/PDD v1.0.docx`. Reuse them only if they match the code.
+- [x] 15.2 `1-2-1-objetivos-y-alcances.md`: PDD objectives and scope checked against the code, with the PDD drift stated (role `comercio`, gamification, paid plans, advertising, suspension, WhatsApp).
+- [x] 15.3 1.2.2.1: Mermaid use-case diagram with the real actors, plus the FR/NFR list with requirement → issue → code → test traceability.
 
 ## Slice 17 (docs + generated, ~400): 1.2.3 screens
 Verify: every screen in `frontend/src/router.tsx` appears with a capture and its flow F-n.
