@@ -1,0 +1,212 @@
+# Final report template outline
+
+Source: `docs/Template Presentacion Final (1).docx` (all sections empty). Heading level = Word style TituloN.
+
+- 1 Desarrollo de un sistema de información real
+  - 1.1 Definición de requerimientos
+    - 1.1.1 Competidor A
+      - 1.1.1.1 Relevamiento general
+        - 1.1.1.1.1 De la organización/sistema
+        - 1.1.1.1.2 Funciones detectadas a nivel general y relaciones con otros Sistemas y Entidades
+        - 1.1.1.1.3 Tecnología de Información
+      - 1.1.1.2 Relevamiento detallado y análisis del Sistema
+        - 1.1.1.2.1 Detalle, explicación y documentación detallada de todas las funciones seleccionadas
+        - 1.1.1.2.2 Modelo lógico del Sistema actual
+        - 1.1.1.2.3 Problemas y necesidades detectados en las funciones relevadas en detalle y en su entorno organizacional
+    - 1.1.2 Competidor B
+      - 1.1.2.1 Relevamiento general
+        - 1.1.2.1.1 De la organización/sistema
+        - 1.1.2.1.2 Funciones detectadas a nivel general y relaciones con otros Sistemas y Entidades
+        - 1.1.2.1.3 Tecnología de Información
+      - 1.1.2.2 Relevamiento detallado y análisis del Sistema
+        - 1.1.2.2.1 Detalle, explicación y documentación detallada de todas las funciones seleccionadas
+        - 1.1.2.2.2 Modelo lógico del Sistema actual
+        - 1.1.2.2.3 Problemas y necesidades detectados en las funciones relevadas en detalle y en su entorno organizacional
+    - 1.1.3 Resumen funcionalidades de los sistemas relevados
+    - 1.1.4 Objetivos y alcances preliminares del nuevo sistema
+      - 1.1.4.1 Objetivos
+      - 1.1.4.2 Alcances preliminares
+  - 1.2 Diseño
+    - 1.2.1 Objetivos y alcances definitivos del nuevo sistema
+      - 1.2.1.1 Alcances Definitivos
+    - 1.2.2 Modelo funcional
+      - 1.2.2.1 Diagrama de casos de uso
+        - 1.2.2.1.1 Lista de Requerimientos
+      - 1.2.2.2 Historias de Usuario
+        - 1.2.2.2.1 Módulo de xxxxxxx, ejemplo: Autenticación de usuarios
+        - 1.2.2.2.2 Módulo de yyyyyyyyyy
+        - 1.2.2.2.3 Módulo de zzzzzzzzzzz
+      - 1.2.2.3 Tareas
+    - 1.2.3 Pantallas y Reportes
+      - 1.2.3.1 Paleta de Colores
+      - 1.2.3.2 Fuentes
+      - 1.2.3.3 Pantallas
+        - 1.2.3.3.1 Módulo de xxxxxxx
+        - 1.2.3.3.2 Módulo de yyyyyyyyyy
+        - 1.2.3.3.3 Módulo de zzzzzzzzzzz
+        - 1.2.3.3.4 Tareas del sistema
+    - 1.2.4 Modelo de Datos
+  - 1.3 Desarrollo e Implementación
+    - 1.3.1 Programación y documentación
+      - 1.3.1.1 Introducción
+      - 1.3.1.2 Documentación
+    - 1.3.2 Planificación de capacitación
+      - 1.3.2.1 Introducción
+      - 1.3.2.2 Objetivos de capacitación
+      - 1.3.2.3 Estrategia de capacitación
+      - 1.3.2.4 Recursos de la capacitación
+        - 1.3.2.4.1 Recursos Materiales
+        - 1.3.2.4.2 Recursos Humanos
+      - 1.3.2.5 Contenido de la capacitación
+      - 1.3.2.6 Diagrama de tiempos
+    - 1.3.3 Planificación, ejecución y documentación de pruebas
+      - 1.3.3.1 Objetivos y alcances
+      - 1.3.3.2 Pruebas de validación de ingreso de datos
+      - 1.3.3.3 Prueba de lógica de los módulos principales
+      - 1.3.3.4 Pruebas de integración entre módulos del sistema
+      - 1.3.3.5 Pruebas de carga
+      - 1.3.3.6 Pruebas de seguridad por niveles de usuarios
+    - 1.3.4 Manual de usuario del sistema
+      - 1.3.4.1 Manual de usuarios
+      - 1.3.4.2 Manual de Administrador
+      - 1.3.4.3 Manual de Moderador
+    - 1.3.5 Planificación de Implementación del sistema
+      - 1.3.5.1 Objetivos de la implementación del sistema
+      - 1.3.5.2 Alcance
+      - 1.3.5.3 Personas y recursos involucrados
+        - 1.3.5.3.1 Personas
+        - 1.3.5.3.2 Recursos Tecnológicos
+        - 1.3.5.3.3 Recursos Financieros
+        - 1.3.5.3.4 Recursos de Datos
+        - 1.3.5.3.5 Recursos de Capacitación
+      - 1.3.5.4 Tareas
+      - 1.3.5.5 Método de conversión
+- 2 Planificación de proyectos de sistemas
+  - 2.1 Capítulo I: Actividades
+    - 2.1.1 Definición y descripción de actividades
+      - 2.1.1.1 Hitos
+      - 2.1.1.2 Etapas y Actividades
+        - 2.1.1.2.1 Etapa de identificación de necesidades (fecha inicio – fecha fin)
+          - 2.1.1.2.1.1 Planificación
+          - 2.1.1.2.1.2 Relevamiento
+          - 2.1.1.2.1.3 Capacitación del equipo
+        - 2.1.1.2.2 Etapa de selección de la solución (fecha inicio – fecha fin)
+        - 2.1.1.2.3 Etapa de diseño (fecha inicio – fecha fin)
+          - 2.1.1.2.3.1 Objetivos y alcances definidos en el nuevo sistema
+          - 2.1.1.2.3.2 Modelo funcional
+          - 2.1.1.2.3.3 Pantallas y reportes
+          - 2.1.1.2.3.4 Modelo de datos
+          - 2.1.1.2.3.5 Definición de historias de usuarios
+        - 2.1.1.2.4 Etapa de desarrollo e implementación (fecha inicio – fecha fin)
+          - 2.1.1.2.4.1 Programación y Documentación
+          - 2.1.1.2.4.2 Planificación de Capacitación
+          - 2.1.1.2.4.3 Planificación, ejecución y documentación de pruebas
+          - 2.1.1.2.4.4 Manuales de usuario
+          - 2.1.1.2.4.5 Planificación de la Implementación de Sistema
+          - 2.1.1.2.4.6 Codificación
+          - 2.1.1.2.4.7 Papers, Poster, Demos y Exposición
+      - 2.1.1.3 Diagrama de tiempos
+  - 2.2 CAPITULO II: Organización para la ejecución del proyecto.
+    - 2.2.1 Equipo de trabajo
+      - 2.2.1.1 Estructura del equipo
+      - 2.2.1.2 Descripción y análisis de puestos
+      - 2.2.1.3 Asignaciones de puestos
+    - 2.2.2 Métodos de comunicación formal, control de avance, retroalimentación, decisiones.
+      - 2.2.2.1 Métodos de comunicación formal
+      - 2.2.2.2 Control de avance
+      - 2.2.2.3 Retroalimentación
+      - 2.2.2.4 Decisiones
+    - 2.2.3 Gestión de Configuración del Software: Método de gestión de versionado durante todo el proyecto
+      - 2.2.3.1 Gestión de versionado: software
+      - 2.2.3.2 Gestión de versionado: documentación
+  - 2.3 Capitulo III: Factibilidad
+    - 2.3.1 Diagrama de recursos
+    - 2.3.2 Análisis de factibilidad
+      - 2.3.2.1 Factibilidad Operativa
+        - 2.3.2.1.1 Personas (PPPP), Personal Permanente, Temporario, Asesoramiento
+        - 2.3.2.1.2 Diseño de campaña para involucrar a los usuarios.
+        - 2.3.2.1.3 Capacitación usuarios
+        - 2.3.2.1.4 Capacitación personal.
+        - 2.3.2.1.5 Apoyo gerencial
+        - 2.3.2.1.6 Aceptación de entregables por parte de usuarios.
+        - 2.3.2.1.7 Testing con usuarios.
+        - 2.3.2.1.8 Motivación, Rendimiento, Cumplimiento, Rechazo Al Sistema.
+        - 2.3.2.1.9 Insumos, Servicios De Apoyo.
+        - 2.3.2.1.10 Relación Con Otras Áreas.
+        - 2.3.2.1.11 Normas y procedimientos propios del sistema y de la empresa
+        - 2.3.2.1.12 Momento De Implementación, Estabilización Y Aceptación Del Sistema.
+        - 2.3.2.1.13 Planificación, Organización, Dirección.
+        - 2.3.2.1.14 Trabajo en equipos eficientes
+        - 2.3.2.1.15 Resolución De Conflictos.
+        - 2.3.2.1.16 Técnicas De Gestión De RRHH
+        - 2.3.2.1.17 Conclusión
+      - 2.3.2.2 Factibilidad Técnica
+        - 2.3.2.2.1 Lenguajes, Herramientas y Tecnologías
+        - 2.3.2.2.2 Despliegue en el servidor
+        - 2.3.2.2.3 Volumen y tipos de datos
+          - 2.3.2.2.3.1 Propósito del análisis “Volumen y tipos de datos”
+          - 2.3.2.2.3.2 Tipos de datos
+          - 2.3.2.2.3.3 Volumen de datos de las entidades principales.
+        - 2.3.2.2.4 Tipo de procesamiento de datos
+        - 2.3.2.2.5 Nivel de automatización de las funciones
+        - 2.3.2.2.6 Tipos de captura de datos
+        - 2.3.2.2.7 Frecuencia y volumen de ingreso de datos
+          - 2.3.2.2.7.1 Volumen de datos durante el primer año de implementación
+          - 2.3.2.2.7.2 Escalabilidad del volumen de datos a partir del segundo año
+        - 2.3.2.2.8 Frecuencia, formas, soporte y volumen de información a generar
+        - 2.3.2.2.9 Formularios
+        - 2.3.2.2.10 Funcionamiento ininterrumpido de sistemas, utilización de equipos, horarios
+        - 2.3.2.2.11 Método de desarrollo, testing, capacitación, implementación y mantenimiento
+        - 2.3.2.2.12 Backups
+        - 2.3.2.2.13 Infraestructura e instalaciones
+        - 2.3.2.2.14 Seguridad de los datos
+        - 2.3.2.2.15 Recuperación
+        - 2.3.2.2.16 Integración con otros Sistemas y otras TI internas y externas
+        - 2.3.2.2.17 Crecimiento funcional y de TI para el Sistema
+        - 2.3.2.2.18 Flexibilidad para nuevas TI
+        - 2.3.2.2.19 Conclusión
+      - 2.3.2.3 Factibilidad Legal
+        - 2.3.2.3.1 Protección de datos personales
+        - 2.3.2.3.2 Propiedad intelectual
+        - 2.3.2.3.3 Términos de uso y condiciones
+        - 2.3.2.3.4 Aspecto laboral
+        - 2.3.2.3.5 Conclusión
+      - 2.3.2.4 Factibilidad ambiental
+      - 2.3.2.5 Factibilidad Social
+        - 2.3.2.5.1 Beneficios Sociales
+        - 2.3.2.5.2 Impacto en la Salud y Bienestar
+        - 2.3.2.5.3 Accesibilidad
+        - 2.3.2.5.4 Responsabilidad Social
+        - 2.3.2.5.5 Conclusión
+      - 2.3.2.6 Análisis de Costos
+        - 2.3.2.6.1 Costos de desarrollo e implementación
+        - 2.3.2.6.2 Costos de insumos informáticos
+        - 2.3.2.6.3 Costos asociados a Recursos Humanos
+        - 2.3.2.6.4 Tabla de costos generales
+        - 2.3.2.6.5 Conclusión
+      - 2.3.2.7 Conclusión general
+    - 2.3.3 Costos desagregados por recursos (personal, tecnología) con periodicidad mensual y análisis correspondientes.
+    - 2.3.4 Análisis de riesgos
+      - 2.3.4.1 Listado de riesgos
+      - 2.3.4.2 Tratamiento de riesgos
+    - 2.3.5 Análisis de impacto ambiental
+      - 2.3.5.1 Parámetros utilizados en el análisis de impacto ambiental
+      - 2.3.5.2 Componentes ambientales
+      - 2.3.5.3 Evaluación de impacto ambiental por etapa
+- 3 Conclusión del Proyecto
+- 4 Referencias
+- 5 Índice de figuras
+- 6 Índice de tablas
+- 7 Índice de Historias de Usuario
+- 8 Índice de Pantallas
+- Anexo Nº1: Diagrama Gantt
+- Anexo Nº2: Minutas reuniones del equipo
+- Anexo N°3: Términos y Condiciones de Uso
+- Anexo N°4: Políticas de Privacidad
+- Anexo N°5: Diagrama de casos de uso
+- Anexo N°6: Diagrama de clases
+- Anexo N°7: Manual de Usuarios
+- Anexo N°8: Manual de Usuario Administrador
+- Anexo N°9: Manual de Usuario Moderador
+- Anexo N°10: Especificación de BackUp y Restauración – Base de datos y Sistema
+- Anexo N°11: Instrucciones para implementar Migraciones/Seeders en Sequelize
