@@ -78,18 +78,37 @@ ${warning}`,
   });
 }
 
+const MONTHS = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+// Solo componentes numéricos: los separadores de ICU cambian entre versiones de Node.
+const ARGENTINA_PARTS = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  day: "numeric",
+  month: "numeric",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 /** Fecha legible en hora de Argentina; el mail no sabe en qué huso está quien lo lee. */
 function formatArgentinaDate(date: Date): string {
-  const formatted = date.toLocaleString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-  return `${formatted} (hora de Argentina)`;
+  const p = Object.fromEntries(ARGENTINA_PARTS.formatToParts(date).map(({ type, value }) => [type, value]));
+  const month = MONTHS[Number(p.month) - 1];
+  return `${p.day} de ${month} de ${p.year} a las ${p.hour}:${p.minute} (hora de Argentina)`;
 }
 
 export async function sendTwoFactorResetLink(to: string, link: string): Promise<void> {
