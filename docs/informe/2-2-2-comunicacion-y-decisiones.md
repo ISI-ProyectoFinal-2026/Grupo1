@@ -33,7 +33,7 @@ Cada decisión de arquitectura o de tecnología se registra como un ADR (registr
 - **Cambios.** Un ADR `Aceptada` no se edita. Si la decisión cambia, se crea un ADR nuevo que enlaza al anterior, y en el anterior solo cambia el Estado ([índice](../adr/README.md), "Cómo usarlo").
 - **Índice.** Cada ADR nuevo agrega su fila al índice en la misma PR. La columna C-ID vincula el ADR con su candidato de decisión (C01-C17 corresponden a ADR-0001 a ADR-0017 y CX01 a ADR-0018).
 - **Decisiones de IA.** Un ADR sobre modelos, umbral o moderación enlaza en Referencias un resultado de `backend-ia/benchmarks/results/` y el comando que lo reproduce ([plantilla](../adr/0000-plantilla.md)).
-- **Revisión periódica.** El procedimiento `docs-review` busca cambios que impliquen una decisión no registrada y le pregunta el motivo al equipo, de a una pregunta por vez, antes de crear el ADR ([`SKILL.md`](../../.claude/skills/docs-review/SKILL.md), pasos 5 a 7).
+- **Revisión periódica.** El procedimiento `docs-review` busca cambios que impliquen una decisión no registrada y le pregunta el motivo al equipo, de a una pregunta por vez, antes de crear el ADR ([`SKILL.md`](../../.claude/skills/docs-review/SKILL.md), pasos 5 a 7). Su ejecución se describe en [2.2.3.2](2-2-3-gestion-de-configuracion.md#2232-gestión-de-versionado-documentación).
 
 ### Decisiones registradas
 

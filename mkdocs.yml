@@ -102,6 +102,7 @@ nav:
   - 2 Planificación:
       - informe/2-2-1-equipo-de-trabajo.md
       - informe/2-2-2-comunicacion-y-decisiones.md
+      - informe/2-2-3-gestion-de-configuracion.md
   # secciones 3 y 4: agregar aca a medida que existan sus archivos
   - Decisiones:
       - adr/README.md

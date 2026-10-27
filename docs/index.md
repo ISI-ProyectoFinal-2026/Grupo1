@@ -30,7 +30,7 @@ Fase y archivo de cada sección según el [registro del informe](informe/README.
 | 2.2.1 Equipo de trabajo | A | [Publicada](informe/2-2-1-equipo-de-trabajo.md) |
 | 2.2.2.1-2.2.2.3 Comunicación, avance, devoluciones | B | Pendiente (Fase B) |
 | 2.2.2.4 Decisiones | A | [Publicada](informe/2-2-2-comunicacion-y-decisiones.md#2224-decisiones) |
-| 2.2.3 Gestión de configuración | A | Sin archivo todavía |
+| 2.2.3 Gestión de configuración | A | [Publicada](informe/2-2-3-gestion-de-configuracion.md) |
 | 2.3.1, 2.3.2.1 Recursos, factibilidad operativa | B | Pendiente (Fase B) |
 | 2.3.2.2 Factibilidad técnica (.1, .2, .4-.6, .11-.14, .16-.19) | A | Sin archivo todavía |
 | 2.3.2.2 Factibilidad técnica (.3, .7-.10, .15) | B | Pendiente (Fase B) |

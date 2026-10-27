@@ -127,3 +127,7 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 2.2.1-2 | Tabla | Puestos y tareas registradas | 2.2.1.2 ([`2-2-1-equipo-de-trabajo.md`](2-2-1-equipo-de-trabajo.md)) | `docs/equipo/ROLES.md`, sección 2 |
 | Tabla 2.2.1-3 | Tabla | Asignación de puestos con su evidencia | 2.2.1.3 ([`2-2-1-equipo-de-trabajo.md`](2-2-1-equipo-de-trabajo.md)) | `docs/equipo/ROLES.md`, sección 2 |
 | Tabla 2.2.2-1 | Tabla | Decisiones registradas y su estado | 2.2.2.4 ([`2-2-2-comunicacion-y-decisiones.md`](2-2-2-comunicacion-y-decisiones.md)) | `docs/adr/README.md`, `rg -n "Estado:" docs/adr` |
+| Tabla 2.2.3-1 | Tabla | Prácticas de ramas e integración | 2.2.3.1 ([`2-2-3-gestion-de-configuracion.md`](2-2-3-gestion-de-configuracion.md)) | `docs/WORKFLOW.md`, ADR-0010 |
+| Tabla 2.2.3-2 | Tabla | Elementos de configuración del software | 2.2.3.1 ([`2-2-3-gestion-de-configuracion.md`](2-2-3-gestion-de-configuracion.md)) | `.github/workflows/ci.yml`, `.gitignore`, `backend-ia/requirements.txt`, ADR-0004, ADR-0011 |
+| Tabla 2.2.3-3 | Tabla | Workflows de GitHub Actions | 2.2.3.1 ([`2-2-3-gestion-de-configuracion.md`](2-2-3-gestion-de-configuracion.md)) | `.github/workflows/` |
+| Tabla 2.2.3-4 | Tabla | Identificación de versiones de la documentación | 2.2.3.2 ([`2-2-3-gestion-de-configuracion.md`](2-2-3-gestion-de-configuracion.md)) | encabezados de los documentos citados, `.claude/CLAUDE.md` |
