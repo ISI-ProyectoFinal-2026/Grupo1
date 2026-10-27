@@ -12,7 +12,7 @@ actualizado: 2026-10-27
 Esta sección releva los dos sistemas que hoy cubren la búsqueda de mascotas perdidas en San Rafael, Mendoza, identificados por el equipo: InfoAnimal SR (Competidor A) y los grupos de Facebook "Perritos Perdidos" y "4 Patitas Felices" (Competidor B).
 
 - **Evidencia.** Capturas de pantalla aportadas por el equipo (`docs/informe/img/1-1/`). La fecha de captura no se registró.
-- **Datos públicos.** La búsqueda en internet no devolvió información sobre ninguno de los competidores; lo que no surge de las capturas figura como `No disponible`.
+- **Datos públicos.** La búsqueda en internet no devolvió información sobre ninguno de los competidores; los enlaces a cada perfil y grupo los aportó el equipo. Lo que no surge de las capturas figura como `No disponible`.
 - 1.1.3 y 1.1.4 quedan `Pendiente (Fase B)`.
 
 ## 1.1.1 Competidor A: InfoAnimal SR
@@ -24,7 +24,7 @@ Esta sección releva los dos sistemas que hoy cubren la búsqueda de mascotas pe
 | Dato | Valor | Evidencia |
 |---|---|---|
 | Nombre | InfoAnimalSR | Figura 1.1-1 |
-| Canal principal | Cuenta de Instagram `infoanimalsr` | Figura 1.1-1 |
+| Canal principal | Cuenta de Instagram [`infoanimalsr`](https://www.instagram.com/infoanimalsr) | Figura 1.1-1; enlace aportado por el equipo |
 | Descripción declarada | "Información y actualidad animal", "Noticias, rescates y curiosidades" | Figura 1.1-1 |
 | Ubicación | San Rafael, Mendoza | Figura 1.1-1 |
 | Publicaciones / seguidores / seguidos | 87 / 269 / 22 | Figura 1.1-1 |
@@ -106,9 +106,10 @@ Tabla 1.1-4. Problemas y necesidades de InfoAnimal SR. Fuente: Figuras 1.1-1 y 1
 | Tipo | Grupo de Facebook | Grupo de Facebook |
 | Nombre visible en la captura | "Perritos Perdidos Sa…" (truncado por la aplicación) | Sin captura |
 | Ubicación de las publicaciones | San Rafael (Figura 1.1-4) | No disponible |
-| Cantidad de miembros, administradores, antigüedad, URL | No disponible | No disponible |
+| Enlace (aportado por el equipo) | [facebook.com/share/g/1A351SCDxk](https://www.facebook.com/share/g/1A351SCDxk/) | [facebook.com/share/g/19NGMZ9DJm](https://www.facebook.com/share/g/19NGMZ9DJm/) |
+| Cantidad de miembros, administradores, antigüedad | No disponible | No disponible |
 
-Tabla 1.1-5. Datos generales de los grupos de Facebook. Fuente: Figuras 1.1-4 a 1.1-6.
+Tabla 1.1-5. Datos generales de los grupos de Facebook. Fuente: Figuras 1.1-4 a 1.1-6; enlaces aportados por el equipo.
 
 #### 1.1.2.1.2 Funciones detectadas a nivel general y relaciones con otros Sistemas y Entidades
 
