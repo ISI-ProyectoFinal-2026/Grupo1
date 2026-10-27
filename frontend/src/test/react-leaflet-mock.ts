@@ -40,11 +40,15 @@ export function setMapViewport(zoom: number, visible: LatLng | null = null) {
 }
 
 export function clickMap(lat: number, lng: number) {
-  act(() => state.click?.({ latlng: { lat, lng } }))
+  act(() => {
+    state.click?.({ latlng: { lat, lng } })
+  })
 }
 
 export function dragPinTo(lat: number, lng: number) {
-  act(() => state.dragEnd?.({ target: { getLatLng: () => ({ lat, lng }) } }))
+  act(() => {
+    state.dragEnd?.({ target: { getLatLng: () => ({ lat, lng }) } })
+  })
 }
 
 export function MapContainer(props: { center: LatLngTuple; zoom: number; children?: ReactNode }) {

@@ -11,7 +11,7 @@ import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
 import { getApiErrorCode } from "@/services/api";
 import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import ImageUploader from "./ImageUploader";
-import LocationPicker from "./LocationPicker";
+import LocationPicker from "@/components/maps/LocationPicker";
 
 interface ReportFormProps {
   initialData?: Partial<CreateReportFormData>;

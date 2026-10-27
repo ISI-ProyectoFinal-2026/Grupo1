@@ -14,7 +14,7 @@ vi.mock('@/services/auth.service')
 // LocationPicker y ImageUploader arrastran leaflet y el flujo de subida a R2:
 // nada de eso hace falta para probar la validacion y el envio del formulario.
 // Los dobles exponen un boton por callback para dispararlos desde el test.
-vi.mock('@/components/reports/LocationPicker', () => ({
+vi.mock('@/components/maps/LocationPicker', () => ({
   default: ({
     onLocationSelect,
   }: {
@@ -201,7 +201,7 @@ describe('ReportForm: validacion', () => {
     await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
 
     expect(
-      await screen.findByText('Indicá la ubicación con el botón de arriba')
+      await screen.findByText('Marcá la ubicación en el mapa o usá tu ubicación actual')
     ).toBeInTheDocument()
     expect(createReport).not.toHaveBeenCalled()
   })
