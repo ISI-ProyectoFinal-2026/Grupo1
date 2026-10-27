@@ -18,6 +18,7 @@ describe("/api/reports image screening", () => {
   });
 
   afterAll(async () => {
+    await prisma.report.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.$disconnect();
   });
@@ -86,5 +87,103 @@ describe("/api/reports image screening", () => {
       "Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM"
     );
     expect(transactionSpy).not.toHaveBeenCalled();
+  });
+
+  // fuera del bucket R2 no se persiste ni se le pide nada a la IA
+  describe("image URL vs the R2 bucket (#229)", () => {
+    const outsideBucket = [
+      "http://169.254.169.254/latest/meta-data/",
+      "https://pub-test.r2.dev.evil.com/pets/dog.jpg",
+      "https://evil.com/dog.jpg",
+      "https://pub-test.r2.dev\\@evil.com/pets/dog.jpg",
+      "https://evil.com@pub-test.r2.dev/pets/dog.jpg",
+    ];
+
+    test("POST stores and screens the normalized URL", async () => {
+      const analyzeSpy = jest.spyOn(matchingService, "analyzeImage").mockResolvedValue("animal");
+      const moderationSpy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue();
+
+      const res = await request(app)
+        .post("/api/reports")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          reportType: "lost",
+          title: "Perro perdido",
+          location: { lat: -34.6, lng: -58.38 },
+          imageUrl: "HTTPS://PUB-TEST.r2.dev/pets/dog.jpg",
+        });
+
+      expect(res.status).toBe(201);
+      expect(analyzeSpy).toHaveBeenCalledWith("https://pub-test.r2.dev/pets/dog.jpg");
+      expect(moderationSpy).toHaveBeenCalledWith(res.body.id, "https://pub-test.r2.dev/pets/dog.jpg");
+      const stored = await prisma.report.findUnique({ where: { id: res.body.id } });
+      expect(stored?.imageUrl).toBe("https://pub-test.r2.dev/pets/dog.jpg");
+    });
+
+    test.each(outsideBucket)("POST responds 400 and creates nothing for %s", async (imageUrl) => {
+      const analyzeSpy = jest.spyOn(matchingService, "analyzeImage");
+
+      const res = await request(app)
+        .post("/api/reports")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ reportType: "lost", title: "Perro perdido", location: { lat: -34.6, lng: -58.38 }, imageUrl });
+
+      expect(res.status).toBe(400);
+      expect(analyzeSpy).not.toHaveBeenCalled();
+      expect(await prisma.report.findFirst({ where: { userId, imageUrl } })).toBeNull();
+    });
+
+    test.each(outsideBucket)("PUT responds 400 and keeps the report unchanged for %s", async (imageUrl) => {
+      const created = await request(app)
+        .post("/api/reports")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ reportType: "lost", title: "Perro perdido", location: { lat: -34.6, lng: -58.38 } });
+      const analyzeSpy = jest.spyOn(matchingService, "analyzeImage");
+
+      const res = await request(app)
+        .put(`/api/reports/${created.body.id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ imageUrl });
+
+      expect(res.status).toBe(400);
+      expect(analyzeSpy).not.toHaveBeenCalled();
+      const stored = await prisma.report.findUnique({ where: { id: created.body.id } });
+      expect(stored).toMatchObject({ imageUrl: null, status: "published" });
+    });
+
+    test("PUT with an in-bucket image still re-moderates the report", async () => {
+      const created = await request(app)
+        .post("/api/reports")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ reportType: "lost", title: "Perro perdido", location: { lat: -34.6, lng: -58.38 } });
+      const analyzeSpy = jest.spyOn(matchingService, "analyzeImage").mockResolvedValue("animal");
+
+      const res = await request(app)
+        .put(`/api/reports/${created.body.id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ imageUrl: "https://pub-test.r2.dev/pets/dog.jpg" });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ imageUrl: "https://pub-test.r2.dev/pets/dog.jpg", status: "pending" });
+      expect(analyzeSpy).toHaveBeenCalledWith("https://pub-test.r2.dev/pets/dog.jpg");
+    });
+
+    // cambio incompatible aceptado: reenviar una URL externa ya guardada también es 400
+    test("PUT resending a stored external image responds 400", async () => {
+      const created = await request(app)
+        .post("/api/reports")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ reportType: "lost", title: "Perro perdido", location: { lat: -34.6, lng: -58.38 } });
+      await prisma.report.update({ where: { id: created.body.id }, data: { imageUrl: "https://evil.com/dog.jpg" } });
+
+      const res = await request(app)
+        .put(`/api/reports/${created.body.id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ title: "Perro perdido en Palermo", imageUrl: "https://evil.com/dog.jpg" });
+
+      expect(res.status).toBe(400);
+      const stored = await prisma.report.findUnique({ where: { id: created.body.id } });
+      expect(stored?.title).toBe("Perro perdido");
+    });
   });
 });

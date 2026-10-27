@@ -8,6 +8,7 @@ jest.mock("../../src/services/storage.service", () => ({
   getObjectMetadata: (...args: unknown[]) => getObjectMetadataMock(...args),
   uploadBuffer: (...args: unknown[]) => uploadBufferMock(...args),
   publicObjectUrl: (key: string) => `https://pub-test.r2.dev/${key}`,
+  normalizeR2PublicUrl: jest.requireActual("../../src/services/storage.service").normalizeR2PublicUrl,
 }));
 
 jest.mock("@napi-rs/canvas", () => {
@@ -58,8 +59,11 @@ function buildReport(overrides: Partial<ReportDTO> = {}): ReportDTO {
 
 // Simula R2: guarda la metadata de lo último que se subió a cada key.
 let bucket: Map<string, Record<string, string>>;
+const originalEnv = { ...process.env };
 
 beforeEach(() => {
+  // las fotos tienen que ser del bucket R2 (#229)
+  process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
   bucket = new Map();
   getObjectMetadataMock.mockReset();
   uploadBufferMock.mockReset();
@@ -74,6 +78,10 @@ beforeEach(() => {
   );
   const tinyPng: Buffer = canvas.createCanvas(4, 4).toBuffer("image/png");
   loadImageMock.mockImplementation(() => canvas.loadImage(tinyPng));
+});
+
+afterEach(() => {
+  process.env = { ...originalEnv };
 });
 
 describe("getOrCreateFlyerUrl (cache del PNG en R2)", () => {
@@ -246,5 +254,27 @@ describe("getOrCreateFlyerUrl (flyer degradado por falla al bajar la foto)", () 
 
     expect(loadImageMock).toHaveBeenCalledTimes(1);
     expect(uploadBufferMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// #229: una foto guardada fuera del bucket nunca se descarga
+describe("getOrCreateFlyerUrl (foto guardada fuera del bucket R2)", () => {
+  test.each([
+    "https://evil.com/gato.jpg",
+    "http://169.254.169.254/latest/meta-data/",
+    "https://pub-test.r2.dev\\@evil.com/pets/gato.jpg",
+    "https://evil.com@pub-test.r2.dev/pets/gato.jpg",
+  ])("no baja %s y sale con el placeholder", async (imageUrl) => {
+    await getOrCreateFlyerUrl(buildReport({ imageUrl }));
+
+    expect(loadImageMock).not.toHaveBeenCalled();
+    expect(uploadBufferMock).toHaveBeenCalledTimes(1);
+    expect(lastUploadedMetadata()["flyer-degraded-at"]).toBeDefined();
+  });
+
+  test("baja la foto del bucket normalizada y sin seguir redirecciones", async () => {
+    await getOrCreateFlyerUrl(buildReport({ imageUrl: "HTTPS://PUB-TEST.r2.dev/pets/gato.jpg" }));
+
+    expect(loadImageMock).toHaveBeenCalledWith("https://pub-test.r2.dev/pets/gato.jpg", { maxRedirects: 0 });
   });
 });

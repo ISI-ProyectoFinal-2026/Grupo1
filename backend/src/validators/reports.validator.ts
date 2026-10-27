@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ReportType, ReportStatus } from "@prisma/client";
-import { safeHttpUrlSchema } from "./shared.validator";
+import { r2ImageUrlSchema } from "./shared.validator";
 
 const locationSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -12,7 +12,7 @@ export const createReportSchema = z.object({
   reportType: z.enum([ReportType.lost, ReportType.found]),
   title: z.string().min(1),
   description: z.string().min(1).optional(),
-  imageUrl: safeHttpUrlSchema.optional(),
+  imageUrl: r2ImageUrlSchema.optional(),
   location: locationSchema,
   locationAddress: z.string().min(1).optional(),
 });
@@ -51,7 +51,7 @@ export const listReportsQuerySchema = z.object({
 });
 
 export const setCustomFlyerSchema = z.object({
-  flyerUrl: safeHttpUrlSchema,
+  flyerUrl: r2ImageUrlSchema,
 });
 
 export type SetCustomFlyerInput = z.infer<typeof setCustomFlyerSchema>;

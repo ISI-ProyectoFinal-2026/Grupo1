@@ -311,7 +311,7 @@ describe("PUT /api/reports/:id/flyer/custom", () => {
   test("responde 401 sin token", async () => {
     const res = await request(app)
       .put(`/api/reports/${reportId}/flyer/custom`)
-      .send({ flyerUrl: "https://cdn.example.com/mi-flyer.png" });
+      .send({ flyerUrl: "https://pub-test.r2.dev/flyers/mi-flyer.png" });
 
     expect(res.status).toBe(401);
   });
@@ -320,7 +320,7 @@ describe("PUT /api/reports/:id/flyer/custom", () => {
     const res = await request(app)
       .put(`/api/reports/${reportId}/flyer/custom`)
       .set("Authorization", `Bearer ${otherToken}`)
-      .send({ flyerUrl: "https://cdn.example.com/mi-flyer.png" });
+      .send({ flyerUrl: "https://pub-test.r2.dev/flyers/mi-flyer.png" });
 
     expect(res.status).toBe(403);
   });
@@ -329,7 +329,7 @@ describe("PUT /api/reports/:id/flyer/custom", () => {
     const res = await request(app)
       .put("/api/reports/999999999/flyer/custom")
       .set("Authorization", `Bearer ${token}`)
-      .send({ flyerUrl: "https://cdn.example.com/mi-flyer.png" });
+      .send({ flyerUrl: "https://pub-test.r2.dev/flyers/mi-flyer.png" });
 
     expect(res.status).toBe(404);
   });
@@ -338,10 +338,10 @@ describe("PUT /api/reports/:id/flyer/custom", () => {
     const res = await request(app)
       .put(`/api/reports/${reportId}/flyer/custom`)
       .set("Authorization", `Bearer ${token}`)
-      .send({ flyerUrl: "https://cdn.example.com/mi-flyer.png" });
+      .send({ flyerUrl: "https://pub-test.r2.dev/flyers/mi-flyer.png" });
 
     expect(res.status).toBe(200);
-    expect(res.body.customFlyerUrl).toBe("https://cdn.example.com/mi-flyer.png");
+    expect(res.body.customFlyerUrl).toBe("https://pub-test.r2.dev/flyers/mi-flyer.png");
   });
 
   // El customFlyerUrl se renderiza como `<a href>` y `<img src>` en
@@ -364,18 +364,49 @@ describe("PUT /api/reports/:id/flyer/custom", () => {
     expect(stored.body.customFlyerUrl).not.toBe(flyerUrl);
   });
 
+  // #229: solo flyers subidos al bucket R2 del proyecto
+  test.each([
+    "https://evil.com/mi-flyer.png",
+    "https://pub-test.r2.dev.evil.com/flyers/mi-flyer.png",
+    "https://pub-test.r2.dev\\@evil.com/flyers/mi-flyer.png",
+    "https://evil.com@pub-test.r2.dev/flyers/mi-flyer.png",
+  ])(
+    "responde 400 y no persiste un flyerUrl fuera del bucket: %s",
+    async (flyerUrl) => {
+      const res = await request(app)
+        .put(`/api/reports/${reportId}/flyer/custom`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ flyerUrl });
+
+      expect(res.status).toBe(400);
+
+      const stored = await request(app).get(`/api/reports/${reportId}`);
+      expect(stored.body.customFlyerUrl).not.toBe(flyerUrl);
+    }
+  );
+
+  test("persiste el flyerUrl normalizado", async () => {
+    const res = await request(app)
+      .put(`/api/reports/${reportId}/flyer/custom`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ flyerUrl: "HTTPS://PUB-TEST.r2.dev/flyers/mi-flyer.png" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.customFlyerUrl).toBe("https://pub-test.r2.dev/flyers/mi-flyer.png");
+  });
+
   test("GET /:id/flyer devuelve el customFlyerUrl seteado sin regenerar el PNG automático", async () => {
     await request(app)
       .put(`/api/reports/${reportId}/flyer/custom`)
       .set("Authorization", `Bearer ${token}`)
-      .send({ flyerUrl: "https://cdn.example.com/mi-flyer.png" });
+      .send({ flyerUrl: "https://pub-test.r2.dev/flyers/mi-flyer.png" });
 
     sendMock.mockReset();
 
     const res = await request(app).get(`/api/reports/${reportId}/flyer`);
 
     expect(res.status).toBe(200);
-    expect(res.body.flyerUrl).toBe("https://cdn.example.com/mi-flyer.png");
+    expect(res.body.flyerUrl).toBe("https://pub-test.r2.dev/flyers/mi-flyer.png");
     expect(sendMock).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import request from "supertest";
 import { createTestUser } from "../helpers/users";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
+import * as matchingService from "../../src/services/matching.service";
 
 describe("GET/POST/PUT/DELETE /api/reports", () => {
   let userId: number;
@@ -17,6 +18,7 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
 
   let otherUserId: number;
   let otherToken: string;
+  const originalEnv = { ...process.env };
 
   beforeAll(async () => {
     const user = await createTestUser({ prefix: "reports-routes-test" });
@@ -28,7 +30,15 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     otherToken = otherUser.token;
   });
 
+  // las imágenes tienen que venir del bucket R2 (#229)
+  beforeEach(() => {
+    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
+    jest.spyOn(matchingService, "analyzeImage").mockResolvedValue("animal");
+  });
+
   afterEach(async () => {
+    process.env = { ...originalEnv };
+    jest.restoreAllMocks();
     while (createdReportIds.length > 0) {
       const id = createdReportIds.pop()!;
       await prisma.report.deleteMany({ where: { id } });
@@ -335,7 +345,7 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   test("POST /api/reports con imageUrl crea el reporte con status pending y GET /api/reports?status=pending lo incluye", async () => {
     const created = await request(app)
       .post("/api/reports").set("Authorization", `Bearer ${token}`)
-      .send({ userId, ...baseReportData, imageUrl: "https://cdn.example.com/hallazgo.jpg" });
+      .send({ userId, ...baseReportData, imageUrl: "https://pub-test.r2.dev/pets/hallazgo.jpg" });
     createdReportIds.push(created.body.id);
 
     expect(created.status).toBe(201);
@@ -356,7 +366,7 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
       const created = await request(app)
         .post("/api/reports")
         .set("Authorization", `Bearer ${token}`)
-        .send({ userId, ...baseReportData, imageUrl: "https://cdn.example.com/hallazgo.jpg" });
+        .send({ userId, ...baseReportData, imageUrl: "https://pub-test.r2.dev/pets/hallazgo.jpg" });
       createdReportIds.push(created.body.id);
       if (status === "rejected") {
         await prisma.report.update({ where: { id: created.body.id }, data: { status: "rejected" } });

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { safeHttpUrlSchema } from "./shared.validator";
+import { r2ImageUrlSchema } from "./shared.validator";
 
 export const joinChatSchema = z.object({
   chatId: z.number().int().positive(),
@@ -13,7 +13,7 @@ export const sendMessageSchema = z
   .object({
     chatId: z.number().int().positive(),
     content: z.string().min(1).optional(),
-    imageUrl: safeHttpUrlSchema.optional(),
+    imageUrl: r2ImageUrlSchema.optional(),
   })
   .refine((data) => Boolean(data.content) || Boolean(data.imageUrl), {
     message: "El mensaje necesita texto o una imagen",

@@ -56,11 +56,23 @@ describe("POST /api/uploads/analyze", () => {
     "http://localhost:8000/health",
     "https://pub-test.r2.dev.evil.com/pets/dog.jpg",
     "https://evil.com/dog.jpg",
+    // httpx lee el host evil.com en estas dos (#229)
+    "https://pub-test.r2.dev\\@evil.com/pets/dog.jpg",
+    "https://evil.com@pub-test.r2.dev/pets/dog.jpg",
   ])("responds 400 for an image URL outside the R2 public bucket: %s", async (imageUrl) => {
     const res = await analyze({ imageUrl });
 
     expect(res.status).toBe(400);
     expect(analyzeSpy).not.toHaveBeenCalled();
+  });
+
+  test("forwards the normalized URL to the AI service", async () => {
+    analyzeSpy.mockResolvedValue("animal");
+
+    const res = await analyze({ imageUrl: "HTTPS://PUB-TEST.r2.dev/pets/dog.jpg" });
+
+    expect(res.status).toBe(200);
+    expect(analyzeSpy).toHaveBeenCalledWith("https://pub-test.r2.dev/pets/dog.jpg");
   });
 
   test("responds hasAnimal=true for an image with an animal", async () => {

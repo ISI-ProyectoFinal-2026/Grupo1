@@ -9,6 +9,8 @@ describe("matching.service", () => {
   let notifySpy: jest.SpyInstance;
 
   beforeEach(() => {
+    // las imágenes tienen que venir del bucket R2 (#229)
+    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
     fetchMock = jest.fn();
     // test double: no necesita implementar el tipo completo de fetch
     global.fetch = fetchMock;
@@ -27,7 +29,7 @@ describe("matching.service", () => {
   test("no llama a fetch si AI_SERVICE_URL no está configurada", () => {
     delete process.env.AI_SERVICE_URL;
 
-    triggerEmbeddingGeneration(1, "https://cdn.example.com/foto.jpg");
+    triggerEmbeddingGeneration(1, "https://pub-test.r2.dev/pets/foto.jpg");
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -39,13 +41,13 @@ describe("matching.service", () => {
     process.env.INTERNAL_API_KEY = "clave-interna-test";
     fetchMock.mockResolvedValue({ status: 201 });
 
-    triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/reports/42/embedding", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Internal-Key": "clave-interna-test" },
-      body: JSON.stringify({ image_url: "https://cdn.example.com/foto.jpg" }),
+      body: JSON.stringify({ image_url: "https://pub-test.r2.dev/pets/foto.jpg" }),
     });
 
     // deja que la resolución interna del fetch procese antes de que termine el test
@@ -56,11 +58,11 @@ describe("matching.service", () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockResolvedValue({ status: 201 });
 
-    await triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    await triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
 
     // publishedAt se sella recien acá, no en la creación del reporte.
     expect(updateManySpy).toHaveBeenCalledWith({
-      where: { id: 42, status: "pending", imageUrl: "https://cdn.example.com/foto.jpg" },
+      where: { id: 42, status: "pending", imageUrl: "https://pub-test.r2.dev/pets/foto.jpg" },
       data: { status: "published", publishedAt: expect.any(Date) },
     });
   });
@@ -69,10 +71,10 @@ describe("matching.service", () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockResolvedValue({ status: 422 });
 
-    await triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    await triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
 
     expect(updateManySpy).toHaveBeenCalledWith({
-      where: { id: 42, status: "pending", imageUrl: "https://cdn.example.com/foto.jpg" },
+      where: { id: 42, status: "pending", imageUrl: "https://pub-test.r2.dev/pets/foto.jpg" },
       data: { status: "rejected" },
     });
   });
@@ -85,10 +87,10 @@ describe("matching.service", () => {
     updateManySpy.mockResolvedValue({ count: 0 });
     const notifySpy = jest.spyOn(notificationsService, "createForStatusChange");
 
-    await triggerEmbeddingGeneration(42, "https://cdn.example.com/foto-vieja.jpg");
+    await triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto-vieja.jpg");
 
     expect(updateManySpy).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ imageUrl: "https://cdn.example.com/foto-vieja.jpg" }) })
+      expect.objectContaining({ where: expect.objectContaining({ imageUrl: "https://pub-test.r2.dev/pets/foto-vieja.jpg" }) })
     );
     expect(notifySpy).not.toHaveBeenCalled();
   });
@@ -100,7 +102,7 @@ describe("matching.service", () => {
     notifySpy.mockRejectedValue(notifyError);
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
-    await expect(triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg")).resolves.toBeUndefined();
+    await expect(triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg")).resolves.toBeUndefined();
 
     expect(updateManySpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("no se pudo avisar"), notifyError);
@@ -113,7 +115,7 @@ describe("matching.service", () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockResolvedValueOnce({ status: 503 }).mockResolvedValueOnce({ status: 201 });
 
-    triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
     await jest.runAllTimersAsync();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -126,7 +128,7 @@ describe("matching.service", () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockResolvedValue({ status: 400 });
 
-    expect(() => triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg")).not.toThrow();
+    expect(() => triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg")).not.toThrow();
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -137,7 +139,7 @@ describe("matching.service", () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockResolvedValue({ status: 401 });
 
-    triggerEmbeddingGeneration(42, "https://cdn.example.com/foto.jpg");
+    triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
     await new Promise((resolve) => setImmediate(resolve));
 
     // Un 401 es un problema de configuracion (INTERNAL_API_KEY que no coincide
@@ -152,7 +154,7 @@ describe("matching.service", () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockRejectedValue(new Error("network down"));
 
-    expect(() => triggerEmbeddingGeneration(1, "https://cdn.example.com/foto.jpg")).not.toThrow();
+    expect(() => triggerEmbeddingGeneration(1, "https://pub-test.r2.dev/pets/foto.jpg")).not.toThrow();
 
     // avanza todos los timers de retry (1s + 5s) y espera que las promesas se resuelvan
     await jest.runAllTimersAsync();
@@ -168,7 +170,7 @@ describe("matching.service", () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     fetchMock.mockResolvedValue({ status: 502 });
 
-    triggerEmbeddingGeneration(1, "https://cdn.example.com/foto.jpg");
+    triggerEmbeddingGeneration(1, "https://pub-test.r2.dev/pets/foto.jpg");
     await jest.runAllTimersAsync();
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -190,7 +192,7 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
         reportType: "lost",
         status,
         title: "Perra perdida en Caballito",
-        imageUrl: "https://cdn.example.com/caballito.jpg",
+        imageUrl: "https://pub-test.r2.dev/pets/caballito.jpg",
       },
     });
     createdReportIds.push(report.id);
@@ -209,6 +211,7 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
 
   beforeEach(() => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
+    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
     fetchMock = jest.fn();
     // test double: no necesita implementar el tipo completo de fetch
     global.fetch = fetchMock;
@@ -334,7 +337,7 @@ describe("matching.service listMatches", () => {
         reportType: "lost",
         status: "published",
         title: "Perro perdido cerca de Once",
-        imageUrl: "https://cdn.example.com/perdido.jpg",
+        imageUrl: "https://pub-test.r2.dev/pets/perdido.jpg",
       },
     });
     lostReportId = lostReport.id;
@@ -345,7 +348,7 @@ describe("matching.service listMatches", () => {
         reportType: "found",
         status: "published",
         title: "Perro encontrado en Once",
-        imageUrl: "https://cdn.example.com/encontrado.jpg",
+        imageUrl: "https://pub-test.r2.dev/pets/encontrado.jpg",
       },
     });
     foundReportId = foundReport.id;
@@ -374,7 +377,7 @@ describe("matching.service listMatches", () => {
     expect(matches[0]).toMatchObject({
       reportId: foundReportId,
       title: "Perro encontrado en Once",
-      imageUrl: "https://cdn.example.com/encontrado.jpg",
+      imageUrl: "https://pub-test.r2.dev/pets/encontrado.jpg",
       reportType: "found",
       similarityScore: 0.83,
       status: "pending",
@@ -389,7 +392,7 @@ describe("matching.service listMatches", () => {
     expect(matches[0]).toMatchObject({
       reportId: lostReportId,
       title: "Perro perdido cerca de Once",
-      imageUrl: "https://cdn.example.com/perdido.jpg",
+      imageUrl: "https://pub-test.r2.dev/pets/perdido.jpg",
       reportType: "lost",
       similarityScore: 0.83,
       status: "pending",
@@ -417,6 +420,7 @@ describe("matching.service reconcilePendingReports", () => {
   let demasiadoViejoId: number;
   let sinImagenId: number;
   let editadoRecienId: number;
+  let externoId: number;
 
   const MINUTO = 60 * 1000;
   const HORA = 60 * MINUTO;
@@ -443,7 +447,7 @@ describe("matching.service reconcilePendingReports", () => {
         data: {
           ...base,
           title: "Atascado",
-          imageUrl: "https://cdn.example.com/atascado.jpg",
+          imageUrl: "https://pub-test.r2.dev/pets/atascado.jpg",
           createdAt: new Date(Date.now() - 23 * HORA),
           // Prisma completa @updatedAt con now() si no se lo pasa explícito.
           updatedAt: new Date(Date.now() - 23 * HORA),
@@ -455,7 +459,7 @@ describe("matching.service reconcilePendingReports", () => {
     // reencolarlo ahora duplicaría la inferencia.
     recienCreadoId = (
       await prisma.report.create({
-        data: { ...base, title: "Recién creado", imageUrl: "https://cdn.example.com/nuevo.jpg" },
+        data: { ...base, title: "Recién creado", imageUrl: "https://pub-test.r2.dev/pets/nuevo.jpg" },
       })
     ).id;
 
@@ -465,7 +469,7 @@ describe("matching.service reconcilePendingReports", () => {
         data: {
           ...base,
           title: "Demasiado viejo",
-          imageUrl: "https://cdn.example.com/viejo.jpg",
+          imageUrl: "https://pub-test.r2.dev/pets/viejo.jpg",
           createdAt: new Date(Date.now() - 3 * DIA),
           updatedAt: new Date(Date.now() - 3 * DIA),
         },
@@ -494,7 +498,20 @@ describe("matching.service reconcilePendingReports", () => {
         data: {
           ...base,
           title: "Editado recién",
-          imageUrl: "https://cdn.example.com/editado.jpg",
+          imageUrl: "https://pub-test.r2.dev/pets/editado.jpg",
+          createdAt: new Date(Date.now() - 3 * DIA),
+          updatedAt: new Date(Date.now() - 22 * HORA),
+        },
+      })
+    ).id;
+
+    // Guardado antes de #229 con una URL fuera del bucket: no se le pide nada a la IA.
+    externoId = (
+      await prisma.report.create({
+        data: {
+          ...base,
+          title: "Externo",
+          imageUrl: "https://evil.com/externo.jpg",
           createdAt: new Date(Date.now() - 3 * DIA),
           updatedAt: new Date(Date.now() - 22 * HORA),
         },
@@ -504,7 +521,7 @@ describe("matching.service reconcilePendingReports", () => {
 
   afterAll(async () => {
     await prisma.report.deleteMany({
-      where: { id: { in: [stuckId, recienCreadoId, demasiadoViejoId, sinImagenId, editadoRecienId] } },
+      where: { id: { in: [stuckId, recienCreadoId, demasiadoViejoId, sinImagenId, editadoRecienId, externoId] } },
     });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.$disconnect();
@@ -521,6 +538,7 @@ describe("matching.service reconcilePendingReports", () => {
     // count 0 no cambia ningún estado ni se crea ninguna notificación. No
     // des-mockear dentro de un test.
     jest.spyOn(prisma.report, "updateMany").mockResolvedValue({ count: 0 });
+    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
   });
 
   afterEach(() => {
@@ -551,7 +569,7 @@ describe("matching.service reconcilePendingReports", () => {
       embeddingUrl(stuckId),
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ image_url: "https://cdn.example.com/atascado.jpg" }),
+        body: JSON.stringify({ image_url: "https://pub-test.r2.dev/pets/atascado.jpg" }),
       })
     );
 
@@ -559,6 +577,17 @@ describe("matching.service reconcilePendingReports", () => {
     expect(calledUrls()).not.toContain(embeddingUrl(recienCreadoId));
     expect(calledUrls()).not.toContain(embeddingUrl(demasiadoViejoId));
     expect(calledUrls()).not.toContain(embeddingUrl(sinImagenId));
+  });
+
+  test("no reencola un reporte guardado con una URL fuera del bucket", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await reconcilePendingReports();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(calledUrls()).not.toContain(embeddingUrl(externoId));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(`report ${externoId}`));
   });
 
   test("un reporte que ya fue publicado deja de reencolarse", async () => {
@@ -577,5 +606,54 @@ describe("matching.service reconcilePendingReports", () => {
     } finally {
       await prisma.$executeRaw`UPDATE reports SET status = 'pending'::report_status WHERE id = ${stuckId}`;
     }
+  });
+});
+
+// #229: una URL guardada fuera del bucket no se le manda a la IA
+describe("triggerEmbeddingGeneration con URLs guardadas fuera del bucket R2", () => {
+  const originalEnv = { ...process.env };
+  let fetchMock: jest.Mock;
+  let updateManySpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock = jest.fn().mockResolvedValue({ status: 201 });
+    // test double: no necesita implementar el tipo completo de fetch
+    global.fetch = fetchMock;
+    updateManySpy = jest.spyOn(prisma.report, "updateMany").mockResolvedValue({ count: 1 });
+    jest.spyOn(notificationsService, "createForStatusChange").mockResolvedValue(null);
+    warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.restoreAllMocks();
+  });
+
+  test.each([
+    "https://evil.com/foto.jpg",
+    "http://169.254.169.254/latest/meta-data/",
+    "https://pub-test.r2.dev\\@evil.com/foto.jpg",
+    "https://evil.com@pub-test.r2.dev/foto.jpg",
+  ])("no hace ningún request, avisa y no toca el reporte: %s", async (imageUrl) => {
+    await triggerEmbeddingGeneration(42, imageUrl);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(updateManySpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("report 42"));
+  });
+
+  test("manda la URL del bucket normalizada y aplica el veredicto sobre la URL guardada", async () => {
+    await triggerEmbeddingGeneration(42, "HTTPS://PUB-TEST.r2.dev/pets/foto.jpg");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/reports/42/embedding",
+      expect.objectContaining({ body: JSON.stringify({ image_url: "https://pub-test.r2.dev/pets/foto.jpg" }) })
+    );
+    expect(updateManySpy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 42, status: "pending", imageUrl: "HTTPS://PUB-TEST.r2.dev/pets/foto.jpg" } })
+    );
   });
 });
