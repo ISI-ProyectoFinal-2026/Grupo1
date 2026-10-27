@@ -203,13 +203,13 @@ Verify: `PY -m pytest tests/benchmarks/test_run_all.py -q`. Harness: `PY -m benc
   - results go to a temp dir, then rename
 - [ ] 11.2 GREEN `run_all.py` (D10). REFACTOR.
 
-## Slice 12 (docs, ~710): Report 2.2.x + outline + tasks
+## Slice 12 (docs, ~710 planned, ~275 actual): Report 2.2.x + outline + tasks - DONE 2026-10-27
 Verify: `rg "^seccion:" docs/informe/2-2-*.md` shows 3 files; ADR links resolve. Harness: N/A. Rollback: delete the files.
 
-- [ ] 12.1 `docs/informe/2-2-1-equipo-de-trabajo.md` from `docs/equipo/ROLES.md`.
-- [ ] 12.2 `2-2-2-comunicacion-y-decisiones.md`: 2.2.2.4 from the ADR index. 2.2.2.1-.3 read "Pendiente (Fase B)".
-- [ ] 12.3 `2-2-3-gestion-de-configuracion.md` from `docs/WORKFLOW.md`, ADR-0010 and `.github/workflows/*`. Cite every claim and write neutral Spanish.
-- [ ] 12.4 Commit `openspec/changes/informe-final/{template-outline.md,tasks.md}` with the checkboxes updated to the real state.
+- [x] 12.1 `docs/informe/2-2-1-equipo-de-trabajo.md` from `docs/equipo/ROLES.md`.
+- [x] 12.2 `2-2-2-comunicacion-y-decisiones.md`: 2.2.2.4 from the ADR index. 2.2.2.1-.3 read "Pendiente (Fase B)".
+- [x] 12.3 `2-2-3-gestion-de-configuracion.md` from `docs/WORKFLOW.md`, ADR-0010 and `.github/workflows/*`. Cite every claim and write neutral Spanish.
+- [x] 12.4 Commit `openspec/changes/informe-final/{template-outline.md,tasks.md}` with the checkboxes updated to the real state. `template-outline.md` was already committed in a3315e3.
 
 ## Slice 13 (docs, ~600): Drift, references, external evidence
 Verify: ledger rows have no "pending" verdict; `rg -i "redis|dependabot|react 18" docs/ARQUITECTURA.md README.md docs/githubactions/README.md` returns nothing that contradicts the code. Harness: N/A. Rollback: revert the PR (doc text only). Over 800: split drift from references.
@@ -261,13 +261,13 @@ Verify: each scope item has a verdict (Implementado, Parcial, Fuera de alcance) 
 - [x] 15.2 `1-2-1-objetivos-y-alcances.md`: PDD objectives and scope checked against the code, with the PDD drift stated (role `comercio`, gamification, paid plans, advertising, suspension, WhatsApp).
 - [x] 15.3 1.2.2.1: Mermaid use-case diagram with the real actors, plus the FR/NFR list with requirement → issue → code → test traceability.
 
-## Slice 17 (docs + generated, ~400): 1.2.3 screens
+## Slice 17 (docs + generated, ~400): 1.2.3 screens - 17.1-17.2 DONE 2026-10-27
 Verify: every screen in `frontend/src/router.tsx` appears with a capture and its flow F-n.
 
-- [ ] 17.1 1.2.3.1 Palette from `frontend/src/index.css` and `frontend/tailwind.config.ts`, including the off-token colors.
-- [ ] 17.2 1.2.3.2 Fonts and type scale.
+- [x] 17.1 1.2.3.1 Palette from `frontend/src/index.css` and `frontend/tailwind.config.ts`, including the off-token colors.
+- [x] 17.2 1.2.3.2 Fonts and type scale.
 - [ ] 17.3 `[HUMAN]` Decide how captures are taken (manual or a Playwright script reusing `frontend/e2e/`).
-- [ ] 17.4 1.2.3.3 Screens per module, captures in `docs/informe/img/` (counted as generated).
+- [ ] 17.4 1.2.3.3 Screens per module, captures in `docs/informe/img/` (counted as generated). Blocked until #208 and #211 are merged; 1.2.3.3 holds a pending note.
 
 ## Phase B (out of scope for 2026-11-04; do not start)
 
