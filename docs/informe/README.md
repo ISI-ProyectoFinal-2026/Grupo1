@@ -126,3 +126,4 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 2.2.1-1 | Tabla | Integrantes y roles asignados | 2.2.1.1 ([`2-2-1-equipo-de-trabajo.md`](2-2-1-equipo-de-trabajo.md)) | `docs/equipo/ROLES.md`, sección 1 |
 | Tabla 2.2.1-2 | Tabla | Puestos y tareas registradas | 2.2.1.2 ([`2-2-1-equipo-de-trabajo.md`](2-2-1-equipo-de-trabajo.md)) | `docs/equipo/ROLES.md`, sección 2 |
 | Tabla 2.2.1-3 | Tabla | Asignación de puestos con su evidencia | 2.2.1.3 ([`2-2-1-equipo-de-trabajo.md`](2-2-1-equipo-de-trabajo.md)) | `docs/equipo/ROLES.md`, sección 2 |
+| Tabla 2.2.2-1 | Tabla | Decisiones registradas y su estado | 2.2.2.4 ([`2-2-2-comunicacion-y-decisiones.md`](2-2-2-comunicacion-y-decisiones.md)) | `docs/adr/README.md`, `rg -n "Estado:" docs/adr` |

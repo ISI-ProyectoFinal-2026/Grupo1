@@ -101,6 +101,7 @@ nav:
       - informe/1-3-3-pruebas.md
   - 2 Planificación:
       - informe/2-2-1-equipo-de-trabajo.md
+      - informe/2-2-2-comunicacion-y-decisiones.md
   # secciones 3 y 4: agregar aca a medida que existan sus archivos
   - Decisiones:
       - adr/README.md
