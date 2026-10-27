@@ -1,11 +1,6 @@
 import { z } from "zod";
 import { ReportType, ReportStatus } from "@prisma/client";
-import { r2ImageUrlSchema } from "./shared.validator";
-
-const locationSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-});
+import { locationSchema, r2ImageUrlSchema } from "./shared.validator";
 
 export const createReportSchema = z.object({
   petId: z.number().int().positive().optional(),
