@@ -12,13 +12,16 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
     age: 3,
     color: "Marrón",
     description: "Mascota de prueba",
-    photoUrls: ["https://cdn.example.com/foto1.jpg"],
+    photoUrls: ["https://pub-test.r2.dev/pets/foto1.jpg"],
   };
 
   let otherUserId: number;
   let otherToken: string;
+  const originalEnv = { ...process.env };
 
   beforeAll(async () => {
+    // las fotos tienen que venir del bucket R2 (#229)
+    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
     const user = await prisma.user.create({
       data: {
         email: `pets-routes-test-${Date.now()}@example.com`,
@@ -46,6 +49,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
   });
 
   afterAll(async () => {
+    process.env = { ...originalEnv };
     await prisma.user.delete({ where: { id: userId } });
     await prisma.user.delete({ where: { id: otherUserId } });
     await prisma.$disconnect();
@@ -59,7 +63,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
     expect(res.status).toBe(201);
     expect(res.body.name).toBe("Rocky");
     expect(res.body.color).toBe("Marrón");
-    expect(res.body.photoUrls).toEqual(["https://cdn.example.com/foto1.jpg"]);
+    expect(res.body.photoUrls).toEqual(["https://pub-test.r2.dev/pets/foto1.jpg"]);
     createdPetIds.push(res.body.id);
   });
 
@@ -87,6 +91,34 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
+  });
+
+  // #229: fotos solo del bucket R2 del proyecto
+  test.each(["https://evil.com/foto.jpg", "https://pub-test.r2.dev\\@evil.com/foto.jpg"])(
+    "POST /api/pets responde 400 y no crea nada si una foto está fuera del bucket: %s",
+    async (externa) => {
+      const res = await request(app)
+        .post("/api/pets").set("Authorization", `Bearer ${token}`)
+        .send({ name: "Foto externa", ...basePetData, photoUrls: ["https://pub-test.r2.dev/pets/foto1.jpg", externa] });
+
+      expect(res.status).toBe(400);
+      expect(await prisma.pet.findFirst({ where: { userId, name: "Foto externa" } })).toBeNull();
+    }
+  );
+
+  test("PUT /api/pets/:id responde 400 y no cambia las fotos si una está fuera del bucket", async () => {
+    const created = await prisma.pet.create({
+      data: { userId, name: "Con fotos", ...basePetData, photoUrls: ["https://pub-test.r2.dev/pets/foto1.jpg"] },
+    });
+    createdPetIds.push(created.id);
+
+    const res = await request(app)
+      .put(`/api/pets/${created.id}`).set("Authorization", `Bearer ${token}`)
+      .send({ photoUrls: ["https://evil.com/foto.jpg"] });
+
+    expect(res.status).toBe(400);
+    const stored = await prisma.pet.findUnique({ where: { id: created.id } });
+    expect(stored?.photoUrls).toEqual(["https://pub-test.r2.dev/pets/foto1.jpg"]);
   });
 
   test("POST /api/pets responde 400 si el JSON del body está mal formado", async () => {

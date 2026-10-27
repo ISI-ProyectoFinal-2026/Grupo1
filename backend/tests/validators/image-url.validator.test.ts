@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { sendMessageSchema } from "../../src/validators/chat-socket.validator";
 import { sendMessageBodySchema } from "../../src/validators/chats.validator";
+import { createPetSchema, updatePetSchema } from "../../src/validators/pets.validator";
 import { createReportSchema, setCustomFlyerSchema, updateReportSchema } from "../../src/validators/reports.validator";
 import { r2ImageUrlSchema } from "../../src/validators/shared.validator";
 import { analyzeImageSchema } from "../../src/validators/uploads.validator";
@@ -120,5 +121,30 @@ describe("image URL validation restricted to the R2 bucket", () => {
       expect(result.success).toBe(false);
       expect(issueMessages(result)).toContain(R2_MESSAGE);
     });
+  });
+
+  // S11: cada foto de la mascota
+  describe.each([
+    ["createPetSchema.photoUrls", createPetSchema],
+    ["updatePetSchema.photoUrls", updatePetSchema],
+  ] as Array<[string, z.ZodType]>)("%s", (_label, schema) => {
+    const basePet = { name: "Rocky", breed: "Labrador", age: 3, color: "Marrón", description: "Mascota" };
+
+    test("accepts in-bucket photos and outputs them normalized", () => {
+      const result = schema.safeParse({ ...basePet, photoUrls: [IN_BUCKET, NOT_NORMALIZED] });
+
+      expect(result.success).toBe(true);
+      expect((result.data as { photoUrls: string[] }).photoUrls).toEqual([IN_BUCKET, NORMALIZED]);
+    });
+
+    test.each([...OUTSIDE_BUCKET, "https://pub-test.r2.dev\\@evil.com/a.jpg", "https://evil.com@pub-test.r2.dev/a.jpg"])(
+      "rejects a photo list containing %s",
+      (url) => {
+        const result = schema.safeParse({ ...basePet, photoUrls: [IN_BUCKET, url] });
+
+        expect(result.success).toBe(false);
+        expect(issueMessages(result)).toContain(R2_MESSAGE);
+      }
+    );
   });
 });
