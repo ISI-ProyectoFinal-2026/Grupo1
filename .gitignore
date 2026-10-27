@@ -35,3 +35,6 @@ htmlcov/
 test-results/
 playwright-report/
 blob-report/
+
+# Sitio web del informe (mkdocs build)
+site/
