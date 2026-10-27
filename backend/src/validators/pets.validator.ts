@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { r2ImageUrlSchema } from "./shared.validator";
 
 export const createPetSchema = z.object({
   name: z.string().min(1),
@@ -7,7 +8,7 @@ export const createPetSchema = z.object({
   age: z.number().int().min(0),
   color: z.string().min(1),
   description: z.string().min(1),
-  photoUrls: z.array(z.string().min(1)).min(1, "Se requiere al menos una foto"),
+  photoUrls: z.array(r2ImageUrlSchema).min(1, "Se requiere al menos una foto"),
   microchipId: z.string().min(1).optional(),
 });
 

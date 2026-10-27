@@ -54,8 +54,11 @@ registerFlyerFonts();
  */
 async function fetchPetImage(imageUrl: string | null): Promise<Image | null> {
   if (!imageUrl) return null;
+  // fuera del bucket no se descarga (SSRF, #229): sale el placeholder
+  const r2ImageUrl = storageService.normalizeR2PublicUrl(imageUrl);
+  if (!r2ImageUrl) return null;
   try {
-    return await loadImage(imageUrl);
+    return await loadImage(r2ImageUrl, { maxRedirects: 0 });
   } catch {
     return null;
   }

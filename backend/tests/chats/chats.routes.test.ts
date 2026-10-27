@@ -18,8 +18,11 @@ describe("/api/chats", () => {
   let chatId: number;
 
   const createdChatIds: number[] = [];
+  const originalEnv = { ...process.env };
 
   beforeAll(async () => {
+    // las imágenes tienen que venir del bucket R2 (#229)
+    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
     const userA = await createTestUser({ prefix: "chats-routes-test-a" });
     userAId = userA.user.id;
     tokenA = userA.token;
@@ -50,6 +53,7 @@ describe("/api/chats", () => {
   });
 
   afterAll(async () => {
+    process.env = { ...originalEnv };
     await prisma.message.deleteMany({ where: { chatId } });
     await prisma.notification.deleteMany({ where: { userId: { in: [userAId, userBId, outsiderId] } } });
     await prisma.chat.delete({ where: { id: chatId } });

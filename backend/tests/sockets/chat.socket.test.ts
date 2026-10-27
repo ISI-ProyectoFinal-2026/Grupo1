@@ -30,8 +30,11 @@ describe("chat.socket", () => {
   let unverifiedToken: string;
 
   const openSockets: ClientSocket[] = [];
+  const originalEnv = { ...process.env };
 
   beforeAll(async () => {
+    // las imágenes tienen que venir del bucket R2 (#229)
+    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
     const userA = await createTestUser({ prefix: "chat-socket-test-a" });
     userAId = userA.user.id;
     tokenA = userA.token;
@@ -66,6 +69,7 @@ describe("chat.socket", () => {
   });
 
   afterAll(async () => {
+    process.env = { ...originalEnv };
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     await prisma.message.deleteMany({ where: { chatId: { in: [chatId, unverifiedChatId] } } });
     await prisma.notification.deleteMany({ where: { userId: { in: [userAId, userBId, outsiderId, unverifiedId] } } });
