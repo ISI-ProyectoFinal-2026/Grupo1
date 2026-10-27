@@ -2,6 +2,7 @@ import { MatchStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import * as notificationsService from "./notifications.service";
+import { normalizeR2PublicUrl } from "./storage.service";
 
 /**
  * Dispara la generación de embedding en el Backend IA para un reporte
@@ -94,13 +95,20 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
   const baseUrl = process.env.AI_SERVICE_URL;
   if (!baseUrl) return Promise.resolve();
 
+  // filas previas a #229 pueden tener una URL externa: no se le manda a la IA
+  const r2ImageUrl = normalizeR2PublicUrl(imageUrl);
+  if (!r2ImageUrl) {
+    console.warn(`[matching] report ${reportId} tiene una imagen fuera del bucket R2; no se envía al Backend IA y queda sin cambios`);
+    return Promise.resolve();
+  }
+
   return fetchWithRetry(`${baseUrl}/reports/${reportId}/embedding`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Internal-Key": process.env.INTERNAL_API_KEY ?? "",
     },
-    body: JSON.stringify({ image_url: imageUrl }),
+    body: JSON.stringify({ image_url: r2ImageUrl }),
   })
     .then(async (response) => {
       if (response.status === 201) {
