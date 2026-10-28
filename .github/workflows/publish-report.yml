@@ -1,0 +1,68 @@
+name: Publish report
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Rama, tag o SHA a publicar"
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+# una publicacion a la vez; no se cancela la que esta en curso
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site (MkDocs)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Run hook tests
+        run: python -m pytest tools/informe-site -v
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      # los enlaces al codigo apuntan al commit publicado
+      - name: Build site
+        run: GITHUB_SHA="$(git rev-parse HEAD)" mkdocs build --strict
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

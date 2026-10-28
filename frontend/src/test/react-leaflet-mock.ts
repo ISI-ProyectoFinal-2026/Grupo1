@@ -67,6 +67,7 @@ export function Marker(props: {
   position: LatLngTuple
   draggable?: boolean
   title?: string
+  icon?: { options: { html?: string } }
   eventHandlers?: { dragend?: DragEndHandler }
   children?: ReactNode
 }) {
@@ -77,6 +78,7 @@ export function Marker(props: {
       'data-testid': 'marker',
       'data-position': props.position.join(','),
       'data-draggable': String(Boolean(props.draggable)),
+      'data-icon-html': props.icon?.options.html,
       title: props.title,
     },
     props.children
