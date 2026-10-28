@@ -4,6 +4,7 @@ import type { ReportDTO } from "@/types/report.types";
 import { MapIcon } from "@/components/ui/icons";
 import OsmTileLayer from "@/components/maps/OsmTileLayer";
 import { DEFAULT_MAP_ZOOM, PILOT_ZONE_CENTER } from "@/lib/map";
+import { getReportPinIcon } from "@/components/reports/reportPinIcon";
 import "leaflet/dist/leaflet.css";
 
 interface MapViewProps {
@@ -37,7 +38,11 @@ export default function MapView({
       <MapContainer center={center} zoom={DEFAULT_MAP_ZOOM} className="h-full w-full">
         <OsmTileLayer />
         {reportsWithLocation.map((report) => (
-          <Marker key={report.id} position={[report.location!.lat, report.location!.lng]}>
+          <Marker
+            key={report.id}
+            position={[report.location!.lat, report.location!.lng]}
+            icon={getReportPinIcon(report.reportType)}
+          >
             <Popup>
               <div className="flex w-52 flex-col gap-2 font-sans">
                 {report.imageUrl && (
