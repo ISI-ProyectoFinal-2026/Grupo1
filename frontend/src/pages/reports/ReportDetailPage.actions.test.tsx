@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import { useAuthStore } from '@/stores/auth.store'
@@ -225,8 +225,19 @@ describe('ReportDetailPage cerrar y denunciar', () => {
   })
 })
 
-describe('ReportDetailPage editar', () => {
+describe('ReportDetailPage editar y eliminar', () => {
   const editar = () => screen.queryByRole('link', { name: 'Editar reporte' })
+  const eliminar = () => screen.queryByRole('button', { name: 'Eliminar reporte' })
+
+  function FeedFalso() {
+    const state = useLocation().state as { message?: string } | null
+    return (
+      <div>
+        <p>pagina feed</p>
+        <p>{state?.message}</p>
+      </div>
+    )
+  }
 
   function renderConRutas(initialEntry: string | { pathname: string; state: unknown } = '/reports/5') {
     const { Wrapper } = createQueryWrapper()
@@ -234,6 +245,7 @@ describe('ReportDetailPage editar', () => {
       <Wrapper>
         <MemoryRouter initialEntries={[initialEntry]}>
           <Routes>
+            <Route path='/reports' element={<FeedFalso />} />
             <Route path='/reports/:id' element={<ReportDetailPage />} />
           </Routes>
         </MemoryRouter>
@@ -252,7 +264,7 @@ describe('ReportDetailPage editar', () => {
   })
 
   it.each<ReportStatus>(['published', 'pending', 'rejected', 'resolved'])(
-    'el dueño ve Editar con el reporte %s',
+    'el dueño ve Editar y Eliminar con el reporte %s',
     async (status) => {
       vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ status }))
       loguear(DUENO_ID)
@@ -260,22 +272,56 @@ describe('ReportDetailPage editar', () => {
       await esperarDetalle()
 
       expect(editar()).toHaveAttribute('href', '/reports/5/edit')
+      expect(eliminar()).toBeInTheDocument()
     }
   )
 
-  it('otro usuario no ve Editar', async () => {
+  it('otro usuario no ve Editar ni Eliminar', async () => {
     loguear(OTRO_ID)
     renderConRutas()
     await esperarDetalle()
 
     expect(editar()).not.toBeInTheDocument()
+    expect(eliminar()).not.toBeInTheDocument()
   })
 
-  it('sin sesión no ve Editar', async () => {
+  it('sin sesión no ve Editar ni Eliminar', async () => {
     renderConRutas()
     await esperarDetalle()
 
     expect(editar()).not.toBeInTheDocument()
+    expect(eliminar()).not.toBeInTheDocument()
+  })
+
+  it('al confirmar la eliminación vuelve al feed con el aviso', async () => {
+    loguear(DUENO_ID)
+    vi.mocked(reportsService.deleteReport).mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    renderConRutas()
+
+    await user.click(await screen.findByRole('button', { name: 'Eliminar reporte' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar eliminación' }))
+
+    expect(await screen.findByText('pagina feed')).toBeInTheDocument()
+    expect(screen.getByText('Reporte eliminado')).toBeInTheDocument()
+    expect(reportsService.deleteReport).toHaveBeenCalledWith(5)
+  })
+
+  it('si la eliminación falla se queda en el detalle con el error', async () => {
+    loguear(DUENO_ID)
+    vi.mocked(reportsService.deleteReport).mockRejectedValue(
+      errorConStatus('Error interno del servidor', 500)
+    )
+    const user = userEvent.setup()
+    renderConRutas()
+
+    await user.click(await screen.findByRole('button', { name: 'Eliminar reporte' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar eliminación' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No se pudo eliminar el reporte, intentá de nuevo.'
+    )
+    expect(screen.queryByText('pagina feed')).not.toBeInTheDocument()
   })
 
   it('muestra el aviso que llega de la pantalla anterior', async () => {

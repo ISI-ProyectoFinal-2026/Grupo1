@@ -28,6 +28,10 @@ export async function updateReport(id: number, input: UpdateReportInput): Promis
   return data;
 }
 
+export async function deleteReport(id: number): Promise<void> {
+  await api.delete(`/reports/${id}`);
+}
+
 export async function closeReport(id: number): Promise<ReportDTO> {
   const { data } = await api.post<ReportDTO>(`/reports/${id}/close`);
   return data;
