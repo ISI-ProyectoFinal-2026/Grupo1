@@ -6,11 +6,14 @@ import { PinIcon } from "@/components/ui/icons";
 
 interface LocationPickerProps {
   onLocationSelect: (location: ReportLocation, address: string) => void;
+  // Location already saved (edit mode): shown until the user picks a new one.
+  initialLocation?: ReportLocation | null;
+  initialAddress?: string;
 }
 
-export default function LocationPicker({ onLocationSelect }: LocationPickerProps) {
-  const [location, setLocation] = useState<ReportLocation | null>(null);
-  const [address, setAddress] = useState<string>("");
+export default function LocationPicker({ onLocationSelect, initialLocation, initialAddress }: LocationPickerProps) {
+  const [location, setLocation] = useState<ReportLocation | null>(initialLocation ?? null);
+  const [address, setAddress] = useState<string>(initialAddress ?? "");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

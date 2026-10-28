@@ -500,3 +500,101 @@ describe('ReportForm: email sin verificar (403 EMAIL_NOT_VERIFIED)', () => {
     expect(screen.queryByRole('button', { name: 'Reenviar email de verificación' })).toBeNull()
   })
 })
+
+describe('ReportForm: modo edicion', () => {
+  const datosIniciales = {
+    reportType: 'lost' as const,
+    title: 'Perro perdido en Nueva Córdoba',
+    description: 'Collar rojo',
+    imageUrl: 'https://cdn/actual.jpg',
+    location: { lat: -31.42, lng: -64.18 },
+    locationAddress: 'Nueva Córdoba',
+  }
+
+  function renderEdicion(
+    props: { onSubmit?: (data: unknown) => Promise<void>; canChangeImage?: boolean } = {}
+  ) {
+    const onSubmit = props.onSubmit ?? vi.fn().mockResolvedValue(undefined)
+    const { Wrapper } = createQueryWrapper()
+    render(
+      <Wrapper>
+        <MemoryRouter>
+          <ReportForm
+            mode='edit'
+            initialData={datosIniciales}
+            onSubmit={onSubmit}
+            canChangeImage={props.canChangeImage}
+          />
+        </MemoryRouter>
+      </Wrapper>
+    )
+    return { onSubmit }
+  }
+
+  it('precarga los datos y guarda con onSubmit sin crear otro reporte', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEdicion()
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Perro perdido en Nueva Córdoba')
+    expect(screen.getByLabelText('Descripción')).toHaveValue('Collar rojo')
+    await user.clear(screen.getByLabelText('Título *'))
+    await user.type(screen.getByLabelText('Título *'), 'Perro encontrado en Güemes')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({ ...datosIniciales, title: 'Perro encontrado en Güemes' })
+    )
+    expect(createReport).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Crear Reporte' })).not.toBeInTheDocument()
+  })
+
+  it('muestra la foto actual y avisa que cambiarla vuelve a revision', () => {
+    renderEdicion()
+
+    expect(screen.getByAltText('Foto actual')).toHaveAttribute('src', 'https://cdn/actual.jpg')
+    expect(screen.queryByText(/Foto subida correctamente/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Si cambiás la foto, el reporte vuelve a revisión/)).toBeInTheDocument()
+  })
+
+  it('confirma la foto nueva cuando el usuario la reemplaza', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEdicion()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    expect(screen.getByText(/Foto subida correctamente/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ imageUrl: 'https://cdn/foto.jpg' })
+      )
+    )
+  })
+
+  it('no ofrece cambiar la foto cuando el reporte no lo permite', () => {
+    renderEdicion({ canChangeImage: false })
+
+    expect(screen.queryByRole('button', { name: 'Simular foto subida' })).not.toBeInTheDocument()
+    expect(screen.getByText(/La foto de un reporte resuelto no se puede cambiar/)).toBeInTheDocument()
+  })
+
+  it('muestra el error que devuelve el guardado', async () => {
+    const user = userEvent.setup()
+    renderEdicion({
+      onSubmit: vi.fn().mockRejectedValue(new Error('No tenés permiso para modificar este reporte')),
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByText('No tenés permiso para modificar este reporte')).toBeInTheDocument()
+  })
+
+  it('cae a un mensaje generico de edicion si el rechazo no es un Error', async () => {
+    const user = userEvent.setup()
+    renderEdicion({ onSubmit: vi.fn().mockRejectedValue('boom') })
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByText('Error al guardar los cambios')).toBeInTheDocument()
+  })
+})

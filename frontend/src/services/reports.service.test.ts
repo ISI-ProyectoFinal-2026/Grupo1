@@ -10,6 +10,7 @@ import {
   getReport,
   listReports,
   rejectMatch,
+  updateReport,
   uploadCustomFlyer,
 } from '@/services/reports.service'
 import type { MatchDTO, MatchDecisionDTO, ReportDTO } from '@/types/report.types'
@@ -107,6 +108,16 @@ describe('reports.service escritura', () => {
 
     expect(api.post).toHaveBeenCalledWith('/reports/5/close')
     expect(resultado.status).toBe('resolved')
+  })
+
+  it('edita el reporte contra PUT /reports/:id con los campos parciales', async () => {
+    const editado = reporte({ title: 'Perro encontrado en Guemes' })
+    vi.mocked(api.put).mockResolvedValue(respuesta(editado))
+
+    const resultado = await updateReport(5, { title: 'Perro encontrado en Guemes' })
+
+    expect(api.put).toHaveBeenCalledWith('/reports/5', { title: 'Perro encontrado en Guemes' })
+    expect(resultado).toEqual(editado)
   })
 })
 

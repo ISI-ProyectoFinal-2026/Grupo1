@@ -13,11 +13,22 @@ import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import ImageUploader from "./ImageUploader";
 import LocationPicker from "./LocationPicker";
 
-interface ReportFormProps {
-  initialData?: Partial<CreateReportFormData>;
-}
+// "create" posts a new report and opens it. "edit" hands the validated data to
+// the caller, which owns the PUT and the navigation afterwards.
+type ReportFormProps =
+  | { mode?: "create"; initialData?: Partial<CreateReportFormData> }
+  | {
+      mode: "edit";
+      initialData: Partial<CreateReportFormData>;
+      onSubmit: (data: CreateReportFormData) => Promise<void>;
+      // The backend rejects a new photo on a resolved report (409).
+      canChangeImage?: boolean;
+    };
 
-export default function ReportForm({ initialData }: ReportFormProps) {
+export default function ReportForm(props: ReportFormProps) {
+  const { initialData } = props;
+  const isEdit = props.mode === "edit";
+  const canChangeImage = props.mode !== "edit" || props.canChangeImage !== false;
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -40,6 +51,9 @@ export default function ReportForm({ initialData }: ReportFormProps) {
     locationAddress: "",
     ...initialData,
   });
+
+  // In edit mode the photo already saved is shown as such, not as a new upload.
+  const isCurrentImage = isEdit && formData.imageUrl === initialData?.imageUrl;
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -82,6 +96,10 @@ export default function ReportForm({ initialData }: ReportFormProps) {
 
     try {
       const validated = createReportSchema.parse(formData);
+      if (props.mode === "edit") {
+        await props.onSubmit(validated);
+        return;
+      }
       const result = await createReport(validated);
 
       navigate(`/reports/${result.id}`, {
@@ -103,7 +121,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
         setFormError(err.message);
         setFormErrorCode(getApiErrorCode(err) ?? null);
       } else {
-        setFormError("Error al crear el reporte");
+        setFormError(isEdit ? "Error al guardar los cambios" : "Error al crear el reporte");
       }
     } finally {
       setIsLoading(false);
@@ -162,16 +180,32 @@ export default function ReportForm({ initialData }: ReportFormProps) {
 
       <fieldset className="flex flex-col gap-2">
         <legend className="field-label mb-1.5">Foto *</legend>
-        <ImageUploader
-          onSuccess={handleImageUploadSuccess}
-          onError={handleImageUploadError}
-          onUploadingChange={setIsImageUploading}
-          screenForAnimals
-        />
+        {canChangeImage ? (
+          <ImageUploader
+            onSuccess={handleImageUploadSuccess}
+            onError={handleImageUploadError}
+            onUploadingChange={setIsImageUploading}
+            screenForAnimals
+          />
+        ) : (
+          <p className="text-sm text-ink-muted">La foto de un reporte resuelto no se puede cambiar.</p>
+        )}
+        {isEdit && canChangeImage && (
+          <p className="text-sm text-ink-muted">
+            Si cambiás la foto, el reporte vuelve a revisión y no se muestra hasta que se apruebe.
+          </p>
+        )}
         {imageRejection ? (
           <ErrorMessage message={imageRejection} />
         ) : (
-          formData.imageUrl && (
+          formData.imageUrl &&
+          (isCurrentImage ? (
+            <img
+              src={formData.imageUrl}
+              alt="Foto actual"
+              className="size-20 shrink-0 rounded-control border border-line object-cover"
+            />
+          ) : (
             <div className="flex items-center gap-3">
               <img
                 src={formData.imageUrl}
@@ -180,13 +214,17 @@ export default function ReportForm({ initialData }: ReportFormProps) {
               />
               <p className="text-sm font-bold text-success-ink">✓ Foto subida correctamente</p>
             </div>
-          )
+          ))
         )}
       </fieldset>
 
       <fieldset className="flex flex-col gap-2">
         <legend className="field-label mb-1.5">Ubicación *</legend>
-        <LocationPicker onLocationSelect={handleLocationSelect} />
+        <LocationPicker
+          onLocationSelect={handleLocationSelect}
+          initialLocation={initialData?.location}
+          initialAddress={initialData?.locationAddress}
+        />
         {fieldErrors.location && <ErrorMessage message={fieldErrors.location} />}
       </fieldset>
 
@@ -198,7 +236,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
         disabled={!canSubmit}
         className="w-full"
       >
-        Crear Reporte
+        {isEdit ? "Guardar cambios" : "Crear Reporte"}
       </Button>
     </form>
   );

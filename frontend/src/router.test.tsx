@@ -34,6 +34,7 @@ vi.mock('@/pages/account/SecurityPage', () => ({ default: () => <div>pagina segu
 vi.mock('@/pages/reports/FeedPage', () => ({ default: () => <div>pagina feed</div> }))
 vi.mock('@/pages/reports/CreateReportPage', () => ({ default: () => <div>pagina crear reporte</div> }))
 vi.mock('@/pages/reports/ReportDetailPage', () => ({ default: () => <div>pagina detalle reporte</div> }))
+vi.mock('@/pages/reports/EditReportPage', () => ({ default: () => <div>pagina editar reporte</div> }))
 vi.mock('@/pages/chat/ChatPage', () => ({ default: () => <div>pagina chat</div> }))
 vi.mock('@/pages/business/BusinessRegisterPage', () => ({
   default: () => <div>pagina alta comercio</div>,
@@ -126,6 +127,7 @@ describe('router: rutas protegidas', () => {
     '/reports',
     '/reports/new',
     '/reports/5',
+    '/reports/5/edit',
     '/chats',
     '/chats/3',
     '/businesses',
@@ -147,6 +149,7 @@ describe('router: rutas protegidas', () => {
     ['/reports', 'pagina feed'],
     ['/reports/new', 'pagina crear reporte'],
     ['/reports/5', 'pagina detalle reporte'],
+    ['/reports/5/edit', 'pagina editar reporte'],
     ['/chats', 'pagina chat'],
     ['/chats/3', 'pagina chat'],
     ['/businesses', 'pagina directorio comercios'],

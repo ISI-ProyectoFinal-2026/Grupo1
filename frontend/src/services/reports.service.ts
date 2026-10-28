@@ -2,6 +2,7 @@ import { api } from "./api";
 import type {
   ReportDTO,
   CreateReportInput,
+  UpdateReportInput,
   ListReportsQuery,
   MatchDTO,
   MatchDecisionDTO,
@@ -19,6 +20,11 @@ export async function getReport(id: number): Promise<ReportDTO> {
 
 export async function createReport(input: CreateReportInput): Promise<ReportDTO> {
   const { data } = await api.post<ReportDTO>("/reports", input);
+  return data;
+}
+
+export async function updateReport(id: number, input: UpdateReportInput): Promise<ReportDTO> {
+  const { data } = await api.put<ReportDTO>(`/reports/${id}`, input);
   return data;
 }
 

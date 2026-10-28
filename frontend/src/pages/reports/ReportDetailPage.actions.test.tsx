@@ -224,3 +224,65 @@ describe('ReportDetailPage cerrar y denunciar', () => {
     })
   })
 })
+
+describe('ReportDetailPage editar', () => {
+  const editar = () => screen.queryByRole('link', { name: 'Editar reporte' })
+
+  function renderConRutas(initialEntry: string | { pathname: string; state: unknown } = '/reports/5') {
+    const { Wrapper } = createQueryWrapper()
+    return render(
+      <Wrapper>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path='/reports/:id' element={<ReportDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </Wrapper>
+    )
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte())
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
+  it.each<ReportStatus>(['published', 'pending', 'rejected', 'resolved'])(
+    'el dueño ve Editar con el reporte %s',
+    async (status) => {
+      vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ status }))
+      loguear(DUENO_ID)
+      renderConRutas()
+      await esperarDetalle()
+
+      expect(editar()).toHaveAttribute('href', '/reports/5/edit')
+    }
+  )
+
+  it('otro usuario no ve Editar', async () => {
+    loguear(OTRO_ID)
+    renderConRutas()
+    await esperarDetalle()
+
+    expect(editar()).not.toBeInTheDocument()
+  })
+
+  it('sin sesión no ve Editar', async () => {
+    renderConRutas()
+    await esperarDetalle()
+
+    expect(editar()).not.toBeInTheDocument()
+  })
+
+  it('muestra el aviso que llega de la pantalla anterior', async () => {
+    loguear(DUENO_ID)
+    renderConRutas({ pathname: '/reports/5', state: { message: 'Reporte actualizado' } })
+    await esperarDetalle()
+
+    expect(screen.getByText('Reporte actualizado').closest('[role="status"]')).toBeInTheDocument()
+  })
+})
