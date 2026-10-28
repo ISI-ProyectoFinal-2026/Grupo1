@@ -1,7 +1,10 @@
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, Marker, Popup } from "react-leaflet";
 import { Link } from "react-router-dom";
 import type { ReportDTO } from "@/types/report.types";
 import { MapIcon } from "@/components/ui/icons";
+import OsmTileLayer from "@/components/maps/OsmTileLayer";
+import { DEFAULT_MAP_ZOOM, PILOT_ZONE_CENTER } from "@/lib/map";
+import { getReportPinIcon } from "@/components/reports/reportPinIcon";
 import "leaflet/dist/leaflet.css";
 
 interface MapViewProps {
@@ -15,7 +18,7 @@ const MAP_HEIGHT = "h-[60vh] min-h-[320px] lg:h-[calc(100vh-17rem)]";
 
 export default function MapView({
   reports,
-  center = [-34.6037, -58.3816],
+  center = PILOT_ZONE_CENTER,
 }: MapViewProps) {
   const reportsWithLocation = reports.filter((r) => r.location);
 
@@ -32,13 +35,14 @@ export default function MapView({
     // `isolate` encierra los z-index altos de Leaflet para que el mapa no se
     // dibuje por encima del header ni de la tab bar.
     <div className={`isolate overflow-hidden rounded-card border border-line ${MAP_HEIGHT}`}>
-      <MapContainer center={center} zoom={13} className="h-full w-full">
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        />
+      <MapContainer center={center} zoom={DEFAULT_MAP_ZOOM} className="h-full w-full">
+        <OsmTileLayer />
         {reportsWithLocation.map((report) => (
-          <Marker key={report.id} position={[report.location!.lat, report.location!.lng]}>
+          <Marker
+            key={report.id}
+            position={[report.location!.lat, report.location!.lng]}
+            icon={getReportPinIcon(report.reportType)}
+          >
             <Popup>
               <div className="flex w-52 flex-col gap-2 font-sans">
                 {report.imageUrl && (

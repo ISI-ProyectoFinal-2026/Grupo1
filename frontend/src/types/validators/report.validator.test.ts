@@ -32,7 +32,7 @@ describe('createReportSchema', () => {
     const resultado = createReportSchema.safeParse(sinUbicacion)
 
     expect(resultado.success).toBe(false)
-    expect(resultado.error?.issues[0].message).toBe('Indicá la ubicación con el botón de arriba')
+    expect(resultado.error?.issues[0].message).toBe('Marcá la ubicación en el mapa o usá tu ubicación actual')
   })
 
   // Los campos de texto opcionales arrancan como "" en el estado del form.

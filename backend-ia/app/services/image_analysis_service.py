@@ -1,8 +1,7 @@
 """Screens an uploaded image before a report is created.
 
-Downloads the image and asks YOLO whether it shows any animal. Nothing is
-persisted: this only answers "is this plausibly a pet photo?" so the main
-backend can reject spam uploads up front.
+Downloads the image and asks YOLO whether it shows any animal, or returns its
+embedding to rank similar reports (#211). Nothing is persisted.
 """
 
 import asyncio
@@ -11,7 +10,7 @@ import io
 import httpx
 from PIL import Image, UnidentifiedImageError
 
-from app.ml.pipeline import contains_animal
+from app.ml.pipeline import contains_animal, detect_and_crop, generate_embedding
 
 # Short on purpose: the user is waiting on this answer while filling the form.
 _DOWNLOAD_TIMEOUT_SECONDS = 10.0
@@ -44,13 +43,22 @@ async def _download(image_url: str) -> bytes:
         raise ImageUnavailableError(f"could not download image: {exc}") from exc
 
 
-def _decode_and_detect(content: bytes) -> bool:
-    """CPU-bound: decode the bytes and run YOLO. Runs in a worker thread."""
+def _decode(content: bytes) -> Image.Image:
     try:
-        image = Image.open(io.BytesIO(content)).convert("RGB")
+        return Image.open(io.BytesIO(content)).convert("RGB")
     except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as exc:
         raise ImageUnavailableError(f"could not decode image: {exc}") from exc
-    return contains_animal(image)
+
+
+def _decode_and_detect(content: bytes) -> bool:
+    """CPU-bound: decode the bytes and run YOLO. Runs in a worker thread."""
+    return contains_animal(_decode(content))
+
+
+def _decode_and_embed(content: bytes) -> list[float] | None:
+    # misma cadena que embedding_service: YOLO recorta y OpenCLIP embebe
+    crop = detect_and_crop(_decode(content))
+    return None if crop is None else generate_embedding(crop)
 
 
 async def image_has_animal(image_url: str) -> bool:
@@ -63,3 +71,12 @@ async def image_has_animal(image_url: str) -> bool:
     # Off the event loop: decoding and YOLO inference would otherwise block
     # every other request this service is handling.
     return await asyncio.to_thread(_decode_and_detect, content)
+
+
+async def embed_image(image_url: str) -> list[float] | None:
+    """Return the OpenCLIP embedding of the pet in the image, or None if there is none.
+
+    Raises ImageUnavailableError like image_has_animal.
+    """
+    content = await _download(image_url)
+    return await asyncio.to_thread(_decode_and_embed, content)

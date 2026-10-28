@@ -317,6 +317,9 @@ model Business {
   address       String
   phone         String
   category      BusinessCategory
+  // pin del mapa (#208); null en comercios previos
+  latitude      Float?
+  longitude     Float?
   plan          BusinessPlan     @default(FREE)
   planExpiresAt DateTime?        @map("plan_expires_at")
   createdAt     DateTime         @default(now()) @map("created_at")

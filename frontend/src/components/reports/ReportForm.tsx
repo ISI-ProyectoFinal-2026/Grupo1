@@ -11,7 +11,8 @@ import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
 import { getApiErrorCode } from "@/services/api";
 import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import ImageUploader from "./ImageUploader";
-import LocationPicker from "./LocationPicker";
+import SimilarReportsSuggestions from "./SimilarReportsSuggestions";
+import LocationPicker from "@/components/maps/LocationPicker";
 
 interface ReportFormProps {
   initialData?: Partial<CreateReportFormData>;
@@ -188,6 +189,11 @@ export default function ReportForm({ initialData }: ReportFormProps) {
         <legend className="field-label mb-1.5">Ubicación *</legend>
         <LocationPicker onLocationSelect={handleLocationSelect} />
         {fieldErrors.location && <ErrorMessage message={fieldErrors.location} />}
+        <SimilarReportsSuggestions
+          reportType={formData.reportType ?? "lost"}
+          location={formData.location}
+          imageUrl={imageRejection ? undefined : formData.imageUrl}
+        />
       </fieldset>
 
       <Button
