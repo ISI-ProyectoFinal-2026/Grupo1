@@ -53,12 +53,26 @@ describe("pets.service", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  test("list() incluye las mascotas creadas", async () => {
-    const pet = await petsService.create({ userId, name: "Lista", ...basePetData });
-    createdPetIds.push(pet.id);
+  test("list() devuelve solo las mascotas del usuario, más nuevas primero", async () => {
+    const other = await prisma.user.create({
+      data: { email: `pets-service-other-${Date.now()}@example.com`, passwordHash: "test-hash" },
+    });
+    try {
+      const first = await petsService.create({ userId, name: "Primera", ...basePetData });
+      const second = await petsService.create({ userId, name: "Segunda", ...basePetData });
+      const foreign = await petsService.create({ userId: other.id, name: "Ajena", ...basePetData });
+      createdPetIds.push(first.id, second.id, foreign.id);
 
-    const pets = await petsService.list();
-    expect(pets.some((p) => p.id === pet.id)).toBe(true);
+      const pets = await petsService.list(userId);
+
+      expect(pets.every((p) => p.userId === userId)).toBe(true);
+      expect(pets.map((p) => p.id)).toEqual(expect.arrayContaining([first.id, second.id]));
+      expect(pets.some((p) => p.id === foreign.id)).toBe(false);
+      expect(pets.findIndex((p) => p.id === second.id)).toBeLessThan(pets.findIndex((p) => p.id === first.id));
+    } finally {
+      await prisma.pet.deleteMany({ where: { userId: other.id } });
+      await prisma.user.delete({ where: { id: other.id } });
+    }
   });
 
   test("getById() devuelve la mascota correcta", async () => {

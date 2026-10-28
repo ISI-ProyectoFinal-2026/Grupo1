@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import * as petsService from "../services/pets.service";
 import { createPetSchema, petIdParamSchema, updatePetSchema } from "../validators/pets.validator";
 
-export async function list(_req: Request, res: Response): Promise<void> {
-  const pets = await petsService.list();
+export async function list(req: Request, res: Response): Promise<void> {
+  const pets = await petsService.list(req.userId!);
   res.status(200).json(pets);
 }
 

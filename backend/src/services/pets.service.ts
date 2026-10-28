@@ -7,8 +7,8 @@ function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
 }
 
-export function list() {
-  return prisma.pet.findMany();
+export function list(userId: number) {
+  return prisma.pet.findMany({ where: { userId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
 }
 
 export async function create(data: CreatePetInput & { userId: number }) {

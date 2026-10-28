@@ -131,17 +131,22 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
     expect(res.body.error).toBeDefined();
   });
 
-  test("GET /api/pets responde 200 con un array", async () => {
-    const created = await request(app)
+  test("GET /api/pets responde 200 solo con las mascotas del usuario autenticado", async () => {
+    const own = await request(app)
       .post("/api/pets").set("Authorization", `Bearer ${token}`)
-      .send({ userId, name: "Lista", ...basePetData });
-    createdPetIds.push(created.body.id);
+      .send({ name: "Propia", ...basePetData });
+    const foreign = await request(app)
+      .post("/api/pets").set("Authorization", `Bearer ${otherToken}`)
+      .send({ name: "Ajena", ...basePetData });
+    createdPetIds.push(own.body.id, foreign.body.id);
 
-    const res = await request(app).get("/api/pets");
+    const res = await request(app).get("/api/pets").set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.some((p: { id: number }) => p.id === created.body.id)).toBe(true);
+    expect(res.body.some((p: { id: number }) => p.id === own.body.id)).toBe(true);
+    expect(res.body.some((p: { id: number }) => p.id === foreign.body.id)).toBe(false);
+    expect(res.body.every((p: { userId: number }) => p.userId === userId)).toBe(true);
   });
 
   test("GET /api/pets/:id responde 200 con la mascota", async () => {
@@ -254,8 +259,19 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
       createdPetIds.push(res.body.id);
     });
 
-    test("GET /api/pets sin token responde 200 (endpoint público)", async () => {
+    test("GET /api/pets sin token responde 401", async () => {
       const res = await request(app).get("/api/pets");
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBeDefined();
+    });
+
+    test("GET /api/pets/:id sin token sigue siendo público", async () => {
+      const created = await request(app)
+        .post("/api/pets").set("Authorization", `Bearer ${token}`)
+        .send({ name: "Pública", ...basePetData });
+      createdPetIds.push(created.body.id);
+
+      const res = await request(app).get(`/api/pets/${created.body.id}`);
       expect(res.status).toBe(200);
     });
   });
