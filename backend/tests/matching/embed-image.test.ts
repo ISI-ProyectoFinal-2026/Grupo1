@@ -3,7 +3,7 @@ import { embedImage } from "../../src/services/matching.service";
 describe("matching.service embedImage", () => {
   const originalEnv = { ...process.env };
   let fetchMock: jest.Mock;
-  const vector = Array.from({ length: 512 }, (_, i) => i / 512);
+  const vector = Array.from({ length: 768 }, (_, i) => i / 768);
 
   beforeEach(() => {
     fetchMock = jest.fn();
@@ -39,7 +39,7 @@ describe("matching.service embedImage", () => {
     expect(options.signal).toBeInstanceOf(AbortSignal);
   });
 
-  test("devuelve el vector de 512 dimensiones", async () => {
+  test("devuelve el vector de 768 dimensiones", async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { embedding: vector }));
 
     await expect(embedImage("https://cdn.example.com/dog.jpg")).resolves.toEqual(vector);
@@ -77,7 +77,7 @@ describe("matching.service embedImage", () => {
   test.each([
     ["sin embedding", {}],
     ["dimensión incorrecta", { embedding: [0.1, 0.2] }],
-    ["valores no numéricos", { embedding: Array(512).fill("x") }],
+    ["valores no numéricos", { embedding: Array(768).fill("x") }],
   ])("devuelve null si el cuerpo es inválido (%s)", async (_case, body) => {
     jest.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockResolvedValue(jsonResponse(200, body));
