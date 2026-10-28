@@ -10,7 +10,7 @@ export const TEST_IMAGE_URL = `${TEST_R2_PUBLIC_URL}/pets/hallazgo.jpg`;
 export function mockImageModeration(): void {
   process.env.R2_PUBLIC_URL = TEST_R2_PUBLIC_URL;
   jest.spyOn(matchingService, "analyzeImage").mockResolvedValue("animal");
-  jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {});
+  jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue(undefined);
 }
 
 // Simula el veredicto "animal" del Backend IA: el reporte pasa de pending a published

@@ -44,7 +44,7 @@ describe("reports.service", () => {
   });
 
   beforeEach(() => {
-    jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {});
+    jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
