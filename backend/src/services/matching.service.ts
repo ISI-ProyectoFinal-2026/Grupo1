@@ -184,8 +184,8 @@ export async function analyzeImage(imageUrl: string): Promise<ImageAnalysisResul
   }
 }
 
-// dimensión de OpenCLIP ViT-B-32, igual que report_embeddings
-const EMBEDDING_DIMENSIONS = 512;
+// dimensión de DINOv2 ViT-B/14, igual que report_embeddings
+const EMBEDDING_DIMENSIONS = 768;
 // Más corto que el análisis: las sugerencias son opcionales y sin respuesta se ordena por cercanía.
 // Cubre la inferencia (≈0,68 s, ADR-0005) más la descarga desde R2.
 export const EMBED_TIMEOUT_MS = 5_000;

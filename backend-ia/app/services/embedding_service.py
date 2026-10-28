@@ -1,10 +1,11 @@
 """Genera y persiste el embedding de un reporte a partir de su imagen.
 
 Descarga la imagen, detecta la mascota (YOLO) y genera el embedding
-(OpenCLIP), luego hace upsert en `report_embeddings`. Sin colas ni
+(DINOv2), luego hace upsert en `report_embeddings`. Sin colas ni
 reintentos — ver "Fuera de alcance" del slice.
 """
 
+import asyncio
 import io
 import logging
 
@@ -33,11 +34,13 @@ async def process_report_image(report_id: int, image_url: str, session: AsyncSes
 
     image = Image.open(io.BytesIO(response.content)).convert("RGB")
 
-    crop = detect_and_crop(image)
+    # Off the event loop: YOLO + DINOv2 are CPU-bound (~0.4s per image) and on
+    # the loop thread they would stall every other request of the service.
+    crop = await asyncio.to_thread(detect_and_crop, image)
     if crop is None:
         return False
 
-    embedding = generate_embedding(crop)
+    embedding = await asyncio.to_thread(generate_embedding, crop)
 
     stmt = insert(ReportEmbedding).values(report_id=report_id, embedding=embedding)
     stmt = stmt.on_conflict_do_update(

@@ -7,9 +7,9 @@ const CENTER = { lat: -51.6977, lng: -57.8517 };
 const DAY_MS = 24 * 60 * 60 * 1000;
 const IMAGE_URL = "https://pub-test.r2.dev/pets/nuevo.jpg";
 
-// vector unitario de 512 dimensiones: coseno con unit(1, 0) = x
+// vector unitario de 768 dimensiones: coseno con unit(1, 0) = x
 function unit(x: number, y: number): number[] {
-  const v = new Array(512).fill(0);
+  const v = new Array(768).fill(0);
   v[0] = x;
   v[1] = y;
   return v;
