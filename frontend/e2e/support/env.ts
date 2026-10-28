@@ -17,6 +17,11 @@ export const BACKEND_URL = `http://localhost:${BACKEND_PORT}`
 export const FRONTEND_URL = `http://localhost:${FRONTEND_PORT}`
 export const AI_STUB_URL = `http://localhost:${AI_STUB_PORT}`
 
+// Report photos must live in the backend's R2 bucket (r2ImageUrlSchema), so the
+// backend is started with this public URL and the specs send images under it.
+export const R2_PUBLIC_URL = process.env.E2E_R2_PUBLIC_URL ?? 'https://pub-e2e.r2.dev'
+export const E2E_IMAGE_URL = `${R2_PUBLIC_URL}/pets/e2e-photo.jpg`
+
 // Local default = docker-compose.yml (host port 5433). The backend is started
 // with this same DATABASE_URL, overriding whatever backend/.env says.
 export const DATABASE_URL =

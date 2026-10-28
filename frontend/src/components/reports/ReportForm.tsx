@@ -56,6 +56,7 @@ export default function ReportForm({ initialData }: ReportFormProps) {
     setFormData((prev) => ({ ...prev, imageUrl: publicUrl }));
     setImageRejection(rejection);
     setFormError(null);
+    setFieldErrors((prev) => ({ ...prev, imageUrl: "" }));
   };
 
   const handleImageUploadError = (error: string, code?: string) => {
@@ -171,6 +172,8 @@ export default function ReportForm({ initialData }: ReportFormProps) {
         />
         {imageRejection ? (
           <ErrorMessage message={imageRejection} />
+        ) : fieldErrors.imageUrl ? (
+          <ErrorMessage message={fieldErrors.imageUrl} />
         ) : (
           formData.imageUrl && (
             <div className="flex items-center gap-3">

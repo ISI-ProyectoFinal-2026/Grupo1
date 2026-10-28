@@ -166,7 +166,7 @@ Objetivo (con cola, futuro): Backend IA desencola un job de Redis con
 
 Implementado hoy (issue #18, sin cola): Backend Ppal llama fire-and-forget
 POST {AI_SERVICE_URL}/reports/{report_id}/embedding con { "image_url": ... }
-apenas crea el reporte (solo si tiene imagen). Backend IA responde
+apenas crea el reporte (la foto es obligatoria). Backend IA responde
 sincrónicamente dentro de esa misma request:
 
 1. Descargar imagen desde la URL recibida (R2 en producción)

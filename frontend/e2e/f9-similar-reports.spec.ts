@@ -10,9 +10,9 @@ test('F9: creating a report suggests a similar one and opens it instead of publi
   const author = await users.create('f9-author')
   const finder = await users.create('f9-finder')
   const stamp = Date.now()
-  const existing = await api.createReport(author.token, { reportType: 'found', title: `Caniche encontrado F9 ${stamp}`, location: SPOT })
-  const own = await api.createReport(finder.token, { reportType: 'found', title: `Mi caniche F9 ${stamp}`, location: SPOT })
-  const otherType = await api.createReport(author.token, { reportType: 'lost', title: `Perro perdido F9 ${stamp}`, location: SPOT })
+  const existing = await api.createPublishedReport(author.token, { reportType: 'found', title: `Caniche encontrado F9 ${stamp}`, location: SPOT })
+  const own = await api.createPublishedReport(finder.token, { reportType: 'found', title: `Mi caniche F9 ${stamp}`, location: SPOT })
+  const otherType = await api.createPublishedReport(author.token, { reportType: 'lost', title: `Perro perdido F9 ${stamp}`, location: SPOT })
   const draftTitle = `Duplicado F9 ${stamp}`
 
   await loginAs(page, finder)

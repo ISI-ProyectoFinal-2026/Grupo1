@@ -9,7 +9,8 @@
  *   409 is a deliberate "inconclusive" answer: no retry, no state change.
  * - GET /health -> readiness probe for Playwright.
  *
- * The browser journeys create reports without image, so they never reach the
+ * Reports always carry a photo (mandatory); the embedding answer keeps them
+ * pending and the specs publish them straight in the DB, so they never reach the
  * AI; the stub exists so the backend never waits on a missing service.
  */
 import { createServer } from 'node:http'

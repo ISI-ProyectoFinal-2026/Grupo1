@@ -6,7 +6,7 @@ test('F3: a user flags a report and a moderator resolves it, hiding the report',
   const owner = await users.create('f3-owner')
   const reporter = await users.create('f3-reporter')
   const moderator = await users.create('f3-mod')
-  const report = await api.createReport(owner.token, { reportType: 'found', title: `Perro encontrado F3 ${Date.now()}` })
+  const report = await api.createPublishedReport(owner.token, { reportType: 'found', title: `Perro encontrado F3 ${Date.now()}` })
   const reason = `Publicación falsa ${Date.now()}`
 
   await loginAs(page, reporter)

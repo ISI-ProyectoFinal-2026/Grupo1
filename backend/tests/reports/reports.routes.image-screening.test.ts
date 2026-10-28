@@ -3,6 +3,7 @@ import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 import { createTestUser } from "../helpers/users";
 import * as matchingService from "../../src/services/matching.service";
+import { createPublishedReport, mockImageModeration, TEST_IMAGE_URL } from "../helpers/reports";
 
 describe("/api/reports image screening", () => {
   // requireAuth valida el token contra la base: el usuario tiene que existir.
@@ -99,6 +100,18 @@ describe("/api/reports image screening", () => {
       "https://evil.com@pub-test.r2.dev/pets/dog.jpg",
     ];
 
+    // reporte ya publicado con foto del bucket; los mocks de creación se descartan para no contaminar los asserts
+    async function createStoredReport() {
+      mockImageModeration();
+      const report = await createPublishedReport(token, {
+        reportType: "lost",
+        title: "Perro perdido",
+        location: { lat: -34.6, lng: -58.38 },
+      });
+      jest.restoreAllMocks();
+      return report;
+    }
+
     test("POST stores and screens the normalized URL", async () => {
       const analyzeSpy = jest.spyOn(matchingService, "analyzeImage").mockResolvedValue("animal");
       const moderationSpy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue();
@@ -134,32 +147,27 @@ describe("/api/reports image screening", () => {
     });
 
     test.each(outsideBucket)("PUT responds 400 and keeps the report unchanged for %s", async (imageUrl) => {
-      const created = await request(app)
-        .post("/api/reports")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ reportType: "lost", title: "Perro perdido", location: { lat: -34.6, lng: -58.38 } });
+      const created = await createStoredReport();
       const analyzeSpy = jest.spyOn(matchingService, "analyzeImage");
 
       const res = await request(app)
-        .put(`/api/reports/${created.body.id}`)
+        .put(`/api/reports/${created.id}`)
         .set("Authorization", `Bearer ${token}`)
         .send({ imageUrl });
 
       expect(res.status).toBe(400);
       expect(analyzeSpy).not.toHaveBeenCalled();
-      const stored = await prisma.report.findUnique({ where: { id: created.body.id } });
-      expect(stored).toMatchObject({ imageUrl: null, status: "published" });
+      const stored = await prisma.report.findUnique({ where: { id: created.id } });
+      expect(stored).toMatchObject({ imageUrl: TEST_IMAGE_URL, status: "published" });
     });
 
     test("PUT with an in-bucket image still re-moderates the report", async () => {
-      const created = await request(app)
-        .post("/api/reports")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ reportType: "lost", title: "Perro perdido", location: { lat: -34.6, lng: -58.38 } });
+      const created = await createStoredReport();
       const analyzeSpy = jest.spyOn(matchingService, "analyzeImage").mockResolvedValue("animal");
+      jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue();
 
       const res = await request(app)
-        .put(`/api/reports/${created.body.id}`)
+        .put(`/api/reports/${created.id}`)
         .set("Authorization", `Bearer ${token}`)
         .send({ imageUrl: "https://pub-test.r2.dev/pets/dog.jpg" });
 
@@ -170,19 +178,16 @@ describe("/api/reports image screening", () => {
 
     // cambio incompatible aceptado: reenviar una URL externa ya guardada también es 400
     test("PUT resending a stored external image responds 400", async () => {
-      const created = await request(app)
-        .post("/api/reports")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ reportType: "lost", title: "Perro perdido", location: { lat: -34.6, lng: -58.38 } });
-      await prisma.report.update({ where: { id: created.body.id }, data: { imageUrl: "https://evil.com/dog.jpg" } });
+      const created = await createStoredReport();
+      await prisma.report.update({ where: { id: created.id }, data: { imageUrl: "https://evil.com/dog.jpg" } });
 
       const res = await request(app)
-        .put(`/api/reports/${created.body.id}`)
+        .put(`/api/reports/${created.id}`)
         .set("Authorization", `Bearer ${token}`)
         .send({ title: "Perro perdido en Palermo", imageUrl: "https://evil.com/dog.jpg" });
 
       expect(res.status).toBe(400);
-      const stored = await prisma.report.findUnique({ where: { id: created.body.id } });
+      const stored = await prisma.report.findUnique({ where: { id: created.id } });
       expect(stored?.title).toBe("Perro perdido");
     });
   });
