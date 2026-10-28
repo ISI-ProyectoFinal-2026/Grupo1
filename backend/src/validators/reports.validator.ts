@@ -45,6 +45,15 @@ export const listReportsQuerySchema = z.object({
   order: z.enum(["asc", "desc"]).optional(),
 });
 
+// posibles duplicados mientras se crea un reporte (#211)
+export const similarReportsSchema = z.object({
+  reportType: z.enum([ReportType.lost, ReportType.found]),
+  location: locationSchema,
+  imageUrl: r2ImageUrlSchema.optional(),
+});
+
+export type SimilarReportsInput = z.infer<typeof similarReportsSchema>;
+
 export const setCustomFlyerSchema = z.object({
   flyerUrl: r2ImageUrlSchema,
 });

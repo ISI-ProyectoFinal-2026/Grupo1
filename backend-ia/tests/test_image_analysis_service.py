@@ -141,3 +141,51 @@ async def test_raises_image_unavailable_on_a_decompression_bomb(monkeypatch):
 
     with pytest.raises(ImageUnavailableError):
         await image_analysis_service.image_has_animal("https://example.com/bomb.png")
+
+
+# --- embed_image ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_embed_image_returns_the_embedding_of_the_detected_pet(monkeypatch):
+    _serve_bytes(monkeypatch, _png_bytes())
+    crop = object()
+    monkeypatch.setattr(image_analysis_service, "detect_and_crop", lambda image: crop)
+    monkeypatch.setattr(
+        image_analysis_service, "generate_embedding", lambda image: [0.5] * 512 if image is crop else None
+    )
+
+    assert await image_analysis_service.embed_image("https://example.com/dog.png") == [0.5] * 512
+
+
+@pytest.mark.asyncio
+async def test_embed_image_returns_none_when_no_pet_is_detected(monkeypatch):
+    _serve_bytes(monkeypatch, _png_bytes())
+    monkeypatch.setattr(image_analysis_service, "detect_and_crop", lambda image: None)
+
+    assert await image_analysis_service.embed_image("https://example.com/car.png") is None
+
+
+@pytest.mark.asyncio
+async def test_embed_image_runs_inference_off_the_event_loop_thread(monkeypatch):
+    _serve_bytes(monkeypatch, _png_bytes())
+    loop_thread = threading.get_ident()
+    seen_threads = []
+
+    def fake_detect_and_crop(image):
+        seen_threads.append(threading.get_ident())
+        return None
+
+    monkeypatch.setattr(image_analysis_service, "detect_and_crop", fake_detect_and_crop)
+
+    await image_analysis_service.embed_image("https://example.com/dog.png")
+
+    assert seen_threads and seen_threads[0] != loop_thread
+
+
+@pytest.mark.asyncio
+async def test_embed_image_raises_image_unavailable_when_the_bytes_are_not_an_image(monkeypatch):
+    _serve_bytes(monkeypatch, b"not an image")
+
+    with pytest.raises(ImageUnavailableError):
+        await image_analysis_service.embed_image("https://example.com/file.txt")

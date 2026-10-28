@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import * as reportsController from "../controllers/reports.controller";
 import * as reportFlagsController from "../controllers/report-flags.controller";
 import { optionalAuth, requireAuth, requireVerifiedEmail } from "../middlewares/auth.middleware";
-import { reportCreateLimiter } from "../middlewares/rate-limit";
+import { reportCreateLimiter, similarReportsLimiter } from "../middlewares/rate-limit";
 
 export const reportsRouter = Router();
 
@@ -19,6 +19,8 @@ const flyerLimiter = rateLimit({
 reportsRouter.get("/", optionalAuth, reportsController.list);
 // El gate va antes del limiter: un usuario sin verificar no gasta su cupo de reportes.
 reportsRouter.post("/", requireAuth, requireVerifiedEmail, reportCreateLimiter, reportsController.create);
+// Posibles duplicados mientras se completa el formulario de alta (#211).
+reportsRouter.post("/similar", requireAuth, requireVerifiedEmail, similarReportsLimiter, reportsController.similar);
 reportsRouter.get("/:id", optionalAuth, reportsController.getById);
 // Las coincidencias sugeridas por la IA se derivan del reporte pero exigen
 // sesión: el reporte en sí es público (material compartible, flyer), pero el
