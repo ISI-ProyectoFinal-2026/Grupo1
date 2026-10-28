@@ -118,9 +118,11 @@ function renderForm(initialData?: Parameters<typeof ReportForm>[0]['initialData'
   )
 }
 
+// La foto es obligatoria: el minimo para enviar incluye titulo, ubicacion y foto.
 async function completarMinimo(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Título *'), 'Perro perdido en Nueva Córdoba')
   await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+  await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
 }
 
 beforeEach(() => {
@@ -190,6 +192,18 @@ describe('ReportForm: validacion', () => {
 
     expect(await screen.findByText('Mínimo 5 caracteres')).toBeInTheDocument()
     expect(screen.getByText('Por favor, corregí los errores del formulario')).toBeInTheDocument()
+    expect(createReport).not.toHaveBeenCalled()
+  })
+
+  it('pide la foto junto al campo y no llama a la API cuando falta', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Título *'), 'Perro perdido en Nueva Córdoba')
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByText('Sube una foto de la mascota')).toBeInTheDocument()
     expect(createReport).not.toHaveBeenCalled()
   })
 

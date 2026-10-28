@@ -5,16 +5,26 @@ function formularioValido(overrides: Record<string, unknown> = {}) {
   return {
     reportType: 'lost',
     title: 'Perro perdido en Nueva Cordoba',
+    imageUrl: 'https://cdn/foto.jpg',
     location: { lat: -31.42, lng: -64.18 },
     ...overrides,
   }
 }
 
 describe('createReportSchema', () => {
-  it('acepta el minimo: tipo, titulo y ubicacion', () => {
+  it('acepta el minimo: tipo, titulo, foto y ubicacion', () => {
     const resultado = createReportSchema.safeParse(formularioValido())
 
     expect(resultado.success).toBe(true)
+  })
+
+  it('exige la foto y explica como cargarla', () => {
+    const { imageUrl: _imageUrl, ...sinFoto } = formularioValido()
+
+    const resultado = createReportSchema.safeParse(sinFoto)
+
+    expect(resultado.success).toBe(false)
+    expect(resultado.error?.issues[0].message).toBe('Sube una foto de la mascota')
   })
 
   it('exige al menos 5 caracteres en el titulo', () => {
