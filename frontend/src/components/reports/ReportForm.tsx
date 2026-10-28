@@ -230,11 +230,14 @@ export default function ReportForm(props: ReportFormProps) {
           initialAddress={initialData?.locationAddress}
         />
         {fieldErrors.location && <ErrorMessage message={fieldErrors.location} />}
-        <SimilarReportsSuggestions
-          reportType={formData.reportType ?? "lost"}
-          location={formData.location}
-          imageUrl={imageRejection ? undefined : formData.imageUrl}
-        />
+        {/* edit: the report already exists and would be suggested as its own duplicate */}
+        {!isEdit && (
+          <SimilarReportsSuggestions
+            reportType={formData.reportType ?? "lost"}
+            location={formData.location}
+            imageUrl={imageRejection ? undefined : formData.imageUrl}
+          />
+        )}
       </fieldset>
 
       <Button

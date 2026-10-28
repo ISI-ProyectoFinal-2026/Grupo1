@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MapContainer, Marker, useMap, useMapEvents } from "react-leaflet";
 import type { LeafletEventHandlerFnMap } from "leaflet";
 import type { GeoPoint } from "@/types/geo.types";
@@ -34,6 +34,12 @@ function FollowPin({ value }: { value: GeoPoint | null }) {
 
 // mapa con un pin que se coloca con un click y se ajusta arrastrandolo
 export default function PinPickerMap({ value, onChange }: PinPickerMapProps) {
+  // con pin inicial (edicion) el mapa arranca centrado en el
+  const [initialView] = useState(() =>
+    value
+      ? { center: [value.lat, value.lng] as [number, number], zoom: PICK_ZOOM }
+      : { center: PILOT_ZONE_CENTER, zoom: DEFAULT_MAP_ZOOM }
+  );
   const pinEvents = useMemo<LeafletEventHandlerFnMap>(
     () => ({
       dragend: (event) => {
@@ -48,8 +54,8 @@ export default function PinPickerMap({ value, onChange }: PinPickerMapProps) {
     // `isolate` encierra los z-index de Leaflet (ver MapView)
     <div className="isolate h-72 overflow-hidden rounded-card border border-line">
       <MapContainer
-        center={PILOT_ZONE_CENTER}
-        zoom={DEFAULT_MAP_ZOOM}
+        center={initialView.center}
+        zoom={initialView.zoom}
         scrollWheelZoom={false}
         className="h-full w-full"
       >

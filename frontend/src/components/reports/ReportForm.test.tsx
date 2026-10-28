@@ -17,15 +17,26 @@ vi.mock('@/services/auth.service')
 vi.mock('@/components/maps/LocationPicker', () => ({
   default: ({
     onLocationSelect,
+    initialLocation,
+    initialAddress,
   }: {
     onLocationSelect: (loc: { lat: number; lng: number }, address: string) => void
+    initialLocation?: { lat: number; lng: number }
+    initialAddress?: string
   }) => (
-    <button
-      type='button'
-      onClick={() => onLocationSelect({ lat: -31.42, lng: -64.18 }, 'Nueva Córdoba')}
-    >
-      Elegir ubicación
-    </button>
+    <>
+      <button
+        type='button'
+        onClick={() => onLocationSelect({ lat: -31.42, lng: -64.18 }, 'Nueva Córdoba')}
+      >
+        Elegir ubicación
+      </button>
+      {initialLocation && (
+        <p>
+          Ubicación inicial: {initialLocation.lat},{initialLocation.lng} {initialAddress}
+        </p>
+      )}
+    </>
   ),
 }))
 
@@ -527,7 +538,11 @@ describe('ReportForm: modo edicion', () => {
   }
 
   function renderEdicion(
-    props: { onSubmit?: (data: unknown) => Promise<void>; canChangeImage?: boolean } = {}
+    props: {
+      onSubmit?: (data: unknown) => Promise<void>
+      canChangeImage?: boolean
+      initialData?: Partial<typeof datosIniciales>
+    } = {}
   ) {
     const onSubmit = props.onSubmit ?? vi.fn().mockResolvedValue(undefined)
     const { Wrapper } = createQueryWrapper()
@@ -536,7 +551,7 @@ describe('ReportForm: modo edicion', () => {
         <MemoryRouter>
           <ReportForm
             mode='edit'
-            initialData={datosIniciales}
+            initialData={props.initialData ?? datosIniciales}
             onSubmit={onSubmit}
             canChangeImage={props.canChangeImage}
           />
@@ -577,6 +592,60 @@ describe('ReportForm: modo edicion', () => {
 
     await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
     expect(screen.getByText(/Foto subida correctamente/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ imageUrl: 'https://cdn/foto.jpg' })
+      )
+    )
+  })
+
+  it('arranca el picker en la ubicacion guardada', () => {
+    renderEdicion()
+
+    expect(screen.getByText('Ubicación inicial: -31.42,-64.18 Nueva Córdoba')).toBeInTheDocument()
+  })
+
+  // el reporte editado ya existe: se sugeriria a si mismo como duplicado
+  it('no sugiere reportes similares', async () => {
+    vi.mocked(findSimilarReports).mockResolvedValue([
+      {
+        id: 21,
+        title: 'Perro marrón visto en el parque',
+        reportType: 'lost',
+        status: 'published',
+        imageUrl: null,
+        distanceMeters: 300,
+        similarity: null,
+        isOwn: true,
+      },
+    ])
+    const user = userEvent.setup()
+    const { onSubmit } = renderEdicion()
+
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    expect(findSimilarReports).not.toHaveBeenCalled()
+    expect(screen.queryByText('¿Alguno de estos coincide con tu avistamiento?')).not.toBeInTheDocument()
+  })
+
+  // la foto es obligatoria tambien al editar (#239)
+  it('no guarda un reporte sin foto hasta que se suba una', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEdicion({
+      initialData: { ...datosIniciales, imageUrl: undefined },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByText('Sube una foto de la mascota')).toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     await waitFor(() =>
