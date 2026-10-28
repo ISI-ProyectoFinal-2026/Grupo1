@@ -1,5 +1,5 @@
 import * as api from './support/api.ts'
-import { E2E_PASSWORD, expect, test } from './fixtures.ts'
+import { E2E_PASSWORD, E2E_PHOTO, expect, test } from './fixtures.ts'
 import { ageLatestToken, insertAuthToken } from './support/db.ts'
 
 const INVALID_LINK = 'El enlace es inválido o expiró'
@@ -30,6 +30,8 @@ test('F6: an unverified user is blocked inline, resends the email and verifies t
 
   await page.goto('/reports/new')
   await page.getByLabel('Título *').fill(title)
+  await page.locator('input[type=file]').setInputFiles(E2E_PHOTO)
+  await expect(page.getByText('Foto subida correctamente')).toBeVisible()
   await page.getByRole('button', { name: /Usar mi ubicación actual/ }).click()
   await expect(page.getByText('Ciudad E2E')).toBeVisible()
   await page.getByRole('button', { name: 'Crear Reporte' }).click()
@@ -52,6 +54,8 @@ test('F6: an unverified user is blocked inline, resends the email and verifies t
 
   await page.goto('/reports/new')
   await page.getByLabel('Título *').fill(title)
+  await page.locator('input[type=file]').setInputFiles(E2E_PHOTO)
+  await expect(page.getByText('Foto subida correctamente')).toBeVisible()
   await page.getByRole('button', { name: /Usar mi ubicación actual/ }).click()
   await expect(page.getByText('Ciudad E2E')).toBeVisible()
   await page.getByRole('button', { name: 'Crear Reporte' }).click()

@@ -5,8 +5,8 @@ import { getMatchStatus, seedMatch } from './support/db.ts'
 test('F2: the owner is notified of an AI match and confirms it from the report detail', async ({ page, users }) => {
   const owner = await users.create('f2-owner')
   const finder = await users.create('f2-finder')
-  const lost = await api.createReport(owner.token, { reportType: 'lost', title: `Gata perdida F2 ${Date.now()}` })
-  const found = await api.createReport(finder.token, { reportType: 'found', title: `Gata encontrada F2 ${Date.now()}` })
+  const lost = await api.createPublishedReport(owner.token, { reportType: 'lost', title: `Gata perdida F2 ${Date.now()}` })
+  const found = await api.createPublishedReport(finder.token, { reportType: 'found', title: `Gata encontrada F2 ${Date.now()}` })
 
   // What backend-ia does when it finds a candidate: persist the match, then
   // call the internal notification endpoint.

@@ -26,6 +26,11 @@ export async function setRole(userId: number, role: Role): Promise<void> {
   await db().query('UPDATE users SET role = $1::role WHERE id = $2', [role, userId])
 }
 
+/** What backend-ia's 201 does: pending -> published. Reports with photo are born pending. */
+export async function publishReport(reportId: number): Promise<void> {
+  await db().query("UPDATE reports SET status = 'published', published_at = now() WHERE id = $1", [reportId])
+}
+
 /**
  * Marks the email as verified, the way following the mailed link would. Creating
  * reports, uploading images and chatting require it (EMAIL_NOT_VERIFIED

@@ -20,6 +20,7 @@ test('F5: the create-report form reports validation errors instead of submitting
 
   await expect(page.getByText('Por favor, corregí los errores del formulario')).toBeVisible()
   await expect(page.getByText('Mínimo 5 caracteres')).toBeVisible()
+  await expect(page.getByText('Sube una foto de la mascota')).toBeVisible()
   await expect(page.getByText('Indicá la ubicación con el botón de arriba')).toBeVisible()
   await expect(page).toHaveURL(/\/reports\/new$/)
 })
