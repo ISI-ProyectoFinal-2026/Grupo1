@@ -144,3 +144,23 @@ async def analyze_image(
         raise HTTPException(status_code=422, detail="No se pudo procesar la imagen") from exc
 
     return {"has_animal": has_animal}
+
+
+@app.post("/images/embedding")
+async def embed_image(
+    body: ImageAnalysisRequest,
+    _: None = Depends(verify_internal_key),
+) -> dict[str, list[float]]:
+    """Embedding of an uploaded image, not persisted (similar reports, #211).
+
+    422 if no pet is detected or the image cannot be processed.
+    """
+    try:
+        embedding = await image_analysis_service.embed_image(body.image_url)
+    except ImageUnavailableError as exc:
+        raise HTTPException(status_code=422, detail="No se pudo procesar la imagen") from exc
+
+    if embedding is None:
+        raise HTTPException(status_code=422, detail="No se detectó una mascota en la imagen")
+
+    return {"embedding": embedding}

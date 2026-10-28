@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import type { AuthUser } from '@/types/auth'
 
 vi.mock('@/services/reports.service')
 vi.mock('@/services/chats.service')
+vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
 
 const DUENO_ID = 7
 
@@ -182,5 +183,34 @@ describe('ReportDetailPage coincidencias', () => {
     )
     expect(screen.queryByRole('button', { name: 'Confirmar coincidencia' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Descartar' })).not.toBeInTheDocument()
+  })
+})
+
+describe('ReportDetailPage mapa', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+  })
+
+  it('muestra un mapa con el pin en la ubicación del reporte', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(
+      reporte({ location: { lat: -34.6177, lng: -68.3301 }, locationAddress: 'San Rafael' })
+    )
+    renderPage()
+
+    const mapa = await screen.findByRole('region', { name: 'Mapa de la ubicación' })
+    expect(within(mapa).getByTestId('map')).toHaveAttribute('data-center', '-34.6177,-68.3301')
+    const pin = within(mapa).getByTestId('marker')
+    expect(pin).toHaveAttribute('data-position', '-34.6177,-68.3301')
+    expect(pin).toHaveAttribute('data-draggable', 'false')
+    expect(pin).toHaveAttribute('title', 'San Rafael')
+  })
+
+  it('no muestra mapa si el reporte no tiene coordenadas', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ location: null }))
+    renderPage()
+
+    expect(await screen.findByText('Perra perdida en Caballito')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Mapa de la ubicación' })).not.toBeInTheDocument()
   })
 })

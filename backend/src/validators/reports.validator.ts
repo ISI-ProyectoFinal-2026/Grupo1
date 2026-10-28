@@ -1,11 +1,6 @@
 import { z } from "zod";
 import { ReportType, ReportStatus } from "@prisma/client";
-import { r2ImageUrlSchema } from "./shared.validator";
-
-const locationSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-});
+import { locationSchema, r2ImageUrlSchema } from "./shared.validator";
 
 export const createReportSchema = z.object({
   petId: z.number().int().positive().optional(),
@@ -49,6 +44,15 @@ export const listReportsQuerySchema = z.object({
   dateTo: z.coerce.date().optional(),
   order: z.enum(["asc", "desc"]).optional(),
 });
+
+// posibles duplicados mientras se crea un reporte (#211)
+export const similarReportsSchema = z.object({
+  reportType: z.enum([ReportType.lost, ReportType.found]),
+  location: locationSchema,
+  imageUrl: r2ImageUrlSchema.optional(),
+});
+
+export type SimilarReportsInput = z.infer<typeof similarReportsSchema>;
 
 export const setCustomFlyerSchema = z.object({
   flyerUrl: r2ImageUrlSchema,

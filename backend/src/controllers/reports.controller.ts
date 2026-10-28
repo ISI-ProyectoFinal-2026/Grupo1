@@ -2,12 +2,14 @@ import { Request, Response } from "express";
 import * as reportsService from "../services/reports.service";
 import * as matchingService from "../services/matching.service";
 import * as flyerService from "../services/flyer.service";
+import * as similarReportsService from "../services/similar-reports.service";
 import {
   createReportSchema,
   listReportsQuerySchema,
   reportIdParamSchema,
   reportMatchParamsSchema,
   setCustomFlyerSchema,
+  similarReportsSchema,
   updateReportSchema,
 } from "../validators/reports.validator";
 
@@ -21,6 +23,12 @@ export async function create(req: Request, res: Response): Promise<void> {
   const data = createReportSchema.parse(req.body);
   const report = await reportsService.create({ ...data, userId: req.userId! });
   res.status(201).json(report);
+}
+
+export async function similar(req: Request, res: Response): Promise<void> {
+  const data = similarReportsSchema.parse(req.body);
+  const reports = await similarReportsService.findSimilarReports(data, req.userId!);
+  res.status(200).json(reports);
 }
 
 export async function getById(req: Request, res: Response): Promise<void> {

@@ -108,6 +108,7 @@ interface NewReport {
   reportType: 'lost' | 'found'
   title: string
   description?: string
+  location?: { lat: number; lng: number }
 }
 
 /**
@@ -121,10 +122,10 @@ export async function createPublishedReport(token: string, report: NewReport): P
     call<ApiReport>('POST', '/reports', {
       token,
       body: {
-        ...report,
         imageUrl: E2E_IMAGE_URL,
         location: { lat: -34.6037, lng: -58.3816 },
         locationAddress: 'Buenos Aires',
+        ...report,
       },
     }),
   )

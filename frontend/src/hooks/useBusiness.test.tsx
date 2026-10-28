@@ -119,6 +119,7 @@ describe('mutaciones', () => {
       address: creado.address,
       phone: creado.phone,
       category: creado.category,
+      location: { lat: -34.6251, lng: -68.3221 },
     })
 
     await waitFor(() => expect(result.current.crear.isSuccess).toBe(true))

@@ -9,6 +9,25 @@ import type { Business } from '@/types/business.types'
 
 vi.mock('@/services/business.service')
 
+// doble del selector: un boton dispara la ubicacion elegida en el mapa
+vi.mock('@/components/maps/LocationPicker', () => ({
+  default: ({
+    onLocationSelect,
+    resolveAddress,
+  }: {
+    onLocationSelect: (loc: { lat: number; lng: number }, address: string) => void
+    resolveAddress?: boolean
+  }) => (
+    <button
+      type='button'
+      data-resolve-address={String(resolveAddress)}
+      onClick={() => onLocationSelect({ lat: -34.6251, lng: -68.3221 }, '-34.6251, -68.3221')}
+    >
+      Elegir ubicación
+    </button>
+  ),
+}))
+
 function comercio(overrides: Partial<Business> = {}): Business {
   return {
     id: 1,
@@ -57,6 +76,11 @@ describe('BusinessRegisterPage', () => {
     expect(screen.getByLabelText('Rubro')).toBeInTheDocument()
     expect(screen.queryByLabelText('Plan')).not.toBeInTheDocument()
     expect(screen.getByText(/arranca en el plan gratis/i)).toBeInTheDocument()
+    // el domicilio lo escribe el usuario: el mapa no consulta Nominatim
+    expect(screen.getByRole('button', { name: 'Elegir ubicación' })).toHaveAttribute(
+      'data-resolve-address',
+      'false'
+    )
   })
 
   it('envia el formulario sin plan: todo comercio nace FREE', async () => {
@@ -74,6 +98,7 @@ describe('BusinessRegisterPage', () => {
     await user.type(screen.getByLabelText('Domicilio'), 'Av. Siempre Viva 123')
     await user.type(screen.getByLabelText('Teléfono'), '1122334455')
     await user.selectOptions(screen.getByLabelText('Rubro'), 'VETERINARIA')
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
     await user.click(screen.getByRole('button', { name: /registrar comercio/i }))
 
     await waitFor(() =>
@@ -83,6 +108,7 @@ describe('BusinessRegisterPage', () => {
         address: 'Av. Siempre Viva 123',
         phone: '1122334455',
         category: 'VETERINARIA',
+        location: { lat: -34.6251, lng: -68.3221 },
       })
     )
     expect(await screen.findByText('Dashboard de comercio')).toBeInTheDocument()
@@ -105,9 +131,28 @@ describe('BusinessRegisterPage', () => {
     await user.type(screen.getByLabelText('CUIT'), '20-12345678-9')
     await user.type(screen.getByLabelText('Domicilio'), 'Av. Siempre Viva 123')
     await user.type(screen.getByLabelText('Teléfono'), '1122334455')
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
     await user.click(screen.getByRole('button', { name: /registrar comercio/i }))
 
     expect(await screen.findByText('El CUIT ya está registrado')).toBeInTheDocument()
+  })
+
+  it('no envia el alta sin ubicación en el mapa y explica como cargarla', async () => {
+    vi.mocked(businessService.getMyBusiness).mockRejectedValue(
+      Object.assign(new Error('Comercio no encontrado'), { status: 404 })
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByLabelText('Nombre')
+    await user.type(screen.getByLabelText('Nombre'), 'Veterinaria San Roque')
+    await user.type(screen.getByLabelText('CUIT'), '20-12345678-9')
+    await user.type(screen.getByLabelText('Domicilio'), 'Av. Siempre Viva 123')
+    await user.type(screen.getByLabelText('Teléfono'), '1122334455')
+    await user.click(screen.getByRole('button', { name: /registrar comercio/i }))
+
+    expect(await screen.findByText('Marcá la ubicación del comercio en el mapa')).toBeInTheDocument()
+    expect(businessService.createBusiness).not.toHaveBeenCalled()
   })
 
   it('redirige al dashboard si el usuario ya tiene un comercio registrado', async () => {

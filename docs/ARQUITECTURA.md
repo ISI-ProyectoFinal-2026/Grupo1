@@ -523,6 +523,8 @@ DELETE /api/reports/:id
 GET /api/reports/:id/matches (candidatos sugeridos)
 POST /api/reports/:id/matches/:match_id/confirm
 POST /api/reports/:id/matches/:match_id/reject
+
+POST /api/reports/similar (posibles duplicados al crear un reporte, #211)
 ```
 
 ### Geolocalización
@@ -561,6 +563,16 @@ POST {AI_SERVICE_URL}/reports/:report_id/embedding
 }
 → 201 si detectó la mascota y guardó embedding + matches
 → 422 si no detectó una mascota en la imagen
+```
+
+Para sugerir reportes similares durante el alta (#211), el Backend IA expone
+además un embedding efímero, sin escribir en la base:
+
+```http
+POST {AI_SERVICE_URL}/images/embedding
+{ "image_url": "https://r2.../image-123.jpg" }
+→ 200 { "embedding": [512 floats] }
+→ 422 si no detectó una mascota o no pudo procesar la imagen
 ```
 
 `POST /api/internal/reports/:report_id/reject` (planteado originalmente

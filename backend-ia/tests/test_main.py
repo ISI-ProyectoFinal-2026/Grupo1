@@ -180,3 +180,56 @@ def test_analyze_rejects_with_401_without_the_internal_key(analyze_mock, client)
 
     assert response.status_code == 401
     analyze_mock.assert_not_awaited()
+
+
+# --- POST /images/embedding -------------------------------------------------
+
+
+@pytest.fixture
+def embed_mock(monkeypatch):
+    mock = AsyncMock(return_value=[0.1] * 512)
+    monkeypatch.setattr(image_analysis_service, "embed_image", mock)
+    return mock
+
+
+def test_embedding_returns_the_vector_without_persisting_it(embed_mock, client):
+    response = client.post(
+        "/images/embedding",
+        json={"image_url": "https://example.com/dog.jpg"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"embedding": [0.1] * 512}
+    embed_mock.assert_awaited_once_with("https://example.com/dog.jpg")
+
+
+def test_embedding_returns_422_when_no_pet_is_detected(embed_mock, client):
+    embed_mock.return_value = None
+
+    response = client.post(
+        "/images/embedding",
+        json={"image_url": "https://example.com/landscape.jpg"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 422
+
+
+def test_embedding_returns_422_when_the_image_cannot_be_processed(embed_mock, client):
+    embed_mock.side_effect = ImageUnavailableError("download failed")
+
+    response = client.post(
+        "/images/embedding",
+        json={"image_url": "https://example.com/broken.jpg"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 422
+
+
+def test_embedding_rejects_with_401_without_the_internal_key(embed_mock, client):
+    response = client.post("/images/embedding", json={"image_url": "https://example.com/dog.jpg"})
+
+    assert response.status_code == 401
+    embed_mock.assert_not_awaited()

@@ -27,7 +27,7 @@ export const createReportSchema = z.object({
   // El mensaje por defecto de Zod para una clave ausente es "expected object,
   // received undefined", que no le dice nada al usuario del formulario.
   location: z.object(reportLocationSchema.shape, {
-    error: "Indicá la ubicación con el botón de arriba",
+    error: "Marcá la ubicación en el mapa o usá tu ubicación actual",
   }),
   locationAddress: optionalText,
   petId: z.number().optional(),
