@@ -3,7 +3,7 @@ import * as api from './support/api.ts'
 
 test('F4: the owner closes a published report and it shows as resolved', async ({ page, users }) => {
   const owner = await users.create('f4-owner')
-  const report = await api.createReport(owner.token, { reportType: 'lost', title: `Loro perdido F4 ${Date.now()}` })
+  const report = await api.createPublishedReport(owner.token, { reportType: 'lost', title: `Loro perdido F4 ${Date.now()}` })
 
   await loginAs(page, owner)
   await page.goto(`/reports/${report.id}`)

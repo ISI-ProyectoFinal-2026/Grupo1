@@ -18,7 +18,7 @@ Aplicación web para reportar y buscar mascotas perdidas/encontradas con **match
 
 - **Frontend:** React 18 + TypeScript + Vite
 - **Backend Principal:** Node.js + Express + Prisma
-- **Backend IA:** Python + FastAPI + YOLO + OpenCLIP
+- **Backend IA:** Python + FastAPI + YOLO + DINOv2
 - **Base de datos:** PostgreSQL + PostGIS + pgvector
 - **Cache/Queue:** Redis
 - **Storage:** Cloudflare R2
@@ -119,7 +119,7 @@ Ver [ESTRUCTURA_PROYECTO.md](./ESTRUCTURA_PROYECTO.md) para detalles completos.
 
 1. **Usuario sube imagen** → Se guarda en Cloudflare R2
 2. **Backend crea reporte** → Backend IA se dispara (hoy: llamada directa fire-and-forget; a futuro: job en Redis Queue)
-3. **Backend IA procesa** → YOLO + OpenCLIP, guarda embedding
+3. **Backend IA procesa** → YOLO + DINOv2, guarda embedding
 4. **Se buscan similares** → pgvector matching (mismo paso, sin cola todavía)
 5. **Usuario confirma** → Match manual (pendiente: notificación al usuario, hoy solo hay un endpoint de lectura)
 
@@ -182,7 +182,7 @@ Ver [CONTRIBUTING.md](./CONTRIBUTING.md) para detalles.
 |------|-----------|
 | Frontend | React 18, TypeScript, Vite, Tailwind |
 | Backend | Node.js, Express, Prisma, PostgreSQL |
-| IA | Python, FastAPI, YOLO v8, OpenCLIP |
+| IA | Python, FastAPI, YOLO v8, DINOv2 |
 | Infra | Docker, Redis, PostgreSQL+PostGIS+pgvector |
 | Storage | Cloudflare R2 |
 | Queue | Redis Queue (o RabbitMQ/SQS) |

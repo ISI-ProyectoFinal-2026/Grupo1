@@ -6,6 +6,8 @@ import type {
   ListReportsQuery,
   MatchDTO,
   MatchDecisionDTO,
+  SimilarReportDTO,
+  SimilarReportsQuery,
 } from "@/types/report.types";
 
 export async function listReports(filters?: ListReportsQuery): Promise<ReportDTO[]> {
@@ -55,5 +57,10 @@ export async function getFlyer(id: number): Promise<{ flyerUrl: string }> {
 
 export async function uploadCustomFlyer(id: number, flyerUrl: string): Promise<ReportDTO> {
   const { data } = await api.put<ReportDTO>(`/reports/${id}/flyer/custom`, { flyerUrl });
+  return data;
+}
+
+export async function findSimilarReports(input: SimilarReportsQuery): Promise<SimilarReportDTO[]> {
+  const { data } = await api.post<SimilarReportDTO[]>("/reports/similar", input);
   return data;
 }

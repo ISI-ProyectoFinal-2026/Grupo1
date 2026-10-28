@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { hasAmbiguousUrlChars, normalizeR2PublicUrl } from "../services/storage.service";
 
+// coordenadas WGS84
+export const locationSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+});
+
 const SAFE_URL_PROTOCOLS = ["http:", "https:"];
 
 /**

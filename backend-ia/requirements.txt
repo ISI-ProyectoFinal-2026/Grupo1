@@ -7,10 +7,10 @@ pgvector==0.3.4
 pydantic==2.9.2
 pydantic-settings==2.15.0
 
-# ML pipeline (detección YOLO + embeddings OpenCLIP) — ver docs/pocs/POC_Similitudes.ipynb
+# ML pipeline (detección YOLO + embeddings DINOv2) — ver app/ml/pipeline.py
 torch==2.13.0
 torchvision==0.28.0
-open_clip_torch==2.24.0
+timm==1.0.28
 ultralytics==8.3.28
 pillow==10.4.0
 httpx==0.28.1

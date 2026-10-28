@@ -184,6 +184,51 @@ export async function analyzeImage(imageUrl: string): Promise<ImageAnalysisResul
   }
 }
 
+// dimensión de DINOv2 ViT-B/14, igual que report_embeddings
+const EMBEDDING_DIMENSIONS = 768;
+// Más corto que el análisis: las sugerencias son opcionales y sin respuesta se ordena por cercanía.
+// Cubre la inferencia (≈0,68 s, ADR-0005) más la descarga desde R2.
+export const EMBED_TIMEOUT_MS = 5_000;
+
+/**
+ * Embedding of an uploaded image that has no report yet (#211). Never throws:
+ * null means "rank without image similarity".
+ */
+export async function embedImage(imageUrl: string): Promise<number[] | null> {
+  const baseUrl = process.env.AI_SERVICE_URL;
+  if (!baseUrl) return null;
+
+  try {
+    const response = await fetch(`${baseUrl}/images/embedding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Key": process.env.INTERNAL_API_KEY ?? "",
+      },
+      body: JSON.stringify({ image_url: imageUrl }),
+      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
+    });
+    if (response.status !== 200) {
+      console.error(`[matching] image embedding inconclusive (status ${response.status}) for ${imageUrl}`);
+      return null;
+    }
+    const body = (await response.json()) as { embedding?: unknown };
+    const { embedding } = body;
+    if (
+      !Array.isArray(embedding) ||
+      embedding.length !== EMBEDDING_DIMENSIONS ||
+      !embedding.every((value) => typeof value === "number" && Number.isFinite(value))
+    ) {
+      console.error(`[matching] image embedding returned a malformed body for ${imageUrl}`);
+      return null;
+    }
+    return embedding as number[];
+  } catch (error) {
+    console.error(`[matching] image embedding failed for ${imageUrl}:`, error);
+    return null;
+  }
+}
+
 /**
  * Los reintentos de `triggerEmbeddingGeneration` viven en memoria y se agotan
  * en ~36s. Si el Backend IA estuvo caído más que eso —o si el proceso de Node

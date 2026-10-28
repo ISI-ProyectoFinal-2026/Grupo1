@@ -12,7 +12,7 @@ import type { AuthUser } from '@/types/auth'
 vi.mock('@/services/reports.service')
 
 // Leaflet, geolocalizacion y subida a R2 no hacen falta para probar la pagina.
-vi.mock('@/components/reports/LocationPicker', () => ({ default: () => null }))
+vi.mock('@/components/maps/LocationPicker', () => ({ default: () => null }))
 vi.mock('@/components/reports/ImageUploader', () => ({ default: () => <p>uploader de fotos</p> }))
 
 const DUENO_ID = 7

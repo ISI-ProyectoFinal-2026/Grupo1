@@ -34,6 +34,20 @@ export const twoFactorLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === "test",
 });
 
+// Reportes similares (#211): con foto cada consulta corre inferencia, mismo
+// cupo que /uploads/analyze. Por usuario, igual que la creación.
+export const SIMILAR_REPORTS_RATE_LIMIT = 20;
+
+export const similarReportsLimiter = rateLimit({
+  windowMs: 60_000,
+  max: SIMILAR_REPORTS_RATE_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => `user:${req.userId}`,
+  message: { error: { message: "Límite de búsqueda de reportes similares alcanzado, esperá un minuto" } },
+  skip: () => process.env.NODE_ENV === "test",
+});
+
 // Va después de requireAuth: el cupo es por usuario y no por IP, para no
 // bloquear a varios usuarios que comparten red (NAT, wifi pública).
 export const reportCreateLimiter = rateLimit({

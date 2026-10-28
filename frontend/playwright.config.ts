@@ -8,6 +8,7 @@ import {
   FRONTEND_URL,
   INTERNAL_API_KEY,
   JWT_SECRET,
+  R2_PUBLIC_URL,
 } from './e2e/support/env.ts'
 
 /**
@@ -59,6 +60,8 @@ export default defineConfig({
         JWT_SECRET,
         INTERNAL_API_KEY,
         AI_SERVICE_URL: AI_STUB_URL,
+        // Report photos are validated against this bucket URL (photo is mandatory).
+        R2_PUBLIC_URL,
         TRUST_PROXY: '1',
       },
       reuseExistingServer: !process.env.CI,
