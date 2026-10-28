@@ -92,6 +92,7 @@ validation:
 nav:
   - Inicio: index.md
   - 1 Desarrollo:
+      - informe/1-1-1-competidores.md
       - informe/1-2-1-objetivos-y-alcances.md
       - informe/1-2-2-modelo-funcional.md
       - informe/1-2-2-2-historias-y-flujos.md

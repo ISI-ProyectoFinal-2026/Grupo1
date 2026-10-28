@@ -17,7 +17,7 @@ Fase y archivo de cada sección según el [registro del informe](informe/README.
 
 | Sección de la plantilla | Fase | En el sitio |
 |---|---|---|
-| 1.1 Definición de requerimientos | B | Pendiente (Fase B) |
+| 1.1 Definición de requerimientos | A | [Publicada](informe/1-1-1-competidores.md) |
 | 1.2.1 Objetivos y alcances definitivos | A | [Publicada](informe/1-2-1-objetivos-y-alcances.md) |
 | 1.2.2 Modelo funcional (casos de uso, requerimientos, tareas) | A | [Publicada](informe/1-2-2-modelo-funcional.md) |
 | 1.2.2.2 Historias de usuario y flujos por módulo | A | [Publicada](informe/1-2-2-2-historias-y-flujos.md) |
