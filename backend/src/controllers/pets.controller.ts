@@ -15,7 +15,7 @@ export async function create(req: Request, res: Response): Promise<void> {
 
 export async function getById(req: Request, res: Response): Promise<void> {
   const { id } = petIdParamSchema.parse(req.params);
-  const pet = await petsService.getById(id);
+  const pet = await petsService.getOwnedById(id, req.userId!);
   res.status(200).json(pet);
 }
 

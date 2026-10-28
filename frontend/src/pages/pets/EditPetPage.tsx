@@ -39,6 +39,15 @@ function BackLink() {
   )
 }
 
+function NotOwnedMessage() {
+  return (
+    <Layout>
+      <ErrorMessage message='No podés editar esta mascota porque no es tuya.' />
+      <BackLink />
+    </Layout>
+  )
+}
+
 export default function EditPetPage() {
   const navigate = useNavigate()
   const params = useParams()
@@ -55,6 +64,10 @@ export default function EditPetPage() {
         <BackLink />
       </Layout>
     )
+  }
+
+  if (getApiErrorStatus(petQuery.error) === 403) {
+    return <NotOwnedMessage />
   }
 
   if (petQuery.isLoading) {
@@ -76,12 +89,7 @@ export default function EditPetPage() {
 
   const pet = petQuery.data
   if (pet.userId !== userId) {
-    return (
-      <Layout>
-        <ErrorMessage message='No podés editar esta mascota porque no es tuya.' />
-        <BackLink />
-      </Layout>
-    )
+    return <NotOwnedMessage />
   }
 
   const handleSubmit = async (input: CreatePetInput) => {

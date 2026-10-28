@@ -90,6 +90,27 @@ describe("pets.service", () => {
     );
   });
 
+  test("getOwnedById() devuelve la mascota si el userId es el dueño", async () => {
+    const pet = await petsService.create({ userId, name: "Propia", ...basePetData });
+    createdPetIds.push(pet.id);
+
+    const found = await petsService.getOwnedById(pet.id, userId);
+    expect(found.id).toBe(pet.id);
+  });
+
+  test("getOwnedById() lanza AppError 403 si el userId no es el dueño", async () => {
+    const pet = await petsService.create({ userId, name: "Ajena", ...basePetData });
+    createdPetIds.push(pet.id);
+
+    await expect(petsService.getOwnedById(pet.id, userId + 1)).rejects.toMatchObject(
+      new AppError(403, "No tenés permiso para ver esta mascota")
+    );
+  });
+
+  test("getOwnedById() lanza AppError 404 si no existe", async () => {
+    await expect(petsService.getOwnedById(-1, userId)).rejects.toMatchObject({ statusCode: 404 });
+  });
+
   test("update() modifica los campos indicados", async () => {
     const pet = await petsService.create({ userId, name: "Original", ...basePetData });
     createdPetIds.push(pet.id);

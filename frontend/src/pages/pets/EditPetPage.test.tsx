@@ -139,6 +139,22 @@ describe('EditPetPage', () => {
     )
   })
 
+  it('no deja editar una mascota ajena si el backend responde 403', async () => {
+    vi.mocked(petsService.getPet).mockRejectedValue(
+      Object.assign(new Error('No tenés permiso para ver esta mascota'), { status: 403 })
+    )
+    renderPage()
+
+    expect(
+      await screen.findByText('No podés editar esta mascota porque no es tuya.')
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guardar cambios' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Volver a mis mascotas' })).toHaveAttribute(
+      'href',
+      '/pets'
+    )
+  })
+
   it('avisa si la mascota no existe', async () => {
     vi.mocked(petsService.getPet).mockRejectedValue(
       Object.assign(new Error('Mascota no encontrada'), { status: 404 })

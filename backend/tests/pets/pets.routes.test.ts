@@ -155,19 +155,19 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
       .send({ userId, name: "Buscada", ...basePetData });
     createdPetIds.push(created.body.id);
 
-    const res = await request(app).get(`/api/pets/${created.body.id}`);
+    const res = await request(app).get(`/api/pets/${created.body.id}`).set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(created.body.id);
   });
 
   test("GET /api/pets/:id responde 404 si no existe", async () => {
-    const res = await request(app).get("/api/pets/999999999");
+    const res = await request(app).get("/api/pets/999999999").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(404);
   });
 
   test("GET /api/pets/:id responde 400 si el id no es numérico", async () => {
-    const res = await request(app).get("/api/pets/abc");
+    const res = await request(app).get("/api/pets/abc").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(400);
   });
 
@@ -197,7 +197,7 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
 
     expect(res.status).toBe(204);
 
-    const getRes = await request(app).get(`/api/pets/${created.body.id}`);
+    const getRes = await request(app).get(`/api/pets/${created.body.id}`).set("Authorization", `Bearer ${token}`);
     expect(getRes.status).toBe(404);
   });
 
@@ -265,14 +265,38 @@ describe("GET/POST/PUT/DELETE /api/pets", () => {
       expect(res.body.error).toBeDefined();
     });
 
-    test("GET /api/pets/:id sin token sigue siendo público", async () => {
+    test("GET /api/pets/:id sin token responde 401", async () => {
       const created = await request(app)
         .post("/api/pets").set("Authorization", `Bearer ${token}`)
-        .send({ name: "Pública", ...basePetData });
+        .send({ name: "Privada", ...basePetData });
       createdPetIds.push(created.body.id);
 
       const res = await request(app).get(`/api/pets/${created.body.id}`);
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBeDefined();
+    });
+
+    test("GET /api/pets/:id con token de otro usuario responde 403", async () => {
+      const created = await request(app)
+        .post("/api/pets").set("Authorization", `Bearer ${token}`)
+        .send({ name: "Ajena", ...basePetData });
+      createdPetIds.push(created.body.id);
+
+      const res = await request(app).get(`/api/pets/${created.body.id}`).set("Authorization", `Bearer ${otherToken}`);
+      expect(res.status).toBe(403);
+      expect(res.body.microchipId).toBeUndefined();
+    });
+
+    test("GET /api/pets/:id con token del dueño responde 200 con la mascota", async () => {
+      const created = await request(app)
+        .post("/api/pets").set("Authorization", `Bearer ${token}`)
+        .send({ name: "Propia", ...basePetData });
+      createdPetIds.push(created.body.id);
+
+      const res = await request(app).get(`/api/pets/${created.body.id}`).set("Authorization", `Bearer ${token}`);
       expect(res.status).toBe(200);
+      expect(res.body.id).toBe(created.body.id);
+      expect(res.body.userId).toBe(userId);
     });
   });
 });

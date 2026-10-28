@@ -30,6 +30,14 @@ export async function getById(id: number) {
   return pet;
 }
 
+export async function getOwnedById(id: number, userId: number) {
+  const pet = await getById(id);
+  if (pet.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para ver esta mascota");
+  }
+  return pet;
+}
+
 export async function update(id: number, userId: number, data: UpdatePetInput) {
   const pet = await getById(id);
   if (pet.userId !== userId) {
