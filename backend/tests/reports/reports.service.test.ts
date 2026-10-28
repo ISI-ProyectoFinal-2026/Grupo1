@@ -2,6 +2,7 @@ import { prisma } from "../../src/db/client";
 import { AppError } from "../../src/errors/app-error";
 import * as reportsService from "../../src/services/reports.service";
 import * as matchingService from "../../src/services/matching.service";
+import { publishReport } from "../helpers/reports";
 
 describe("reports.service", () => {
   let userId: number;
@@ -42,7 +43,12 @@ describe("reports.service", () => {
     petIdPoodle = poodle.id;
   });
 
+  beforeEach(() => {
+    jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockImplementation(() => {});
+  });
+
   afterEach(async () => {
+    jest.restoreAllMocks();
     while (createdReportIds.length > 0) {
       const id = createdReportIds.pop()!;
       await prisma.report.deleteMany({ where: { id } });
@@ -62,12 +68,15 @@ describe("reports.service", () => {
     description: "Cachorro mestizo, collar rojo",
     location: { lat: -34.6037, lng: -58.3816 },
     locationAddress: "Plaza de Mayo, CABA",
-  };
-
-  const baseReportDataWithImage = {
-    ...baseReportData,
     imageUrl: "https://cdn.example.com/hallazgo.jpg",
   };
+
+  // crea y publica directo en la base (el veredicto del Backend IA queda fuera de estas pruebas)
+  async function createPublished(data: Parameters<typeof reportsService.create>[0]) {
+    const report = await reportsService.create(data);
+    await publishReport(report.id);
+    return { ...report, status: "published" as const };
+  }
 
   test("create() crea un reporte de avistamiento sin petId (encontrado)", async () => {
     const report = await reportsService.create({ userId, ...baseReportData });
@@ -77,8 +86,8 @@ describe("reports.service", () => {
     expect(report.userId).toBe(userId);
     expect(report.petId).toBeNull();
     expect(report.reportType).toBe("found");
-    expect(report.status).toBe("published");
-    expect(report.publishedAt).not.toBeNull();
+    expect(report.status).toBe("pending");
+    expect(report.publishedAt).toBeNull();
     expect(report.location?.lat).toBeCloseTo(-34.6037, 5);
     expect(report.location?.lng).toBeCloseTo(-58.3816, 5);
   });
@@ -102,7 +111,7 @@ describe("reports.service", () => {
   });
 
   test("list() incluye los reportes creados y expone location", async () => {
-    const report = await reportsService.create({ userId, ...baseReportData });
+    const report = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
     const reports = await reportsService.list();
@@ -112,7 +121,7 @@ describe("reports.service", () => {
   });
 
   test("list() filtra por type y status", async () => {
-    const report = await reportsService.create({ userId, ...baseReportData });
+    const report = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
     const reports = await reportsService.list({ type: "found", status: "published" });
@@ -197,7 +206,7 @@ describe("reports.service", () => {
   });
 
   test("update() a status resolved expone tag RESUELTO sin importar el reportType", async () => {
-    const report = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
+    const report = await createPublished({ userId, ...baseReportData, reportType: "lost" });
     createdReportIds.push(report.id);
 
     const updated = await reportsService.update(report.id, userId, { status: "resolved" });
@@ -207,10 +216,10 @@ describe("reports.service", () => {
   test("create() dispara triggerEmbeddingGeneration cuando el reporte tiene imageUrl", async () => {
     const spy = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue();
 
-    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
-    expect(spy).toHaveBeenCalledWith(report.id, baseReportDataWithImage.imageUrl);
+    expect(spy).toHaveBeenCalledWith(report.id, baseReportData.imageUrl);
     spy.mockRestore();
   });
 
@@ -219,7 +228,7 @@ describe("reports.service", () => {
       throw new Error("ai service down");
     });
 
-    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
     expect(report.id).toBeDefined();
@@ -228,14 +237,14 @@ describe("reports.service", () => {
   });
 
   test("create() inserta con status pending cuando se provee imageUrl (queda pendiente de moderación)", async () => {
-    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
     expect(report.status).toBe("pending");
   });
 
   test("create() deja publishedAt en null mientras el reporte está pendiente de moderación", async () => {
-    const report = await reportsService.create({ userId, ...baseReportDataWithImage });
+    const report = await reportsService.create({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
     // Un reporte en "pending" todavía no se publicó: sellar la fecha acá hacía
@@ -243,17 +252,10 @@ describe("reports.service", () => {
     expect(report.publishedAt).toBeNull();
   });
 
-  test("create() inserta con status published cuando no se provee imageUrl (nada que validar)", async () => {
-    const report = await reportsService.create({ userId, ...baseReportData });
-    createdReportIds.push(report.id);
-
-    expect(report.status).toBe("published");
-  });
-
   test("los tags PERDIDO, ENCONTRADO y RESUELTO tienen colores diferenciados entre sí", async () => {
-    const lost = await reportsService.create({ userId, ...baseReportData, reportType: "lost" });
+    const lost = await createPublished({ userId, ...baseReportData, reportType: "lost" });
     createdReportIds.push(lost.id);
-    const found = await reportsService.create({ userId, ...baseReportData, reportType: "found" });
+    const found = await createPublished({ userId, ...baseReportData, reportType: "found" });
     createdReportIds.push(found.id);
     const resolved = await reportsService.update(found.id, userId, { status: "resolved" });
 
@@ -262,9 +264,9 @@ describe("reports.service", () => {
   });
 
   test("list() sin filtro de status solo devuelve reportes activos (published)", async () => {
-    const published = await reportsService.create({ userId, ...baseReportData });
+    const published = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(published.id);
-    const resolved = await reportsService.create({ userId, ...baseReportData });
+    const resolved = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(resolved.id);
     await reportsService.update(resolved.id, userId, { status: "resolved" });
 
@@ -277,9 +279,9 @@ describe("reports.service", () => {
   });
 
   test("list() filtra por raza a través de la mascota asociada", async () => {
-    const labradorReport = await reportsService.create({ userId, petId, ...baseReportData });
+    const labradorReport = await createPublished({ userId, petId, ...baseReportData });
     createdReportIds.push(labradorReport.id);
-    const poodleReport = await reportsService.create({ userId, petId: petIdPoodle, ...baseReportData });
+    const poodleReport = await createPublished({ userId, petId: petIdPoodle, ...baseReportData });
     createdReportIds.push(poodleReport.id);
 
     const reports = await reportsService.list({ breed: "Labrador" });
@@ -288,7 +290,7 @@ describe("reports.service", () => {
   });
 
   test("list() filtra por raza sin distinguir mayúsculas/minúsculas", async () => {
-    const labradorReport = await reportsService.create({ userId, petId, ...baseReportData });
+    const labradorReport = await createPublished({ userId, petId, ...baseReportData });
     createdReportIds.push(labradorReport.id);
 
     const reports = await reportsService.list({ breed: "labrador" });
@@ -296,13 +298,13 @@ describe("reports.service", () => {
   });
 
   test("list() filtra por zona con match parcial de locationAddress", async () => {
-    const plazaDeMayo = await reportsService.create({
+    const plazaDeMayo = await createPublished({
       userId,
       ...baseReportData,
       locationAddress: "Plaza de Mayo, CABA",
     });
     createdReportIds.push(plazaDeMayo.id);
-    const parqueRivadavia = await reportsService.create({
+    const parqueRivadavia = await createPublished({
       userId,
       ...baseReportData,
       locationAddress: "Parque Rivadavia, CABA",
@@ -315,9 +317,9 @@ describe("reports.service", () => {
   });
 
   test("list() filtra por rango de fechas (dateFrom/dateTo)", async () => {
-    const recent = await reportsService.create({ userId, ...baseReportData });
+    const recent = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(recent.id);
-    const old = await reportsService.create({ userId, ...baseReportData });
+    const old = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(old.id);
     await prisma.$executeRaw`UPDATE reports SET created_at = '2020-01-01T00:00:00Z' WHERE id = ${old.id}`;
 
@@ -331,7 +333,7 @@ describe("reports.service", () => {
   });
 
   test("close() cierra el reporte y devuelve tag RESUELTO", async () => {
-    const report = await reportsService.create({ userId, ...baseReportData });
+    const report = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
     const closed = await reportsService.close(report.id, userId);
@@ -340,7 +342,7 @@ describe("reports.service", () => {
   });
 
   test("close() excluye el reporte del feed activo", async () => {
-    const report = await reportsService.create({ userId, ...baseReportData });
+    const report = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
     await reportsService.close(report.id, userId);
@@ -354,14 +356,14 @@ describe("reports.service", () => {
   });
 
   test("close() lanza AppError 403 si el userId no es el autor", async () => {
-    const report = await reportsService.create({ userId, ...baseReportData });
+    const report = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(report.id);
 
     await expect(reportsService.close(report.id, userId + 1)).rejects.toMatchObject({ statusCode: 403 });
   });
 
   test("close() lanza AppError 409 si el reporte ya está resuelto", async () => {
-    const report = await reportsService.create({ userId, ...baseReportData });
+    const report = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(report.id);
     await reportsService.close(report.id, userId);
 
@@ -373,7 +375,7 @@ describe("reports.service", () => {
   test.each(["pending", "rejected"] as const)(
     "close() lanza AppError 409 si el reporte está %s",
     async (status) => {
-      const report = await reportsService.create({ userId, ...baseReportData });
+      const report = await createPublished({ userId, ...baseReportData });
       createdReportIds.push(report.id);
       await prisma.report.update({ where: { id: report.id }, data: { status } });
 
@@ -388,7 +390,7 @@ describe("reports.service", () => {
   test.each(["pending", "rejected"] as const)(
     "update() con status resolved lanza AppError 409 si el reporte está %s",
     async (status) => {
-      const report = await reportsService.create({ userId, ...baseReportData });
+      const report = await createPublished({ userId, ...baseReportData });
       createdReportIds.push(report.id);
       await prisma.report.update({ where: { id: report.id }, data: { status } });
 
@@ -440,10 +442,10 @@ describe("reports.service", () => {
   });
 
   test("list() ordena por fecha, DESC por defecto y ASC cuando se pide", async () => {
-    const first = await reportsService.create({ userId, ...baseReportData });
+    const first = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(first.id);
     await prisma.$executeRaw`UPDATE reports SET created_at = '2021-01-01T00:00:00Z' WHERE id = ${first.id}`;
-    const second = await reportsService.create({ userId, ...baseReportData });
+    const second = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(second.id);
     await prisma.$executeRaw`UPDATE reports SET created_at = '2022-01-01T00:00:00Z' WHERE id = ${second.id}`;
 

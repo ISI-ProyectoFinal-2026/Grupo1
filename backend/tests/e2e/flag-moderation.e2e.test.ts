@@ -1,6 +1,7 @@
 import request from "supertest";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
+import { createPublishedReport, mockImageModeration } from "../helpers/reports";
 import { createE2EContext, E2EUser, promoteTo } from "./helpers/factories";
 
 /**
@@ -30,14 +31,15 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     moderator = await ctx.registerAndLogin("moderator");
     bystander = await ctx.registerAndLogin("bystander");
 
-    // Sin imagen el reporte nace published: no hace falta el Backend IA.
-    const res = await request(app)
-      .post("/api/reports")
-      .set(auth(owner))
-      .send({ reportType: "lost", title: "Perro perdido en Flores", location: { lat: -34.63, lng: -58.46 } });
-    expect(res.status).toBe(201);
-    expect(res.body.status).toBe("published");
-    reportId = res.body.id;
+    // La foto es obligatoria: el reporte nace pending y se publica directo (sin Backend IA).
+    mockImageModeration();
+    const report = await createPublishedReport(owner.token, {
+      reportType: "lost",
+      title: "Perro perdido en Flores",
+      location: { lat: -34.63, lng: -58.46 },
+    });
+    jest.restoreAllMocks();
+    reportId = report.id;
     ctx.trackReport(reportId);
   }, 30_000);
 

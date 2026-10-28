@@ -12,7 +12,7 @@ export const createReportSchema = z.object({
   reportType: z.enum([ReportType.lost, ReportType.found]),
   title: z.string().min(1),
   description: z.string().min(1).optional(),
-  imageUrl: r2ImageUrlSchema.optional(),
+  imageUrl: r2ImageUrlSchema,
   location: locationSchema,
   locationAddress: z.string().min(1).optional(),
 });
