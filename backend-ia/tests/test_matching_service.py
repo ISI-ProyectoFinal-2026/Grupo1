@@ -11,6 +11,7 @@ import pytest_asyncio
 from sqlalchemy import text
 
 from app.db import async_session_factory
+from app.ml.pipeline import EMBEDDING_DIM
 from app.services import matching_service
 
 NEAR_LAT, NEAR_LNG = -34.6037, -58.3816  # Plaza de Mayo, CABA
@@ -18,25 +19,26 @@ FAR_LAT, FAR_LNG = -34.6037, -57.9000  # ~40km al este, fuera del radio de 5km
 
 
 def _unit_vector_at_cosine(cosine: float) -> list[float]:
-    """Vector unitario de 512 dims cuya similitud coseno con EMBEDDING_BASE
-    es exactamente `cosine`.
+    """Vector unitario de EMBEDDING_DIM dims cuya similitud coseno con
+    EMBEDDING_BASE es exactamente `cosine`.
     """
-    return [cosine, math.sqrt(1 - cosine**2)] + [0.0] * 510
+    return [cosine, math.sqrt(1 - cosine**2)] + [0.0] * (EMBEDDING_DIM - 2)
 
 
 # Los embeddings reales llegan normalizados (norma L2 = 1, ver
-# app/ml/pipeline.generate_embedding) y el POC (docs/pocs/poc_similitudes.md)
-# midió ~0.85-0.89 de similitud coseno para la MISMA mascota y ~0.65 para
-# mascotas distintas. Los fixtures reproducen esos valores para que el test
-# ejerza el umbral de verdad.
+# app/ml/pipeline.generate_embedding). Con DINOv2 el benchmark de identidad
+# midió ~0.66 de media para la MISMA mascota y ~0.10 para mascotas distintas;
+# los fixtures caen a cada lado de los dos umbrales (MATCH_THRESHOLD 0.45 y
+# NOTIFY_THRESHOLD 0.63) para ejercerlos de verdad.
 #
 # REGRESIÓN: sembrar vectores idénticos (coseno 1.0) hace que el test pase con
-# cualquier métrica y no distingue `<=>` (coseno) de `<->` (L2). Con `<->`, este
-# par de 0.87 de coseno da 1 - 0.51 = 0.49 de "similitud", debajo del umbral de
-# 0.75, y no se crea ningún match.
+# cualquier métrica y no distingue `<=>` (coseno) de `<->` (L2). Con `<->`, el
+# par de 0.70 de coseno da 1 - 0.77 = 0.23 de "similitud", debajo de ambos
+# umbrales, y no se crea ningún match.
 EMBEDDING_BASE = _unit_vector_at_cosine(1.0)
-EMBEDDING_MISMA_MASCOTA = _unit_vector_at_cosine(0.87)
-EMBEDDING_OTRA_MASCOTA = _unit_vector_at_cosine(0.65)
+EMBEDDING_MISMA_MASCOTA = _unit_vector_at_cosine(0.70)
+EMBEDDING_POSIBLE_MASCOTA = _unit_vector_at_cosine(0.50)
+EMBEDDING_OTRA_MASCOTA = _unit_vector_at_cosine(0.20)
 
 
 def _vector_literal(values: list[float]) -> str:
@@ -98,12 +100,13 @@ async def _insert_embedding(session, report_id: int, embedding: list[float]) -> 
 @pytest_asyncio.fixture
 async def scenario():
     """Siembra: un 'found' con EMBEDDING_BASE (el reporte "recién procesado"),
-    y 5 candidatos alrededor:
-      - lost_match: coseno 0.87 (misma mascota), opuesto, cerca, reciente -> DEBE matchear.
-      - lost_baja_similitud: coseno 0.65 (otra mascota), opuesto, cerca, reciente -> NO matchea (similitud < umbral).
-      - found_mismo_tipo: coseno 0.87, MISMO tipo, cerca, reciente -> filtrado por tipo.
-      - lost_fuera_de_radio: coseno 0.87, opuesto, LEJOS, reciente -> filtrado por radio.
-      - lost_fuera_de_recencia: coseno 0.87, opuesto, cerca, VIEJO (>30 días) -> filtrado por recencia.
+    y 6 candidatos alrededor:
+      - lost_match: coseno 0.70 (misma mascota), opuesto, cerca, reciente -> matchea Y notifica.
+      - lost_posible: coseno 0.50 (posible), opuesto, cerca, reciente -> matchea SIN notificar.
+      - lost_baja_similitud: coseno 0.20 (otra mascota), opuesto, cerca, reciente -> NO matchea (similitud < umbral).
+      - found_mismo_tipo: coseno 0.70, MISMO tipo, cerca, reciente -> filtrado por tipo.
+      - lost_fuera_de_radio: coseno 0.70, opuesto, LEJOS, reciente -> filtrado por radio.
+      - lost_fuera_de_recencia: coseno 0.70, opuesto, cerca, VIEJO (>30 días) -> filtrado por recencia.
     """
     email = f"matching-service-test-{uuid.uuid4()}@example.com"
     async with async_session_factory() as session:
@@ -114,6 +117,9 @@ async def scenario():
 
         lost_match_id = await _insert_report(session, user_id, "lost", NEAR_LAT, NEAR_LNG)
         await _insert_embedding(session, lost_match_id, EMBEDDING_MISMA_MASCOTA)
+
+        lost_posible_id = await _insert_report(session, user_id, "lost", NEAR_LAT, NEAR_LNG)
+        await _insert_embedding(session, lost_posible_id, EMBEDDING_POSIBLE_MASCOTA)
 
         lost_baja_similitud_id = await _insert_report(session, user_id, "lost", NEAR_LAT, NEAR_LNG)
         await _insert_embedding(session, lost_baja_similitud_id, EMBEDDING_OTRA_MASCOTA)
@@ -135,6 +141,7 @@ async def scenario():
         "user_id": user_id,
         "found_id": found_id,
         "lost_match_id": lost_match_id,
+        "lost_posible_id": lost_posible_id,
         "lost_baja_similitud_id": lost_baja_similitud_id,
         "found_mismo_tipo_id": found_mismo_tipo_id,
         "lost_fuera_de_radio_id": lost_fuera_de_radio_id,
@@ -157,29 +164,62 @@ async def scenario():
         await session.commit()
 
 
+@pytest.fixture
+def notified(monkeypatch):
+    """Captura las notificaciones en vez de llamar al Backend Principal."""
+    calls = []
+
+    async def fake_notify(lost_id, found_id, similarity):
+        calls.append((lost_id, found_id, similarity))
+
+    monkeypatch.setattr(matching_service, "_notify_match", fake_notify)
+    return calls
+
+
+async def _scenario_matches(scenario):
+    """Filas de report_matches que involucran reportes del escenario (la DB de
+    desarrollo puede tener matches propios que no son de este test)."""
+    report_ids = [v for k, v in scenario.items() if k != "user_id"]
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text(
+                """
+                SELECT report_lost_id, report_found_id, similarity_score, status
+                FROM report_matches
+                WHERE report_lost_id = ANY(:ids) OR report_found_id = ANY(:ids)
+                """
+            ),
+            {"ids": report_ids},
+        )
+        return result.mappings().all()
+
+
 @pytest.mark.asyncio
-async def test_crea_match_solo_para_el_candidato_similar_opuesto_cerca_y_reciente(scenario):
+async def test_crea_match_para_candidatos_sobre_el_umbral_opuestos_cerca_y_recientes(scenario, notified):
     async with async_session_factory() as session:
         created = await matching_service.find_and_store_matches(scenario["found_id"], session)
 
-    assert created == 1
+    assert created == 2
 
-    async with async_session_factory() as session:
-        result = await session.execute(
-            text("SELECT report_lost_id, report_found_id, similarity_score, status FROM report_matches")
-        )
-        rows = result.mappings().all()
-
-    assert len(rows) == 1
-    row = rows[0]
-    assert row["report_lost_id"] == scenario["lost_match_id"]
-    assert row["report_found_id"] == scenario["found_id"]
-    assert row["similarity_score"] == pytest.approx(0.87, abs=1e-4)
-    assert row["status"] == "pending"
+    rows = {row["report_lost_id"]: row for row in await _scenario_matches(scenario)}
+    assert set(rows) == {scenario["lost_match_id"], scenario["lost_posible_id"]}
+    assert all(row["report_found_id"] == scenario["found_id"] for row in rows.values())
+    assert all(row["status"] == "pending" for row in rows.values())
+    assert rows[scenario["lost_match_id"]]["similarity_score"] == pytest.approx(0.70, abs=1e-4)
+    assert rows[scenario["lost_posible_id"]]["similarity_score"] == pytest.approx(0.50, abs=1e-4)
 
 
 @pytest.mark.asyncio
-async def test_no_crea_match_para_decoys(scenario):
+async def test_notifica_solo_los_matches_sobre_el_umbral_de_notificacion(scenario, notified):
+    async with async_session_factory() as session:
+        await matching_service.find_and_store_matches(scenario["found_id"], session)
+
+    assert [(lost, found) for lost, found, _ in notified] == [(scenario["lost_match_id"], scenario["found_id"])]
+    assert notified[0][2] == pytest.approx(0.70, abs=1e-4)
+
+
+@pytest.mark.asyncio
+async def test_no_crea_match_para_decoys(scenario, notified):
     async with async_session_factory() as session:
         await matching_service.find_and_store_matches(scenario["found_id"], session)
 
@@ -190,38 +230,25 @@ async def test_no_crea_match_para_decoys(scenario):
         scenario["lost_fuera_de_recencia_id"],
     }
 
-    async with async_session_factory() as session:
-        result = await session.execute(
-            text("SELECT report_lost_id, report_found_id FROM report_matches")
-        )
-        rows = result.mappings().all()
-
+    rows = await _scenario_matches(scenario)
     involved_ids = {row["report_lost_id"] for row in rows} | {row["report_found_id"] for row in rows}
     assert involved_ids.isdisjoint(decoy_ids)
 
 
 @pytest.mark.asyncio
-async def test_correr_dos_veces_no_duplica(scenario):
+async def test_correr_dos_veces_no_duplica(scenario, notified):
     async with async_session_factory() as session:
         first = await matching_service.find_and_store_matches(scenario["found_id"], session)
     async with async_session_factory() as session:
         second = await matching_service.find_and_store_matches(scenario["found_id"], session)
 
-    assert first == 1
-    assert second == 1  # sigue "pending", se actualiza sin duplicar
-
-    async with async_session_factory() as session:
-        result = await session.execute(
-            text(
-                "SELECT COUNT(*) FROM report_matches WHERE report_lost_id = :lost_id AND report_found_id = :found_id"
-            ),
-            {"lost_id": scenario["lost_match_id"], "found_id": scenario["found_id"]},
-        )
-        assert result.scalar_one() == 1
+    assert first == 2
+    assert second == 2  # siguen "pending", se actualizan sin duplicar
+    assert len(await _scenario_matches(scenario)) == 2
 
 
 @pytest.mark.asyncio
-async def test_no_pisa_un_match_ya_confirmado(scenario):
+async def test_no_pisa_un_match_ya_confirmado(scenario, notified):
     async with async_session_factory() as session:
         await matching_service.find_and_store_matches(scenario["found_id"], session)
 
@@ -241,16 +268,9 @@ async def test_no_pisa_un_match_ya_confirmado(scenario):
     async with async_session_factory() as session:
         second_run_created = await matching_service.find_and_store_matches(scenario["found_id"], session)
 
-    assert second_run_created == 0
+    assert second_run_created == 1  # solo el "posible", que sigue pending
 
-    async with async_session_factory() as session:
-        result = await session.execute(
-            text(
-                "SELECT similarity_score, status FROM report_matches WHERE report_lost_id = :lost_id AND report_found_id = :found_id"
-            ),
-            {"lost_id": scenario["lost_match_id"], "found_id": scenario["found_id"]},
-        )
-        row = result.mappings().first()
-
-    assert row["status"] == "confirmed"
-    assert row["similarity_score"] == pytest.approx(0.42, abs=1e-6)
+    rows = {row["report_lost_id"]: row for row in await _scenario_matches(scenario)}
+    confirmed = rows[scenario["lost_match_id"]]
+    assert confirmed["status"] == "confirmed"
+    assert confirmed["similarity_score"] == pytest.approx(0.42, abs=1e-6)

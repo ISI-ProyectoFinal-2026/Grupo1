@@ -28,11 +28,11 @@ class Report(Base):
 
 
 class ReportEmbedding(Base):
-    """Embeddings (OpenCLIP) generados por este servicio tras procesar la imagen."""
+    """Embeddings (DINOv2) generados por este servicio tras procesar la imagen."""
 
     __tablename__ = "report_embeddings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     report_id: Mapped[int] = mapped_column(ForeignKey("reports.id"), unique=True)
-    embedding: Mapped[list[float]] = mapped_column(Vector(512))
+    embedding: Mapped[list[float]] = mapped_column(Vector(768))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())
