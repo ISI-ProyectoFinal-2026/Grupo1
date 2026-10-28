@@ -1,3 +1,5 @@
+import type { GeoPoint } from './geo.types'
+
 export type BusinessCategory = 'VETERINARIA' | 'REFUGIO' | 'PET_SHOP' | 'OTRO'
 
 // El plan no se elige vía API: todo comercio nace FREE y ni el alta ni la
@@ -37,6 +39,8 @@ export interface CreateBusinessInput {
   address: string
   phone: string
   category: BusinessCategory
+  // pin del mapa (#208)
+  location: GeoPoint
 }
 
 export type UpdateBusinessInput = Partial<CreateBusinessInput>

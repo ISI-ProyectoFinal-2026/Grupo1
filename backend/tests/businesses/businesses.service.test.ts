@@ -12,6 +12,7 @@ describe("businesses.service", () => {
     address: "Av. Siempre Viva 123",
     phone: "1122334455",
     category: "VETERINARIA" as const,
+    location: { lat: -34.6251, lng: -68.3221 },
   };
 
   function uniqueCuit(): string {
@@ -51,6 +52,14 @@ describe("businesses.service", () => {
     expect(business.userId).toBe(userId);
     expect(business.name).toBe(baseBusinessData.name);
     expect(business.plan).toBe("FREE");
+  });
+
+  test("create() guarda las coordenadas elegidas en el mapa", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    expect(business.latitude).toBeCloseTo(-34.6251, 5);
+    expect(business.longitude).toBeCloseTo(-68.3221, 5);
   });
 
   test("create() lanza AppError 409 si el usuario ya tiene un comercio registrado", async () => {
@@ -98,6 +107,24 @@ describe("businesses.service", () => {
 
     const updated = await businessesService.updateByUserId(userId, { name: "Nuevo nombre" });
     expect(updated.name).toBe("Nuevo nombre");
+  });
+
+  test("updateByUserId() actualiza las coordenadas si llega una nueva ubicación", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    const updated = await businessesService.updateByUserId(userId, { location: { lat: -34.6, lng: -68.33 } });
+    expect(updated.latitude).toBeCloseTo(-34.6, 5);
+    expect(updated.longitude).toBeCloseTo(-68.33, 5);
+  });
+
+  test("updateByUserId() sin ubicación conserva las coordenadas guardadas", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    const updated = await businessesService.updateByUserId(userId, { name: "Otro nombre" });
+    expect(updated.latitude).toBeCloseTo(-34.6251, 5);
+    expect(updated.longitude).toBeCloseTo(-68.3221, 5);
   });
 
   test("create() ignora un plan colado en los datos: todo comercio nace FREE", async () => {

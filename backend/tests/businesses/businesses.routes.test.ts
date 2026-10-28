@@ -15,6 +15,7 @@ describe("POST/GET/PUT /api/businesses", () => {
     address: "Ruta 8 km 45",
     phone: "1133445566",
     category: "REFUGIO",
+    location: { lat: -34.6251, lng: -68.3221 },
   };
 
   function uniqueCuit(): string {
@@ -92,6 +93,37 @@ describe("POST/GET/PUT /api/businesses", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
+  });
+
+  test("POST /api/businesses guarda las coordenadas del pin del mapa", async () => {
+    const res = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+
+    expect(res.status).toBe(201);
+    expect(res.body.latitude).toBeCloseTo(-34.6251, 5);
+    expect(res.body.longitude).toBeCloseTo(-68.3221, 5);
+    createdBusinessIds.push(res.body.id);
+  });
+
+  test("POST /api/businesses responde 400 si las coordenadas están fuera de rango", async () => {
+    const res = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), location: { lat: -95, lng: -68.3221 } });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/businesses responde 400 si falta la ubicación", async () => {
+    const { location: _omitted, ...withoutLocation } = baseBusinessData;
+    const res = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...withoutLocation, cuit: uniqueCuit() });
+
+    expect(res.status).toBe(400);
   });
 
   test("POST /api/businesses ignora el plan: no se puede auto-otorgar PREMIUM", async () => {
