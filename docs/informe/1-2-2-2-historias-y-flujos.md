@@ -4,7 +4,7 @@ titulo: "Historias de Usuario"
 nivel: 4
 fase: A
 estado: borrador
-actualizado: 2026-10-24
+actualizado: 2026-10-28
 ---
 
 # 1.2.2.2 Historias de Usuario
@@ -348,7 +348,7 @@ Tabla 1.2.2-7. Reglas del módulo de IA y matching. Fuente: archivos de la colum
 | Issue | Historia | Estado del issue | Estado en el código |
 |---|---|---|---|
 | [#32](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/32) | Como usuario quiero recibir notificaciones de eventos importantes para seguir mi caso | Cerrado | Parcial: solo dentro de la app; no hay push ni email ni aviso de nuevo reporte en un radio |
-| [#33](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/33) | Como usuario quiero configurar mis preferencias de notificación para recibir solo lo relevante | Cerrado | No implementada ([#226](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/226)) |
+| [#33](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/33) | Como usuario quiero configurar mis preferencias de notificación para recibir solo lo relevante | Abierto | No implementada ([#226](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/226)) |
 | [#149](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/149) | Notificaciones en la interfaz: campana, lista y marcar como leída | Cerrado | Implementada (`frontend/src/components/notifications/`) |
 | [#176](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/176) | Como usuario que reportó una mascota quiero recibir una notificación cuando la IA detecta un match de alta similitud | Cerrado | Implementada (`backend/src/services/notifications.service.ts:58`) |
 | [#182](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/182) | Como dueño de un reporte quiero recibir una notificación cuando se publica, se rechaza por moderación o se resuelve | Cerrado | Implementada para la moderación por IA (`backend/src/services/notifications.service.ts:151`); el aviso al resolver era opcional en el issue y no existe |
@@ -384,7 +384,7 @@ Tabla 1.2.2-9. Reglas del módulo de notificaciones. Fuente: archivos de la colu
 ### Limitaciones conocidas
 
 - La notificación no enlaza al reporte ([#222](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/222)).
-- No hay preferencias de notificación, aunque [#33](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/33) está cerrado ([#226](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/226)).
+- No hay preferencias de notificación; [#33](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/33) se reabrió por ese motivo ([#226](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/226)).
 - No hay avisos por email ni push, ni aviso al cerrar un reporte o al ocultarlo por una denuncia ([#223](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/223)).
 
 ## 1.2.2.2.5 Módulo de Chat
