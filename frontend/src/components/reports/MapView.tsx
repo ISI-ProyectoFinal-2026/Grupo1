@@ -2,6 +2,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { Link } from "react-router-dom";
 import type { ReportDTO } from "@/types/report.types";
 import { MapIcon } from "@/components/ui/icons";
+import { getReportPinIcon } from "@/components/reports/reportPinIcon";
 import "leaflet/dist/leaflet.css";
 
 interface MapViewProps {
@@ -38,7 +39,11 @@ export default function MapView({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
         {reportsWithLocation.map((report) => (
-          <Marker key={report.id} position={[report.location!.lat, report.location!.lng]}>
+          <Marker
+            key={report.id}
+            position={[report.location!.lat, report.location!.lng]}
+            icon={getReportPinIcon(report.reportType)}
+          >
             <Popup>
               <div className="flex w-52 flex-col gap-2 font-sans">
                 {report.imageUrl && (
