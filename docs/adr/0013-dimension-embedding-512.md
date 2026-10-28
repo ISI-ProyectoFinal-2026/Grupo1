@@ -1,6 +1,6 @@
 # ADR-0013: Dimensión del embedding de 512
 
-- **Estado:** Aceptada
+- **Estado:** Reemplazada por [ADR-0021](0021-modelo-embeddings-dinov2.md)
 - **Responsables:** Agustín Díaz (corrección); Matías Alvarado (especificación inicial) y Gabriel Valdivieso (esquema inicial)
 
 ## Decisión
