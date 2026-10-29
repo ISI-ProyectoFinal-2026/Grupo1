@@ -32,29 +32,40 @@ El `.docx` resultante se sube a Google Drive a mano (en Drive: clic derecho sobr
 
 ## 4. Formato de tesis
 
-- Página A4; márgenes de 2,5 cm y 3 cm el izquierdo.
-- Portada en la primera página: "PATITAS", "Informe Final", "Grupo 1 - Proyecto Final 2026" y la fecha de generación. Institución, carrera, cátedra, integrantes y docentes quedan como `[COMPLETAR]` mientras no estén en el repositorio. Sin encabezado ni número de página.
-- Índice de contenidos automático con números de página, en página propia, con todos los niveles de título numerados (índices y subíndices).
-- Índice de figuras e índice de tablas automáticos en los capítulos 5 y 6 del template, armados con los epígrafes.
-- Encabezado "Patitas - Informe Final" (9 pt, gris) y número de página centrado en el pie, desde el índice en adelante.
-- Cuerpo: Arial 11 pt, interlineado 1,5, justificado, 6 pt después de cada párrafo.
-- Títulos: Título 1 de 18 pt con salto de página antes; Título 2 de 15 pt; Título 3 de 13 pt; Título 4 de 12 pt; Títulos 5 y 6 de 11 pt (negrita y negrita cursiva). Negrita, alineados a la izquierda, un solo color oscuro.
-- Tablas: ancho de página, bordes finos grises, primera fila en negrita con fondo gris claro y repetida en cada página, texto de celdas en 10 pt con interlineado simple.
-- Epígrafes con el texto y la numeración del Markdown: "Tabla ..." arriba de la tabla y "Figura ..." debajo de la imagen, 9 pt cursiva, centrados. No se inventan epígrafes.
-- Imágenes centradas, ajustadas al ancho de página, sin deformar.
-- Código y nombres de archivo: Consolas 10 pt.
+Prioridad: primero el template de la cátedra; lo que el template no define sigue APA 7.ª edición (tablas, figuras y notas); se agregan los elementos propios de una tesis (portada, índices).
+
+Del template (no se modifica):
+
+- Página A4; márgenes de 3 cm a izquierda y derecha y 2,5 cm arriba y abajo.
+- Fuentes del tema del template (Aptos 11 pt en el cuerpo) y estilos de título 1 a 6, con la numeración literal de cada título.
+
+APA 7:
+
+- Tablas y figuras: número en negrita ("**Tabla 1.2.1-1**") y debajo el título en cursiva, ambos arriba de la tabla o de la imagen, alineados a la izquierda. Debajo, la fuente como nota: "*Nota.* Fuente: ...". El texto, el número y la fuente son los del epígrafe del Markdown ("Tabla X. Título. Fuente: ..."); solo cambia su ubicación y formato. No se inventan epígrafes.
+- Tablas sin líneas verticales: solo una línea arriba, otra bajo el encabezado y otra al final. Encabezado en negrita y repetido en cada página; celdas en 10 pt con interlineado simple; las filas no se cortan entre páginas.
+- Número de página arriba a la derecha en todas las páginas.
+
+Propios de la tesis:
+
+- Portada en la primera página: Universidad Tecnológica Nacional, Proyecto Final 2026, "PATITAS", "Informe Final", Grupo 1, integrantes (según `docs/pdd/PDD v1.0.docx`) y la fecha de generación. Facultad regional, carrera y docentes quedan como `[COMPLETAR]` mientras no estén en el repositorio.
+- Índice de contenidos con números de página, hasta el nivel 5 de título.
+- Índice de figuras e índice de tablas en los capítulos 5 y 6 del template, armados con los epígrafes.
+- Cada capítulo (Título 1) empieza en página nueva.
+- Imágenes y diagramas centrados, ajustados al ancho de página, sin deformar.
+- Los índices y los números de página se calculan con Microsoft Word al generar el archivo, porque Google Drive no actualiza campos: el `.docx` llega a Drive con los índices completos.
 
 ## 5. Verificación antes de entregar
 
 - Están todos los títulos del template, en orden y sin duplicar la numeración.
 - Ningún título quedó pegado a un párrafo o a una viñeta.
 - Cantidad de imágenes = imágenes de los `.md` + bloques Mermaid; cantidad de tablas = tablas de los `.md`.
-- Los índices de contenidos, figuras y tablas se generan al abrir el archivo.
+- Los índices de contenidos, figuras y tablas tienen entradas y números de página (exportando a PDF con Word).
+- Cantidad de entradas de los índices de figuras y tablas = cantidad de epígrafes "Figura" y "Tabla" de los `.md`.
 - Revisión visual de una muestra de páginas (portada, índice, una tabla ancha, un diagrama).
 
 ## 6. Generador
 
-`tools/informe-docx/informe_docx.py` implementa las secciones 1 a 3 y aplica los estilos del template. El formato de tesis de la sección 4 todavía no está implementado en el generador.
+`tools/informe-docx/informe_docx.py` implementa las secciones 1 a 4. Para completar los índices necesita Microsoft Word en Windows; sin Word (o con `--no-word`) los índices se completan al abrir el archivo en Word, no en Drive.
 
 ```bash
 pip install -r requirements-docs.txt

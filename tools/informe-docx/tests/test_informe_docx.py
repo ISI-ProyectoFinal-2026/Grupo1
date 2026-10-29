@@ -114,3 +114,91 @@ def test_report_files_excludes_registry_and_template(repo):
 
 def test_default_output_name_has_date():
     assert gen.output_name("2026-10-28") == "Patitas-Informe-Final-2026-10-28.docx"
+
+
+TABLE_MD = """\
+Texto previo.
+
+| A | B |
+|---|---|
+| 1 | 2 |
+
+Tabla 1.2.1-1. Objetivos del PDD contrastados con el código. Fuente: PDD v1.0 y `git ls-files`.
+
+Texto posterior."""
+
+
+def test_caption_of_table_moves_above_with_bold_number_and_italic_title():
+    out = gen.format_captions(TABLE_MD)
+    caption = '::: {custom-style="Epígrafe tabla"}\n**Tabla 1.2.1-1**\\\n*Objetivos del PDD contrastados con el código*\n:::'
+    assert caption in out
+    assert out.index(caption) < out.index("| A | B |")
+
+
+def test_caption_source_becomes_note_below_table():
+    out = gen.format_captions(TABLE_MD)
+    note = '::: {custom-style="Nota"}\n*Nota.* Fuente: PDD v1.0 y `git ls-files`.\n:::'
+    assert note in out
+    assert out.index("| 1 | 2 |") < out.index(note) < out.index("Texto posterior.")
+    assert "Tabla 1.2.1-1. Objetivos" not in out
+
+
+def test_caption_of_image_moves_above_image():
+    md = "![Alt](img/a.png)\n\nFigura 1.1-1. Perfil de Instagram. Fuente: `img/a.png`.\n"
+    out = gen.format_captions(md)
+    assert out.index('custom-style="Epígrafe figura"') < out.index("![Alt](img/a.png)")
+    assert out.index("![Alt](img/a.png)") < out.index("*Nota.* Fuente: `img/a.png`.")
+
+
+def test_caption_without_table_or_image_is_left_untouched():
+    md = "Párrafo.\n\nTabla 9-1. Huérfana. Fuente: nada.\n"
+    assert gen.format_captions(md) == md
+
+
+def test_caption_inside_code_fence_is_ignored():
+    md = "```\n| a |\n\nTabla 1-1. X. Fuente: y.\n```"
+    assert gen.format_captions(md) == md
+
+
+def test_cover_lines_use_completar_for_unknown_data():
+    lines = gen.cover_lines("2026-10-28")
+    assert "Universidad Tecnológica Nacional" in lines
+    assert "28 de octubre de 2026" in lines
+    assert any(line.startswith("[COMPLETAR") for line in lines)
+
+
+def _doc_with_table():
+    import docx
+
+    d = docx.Document()
+    d.add_paragraph("Uno", style="Heading 1")
+    t = d.add_table(rows=3, cols=2)
+    for row in t.rows:
+        for cell in row.cells:
+            cell.text = "x"
+    return d
+
+
+def test_apa_table_has_only_top_header_and_bottom_rules():
+    d = _doc_with_table()
+    gen.format_tables(d)
+    xml = d.tables[0]._tbl.xml
+    for side in ("top", "bottom"):
+        assert f'<w:{side} w:val="single"' in xml
+    for side in ("insideV", "insideH", "left", "right"):
+        assert f'<w:{side} w:val="nil"' in xml
+    assert "<w:tblHeader/>" in d.tables[0].rows[0]._tr.xml
+
+
+def test_page_number_field_goes_in_header_right():
+    d = _doc_with_table()
+    gen.add_page_number(d)
+    header = d.sections[0].header
+    assert "PAGE" in header._element.xml
+    assert header.paragraphs[0].alignment == 2
+
+
+def test_heading_1_starts_on_new_page():
+    d = _doc_with_table()
+    gen.format_styles(d)
+    assert d.styles["Heading 1"].paragraph_format.page_break_before is True
