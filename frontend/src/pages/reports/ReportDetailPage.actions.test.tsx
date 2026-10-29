@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,7 @@ import type { AuthUser } from '@/types/auth'
 vi.mock('@/services/reports.service')
 vi.mock('@/services/chats.service')
 vi.mock('@/services/moderation.service')
+vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
 
 const DUENO_ID = 7
 const OTRO_ID = 8
@@ -304,6 +305,27 @@ describe('ReportDetailPage editar y eliminar', () => {
 
     expect(await screen.findByText('pagina feed')).toBeInTheDocument()
     expect(screen.getByText('Reporte eliminado')).toBeInTheDocument()
+    expect(reportsService.deleteReport).toHaveBeenCalledWith(5)
+  })
+
+  // el mapa del detalle (#208) y el boton de eliminar conviven
+  it('con ubicación, el dueño ve el mapa y puede eliminar el reporte', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(
+      reporte({ location: { lat: -34.6177, lng: -68.3301 } })
+    )
+    vi.mocked(reportsService.deleteReport).mockResolvedValue(undefined)
+    loguear(DUENO_ID)
+    const user = userEvent.setup()
+    renderConRutas()
+
+    const mapa = await screen.findByRole('region', { name: 'Mapa de la ubicación' })
+    expect(within(mapa).getByTestId('map')).toBeInTheDocument()
+    expect(within(mapa).queryByRole('button', { name: 'Eliminar reporte' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Eliminar reporte' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar eliminación' }))
+
+    expect(await screen.findByText('pagina feed')).toBeInTheDocument()
     expect(reportsService.deleteReport).toHaveBeenCalledWith(5)
   })
 
