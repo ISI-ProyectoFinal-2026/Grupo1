@@ -77,12 +77,58 @@ def test_splice_leaves_heading_in_its_own_paragraph():
     assert "- ultima viñeta\n\n## 1.2.2.3 Tareas" in out
 
 
-def test_fix_links_page_of_site_goes_to_site_url(repo):
+def test_fix_links_page_in_document_becomes_plain_text(repo):
     src = repo / "docs/informe/1-2-2-modelo-funcional.md"
-    md = "[1.2.1](1-2-1-objetivos-y-alcances.md#objetivos)"
-    assert gen.fix_links(md, src, repo, SITE_PAGES) == (
-        "[1.2.1](https://isi-proyectofinal-2026.github.io/Grupo1/informe/1-2-1-objetivos-y-alcances/#objetivos)"
-    )
+    md = "Ver [1.2.1](1-2-1-objetivos-y-alcances.md#objetivos)."
+    assert gen.fix_links(md, src, repo, SITE_PAGES) == "Ver 1.2.1."
+
+
+def _write(repo: Path, rel: str, text: str) -> Path:
+    path = repo / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_expand_refs_inlines_cited_md_at_end_of_its_section(repo):
+    _write(repo, "docs/QA.md", "# QA pipeline\n\nContenido QA.\n\n## Casos\n\nC1")
+    src = repo / "docs/informe/1-3-1-x.md"
+    md = "# 1.3.1 X\n\n## Calidad\n\nVer [QA](../QA.md) y sigue.\n\nOtro párrafo.\n\n## Otra\n\nfin"
+    out = gen.expand_refs(md, src, repo, SITE_PAGES, set())
+    assert "Ver QA y sigue." in out
+    assert out.index("Otro párrafo.") < out.index("### QA pipeline") < out.index("## Otra")
+    assert "#### Casos" in out and "Contenido QA." in out
+
+
+def test_expand_refs_inlines_each_file_once(repo):
+    _write(repo, "docs/QA.md", "# QA\n\nUna vez.")
+    src = repo / "docs/informe/x.md"
+    md = "# 1 X\n\n[a](../QA.md)\n\n## Y\n\n[b](../QA.md)"
+    out = gen.expand_refs(md, src, repo, SITE_PAGES, set())
+    assert out.count("Una vez.") == 1
+
+
+def test_expand_refs_follows_nested_refs_without_cycles(repo):
+    _write(repo, "docs/A.md", "# A\n\nA cita [B](B.md).")
+    _write(repo, "docs/B.md", "# B\n\nB cita [A](A.md).\n\n![F](img/f.png)")
+    (repo / "docs/img").mkdir()
+    (repo / "docs/img/f.png").write_bytes(b"png")
+    src = repo / "docs/informe/x.md"
+    out = gen.expand_refs("# 1 X\n\n[A](../A.md)", src, repo, SITE_PAGES, set())
+    assert out.count("A cita B.") == 1 and out.count("B cita A.") == 1
+    assert "### B" in out
+    assert f"![F]({(repo / 'docs/img/f.png').as_posix()})" in out
+
+
+def test_expand_refs_does_not_inline_excluded_files(repo):
+    _write(repo, "docs/adr/0000-plantilla.md", "# Plantilla\n\nNo va.")
+    src = repo / "docs/adr/README.md"
+    out = gen.expand_refs("# ADR\n\n[plantilla](0000-plantilla.md)", src, repo, SITE_PAGES, set())
+    assert "No va." not in out and "plantilla" in out
+
+
+def test_shift_headings_turns_levels_beyond_six_into_bold():
+    assert gen.shift_headings("# A\n\n## B", 6) == "###### A\n\n**B**"
 
 
 def test_fix_links_other_repo_file_goes_to_github_blob(repo):
@@ -160,11 +206,14 @@ def test_caption_inside_code_fence_is_ignored():
     assert gen.format_captions(md) == md
 
 
-def test_cover_lines_use_completar_for_unknown_data():
+def test_cover_lines_include_faculty_career_and_teachers():
     lines = gen.cover_lines("2026-10-28")
     assert "Universidad Tecnológica Nacional" in lines
+    assert "Facultad Regional San Rafael" in lines
+    assert "Ingeniería en Sistemas de Información" in lines
+    assert "Docentes: Hernán Zinik y Matías Varela" in lines
     assert "28 de octubre de 2026" in lines
-    assert any(line.startswith("[COMPLETAR") for line in lines)
+    assert not any("[COMPLETAR" in line for line in lines)
 
 
 def _doc_with_table():

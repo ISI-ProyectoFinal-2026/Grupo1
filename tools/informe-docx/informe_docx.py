@@ -10,7 +10,6 @@ from urllib.parse import quote, unquote
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = "docs/Template Presentacion Final (1).docx"
-SITE_URL = "https://isi-proyectofinal-2026.github.io/Grupo1/"
 BLOB_URL = "https://github.com/ISI-ProyectoFinal-2026/Grupo1/blob/main/"
 EXCLUDED = {"informe/README.md", "adr/README.md", "adr/0000-plantilla.md"}
 DECISIONS = "2.2.2.4"
@@ -32,7 +31,8 @@ TOC_DEPTH = 5
 NUM = re.compile(r"^(\d+(?:\.\d+)*)\s")
 CAPTION = re.compile(r"^(Tabla|Figura) (\d[\d.]*-\d+)\. (.+?)\. Fuente: (.+)$")
 HEAD = re.compile(r"^(#{1,9})\s+(.*)$")
-LINK = re.compile(r"(\]\()([^)\s]+)(\))")
+MD_LINK = re.compile(r"(!?)\[([^\]]*)\]\(([^)\s]+)\)")
+MAX_HEADING = 6
 MERMAID = re.compile(r"^```mermaid\s*\n(.*?)^```\s*$", re.S | re.M)
 NAV_ENTRY = re.compile(r"^\s*-\s*(?:[^:\n#]+:\s*)?((?:informe|adr)/[\w.-]+\.md)\s*$", re.M)
 
@@ -77,7 +77,8 @@ def shift_headings(md: str, level_of_first: int) -> str:
         if h:
             if offset is None:
                 offset = level_of_first - len(h.group(1))
-            line = "#" * (len(h.group(1)) + offset) + " " + h.group(2)
+            level = len(h.group(1)) + offset
+            line = "#" * level + " " + h.group(2) if level <= MAX_HEADING else f"**{h.group(2)}**"
         out.append(line)
     return "\n".join(out)
 
@@ -101,24 +102,55 @@ def splice(md: str, number: str, sub_md: str) -> str:
     return "\n".join(lines[:start] + ["", sub_md, ""] + lines[end:])
 
 
-def fix_links(md: str, src: Path, repo: Path, site_pages: set[str]) -> str:
+def fix_links(md: str, src: Path, repo: Path, site_pages: set[str], cited: list[Path] | None = None) -> str:
+    # documento autocontenido: los .md citados quedan como texto y se desglosan (expand_refs)
     def repl(m: re.Match) -> str:
-        raw = m.group(2)
+        bang, text, raw = m.groups()
         if re.match(r"^[a-z]+:|^#", raw):
             return m.group(0)
         path, _, frag = raw.partition("#")
         target = (src.parent / unquote(path)).resolve()
-        if target.suffix.lower() == ".png" and target.exists():
-            return m.group(1) + target.as_posix() + m.group(3)
+        if bang and target.suffix.lower() == ".png" and target.exists():
+            return f"![{text}]({target.as_posix()})"
         rel = target.relative_to(repo.resolve()).as_posix()
+        if not bang and target.suffix.lower() == ".md":
+            docs_rel = rel[5:] if rel.startswith("docs/") else None
+            if cited is not None and target.exists() and docs_rel not in site_pages and docs_rel not in EXCLUDED:
+                cited.append(target)
+            return text
         anchor = "#" + frag if frag else ""
-        if rel.startswith("docs/") and rel[5:] in site_pages:
-            url = SITE_URL + rel[5:-3] + "/" + anchor
-        else:
-            url = BLOB_URL + quote(rel) + anchor
-        return m.group(1) + url + m.group(3)
+        return f"{bang}[{text}]({BLOB_URL}{quote(rel)}{anchor})"
 
-    return LINK.sub(repl, md)
+    return MD_LINK.sub(repl, md)
+
+
+def expand_refs(md: str, src: Path, repo: Path, site_pages: set[str], seen: set[Path]) -> str:
+    # cada .md citado fuera del documento va al final de la seccion que lo cita, una sola vez
+    out, pending, level, fence = [], [], 1, False
+
+    def flush() -> None:
+        for target in pending:
+            sub = strip_front_matter(target.read_text(encoding="utf-8"))
+            out.extend(["", shift_headings(expand_refs(sub, target, repo, site_pages, seen), level + 1), ""])
+        pending.clear()
+
+    for line in md.splitlines():
+        if line.startswith("```"):
+            fence = not fence
+        h = None if fence else HEAD.match(line)
+        if h:
+            flush()
+            level = len(h.group(1))
+        if not fence:
+            cited: list[Path] = []
+            line = fix_links(line, src, repo, site_pages, cited)
+            for target in cited:
+                if target not in seen:
+                    seen.add(target)
+                    pending.append(target)
+        out.append(line)
+    flush()
+    return "\n".join(out)
 
 
 def render_mermaid(md: str, work: Path, mmdc: str) -> str:
@@ -174,14 +206,14 @@ def cover_lines(date: str) -> list[str]:
     year, month, day = (int(x) for x in date.split("-"))
     return [
         "Universidad Tecnológica Nacional",
-        "[COMPLETAR: Facultad Regional]",
-        "[COMPLETAR: Carrera]",
+        "Facultad Regional San Rafael",
+        "Ingeniería en Sistemas de Información",
         "Proyecto Final 2026",
         "PATITAS",
         "Informe Final",
         "Grupo 1",
         *TEAM,
-        "Docentes: [COMPLETAR]",
+        "Docentes: Hernán Zinik y Matías Varela",
         f"{day} de {MONTHS[month - 1]} de {year}",
     ]
 
@@ -405,11 +437,12 @@ def assemble(repo: Path, work: Path, mmdc: str) -> str:
     files = nav_files(repo)
     site_pages = set(files)
     informe, adrs = report_files(files)
+    seen = {(repo / "docs" / f).resolve() for f in files}
 
     def load(rel: str) -> str:
         src = repo / "docs" / rel
         md = strip_front_matter(src.read_text(encoding="utf-8"))
-        return format_captions(render_mermaid(fix_links(md, src, repo, site_pages), work, mmdc))
+        return format_captions(render_mermaid(expand_refs(md, src, repo, site_pages, seen), work, mmdc))
 
     sections = {}
     for rel in informe:
