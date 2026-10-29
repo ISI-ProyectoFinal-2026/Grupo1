@@ -5,11 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import { useAuthStore } from '@/stores/auth.store'
 import * as reportsService from '@/services/reports.service'
+import { listMyPets } from '@/services/pets.service'
 import EditReportPage from '@/pages/reports/EditReportPage'
 import type { ReportDTO } from '@/types/report.types'
 import type { AuthUser } from '@/types/auth'
+import type { PetDTO } from '@/types/pet.types'
 
 vi.mock('@/services/reports.service')
+vi.mock('@/services/pets.service')
 
 // Leaflet, geolocalizacion y subida a R2 no hacen falta para probar la pagina.
 vi.mock('@/components/maps/LocationPicker', () => ({ default: () => null }))
@@ -51,6 +54,23 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
   }
 }
 
+function mascota(overrides: Partial<PetDTO> = {}): PetDTO {
+  return {
+    id: 3,
+    userId: DUENO_ID,
+    name: 'Firulais',
+    species: 'dog',
+    breed: 'Labrador',
+    age: 3,
+    color: 'Marrón',
+    description: null,
+    photoUrls: ['https://pub.r2.dev/pets/a.jpg'],
+    microchipId: null,
+    createdAt: '2026-10-01T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
 function DetalleFalso() {
   const state = useLocation().state as { message?: string } | null
   return (
@@ -77,6 +97,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(listMyPets).mockResolvedValue([])
   useAuthStore.setState({ token: 'token', user: usuario(DUENO_ID) })
 })
 
@@ -93,6 +114,17 @@ describe('EditReportPage', () => {
     expect(screen.getByLabelText('Título *')).toHaveValue('Perra perdida en Caballito')
     expect(screen.getByLabelText('Descripción')).toHaveValue('Collar rojo')
     expect(reportsService.getReport).toHaveBeenCalledWith(5)
+  })
+
+  it('precarga la mascota vinculada al reporte en el selector', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([
+      mascota(),
+      mascota({ id: 4, name: 'Michi', breed: null }),
+    ])
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ petId: 3 }))
+    renderPage()
+
+    expect(await screen.findByLabelText('Mascota')).toHaveValue('3')
   })
 
   it('guarda con PUT y vuelve al detalle con el aviso de exito', async () => {
