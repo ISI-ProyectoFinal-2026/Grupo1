@@ -11,6 +11,7 @@ import { geoRouter } from "./routes/geo.routes";
 import { businessesRouter } from "./routes/businesses.routes";
 import { chatsRouter } from "./routes/chats.routes";
 import { notificationsRouter } from "./routes/notifications.routes";
+import { notificationPreferencesRouter } from "./routes/notification-preferences.routes";
 import { errorHandler } from "./middlewares/error-handler";
 import { applyTrustProxy } from "./config/trust-proxy";
 import { globalLimiter } from "./middlewares/rate-limit";
@@ -43,6 +44,7 @@ app.use("/api/geo", geoRouter);
 app.use("/api/businesses", businessesRouter);
 app.use("/api/chats", chatsRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/notification-preferences", notificationPreferencesRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: { message: "Recurso no encontrado" } });

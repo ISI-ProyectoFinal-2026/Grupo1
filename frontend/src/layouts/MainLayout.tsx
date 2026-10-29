@@ -2,12 +2,15 @@ import { useState, type ComponentType, type SVGProps } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
+import LocationConsentModal from "@/components/account/LocationConsentModal";
 import UnverifiedEmailBanner from "@/components/auth/UnverifiedEmailBanner";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsModerator } from "@/hooks/useIsModerator";
+import { useLocationSync } from "@/hooks/useLocationSync";
 import { cn } from "@/lib/cn";
 import {
+  BellIcon,
   ChatIcon,
   LogoutIcon,
   MoreIcon,
@@ -102,6 +105,8 @@ function MainLayout() {
   const isModerator = useIsModerator();
   // Mantiene sincronizado `emailVerifiedAt` con el backend (ver el hook).
   useCurrentUser();
+  // Actualiza la ubicación una vez por apertura si la persona la aceptó.
+  useLocationSync();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   // Navigating from outside the sheet (bell, links in the page) must close it too.
   const [sheetPathname, setSheetPathname] = useState(pathname);
@@ -129,7 +134,8 @@ function MainLayout() {
     isOwnPetsPath(pathname) ||
     isOwnBusinessPath(pathname) ||
     pathname === "/moderation" ||
-    pathname === "/account/security";
+    pathname === "/account/security" ||
+    pathname === "/account/notifications";
 
   const moreLinkClasses = (active: boolean) =>
     cn(
@@ -275,6 +281,15 @@ function MainLayout() {
 
             <div className="mt-2 flex flex-col border-t border-line pt-3">
               <Link
+                to="/account/notifications"
+                onClick={closeMore}
+                aria-current={pathname === "/account/notifications" ? "page" : undefined}
+                className={moreLinkClasses(pathname === "/account/notifications")}
+              >
+                <BellIcon className="h-5 w-5" />
+                Notificaciones
+              </Link>
+              <Link
                 to="/account/security"
                 onClick={closeMore}
                 aria-label={`Seguridad de la cuenta: ${user.email}`}
@@ -303,6 +318,7 @@ function MainLayout() {
         <UnverifiedEmailBanner />
         <Outlet />
       </main>
+      <LocationConsentModal />
     </div>
   );
 }

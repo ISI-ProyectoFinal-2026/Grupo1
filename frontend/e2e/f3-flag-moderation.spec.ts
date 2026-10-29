@@ -1,4 +1,4 @@
-import { expect, loginAs, stubExternalServices, test } from './fixtures.ts'
+import { dismissLocationConsent, expect, loginAs, stubExternalServices, test } from './fixtures.ts'
 import * as api from './support/api.ts'
 import { setRole } from './support/db.ts'
 
@@ -27,6 +27,7 @@ test('F3: a user flags a report and a moderator resolves it, hiding the report',
   try {
     const moderatorPage = await moderatorContext.newPage()
     await stubExternalServices(moderatorPage)
+    await dismissLocationConsent(moderatorPage)
     await loginAs(moderatorPage, moderatorSession)
 
     await moderatorPage.goto('/moderation')

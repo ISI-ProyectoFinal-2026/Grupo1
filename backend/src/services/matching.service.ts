@@ -88,6 +88,13 @@ async function applyModerationVerdict(
   } catch (error) {
     console.error(`[matching] no se pudo avisar al dueño el cambio de estado del report ${reportId}:`, error);
   }
+
+  if (verdict !== "published") return;
+  try {
+    await notificationsService.createForNearbyReport(reportId);
+  } catch (error) {
+    console.error(`[matching] no se pudieron generar los avisos de zona del report ${reportId}:`, error);
+  }
 }
 
 // Devuelve la promesa (nunca rechaza) para poder esperarla; los callers la ignoran.

@@ -23,11 +23,11 @@ const usuario: AuthUser = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
 
-function renderLayout() {
+function renderLayout(ruta = '/') {
   const { Wrapper } = createQueryWrapper()
   return render(
     <Wrapper>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[ruta]}>
         <MainLayout />
       </MemoryRouter>
     </Wrapper>
@@ -128,6 +128,38 @@ describe('MainLayout', () => {
     expect(enlace).toHaveAttribute('href', '/account/security')
     expect(enlace).toHaveAccessibleName('Seguridad de la cuenta: franco@patitas.test')
     expect(enlace).toHaveTextContent('franco@patitas.test')
+  })
+
+  it('ofrece el acceso a las notificaciones arriba del email', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout()
+
+    const enlace = await screen.findByRole('link', { name: 'Notificaciones' })
+    expect(enlace).toHaveAttribute('href', '/account/notifications')
+    const email = screen.getByRole('link', { name: /franco@patitas.test/ })
+    expect(enlace.compareDocumentPosition(email) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(enlace).not.toHaveAttribute('aria-current')
+  })
+
+  it('marca Notificaciones como activa en su ruta', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout('/account/notifications')
+
+    expect(await screen.findByRole('link', { name: 'Notificaciones' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+  })
+
+  it('sin sesion no hay enlace a las notificaciones', async () => {
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: 'Notificaciones' })).not.toBeInTheDocument()
   })
 
   it('muestra el email del usuario que esta logueado, no uno fijo', async () => {

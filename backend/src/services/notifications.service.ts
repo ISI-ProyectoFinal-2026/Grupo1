@@ -1,6 +1,7 @@
-import { Chat, Message, Notification } from "@prisma/client";
+import { Chat, Message, Notification, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { isNotificationEnabled } from "./notification-preferences.service";
 
 export async function listByUser(userId: number): Promise<Notification[]> {
   return prisma.notification.findMany({
@@ -73,6 +74,9 @@ export async function createForMatch(data: CreateForMatchInput): Promise<Notific
 
   const notifications: Notification[] = [];
   for (const recipient of recipients) {
+    if (!(await isNotificationEnabled(recipient.userId, "notifyMatch"))) {
+      continue;
+    }
     const existing = await prisma.notification.findFirst({
       where: {
         userId: recipient.userId,
@@ -156,6 +160,9 @@ export async function createForStatusChange(
   if (!report) {
     return null;
   }
+  if (!(await isNotificationEnabled(report.userId, "notifyStatusChange"))) {
+    return null;
+  }
 
   const texts = STATUS_CHANGE_TEXTS[status];
   return prisma.notification.create({
@@ -186,8 +193,11 @@ export function resolveMessageRecipientId(chat: Pick<Chat, "userAId" | "userBId"
  * de envío (REST y Socket.io) para que la notificación se genere siempre, sin
  * importar cómo llegó el mensaje.
  */
-export async function notifyNewMessage(chat: Chat, message: Message): Promise<Notification> {
+export async function notifyNewMessage(chat: Chat, message: Message): Promise<Notification | null> {
   const recipientId = resolveMessageRecipientId(chat, message.senderId);
+  if (!(await isNotificationEnabled(recipientId, "notifyMessage"))) {
+    return null;
+  }
   const content = (message.content ?? "").trim();
   const preview =
     content.length > MESSAGE_PREVIEW_MAX_LENGTH ? `${content.slice(0, MESSAGE_PREVIEW_MAX_LENGTH)}…` : content;
@@ -200,5 +210,54 @@ export async function notifyNewMessage(chat: Chat, message: Message): Promise<No
       message: preview ? `Tenés un mensaje nuevo: "${preview}"` : "Tenés un mensaje nuevo.",
       reportId: chat.reportId,
     },
+  });
+}
+
+interface NearbyRecipientRow {
+  user_id: number;
+}
+
+/**
+ * Avisa a los usuarios con ubicación cercana a un reporte recién publicado.
+ * Idempotente por (userId, reportId, "nearby_report").
+ */
+export async function createForNearbyReport(reportId: number): Promise<Notification[]> {
+  const report = await prisma.report.findUnique({
+    where: { id: reportId },
+    select: { title: true, reportType: true, status: true },
+  });
+  if (!report || report.status !== "published") {
+    return [];
+  }
+
+  const recipients = await prisma.$queryRaw<NearbyRecipientRow[]>(Prisma.sql`
+    SELECT np.user_id
+    FROM notification_preferences np
+    JOIN reports r ON r.id = ${reportId}
+    WHERE np.user_id <> r.user_id
+      AND np.notify_nearby = true
+      AND np.location_consent_status = 'accepted'
+      AND np.location IS NOT NULL
+      AND r.location IS NOT NULL
+      AND (np.nearby_report_type::text = 'both' OR np.nearby_report_type::text = r.report_type::text)
+      AND ST_DWithin(np.location::geography, r.location::geography, np.nearby_radius_km * 1000)
+      AND NOT EXISTS (
+        SELECT 1 FROM notifications n
+        WHERE n.user_id = np.user_id AND n.report_id = r.id AND n.type = 'nearby_report'
+      )
+  `);
+  if (recipients.length === 0) {
+    return [];
+  }
+
+  const kind = report.reportType === "lost" ? "una mascota perdida" : "una mascota encontrada";
+  return prisma.notification.createManyAndReturn({
+    data: recipients.map((recipient) => ({
+      userId: recipient.user_id,
+      type: "nearby_report",
+      title: "Nuevo reporte cerca tuyo",
+      message: `Publicaron ${kind} cerca de tu zona: "${report.title}".`,
+      reportId,
+    })),
   });
 }

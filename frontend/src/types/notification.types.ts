@@ -1,5 +1,6 @@
 // valores segun modelo Notification de Prisma
-export type NotificationType = 'match_suggested' | 'message' | 'report_status_change'
+export type NotificationType =
+  'match_suggested' | 'message' | 'report_status_change' | 'nearby_report'
 
 export interface NotificationDTO {
   id: number

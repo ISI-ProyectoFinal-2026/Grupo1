@@ -50,12 +50,24 @@ export async function stubExternalServices(page: Page): Promise<void> {
   await page.route(`${R2_PUBLIC_URL}/**`, (route) => route.fulfill({ status: 204 }))
 }
 
+/**
+ * The first-run location consent modal (#33) covers the page until answered:
+ * decline it whenever it shows up. Pages created by hand (browser.newContext)
+ * must call this too.
+ */
+export async function dismissLocationConsent(page: Page): Promise<void> {
+  await page.addLocatorHandler(page.getByTestId('location-consent-overlay'), () =>
+    page.getByRole('button', { name: 'Ahora no' }).click(),
+  )
+}
+
 /** Small valid JPEG-typed file for the photo input (content is irrelevant, R2 is faked). */
 export const E2E_PHOTO = { name: 'e2e-photo.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('e2e-photo') }
 
 export const test = base.extend<Fixtures>({
   page: async ({ page }, use) => {
     await stubExternalServices(page)
+    await dismissLocationConsent(page)
     await use(page)
   },
 

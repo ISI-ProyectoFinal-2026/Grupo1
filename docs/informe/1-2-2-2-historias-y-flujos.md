@@ -347,44 +347,55 @@ Tabla 1.2.2-7. Reglas del módulo de IA y matching. Fuente: archivos de la colum
 
 | Issue | Historia | Estado del issue | Estado en el código |
 |---|---|---|---|
-| [#32](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/32) | Como usuario quiero recibir notificaciones de eventos importantes para seguir mi caso | Cerrado | Parcial: solo dentro de la app; no hay push ni email ni aviso de nuevo reporte en un radio |
-| [#33](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/33) | Como usuario quiero configurar mis preferencias de notificación para recibir solo lo relevante | Abierto | No implementada ([#226](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/226)) |
+| [#32](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/32) | Como usuario quiero recibir notificaciones de eventos importantes para seguir mi caso | Cerrado | Parcial: solo dentro de la app; no hay push ni email |
+| [#33](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/33) | Como usuario quiero configurar mis preferencias de notificación para recibir solo lo relevante | Abierto | Implementada (`backend/src/services/notification-preferences.service.ts`, `frontend/src/pages/account/NotificationSettingsPage.tsx`); reabierto por [#226](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/226) |
 | [#149](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/149) | Notificaciones en la interfaz: campana, lista y marcar como leída | Cerrado | Implementada (`frontend/src/components/notifications/`) |
-| [#176](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/176) | Como usuario que reportó una mascota quiero recibir una notificación cuando la IA detecta un match de alta similitud | Cerrado | Implementada (`backend/src/services/notifications.service.ts:58`) |
-| [#182](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/182) | Como dueño de un reporte quiero recibir una notificación cuando se publica, se rechaza por moderación o se resuelve | Cerrado | Implementada para la moderación por IA (`backend/src/services/notifications.service.ts:151`); el aviso al resolver era opcional en el issue y no existe |
+| [#176](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/176) | Como usuario que reportó una mascota quiero recibir una notificación cuando la IA detecta un match de alta similitud | Cerrado | Implementada (`backend/src/services/notifications.service.ts:59`) |
+| [#182](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/182) | Como dueño de un reporte quiero recibir una notificación cuando se publica, se rechaza por moderación o se resuelve | Cerrado | Implementada para la moderación por IA (`backend/src/services/notifications.service.ts:155`); el aviso al resolver era opcional en el issue y no existe |
 | [#222](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/222) | Las notificaciones deberían enlazar al reporte que mencionan | Abierto | No implementada |
 
 Tabla 1.2.2-8. Historias del módulo de notificaciones. Fuente: `gh issue list` (comando al inicio de la sección).
 
 ### Flujo punta a punta
 
-1. **Generación.** Toda notificación es una fila en `notifications` con un `type` de texto (`backend/prisma/schema.prisma:281`). Hay tres orígenes:
-   - `match_suggested`: el Backend IA llama a `POST /api/notifications/internal/match`, protegido con `X-Internal-Key` (`backend/src/routes/notifications.routes.ts:14`). `notifyMatch` y `createForMatch` crean una notificación por autor, apuntando al otro reporte, y no repiten una existente para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:58-135`).
-   - `report_status_change`: al aplicar el veredicto de la IA ("Tu reporte fue publicado" o "Tu reporte no fue publicado") (`backend/src/services/notifications.service.ts:151-170`).
-   - `message`: por cada mensaje de chat, para el receptor, con una vista previa (`backend/src/services/notifications.service.ts:189-203`).
-2. **Visualización.** La campana del encabezado (`frontend/src/layouts/MainLayout.tsx:154`) consulta `GET /api/notifications` cada 30 s (`frontend/src/hooks/useNotificationsQuery.ts:12`, `:23`), que devuelve las del usuario de la más nueva a la más vieja (`backend/src/services/notifications.service.ts:5-10`).
-3. **Gestión.** `PUT /api/notifications/:id/read` marca como leída y `DELETE /api/notifications/:id` borra; solo el destinatario (403 para otro usuario) (`backend/src/services/notifications.service.ts:12-34`).
+1. **Preferencias y ubicación.** Cada usuario tiene una fila opcional en `notification_preferences`; sin fila rigen los valores por defecto (`backend/prisma/schema.prisma:314`, `backend/src/services/notification-preferences.service.ts:24`, [ADR-0022](../adr/0022-preferencias-notificacion-tabla-propia.md)).
+   - La primera vez que un usuario con sesión abre la app, `LocationConsentModal` le pregunta si acepta compartir su ubicación ("Aceptar" o "Ahora no"); la respuesta queda registrada y el modal no vuelve a aparecer (`frontend/src/components/account/LocationConsentModal.tsx`).
+   - Con el consentimiento aceptado, `useLocationSync` envía la ubicación del navegador una vez por carga de página y el backend guarda solo la última, con su fecha (`frontend/src/hooks/useLocationSync.ts`, `backend/src/services/notification-preferences.service.ts:102`). Si el usuario revoca el consentimiento, se borra la ubicación y se desactiva el aviso de zona (`backend/src/services/notification-preferences.service.ts:76`).
+   - En `/account/notifications`, enlazada desde el menú "Más", el usuario activa o desactiva cada tipo de aviso y, para el de zona, elige radio y tipo de reporte (`frontend/src/pages/account/NotificationSettingsPage.tsx`). Los endpoints son `GET` y `PUT /api/notification-preferences`, `PUT .../location-consent` y `PUT .../location`, todos con JWT y limitados a las preferencias del propio usuario (`backend/src/routes/notification-preferences.routes.ts:7-10`).
+2. **Generación.** Toda notificación es una fila en `notifications` con un `type` de texto (`backend/prisma/schema.prisma:282`). Antes de crearla se consulta la preferencia del destinatario y, si ese tipo está desactivado, no se crea; la acción que la origina no cambia (`backend/src/services/notification-preferences.service.ts:56`). Hay cuatro orígenes:
+   - `match_suggested`: el Backend IA llama a `POST /api/notifications/internal/match`, protegido con `X-Internal-Key` (`backend/src/routes/notifications.routes.ts:14`). `notifyMatch` y `createForMatch` crean una notificación por autor, apuntando al otro reporte, y no repiten una existente para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:59-139`).
+   - `report_status_change`: al aplicar el veredicto de la IA ("Tu reporte fue publicado" o "Tu reporte no fue publicado") (`backend/src/services/notifications.service.ts:155-177`).
+   - `message`: por cada mensaje de chat, para el receptor, con una vista previa (`backend/src/services/notifications.service.ts:196-214`).
+   - `nearby_report`: cuando un reporte pasa a `published`, `applyModerationVerdict` llama a `createForNearbyReport` (`backend/src/services/matching.service.ts:92-97`). Avisa a los usuarios que no son el autor, tienen el aviso de zona activado, aceptaron compartir su ubicación, coincide el tipo de reporte elegido y su última ubicación está dentro del radio (consulta PostGIS `ST_DWithin`); no repite el aviso para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:224-263`).
+3. **Visualización.** La campana del encabezado (`frontend/src/layouts/MainLayout.tsx:164`) consulta `GET /api/notifications` cada 30 s (`frontend/src/hooks/useNotificationsQuery.ts:12`, `:23`), que devuelve las del usuario de la más nueva a la más vieja (`backend/src/services/notifications.service.ts:6-11`).
+4. **Gestión.** `PUT /api/notifications/:id/read` marca como leída y `DELETE /api/notifications/:id` borra; solo el destinatario (403 para otro usuario) (`backend/src/services/notifications.service.ts:13-35`).
 
 ### Reglas de negocio
 
 | Regla | Valor | Fuente |
 |---|---|---|
 | Consulta de la campana | Cada 30 s | `frontend/src/hooks/useNotificationsQuery.ts:12` |
-| Duplicados de coincidencia | Una por usuario y reporte; si ambos reportes son del mismo usuario, una sola | `backend/src/services/notifications.service.ts:61-86` |
-| Vista previa del mensaje | Hasta 80 caracteres | `backend/src/services/notifications.service.ts:172` |
-| Propiedad | Solo el destinatario lee, marca o borra | `backend/src/services/notifications.service.ts:12-21` |
+| Duplicados de coincidencia | Una por usuario y reporte; si ambos reportes son del mismo usuario, una sola | `backend/src/services/notifications.service.ts:62-90` |
+| Vista previa del mensaje | Hasta 80 caracteres | `backend/src/services/notifications.service.ts:179` |
+| Propiedad | Solo el destinatario lee, marca o borra | `backend/src/services/notifications.service.ts:13-22` |
+| Valores por defecto | Todos los avisos activados, radio de 5 km y reportes perdidos y encontrados | `backend/prisma/schema.prisma:314` |
+| Radio del aviso de zona | 1, 2, 5 o 10 km | `backend/src/validators/notification-preferences.validator.ts` |
+| Aviso de zona sin consentimiento | No se puede activar (409) ni guardar la ubicación (403) | `backend/src/services/notification-preferences.service.ts:61`, `:102` |
+| Duplicados del aviso de zona | Uno por usuario y reporte, también si el reporte se vuelve a publicar | `backend/src/services/notifications.service.ts:224-263` |
 
 Tabla 1.2.2-9. Reglas del módulo de notificaciones. Fuente: archivos de la columna Fuente.
 
 ### Qué pasa si algo falla
 
-- Un error al crear la notificación no hace fallar la acción que la origina (`backend/src/services/matching.service.ts:85-89`, `backend/src/sockets/chat.socket.ts:97-102`).
+- Un error al crear la notificación no hace fallar la acción que la origina, tampoco el aviso de zona al publicar un reporte (`backend/src/services/matching.service.ts:86-97`, `backend/src/sockets/chat.socket.ts:97-102`).
+- Si el navegador deniega la geolocalización, el consentimiento queda registrado, no se guarda ubicación y no se muestra ningún error (`frontend/src/hooks/useLocationSync.ts`).
 - Sin `NODE_BACKEND_URL` en el Backend IA, las coincidencias se guardan sin notificación (`backend-ia/app/services/matching_service.py:38-39`).
 
 ### Limitaciones conocidas
 
 - La notificación no enlaza al reporte ([#222](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/222)).
-- No hay preferencias de notificación; [#33](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/33) se reabrió por ese motivo ([#226](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/226)).
+- La ubicación se actualiza solo al abrir la app, una vez por carga de página; el aviso de zona usa la última ubicación guardada.
+- Los reportes sin ubicación no generan aviso de zona.
 - No hay avisos por email ni push, ni aviso al cerrar un reporte o al ocultarlo por una denuncia ([#223](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/223)).
 
 ## 1.2.2.2.5 Módulo de Chat
