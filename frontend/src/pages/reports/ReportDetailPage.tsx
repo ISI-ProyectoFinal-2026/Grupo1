@@ -223,6 +223,7 @@ export default function ReportDetailPage() {
               <LocationMap
                 location={report.location}
                 label={report.locationAddress || report.title}
+                reportType={report.reportType}
               />
             </section>
           )}

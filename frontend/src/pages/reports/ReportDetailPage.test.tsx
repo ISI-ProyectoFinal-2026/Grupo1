@@ -6,6 +6,7 @@ import { createQueryWrapper } from '@/test/query-wrapper'
 import { useAuthStore } from '@/stores/auth.store'
 import * as reportsService from '@/services/reports.service'
 import ReportDetailPage from '@/pages/reports/ReportDetailPage'
+import { PIN_COLORS } from '@/components/reports/reportPinIcon'
 import type { MatchDTO, ReportDTO } from '@/types/report.types'
 import type { AuthUser } from '@/types/auth'
 
@@ -204,6 +205,19 @@ describe('ReportDetailPage mapa', () => {
     expect(pin).toHaveAttribute('data-position', '-34.6177,-68.3301')
     expect(pin).toHaveAttribute('data-draggable', 'false')
     expect(pin).toHaveAttribute('title', 'San Rafael')
+  })
+
+  it.each([
+    ['lost', PIN_COLORS.lost],
+    ['found', PIN_COLORS.found],
+  ] as const)('el pin del mapa usa el color del tipo de reporte (%s)', async (reportType, color) => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(
+      reporte({ reportType, location: { lat: -34.6177, lng: -68.3301 } })
+    )
+    renderPage()
+
+    const mapa = await screen.findByRole('region', { name: 'Mapa de la ubicación' })
+    expect(within(mapa).getByTestId('marker').getAttribute('data-icon-html')).toContain(color)
   })
 
   it('no muestra mapa si el reporte no tiene coordenadas', async () => {
