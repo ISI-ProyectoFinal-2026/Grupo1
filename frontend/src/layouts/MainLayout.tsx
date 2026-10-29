@@ -2,10 +2,12 @@ import { useState, type ComponentType, type SVGProps } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
+import LocationConsentModal from "@/components/account/LocationConsentModal";
 import UnverifiedEmailBanner from "@/components/auth/UnverifiedEmailBanner";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsModerator } from "@/hooks/useIsModerator";
+import { useLocationSync } from "@/hooks/useLocationSync";
 import { cn } from "@/lib/cn";
 import {
   ChatIcon,
@@ -102,6 +104,8 @@ function MainLayout() {
   const isModerator = useIsModerator();
   // Mantiene sincronizado `emailVerifiedAt` con el backend (ver el hook).
   useCurrentUser();
+  // Actualiza la ubicación una vez por apertura si la persona la aceptó.
+  useLocationSync();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   // Navigating from outside the sheet (bell, links in the page) must close it too.
   const [sheetPathname, setSheetPathname] = useState(pathname);
@@ -303,6 +307,7 @@ function MainLayout() {
         <UnverifiedEmailBanner />
         <Outlet />
       </main>
+      <LocationConsentModal />
     </div>
   );
 }
