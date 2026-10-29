@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BellIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import type { NotificationDTO } from '@/types/notification.types'
 
@@ -22,7 +23,7 @@ function formatDate(value: string) {
 }
 
 const actionClasses =
-  'inline-flex min-h-11 items-center rounded-control px-2 text-sm font-bold transition-colors hover:bg-surface'
+  'press inline-flex min-h-11 items-center rounded-control px-2 text-sm font-bold hover:bg-surface'
 
 function NotificationList({ notifications, onMarkRead, onDelete }: NotificationListProps) {
   const [page, setPage] = useState(0)
@@ -34,7 +35,14 @@ function NotificationList({ notifications, onMarkRead, onDelete }: NotificationL
   const visible = notifications.slice(start, start + NOTIFICATIONS_PAGE_SIZE)
 
   if (notifications.length === 0) {
-    return <p className='px-4 py-8 text-center text-sm text-ink-muted'>No tenés notificaciones</p>
+    return (
+      <div className='flex flex-col items-center gap-3 px-4 py-10 text-center'>
+        <span className='grid h-12 w-12 place-items-center rounded-full bg-surface text-ink-muted ring-1 ring-line'>
+          <BellIcon className='h-6 w-6' />
+        </span>
+        <p className='text-sm text-ink-muted'>No tenés notificaciones</p>
+      </div>
+    )
   }
 
   return (

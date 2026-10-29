@@ -31,7 +31,7 @@ function NotificationBell() {
         aria-controls='panel-notificaciones'
         onClick={() => setOpen((previous) => !previous)}
         className={cn(
-          'relative grid h-11 w-11 place-items-center rounded-full text-ink transition-colors hover:bg-ink/5',
+          'press relative grid h-11 w-11 place-items-center rounded-full text-ink hover:bg-ink/5',
           open && 'bg-ink/5'
         )}
       >
@@ -52,10 +52,12 @@ function NotificationBell() {
           className={cn(
             'fixed inset-x-3 top-[calc(var(--header-h)+0.5rem)] z-40 max-h-[70vh] overflow-y-auto overscroll-contain rounded-card border border-line bg-paper shadow-pop',
             'sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96',
-            'lg:left-0 lg:right-auto'
+            'lg:left-0 lg:right-auto',
+            // crece desde la campana: el origen sigue al lado donde se ancla
+            'origin-top animate-pop sm:origin-top-right lg:origin-top-left'
           )}
         >
-          <h2 className='border-b border-line px-4 py-3 font-display text-display-sm'>Notificaciones</h2>
+          <h2 className='sticky top-0 z-10 border-b border-line bg-paper px-4 py-3 font-display text-display-sm'>Notificaciones</h2>
           <NotificationList
             notifications={notifications ?? []}
             onMarkRead={(id) => markRead.mutate(id)}

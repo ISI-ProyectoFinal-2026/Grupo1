@@ -1,7 +1,10 @@
 import { Link } from "react-router-dom";
 import type { ReportDTO } from "@/types/report.types";
-import { PawIcon, PinIcon } from "@/components/ui/icons";
+import { PinIcon } from "@/components/ui/icons";
+import { DogFace } from "@/components/ui/canine";
 import { formatRelativeDate } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import { tagTone } from "@/lib/tag-tone";
 
 interface ReportCardProps {
   report: ReportDTO;
@@ -11,9 +14,19 @@ interface ReportCardProps {
 // etiqueta de estado va encima, como el sticker del afiche.
 export default function ReportCard({ report }: ReportCardProps) {
   return (
-    <Link to={`/reports/${report.id}`} className="group block h-full rounded-card">
-      <article className="card flex h-full flex-col overflow-hidden transition-colors duration-150 group-hover:border-ink-muted">
-        <div className="relative aspect-[4/3] bg-surface">
+    <Link
+      to={`/reports/${report.id}`}
+      className="group block h-full rounded-card transition-transform duration-press ease-out active:scale-[0.985]"
+    >
+      {/* La sombra de hover vive en un pseudo-elemento: se anima solo su opacidad. */}
+      <article
+        className={cn(
+          "card relative flex h-full flex-col transition-[transform,border-color] duration-base ease-out",
+          "after:pointer-events-none after:absolute after:inset-0 after:rounded-card after:opacity-0 after:shadow-lift after:transition-opacity after:duration-base after:ease-out",
+          "group-hover:-translate-y-0.5 group-hover:border-ink-muted/60 group-hover:after:opacity-100",
+        )}
+      >
+        <div className="relative aspect-[4/3] overflow-hidden rounded-t-[15px] bg-surface">
           {report.imageUrl ? (
             // Absolute so a portrait photo can't stretch the box past 4:3: an
             // in-flow image raises the aspect-ratio box's automatic min-height.
@@ -24,18 +37,18 @@ export default function ReportCard({ report }: ReportCardProps) {
               height={300}
               loading="lazy"
               decoding="async"
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
             />
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-1 text-ink-muted">
-              <PawIcon className="h-10 w-10" strokeWidth={1.5} />
+            <div className="flex h-full flex-col items-center justify-center gap-2 bg-signal-soft text-ink-muted">
+              <DogFace className="w-20" />
               <span className="text-sm">Sin foto</span>
             </div>
           )}
           {report.tag && (
             <span
               className="tag-sticker absolute left-3 top-3 -rotate-3"
-              style={{ backgroundColor: report.tag.color }}
+              style={{ backgroundColor: tagTone(report.tag) }}
             >
               {report.tag.label}
             </span>

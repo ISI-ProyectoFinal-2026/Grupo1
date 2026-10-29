@@ -22,11 +22,11 @@ const REPORT_TYPE_LABEL: Record<MatchDTO["reportType"], string> = {
 
 // Tonos con contraste AA contra el texto blanco de la pastilla.
 const REPORT_TYPE_COLOR: Record<MatchDTO["reportType"], string> = {
-  lost: "#D93636",
-  found: "#2563EB",
+  lost: "#C4342B",
+  found: "#2457A6",
 };
 
-const CONFIRMED_COLOR = "#176B47";
+const CONFIRMED_COLOR = "#1F7A4D";
 
 export default function MatchCard({
   match,
@@ -42,7 +42,7 @@ export default function MatchCard({
     <div className="card overflow-hidden">
       <Link
         to={`/reports/${match.reportId}`}
-        className="flex gap-3 p-3 transition-colors hover:bg-surface"
+        className="flex gap-3 p-3 transition-colors duration-fast hover:bg-surface"
       >
         {match.imageUrl ? (
           <img

@@ -8,6 +8,7 @@ import type { ReportLocation } from "@/types/report.types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import { CheckIcon } from "@/components/ui/icons";
 import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
 import { getApiErrorCode } from "@/services/api";
 import { EMAIL_NOT_VERIFIED } from "@/types/auth";
@@ -222,7 +223,10 @@ export default function ReportForm(props: ReportFormProps) {
                 alt="Foto subida"
                 className="size-20 shrink-0 rounded-control border border-line object-cover"
               />
-              <p className="text-sm font-bold text-success-ink">✓ Foto subida correctamente</p>
+              <p className="flex items-center gap-1.5 text-sm font-bold text-success-ink">
+                <CheckIcon className="h-4 w-4 shrink-0" />
+                Foto subida correctamente
+              </p>
             </div>
           ))
         )}

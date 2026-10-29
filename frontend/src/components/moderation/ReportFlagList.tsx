@@ -1,3 +1,4 @@
+import EmptyState from '@/components/ui/EmptyState'
 import { Link } from 'react-router-dom'
 import Badge from '@/components/ui/Badge'
 import { buttonClasses } from '@/components/ui/buttonClasses'
@@ -6,10 +7,10 @@ import type { ReportFlagDTO } from '@/types/moderation.types'
 import { REPORT_STATUS_LABELS } from '@/lib/report-status'
 
 const REPORT_STATUS_COLORS: Record<ReportStatus, string> = {
-  pending: '#a16207',
-  published: '#15803d',
-  rejected: '#b91c1c',
-  resolved: '#1d4ed8',
+  pending: '#8A5A0B',
+  published: '#1F7A4D',
+  rejected: '#C4342B',
+  resolved: '#2457A6',
 }
 
 interface ReportFlagListProps {
@@ -32,9 +33,9 @@ function formatDate(value: string) {
 function ReportFlagList({ flags, onResolve, resolvingId }: ReportFlagListProps) {
   if (flags.length === 0) {
     return (
-      <p className='rounded-card border border-dashed border-line px-4 py-10 text-center text-ink-muted'>
-        No hay reportes pendientes de moderación
-      </p>
+      <EmptyState>
+        <p className='text-ink-muted'>No hay reportes pendientes de moderación</p>
+      </EmptyState>
     )
   }
 

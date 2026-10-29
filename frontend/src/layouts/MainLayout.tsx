@@ -59,12 +59,14 @@ function Wordmark() {
     <Link
       to="/"
       translate="no"
-      className="inline-flex min-h-11 items-center gap-2 rounded-control font-display text-xl font-extrabold tracking-tight text-ink"
+      className="inline-flex min-h-11 items-center gap-2.5 rounded-control text-ink"
     >
-      <span className="grid h-8 w-8 -rotate-6 place-items-center rounded-[10px] bg-signal">
+      {/* Chapita de collar: argolla arriba */}
+      <span className="relative grid h-9 w-9 -rotate-6 place-items-center rounded-full bg-signal text-ink">
+        <span aria-hidden="true" className="absolute -top-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-ink/70 bg-paper" />
         <PawIcon className="h-5 w-5" />
       </span>
-      <span>PATITAS</span>
+      <span className="letra-filete text-[1.625rem] leading-none">PATITAS</span>
     </Link>
   );
 }
@@ -78,15 +80,15 @@ function TabLink({ item, pathname, onNavigate }: { item: NavItemConfig; pathname
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex h-full min-h-11 flex-col items-center justify-center gap-0.5 rounded-control px-1 text-xs font-bold transition-colors",
+        "group flex h-full min-h-11 flex-col items-center justify-center gap-0.5 rounded-control px-1 text-xs font-bold transition-colors duration-fast",
         "lg:h-11 lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:text-base",
-        active ? "text-ink lg:bg-surface" : "text-ink-muted hover:text-ink lg:hover:bg-surface",
+        active ? "text-signal-ink lg:bg-signal-soft" : "text-ink-muted hover:text-ink lg:hover:bg-ink/5",
       )}
     >
       <span
         className={cn(
-          "grid h-7 w-12 place-items-center rounded-full transition-colors lg:h-auto lg:w-auto",
-          active && "bg-signal/40 lg:bg-transparent",
+          "grid h-7 w-12 place-items-center rounded-full transition-[background-color,transform] duration-press ease-out group-active:scale-90 lg:h-auto lg:w-auto lg:group-active:scale-100",
+          active && "bg-signal-track lg:bg-transparent",
         )}
       >
         <Icon className="h-[22px] w-[22px]" />
@@ -139,8 +141,8 @@ function MainLayout() {
 
   const moreLinkClasses = (active: boolean) =>
     cn(
-      "flex min-h-12 items-center gap-3 rounded-control px-3 text-base font-bold transition-colors lg:min-h-11",
-      active ? "bg-surface text-ink" : "text-ink-muted hover:bg-surface hover:text-ink",
+      "press flex min-h-12 items-center gap-3 rounded-control px-3 text-base font-bold lg:min-h-11",
+      active ? "bg-signal-soft text-signal-ink" : "text-ink-muted hover:bg-ink/5 hover:text-ink",
     );
 
   return (
@@ -156,7 +158,7 @@ function MainLayout() {
         className={cn(
           "z-30 flex h-header items-center justify-between gap-3 px-4",
           user
-            ? "sticky top-0 border-b border-line bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/85 lg:fixed lg:z-40 lg:left-0 lg:w-sidebar lg:border-r lg:bg-paper lg:px-5"
+            ? "sticky top-0 border-b border-line bg-paper lg:fixed lg:z-40 lg:left-0 lg:w-sidebar lg:border-r lg:px-5"
             : "mx-auto max-w-5xl sm:px-6",
         )}
       >
@@ -188,11 +190,11 @@ function MainLayout() {
                 onClick={closeMore}
                 aria-current={isReportarActive ? "page" : undefined}
                 className={cn(
-                  "flex h-full flex-col items-center justify-center gap-0.5 text-xs font-bold text-ink",
-                  "lg:h-auto lg:min-h-12 lg:flex-row lg:gap-2 lg:rounded-control lg:bg-signal lg:px-4 lg:text-base lg:hover:bg-signal-deep",
+                  "group flex h-full flex-col items-center justify-center gap-0.5 text-xs font-bold text-ink",
+                  "lg:press lg:h-auto lg:min-h-12 lg:flex-row lg:gap-2 lg:rounded-full lg:bg-signal lg:px-4 lg:text-base lg:hover:bg-signal-deep",
                 )}
               >
-                <span className="-my-1 grid h-9 w-11 place-items-center rounded-full bg-signal lg:my-0 transition-transform active:scale-95 motion-reduce:transition-none lg:h-auto lg:w-auto lg:bg-transparent">
+                <span className="-my-1 grid h-10 w-12 place-items-center rounded-full bg-signal ring-4 ring-paper transition-transform duration-press ease-out group-active:scale-90 lg:my-0 lg:h-auto lg:w-auto lg:bg-transparent lg:ring-0 lg:group-active:scale-100">
                   <PlusIcon className="h-6 w-6 lg:h-5 lg:w-5" strokeWidth={2.5} />
                 </span>
                 Reportar
@@ -212,14 +214,14 @@ function MainLayout() {
                 aria-controls="menu-mas"
                 onClick={() => setIsMoreOpen((open) => !open)}
                 className={cn(
-                  "flex h-full min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-control text-xs font-bold transition-colors",
-                  isMoreActive || isMoreOpen ? "text-ink" : "text-ink-muted hover:text-ink",
+                  "group flex h-full min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-control text-xs font-bold transition-colors duration-fast",
+                  isMoreActive || isMoreOpen ? "text-signal-ink" : "text-ink-muted hover:text-ink",
                 )}
               >
                 <span
                   className={cn(
-                    "grid h-7 w-12 place-items-center rounded-full",
-                    isMoreActive && "bg-signal/40",
+                    "grid h-7 w-12 place-items-center rounded-full transition-[background-color,transform] duration-press ease-out group-active:scale-90",
+                    (isMoreActive || isMoreOpen) && "bg-signal-track",
                   )}
                 >
                   <MoreIcon className="h-[22px] w-[22px]" />
@@ -235,7 +237,7 @@ function MainLayout() {
               aria-label="Cerrar menú"
               tabIndex={-1}
               onClick={closeMore}
-              className="fixed inset-0 -z-10 bg-ink/40 lg:hidden"
+              className="fixed inset-0 -z-10 animate-fade bg-ink/40 lg:hidden"
             />
           )}
 
@@ -246,6 +248,7 @@ function MainLayout() {
             className={cn(
               isMoreOpen ? "flex" : "hidden",
               "fixed inset-x-0 bottom-above-tabbar flex-col gap-1 overscroll-contain rounded-t-card border-t border-line bg-paper p-3 shadow-sheet",
+              isMoreOpen && "max-lg:animate-sheet",
               "lg:static lg:mt-auto lg:flex lg:rounded-none lg:shadow-none",
             )}
           >
@@ -304,7 +307,7 @@ function MainLayout() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="mt-1 inline-flex min-h-11 items-center gap-3 rounded-control px-3 text-base font-bold text-ink transition-colors hover:bg-surface"
+                className="press mt-1 inline-flex min-h-11 items-center gap-3 rounded-control px-3 text-base font-bold text-ink hover:bg-ink/5"
               >
                 <LogoutIcon className="h-5 w-5" />
                 Cerrar sesión

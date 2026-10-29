@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import Button from '@/components/ui/Button'
 import { buttonClasses } from '@/components/ui/buttonClasses'
 import ErrorMessage from '@/components/ui/ErrorMessage'
-import { PawIcon } from '@/components/ui/icons'
+import { BoneTag } from '@/components/ui/canine'
 import type { PetDTO } from '@/types/pet.types'
 
 interface PetCardProps {
@@ -34,8 +34,8 @@ export default function PetCard({
             className='size-20 shrink-0 rounded-control border border-line object-cover'
           />
         ) : (
-          <span className='grid size-20 shrink-0 place-items-center rounded-control bg-surface text-ink-muted'>
-            <PawIcon className='h-8 w-8' />
+          <span className='grid size-20 shrink-0 place-items-center rounded-control bg-surface'>
+            <BoneTag className='w-14 -rotate-6' />
           </span>
         )}
         <div className='min-w-0'>

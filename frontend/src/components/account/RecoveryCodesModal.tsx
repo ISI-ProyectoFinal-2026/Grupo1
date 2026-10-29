@@ -71,7 +71,7 @@ function RecoveryCodesModal({ codes, onClose }: RecoveryCodesModalProps) {
   return (
     <div
       data-testid="recovery-codes-overlay"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex animate-fade items-end justify-center bg-ink/40 p-4 pb-[calc(1rem+var(--safe-bottom))] sm:items-center"
     >
       <div
         ref={dialogRef}
@@ -80,7 +80,7 @@ function RecoveryCodesModal({ codes, onClose }: RecoveryCodesModalProps) {
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className="max-h-full w-full max-w-md overflow-y-auto overscroll-contain rounded-card bg-paper p-5 shadow-pop focus:outline-none sm:p-6"
+        className="max-h-full w-full max-w-md animate-sheet overflow-y-auto overscroll-contain rounded-card bg-paper p-5 shadow-pop focus:outline-none sm:animate-pop sm:p-6"
       >
         <h2 id={titleId} className="font-display text-display-md">
           Tus códigos de recuperación

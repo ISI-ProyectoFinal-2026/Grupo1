@@ -5,23 +5,45 @@
 @layer base {
   :root {
     /* Tokens de color como canales RGB (Tailwind les aplica la opacidad). */
-    --color-ink: 27 36 48; /* #1B2430 */
-    --color-ink-muted: 91 102 117; /* #5B6675 */
-    --color-line: 221 226 232; /* #DDE2E8 */
-    --color-surface: 243 245 247; /* #F3F5F7 */
+    /* Mundo "filete de barrio": revoque rosado, negro carruaje y oro de filete. */
+    --color-ink: 42 31 26; /* #2A1F1A negro carruaje */
+    --color-ink-muted: 110 88 78; /* #6E584E */
+    --color-line: 238 223 212; /* #EEDFD4 */
+    --color-surface: 248 237 234; /* #F8EDEA revoque rosado */
     --color-paper: 255 255 255; /* #FFFFFF */
-    --color-signal: 255 206 58; /* #FFCE3A */
-    --color-signal-deep: 240 184 20; /* hover del signal */
-    --color-danger: 217 54 54; /* #D93636 */
-    --color-danger-soft: 253 236 236;
-    --color-success: 31 138 91; /* #1F8A5B */
-    --color-success-ink: 23 107 71; /* texto chico sobre blanco con contraste AA */
-    --color-success-soft: 230 245 238;
+    --color-signal: 244 180 62; /* #F4B43E oro de filete */
+    --color-signal-deep: 230 160 40; /* hover del signal */
+    --color-signal-soft: 254 244 223; /* tinte de areas (nav activo, badges) */
+    --color-signal-track: 251 226 174;
+    --color-signal-ink: 122 74 11; /* texto sobre tintes de oro */
+    --color-danger: 196 52 43; /* #C4342B */
+    --color-danger-soft: 252 230 225;
+    --color-success: 31 122 77; /* #1F7A4D */
+    --color-success-ink: 22 96 60; /* texto chico sobre blanco con contraste AA */
+    --color-success-soft: 226 243 233;
+
+    /* Estados del reporte */
+    --color-lost: 196 52 43; /* #C4342B perdido */
+    --color-lost-soft: 252 230 225;
+    --color-found: 36 87 166; /* #2457A6 encontrado */
+    --color-found-soft: 225 234 248;
+
+    /* Perro callejero caramelo de las ilustraciones */
+    --color-caramel: 201 128 66; /* #C98042 */
+    --color-caramel-soft: 246 214 178;
 
     --header-h: 3.5rem;
     --tabbar-h: 4rem;
     --sidebar-w: 16rem;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* Movimiento: curvas fuertes y duraciones cortas (UI < 300ms). */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    --duration-press: 140ms;
+    --duration-fast: 180ms;
+    --duration-base: 220ms;
 
     color-scheme: light;
     -webkit-text-size-adjust: 100%;
@@ -30,12 +52,27 @@
   html {
     background-color: rgb(var(--color-surface));
     -webkit-tap-highlight-color: transparent;
+    scrollbar-gutter: stable;
   }
 
+  ::selection {
+    background-color: rgb(var(--color-signal) / 0.55);
+    color: rgb(var(--color-ink));
+  }
+
+  /* Empapelado de barrio: huellas y huesitos muy tenues sobre el revoque */
   body {
     @apply bg-surface font-sans text-base text-ink antialiased;
     min-height: 100vh;
     min-height: 100dvh;
+    caret-color: rgb(var(--color-caramel));
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='%232A1F1A' fill-opacity='0.05'%3E%3Cg transform='translate(18 20) rotate(-18 12 12)'%3E%3Ccircle cx='5.5' cy='10' r='2.3'/%3E%3Ccircle cx='9.5' cy='5.5' r='2.3'/%3E%3Ccircle cx='14.5' cy='5.5' r='2.3'/%3E%3Ccircle cx='18.5' cy='10' r='2.3'/%3E%3Cpath d='M12 11.5c-2.6 0-5.5 3.4-5.5 6 0 1.6 1.2 2.5 2.7 2.5 1.2 0 1.8-.6 2.8-.6s1.6.6 2.8.6c1.5 0 2.7-.9 2.7-2.5 0-2.6-2.9-6-5.5-6Z'/%3E%3C/g%3E%3Cg transform='translate(78 88) rotate(28 14 6)'%3E%3Crect x='4' y='3' width='20' height='6' rx='2'/%3E%3Ccircle cx='4.5' cy='3.5' r='3'/%3E%3Ccircle cx='4.5' cy='8.5' r='3'/%3E%3Ccircle cx='23.5' cy='3.5' r='3'/%3E%3Ccircle cx='23.5' cy='8.5' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* Scrollbar del mismo mundo */
+  * {
+    scrollbar-color: rgb(var(--color-ink) / 0.28) transparent;
   }
 
   h1,
@@ -44,6 +81,13 @@
   h4 {
     @apply font-display;
     text-wrap: balance;
+  }
+
+  /* Titulos grandes en letra de filete */
+  :is(h1, p).text-display-lg,
+  :is(h1, p).text-display-xl {
+    font-family: "Abril Fatface", Georgia, serif;
+    font-weight: 400;
   }
 
   p {
@@ -58,6 +102,14 @@
   label,
   summary {
     touch-action: manipulation;
+  }
+
+  /* Un control no es texto: el long-press no debe seleccionar su etiqueta. */
+  button,
+  [role="button"],
+  summary {
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   :focus-visible {
@@ -84,13 +136,60 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+
+    /* Entradas: sin desplazamiento, solo un fundido corto. */
+    .animate-fade,
+    .stagger > *,
+    .animate-rise,
+    .animate-drop,
+    .animate-pop,
+    .animate-sheet,
+    .dog-peek,
+    .dog-paws,
+    .paw-step {
+      animation-name: reduced-fade !important;
+      animation-duration: 160ms !important;
+      animation-delay: 0ms !important;
+    }
+
+    /* El spinner es funcional: gira lento en vez de quedar quieto. */
+    .spinner {
+      animation-duration: 1.5s !important;
+      animation-iteration-count: infinite !important;
+    }
+
+    .skeleton {
+      animation: none !important;
+    }
+  }
+
+  @keyframes reduced-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes skeleton-breathe {
+    50% {
+      opacity: 0.55;
+    }
   }
 }
 
 @layer components {
   /* Campo de formulario: 16px minimo para que iOS no haga zoom al enfocar. */
   .field {
-    @apply block min-h-[44px] w-full rounded-control border border-line bg-paper px-3.5 py-2.5 text-base text-ink transition-colors placeholder:text-ink-muted hover:border-ink-muted focus-visible:border-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/25 disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-muted aria-[invalid=true]:border-danger;
+    @apply block min-h-[44px] w-full rounded-control border border-line bg-paper px-3.5 py-2.5 text-base text-ink shadow-card transition-colors duration-fast ease-out placeholder:text-ink-muted hover:border-ink-muted focus-visible:border-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-signal/45 disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-muted aria-[invalid=true]:border-danger;
+  }
+
+  /* Select nativo con chevron propio (el del sistema varia por navegador). */
+  select.field:not([multiple]) {
+    appearance: none;
+    padding-right: 2.75rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236E584E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.875rem center;
+    background-repeat: no-repeat;
+    background-size: 1.125rem;
   }
 
   .field-label {
@@ -98,13 +197,215 @@
   }
 
   .card {
-    @apply rounded-card border border-line bg-paper;
+    @apply rounded-card border border-line bg-paper shadow-card;
+  }
+
+  /* Feedback de presion: escala apenas al tocar, vuelve rapido al soltar. */
+  .press {
+    transition-property: color, background-color, border-color, transform;
+    transition-duration: var(--duration-press);
+    transition-timing-function: var(--ease-out);
+  }
+
+  .press:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: scale(0.97);
+  }
+
+  /* Lista que entra en cascada (40ms entre items, con tope). */
+  .stagger > * {
+    animation: rise-in 280ms var(--ease-out) both;
+  }
+  .stagger > :nth-child(2) { animation-delay: 40ms; }
+  .stagger > :nth-child(3) { animation-delay: 80ms; }
+  .stagger > :nth-child(4) { animation-delay: 120ms; }
+  .stagger > :nth-child(5) { animation-delay: 160ms; }
+  .stagger > :nth-child(6) { animation-delay: 200ms; }
+  .stagger > :nth-child(n + 7) { animation-delay: 240ms; }
+
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  /* Placeholder de carga. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background-color: rgb(var(--color-line) / 0.65);
+  }
+
+  /* Respira suave mientras carga */
+  .skeleton {
+    animation: skeleton-breathe 1.6s ease-in-out infinite;
+  }
+
+  /* Perro asomado en las pantallas de auth */
+  .dog-peek {
+    animation: dog-peek-up 380ms var(--ease-out) 200ms both;
+  }
+
+  .dog-paws {
+    animation: drop-in var(--duration-fast) var(--ease-out) 460ms both;
+  }
+
+  .dog-head {
+    transform-origin: 48px 60px;
+    transition: transform 260ms var(--ease-out);
+  }
+
+  .dog-ear {
+    transition: transform var(--duration-base) var(--ease-out);
+  }
+  .dog-ear-left { transform-origin: 33px 28px; }
+  .dog-ear-right { transform-origin: 63px 28px; }
+
+  .dog-eye {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .dog-nose {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  /* Orejas paradas mientras completás el formulario */
+  .auth-frame:focus-within .dog-ear-left { transform: rotate(16deg); }
+  .auth-frame:focus-within .dog-ear-right { transform: rotate(-16deg); }
+  .auth-frame:focus-within .dog-nose {
+    animation: dog-sniff 420ms var(--ease-in-out) 2;
+  }
+
+  /* No mira la contraseña */
+  .auth-frame:has(input[type="password"]:focus) .dog-eye {
+    transform: scaleY(0.15);
+  }
+
+  /* Cabeza ladeada ante un error */
+  .auth-frame:has([role="alert"]) .dog-head {
+    transform: rotate(-9deg);
+  }
+
+  /* Contento ante un aviso de exito */
+  .auth-frame:has([data-happy]) .dog-head {
+    animation: dog-happy 520ms ease-in-out 640ms 2;
+  }
+
+  @keyframes dog-happy {
+    25% {
+      transform: rotate(-6deg);
+    }
+    75% {
+      transform: rotate(6deg);
+    }
+  }
+
+  @keyframes dog-peek-up {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+  }
+
+  @keyframes drop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes dog-sniff {
+    50% {
+      transform: scale(1.18, 0.9);
+    }
+  }
+
+  /* Rastro de huellas: aparece paso a paso una sola vez */
+  .paw-step {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: paw-step-in 260ms var(--ease-out) both;
+  }
+
+  @keyframes paw-step-in {
+    from {
+      opacity: 0;
+      transform: scale(0.7);
+    }
+  }
+
+  /* Perro olfateando: unas pocas veces y queda quieto */
+  .dog-sniff-head {
+    transform-origin: 62px 54px;
+    animation: dog-sniff-head 1.8s var(--ease-in-out) 400ms 3;
+  }
+
+  .dog-tail {
+    transform-origin: 121px 50px;
+    animation: dog-wag 520ms ease-in-out 400ms 4;
+  }
+
+  .dog-scent {
+    opacity: 0;
+    animation: dog-scent 1.8s var(--ease-out) 600ms 3;
+  }
+
+  @keyframes dog-sniff-head {
+    20%,
+    40% {
+      transform: rotate(5deg);
+    }
+    30% {
+      transform: rotate(2deg);
+    }
+    60% {
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes dog-wag {
+    25% {
+      transform: rotate(-10deg);
+    }
+    75% {
+      transform: rotate(12deg);
+    }
+  }
+
+  @keyframes dog-scent {
+    30% {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
   }
 
   /* La etiqueta de estado del reporte: el "sticker" del afiche. */
+  /* Forma de chapita de collar: argolla a la izquierda */
   .tag-sticker {
-    @apply inline-flex items-center rounded-full px-3 py-1.5 font-display text-sm font-bold leading-none text-white;
-    box-shadow: 0 1px 0 rgb(27 36 48 / 0.3);
+    @apply inline-flex items-center gap-1.5 rounded-full py-1.5 pl-2 pr-3 font-display text-sm font-bold leading-none text-white;
+  }
+
+  .tag-sticker::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: rgb(var(--color-paper));
+    border: 1.5px solid rgb(0 0 0 / 0.18);
+  }
+
+  /* Letra de filete del wordmark */
+  .letra-filete {
+    font-family: "Abril Fatface", Georgia, serif;
+    font-weight: 400;
+    letter-spacing: 0.01em;
   }
 }
 

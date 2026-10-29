@@ -80,7 +80,7 @@ describe('FeedPage: listado', () => {
   it('tiene un link para crear un reporte', async () => {
     renderPage()
 
-    expect(await screen.findByRole('link', { name: '+ Crear Reporte' })).toHaveAttribute(
+    expect((await screen.findAllByRole('link', { name: 'Crear Reporte' }))[0]).toHaveAttribute(
       'href',
       '/reports/new'
     )

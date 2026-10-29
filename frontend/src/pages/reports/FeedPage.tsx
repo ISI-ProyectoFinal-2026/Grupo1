@@ -6,11 +6,14 @@ import type { ReportType } from "@/types/report.types";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import SuccessMessage from "@/components/ui/SuccessMessage";
-import { ListIcon, MapIcon, PawIcon } from "@/components/ui/icons";
+import { ListIcon, MapIcon, PlusIcon } from "@/components/ui/icons";
+import EmptyState from "@/components/ui/EmptyState";
+import { PawPrint } from "@/components/ui/canine";
 import { cn } from "@/lib/cn";
-import Spinner from "@/components/ui/Spinner";
+import { SkeletonGroup } from "@/components/ui/Skeleton";
 import FilterBar from "@/components/reports/FilterBar";
 import ReportCard from "@/components/reports/ReportCard";
+import ReportCardSkeleton from "@/components/reports/ReportCardSkeleton";
 import MapView from "@/components/reports/MapView";
 
 export default function FeedPage() {
@@ -40,8 +43,8 @@ export default function FeedPage() {
 
   const viewButton = (mode: "list" | "map") =>
     cn(
-      "inline-flex min-h-10 items-center gap-1.5 rounded-[9px] px-3 text-sm font-bold transition-colors",
-      viewMode === mode ? "bg-ink text-white" : "text-ink-muted hover:text-ink",
+      "press relative z-10 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full px-3.5 text-sm font-bold",
+      viewMode === mode ? "text-paper" : "text-ink-muted hover:text-ink",
     );
 
   return (
@@ -51,9 +54,22 @@ export default function FeedPage() {
         <div className="flex items-center gap-2">
           {/* En mobile el alta ya está en la tab bar ("Reportar"). */}
           <Link to="/reports/new" className={buttonClasses("signal", "md", "hidden sm:inline-flex")}>
-            + Crear Reporte
+            <PlusIcon className="h-5 w-5" strokeWidth={2.5} />
+            Crear Reporte
           </Link>
-          <div role="group" aria-label="Vista" className="inline-flex rounded-control border border-line bg-paper p-1">
+          <div
+            role="group"
+            aria-label="Vista"
+            className="relative grid grid-cols-2 rounded-full border border-line bg-paper p-1"
+          >
+            {/* indicador que se desliza entre Lista y Mapa */}
+            <span
+              aria-hidden="true"
+              className={cn(
+                "absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-ink transition-transform duration-base ease-in-out",
+                viewMode === "map" && "translate-x-full",
+              )}
+            />
             <button
               type="button"
               aria-pressed={viewMode === "list"}
@@ -93,9 +109,17 @@ export default function FeedPage() {
 
       <div className="mt-5" aria-live="polite">
         {isLoading ? (
-          <div className="flex justify-center py-16 text-ink-muted">
-            <Spinner />
-          </div>
+          <SkeletonGroup className="animate-fade">
+            <p aria-hidden="true" className="mb-3 flex h-5 items-center gap-1.5 text-sm text-ink-muted">
+              <PawPrint className="h-3.5 w-3.5" />
+              Olfateando reportes…
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }, (_, index) => (
+                <ReportCardSkeleton key={index} />
+              ))}
+            </div>
+          </SkeletonGroup>
         ) : error ? (
           <ErrorMessage
             message="Error al cargar reportes. Intentá de nuevo."
@@ -104,13 +128,17 @@ export default function FeedPage() {
         ) : viewMode === "map" ? (
           <MapView reports={sortedReports} />
         ) : sortedReports.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-line px-6 py-12 text-center">
-            <PawIcon className="h-10 w-10 text-ink-muted" strokeWidth={1.5} />
-            <p className="text-lg text-ink">No hay reportes que coincidan con tus filtros</p>
-            <Link to="/reports/new" className={buttonClasses("secondary", "md")}>
-              Crear Reporte
-            </Link>
-          </div>
+          <EmptyState
+            action={
+              <Link to="/reports/new" className={buttonClasses("secondary", "md")}>
+                Crear Reporte
+              </Link>
+            }
+          >
+            <p className="max-w-xs text-balance font-display text-display-sm text-ink">
+              No hay reportes que coincidan con tus filtros
+            </p>
+          </EmptyState>
         ) : (
           <>
             <p className="mb-3 text-sm text-ink-muted">
@@ -118,8 +146,13 @@ export default function FeedPage() {
               {sortedReports.length === 1 ? "reporte" : "reportes"}
             </p>
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {sortedReports.map((report) => (
-                <li key={report.id}>
+              {sortedReports.map((report, index) => (
+                <li
+                  key={report.id}
+                  className="animate-rise"
+                  // stagger corto y con tope: la lista nunca tarda en estar completa
+                  style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+                >
                   <ReportCard report={report} />
                 </li>
               ))}

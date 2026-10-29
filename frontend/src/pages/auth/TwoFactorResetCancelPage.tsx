@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import LinkFlowExit from "@/components/auth/LinkFlowExit";
-import AuthCard from "@/components/ui/AuthCard";
+import AuthCard, { AuthFrame } from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { CheckIcon } from "@/components/ui/icons";
 import Spinner from "@/components/ui/Spinner";
@@ -50,12 +50,12 @@ function TwoFactorResetCancelPage() {
 
   if (phase === "cancelling") {
     return (
-      <div className="flex justify-center px-4 pb-12 pt-4 sm:pt-12">
-        <div className="card flex w-full max-w-sm items-center gap-3 p-5 sm:p-7 text-ink-muted">
+      <AuthFrame>
+        <div className="flex items-center gap-3 text-ink-muted">
           <Spinner size="sm" />
           <p>Cancelando el reinicio...</p>
         </div>
-      </div>
+      </AuthFrame>
     );
   }
 
@@ -64,6 +64,7 @@ function TwoFactorResetCancelPage() {
       <AuthCard title="Reinicio cancelado">
         <p
           role="status"
+          data-happy
           className="mt-5 flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink"
         >
           <CheckIcon className="h-5 w-5 shrink-0" />

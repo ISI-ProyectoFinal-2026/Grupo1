@@ -12,7 +12,7 @@ import { createChat } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
 import Button from "@/components/ui/Button";
 import { buttonClasses } from "@/components/ui/buttonClasses";
-import Spinner from "@/components/ui/Spinner";
+import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import SuccessMessage from "@/components/ui/SuccessMessage";
 import { CalendarIcon, ChatIcon, ChevronLeftIcon, PawIcon, PinIcon } from "@/components/ui/icons";
@@ -27,6 +27,8 @@ import DeleteReportButton from "@/components/reports/DeleteReportButton";
 import FlagReportForm from "@/components/reports/FlagReportForm";
 import LocationMap from "@/components/maps/LocationMap";
 import { cn } from "@/lib/cn";
+import { DogFace } from "@/components/ui/canine";
+import { tagTone } from "@/lib/tag-tone";
 import { REPORT_STATUS_LABELS } from "@/lib/report-status";
 
 const sectionTitle = "font-display text-display-sm text-ink";
@@ -94,10 +96,22 @@ export default function ReportDetailPage() {
   };
 
   if (isLoading) {
+    // Mismo esqueleto que el detalle: la foto y el título no saltan al cargar.
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-ink-muted">
-        <Spinner size="lg" />
-      </div>
+      <SkeletonGroup className="mx-auto max-w-6xl animate-fade px-4 pb-4 pt-2 sm:px-6 lg:py-6">
+        <Skeleton className="h-11 w-24" />
+        <div className="mt-2 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] lg:gap-8">
+          <div>
+            <Skeleton className="-mx-4 aspect-[4/3] rounded-none sm:mx-0 sm:rounded-card" />
+            <Skeleton className="mt-5 h-9 w-3/4" />
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Skeleton className="h-12" />
+              <Skeleton className="h-12" />
+            </div>
+          </div>
+          <Skeleton className="hidden h-40 rounded-card lg:block" />
+        </div>
+      </SkeletonGroup>
     );
   }
 
@@ -135,20 +149,20 @@ export default function ReportDetailPage() {
     <div className="mx-auto max-w-6xl px-4 pb-4 pt-2 sm:px-6 lg:py-6">
       <Link
         to="/reports"
-        className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-control px-2 font-bold text-ink-muted transition-colors hover:text-ink"
+        className="press group -ml-2 inline-flex min-h-11 items-center gap-1 rounded-control px-2 font-bold text-ink-muted hover:text-ink"
       >
-        <ChevronLeftIcon className="h-5 w-5" />
+        <ChevronLeftIcon className="h-5 w-5 transition-transform duration-fast ease-out group-hover:-translate-x-0.5" />
         Volver
       </Link>
 
-      {flashMessage && <SuccessMessage message={flashMessage} className="mt-2" />}
+      {flashMessage && <SuccessMessage message={flashMessage} className="mt-2 animate-drop" />}
 
       {/* Una sola grilla: en mobile el panel de acciones queda último en el
           flujo y se pega abajo (sticky) sobre la tab bar; en desktop pasa a la
           columna derecha, arriba de las coincidencias. */}
       <div className="mt-2 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] lg:grid-rows-[auto_1fr] lg:gap-8">
         <article className="min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-          <div className="relative -mx-4 overflow-hidden bg-surface sm:mx-0 sm:rounded-card sm:border sm:border-line">
+          <div className="relative -mx-4 overflow-hidden bg-surface sm:mx-0 sm:rounded-card sm:border sm:border-line sm:shadow-card">
             {report.imageUrl ? (
               <img
                 src={report.imageUrl}
@@ -159,15 +173,15 @@ export default function ReportDetailPage() {
                 className="aspect-[4/3] max-h-[70vh] w-full bg-surface object-cover"
               />
             ) : (
-              <div className="flex aspect-[16/9] flex-col items-center justify-center gap-2 text-ink-muted">
-                <PawIcon className="h-14 w-14" strokeWidth={1.5} />
+              <div className="flex aspect-[16/9] flex-col items-center justify-center gap-3 bg-signal-soft text-ink-muted">
+                <DogFace className="w-32" />
                 <span>Sin foto</span>
               </div>
             )}
             {report.tag && (
               <span
-                className="tag-sticker absolute left-4 top-4 -rotate-3 px-4 py-2 text-base"
-                style={{ backgroundColor: report.tag.color }}
+                className="tag-sticker absolute left-4 top-4 -rotate-3 px-4 py-2 text-base shadow-pop"
+                style={{ backgroundColor: tagTone(report.tag) }}
               >
                 {report.tag.label}
               </span>
@@ -255,7 +269,7 @@ export default function ReportDetailPage() {
                     width={160}
                     height={226}
                     loading="lazy"
-                    className="w-40 rounded-control border border-line"
+                    className="w-40 rounded-control border border-line shadow-card"
                   />
                   <div className="grid grid-cols-2 gap-2 sm:flex">
                     <a
@@ -290,25 +304,40 @@ export default function ReportDetailPage() {
               </h2>
               <div className="mt-3">
                 {isLoadingMatches ? (
-                  <div className="flex justify-center py-4 text-ink-muted">
-                    <Spinner size="sm" />
-                  </div>
+                  <SkeletonGroup className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
+                    {[0, 1].map((key) => (
+                      <div key={key} className="card flex gap-3 p-3">
+                        <Skeleton className="h-[88px] w-[88px] shrink-0 rounded-[10px]" />
+                        <div className="flex flex-1 flex-col gap-2 py-1">
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-5 w-20 rounded-full" />
+                          <Skeleton className="mt-auto h-3.5 w-1/2" />
+                        </div>
+                      </div>
+                    ))}
+                  </SkeletonGroup>
                 ) : matches && matches.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
-                    {matches.map((match) => (
-                      <MatchCard
+                    {matches.map((match, index) => (
+                      <div
                         key={match.matchId}
-                        match={match}
-                        canManage={isOwner}
-                        onConfirm={matchActions.confirm}
-                        onReject={matchActions.reject}
-                        isBusy={matchActions.isBusy}
-                        error={matchActions.errorFor(match.matchId)}
-                      />
+                        className="animate-rise"
+                        style={{ animationDelay: `${Math.min(index, 6) * 50}ms` }}
+                      >
+                        <MatchCard
+                          match={match}
+                          canManage={isOwner}
+                          onConfirm={matchActions.confirm}
+                          onReject={matchActions.reject}
+                          isBusy={matchActions.isBusy}
+                          error={matchActions.errorFor(match.matchId)}
+                        />
+                      </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="rounded-card border border-dashed border-line p-4 text-sm text-ink-muted">
+                  <p className="flex animate-fade items-center gap-3 rounded-card border border-dashed border-line bg-paper/60 p-4 text-sm text-ink-muted">
+                    <PawIcon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
                     No se encontraron coincidencias todavía
                   </p>
                 )}
@@ -322,7 +351,7 @@ export default function ReportDetailPage() {
             aria-label="Acciones del reporte"
             className={cn(
               "sticky bottom-above-tabbar z-20 -mx-4 flex max-h-[60vh] flex-col gap-2 overflow-y-auto overscroll-contain border-t border-line bg-paper px-4 py-3 shadow-sheet sm:-mx-6 sm:px-6",
-              "lg:static lg:col-start-2 lg:row-start-1 lg:mx-0 lg:max-h-none lg:gap-3 lg:rounded-card lg:border lg:p-5 lg:shadow-none",
+              "lg:static lg:col-start-2 lg:row-start-1 lg:mx-0 lg:max-h-none lg:gap-3 lg:rounded-card lg:border lg:p-5 lg:shadow-card",
             )}
           >
             {canContact && (

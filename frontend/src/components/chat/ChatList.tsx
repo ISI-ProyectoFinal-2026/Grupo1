@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
 import ErrorMessage from '@/components/ui/ErrorMessage'
-import Spinner from '@/components/ui/Spinner'
+import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { UserIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
+import { SniffingDog } from '@/components/ui/canine'
 import type { ChatDTO } from '@/types/chat.types'
 
 interface ChatListProps {
@@ -20,9 +21,17 @@ function formatDate(dateString: string): string {
 function ChatList({ chats, currentUserId, activeChatId, isLoading, error }: ChatListProps) {
   if (isLoading) {
     return (
-      <div className='flex justify-center py-8 text-ink-muted'>
-        <Spinner size='md' />
-      </div>
+      <SkeletonGroup className='animate-fade divide-y divide-line'>
+        {[0, 1, 2, 3].map((key) => (
+          <div key={key} className='flex min-h-16 items-center gap-3 px-4 py-3'>
+            <Skeleton className='h-10 w-10 shrink-0 rounded-full' />
+            <div className='flex flex-1 flex-col gap-2'>
+              <Skeleton className='h-4 w-2/5' />
+              <Skeleton className='h-3.5 w-1/4' />
+            </div>
+          </div>
+        ))}
+      </SkeletonGroup>
     )
   }
 
@@ -31,7 +40,12 @@ function ChatList({ chats, currentUserId, activeChatId, isLoading, error }: Chat
   }
 
   if (chats.length === 0) {
-    return <p className='px-4 py-10 text-center text-ink-muted'>No tenés conversaciones.</p>
+    return (
+      <div className='flex flex-col items-center gap-2 px-4 py-10 text-center'>
+        <SniffingDog className='w-28' />
+        <p className='text-ink-muted'>No tenés conversaciones.</p>
+      </div>
+    )
   }
 
   return (
@@ -46,7 +60,7 @@ function ChatList({ chats, currentUserId, activeChatId, isLoading, error }: Chat
               to={`/chats/${chat.id}`}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'relative flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-surface',
+                'relative flex min-h-16 items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-surface active:bg-surface',
                 isActive &&
                   'bg-surface before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-r-full before:bg-signal'
               )}

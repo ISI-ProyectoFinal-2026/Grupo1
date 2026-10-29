@@ -1,3 +1,4 @@
+import EmptyState from "@/components/ui/EmptyState";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useBusinessesQuery } from "@/hooks/useBusiness";
@@ -61,9 +62,9 @@ function BusinessDirectoryPage() {
         ) : isError ? (
           <ErrorMessage message="No se pudieron cargar los comercios, intentá de nuevo." />
         ) : !businesses || businesses.length === 0 ? (
-          <p className="rounded-card border border-dashed border-line px-4 py-10 text-center text-ink-muted">
-            No hay comercios registrados todavía.
-          </p>
+          <EmptyState>
+            <p className="text-ink-muted">No hay comercios registrados todavía.</p>
+          </EmptyState>
         ) : (
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {businesses.map((business) => (

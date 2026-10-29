@@ -13,7 +13,7 @@ export default function SuccessMessage({ message, className = '' }: SuccessMessa
     <p
       role='status'
       className={cn(
-        'flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink',
+        'flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink ring-1 ring-inset ring-success/15',
         className
       )}
     >

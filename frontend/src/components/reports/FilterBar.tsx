@@ -54,12 +54,15 @@ export default function FilterBar({
             aria-expanded={isExpanded}
             aria-controls="filtros-extra"
             onClick={() => setIsExpanded((open) => !open)}
-            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-control border border-line bg-paper px-3 font-bold text-ink transition-colors hover:border-ink-muted md:hidden"
+            className={cn(
+              "press inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border bg-paper px-4 font-bold text-ink hover:border-ink-muted md:hidden",
+              isExpanded ? "border-ink-muted" : "border-line",
+            )}
           >
             <FilterIcon className="h-5 w-5" />
             Más filtros
             {extraCount > 0 && (
-              <span className="tabular grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 text-xs text-white">
+              <span className="tabular grid h-5 min-w-5 animate-pop place-items-center rounded-full bg-signal px-1 text-xs text-ink">
                 {extraCount}
               </span>
             )}
@@ -69,7 +72,7 @@ export default function FilterBar({
         <div
           id="filtros-extra"
           className={cn(
-            isExpanded ? "grid" : "hidden",
+            isExpanded ? "grid max-md:animate-drop" : "hidden",
             "grid-cols-2 gap-3 md:col-span-3 md:grid md:grid-cols-3",
           )}
         >

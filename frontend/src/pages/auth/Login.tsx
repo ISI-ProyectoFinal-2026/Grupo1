@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import TwoFactorChallengeForm from "@/components/auth/TwoFactorChallengeForm";
 import TwoFactorResetRequestForm from "@/components/auth/TwoFactorResetRequestForm";
-import AuthCard from "@/components/ui/AuthCard";
+import AuthCard, { AuthFrame } from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import { CheckIcon } from "@/components/ui/icons";
@@ -36,7 +36,7 @@ function messageOf(err: unknown): string {
 
 function SuccessNotice({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-5 flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink">
+    <p data-happy className="mt-5 flex animate-drop items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink">
       <CheckIcon className="h-5 w-5 shrink-0" />
       <span>{children}</span>
     </p>
@@ -181,40 +181,36 @@ function Login() {
 
   if (step.kind === "challenge") {
     return (
-      <div className="flex justify-center px-4 pb-12 pt-4 sm:pt-12">
-        <div className="card w-full max-w-sm p-5 sm:p-7">
-          <TwoFactorChallengeForm
-            mode={mode}
-            code={code}
-            isLoading={isLoading}
-            error={error}
-            resetEffectiveAt={step.resetEffectiveAt}
-            onCodeChange={setCode}
-            onModeChange={handleModeChange}
-            onSubmit={handleCodeSubmit}
-            onLostAccess={openLostAccess}
-            onBack={() => backToPassword(null)}
-          />
-        </div>
-      </div>
+      <AuthFrame>
+        <TwoFactorChallengeForm
+          mode={mode}
+          code={code}
+          isLoading={isLoading}
+          error={error}
+          resetEffectiveAt={step.resetEffectiveAt}
+          onCodeChange={setCode}
+          onModeChange={handleModeChange}
+          onSubmit={handleCodeSubmit}
+          onLostAccess={openLostAccess}
+          onBack={() => backToPassword(null)}
+        />
+      </AuthFrame>
     );
   }
 
   if (step.kind === "lost") {
     return (
-      <div className="flex justify-center px-4 pb-12 pt-4 sm:pt-12">
-        <div className="card w-full max-w-sm p-5 sm:p-7">
-          <TwoFactorResetRequestForm
-            password={resetPassword}
-            isLoading={isLoading}
-            error={error}
-            sentMessage={sentMessage}
-            onPasswordChange={setResetPassword}
-            onSubmit={handleResetRequest}
-            onBack={backToChallenge}
-          />
-        </div>
-      </div>
+      <AuthFrame>
+        <TwoFactorResetRequestForm
+          password={resetPassword}
+          isLoading={isLoading}
+          error={error}
+          sentMessage={sentMessage}
+          onPasswordChange={setResetPassword}
+          onSubmit={handleResetRequest}
+          onBack={backToChallenge}
+        />
+      </AuthFrame>
     );
   }
 

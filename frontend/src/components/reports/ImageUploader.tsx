@@ -112,19 +112,21 @@ export default function ImageUploader({
       <label
         htmlFor={inputId}
         className={cn(
-          "flex min-h-36 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-card border-2 border-dashed border-line bg-surface px-4 py-6 text-center transition-colors hover:border-ink-muted",
+          "group flex min-h-36 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-card border-2 border-dashed border-line bg-surface px-4 py-6 text-center transition-[border-color,background-color,transform] duration-fast ease-out hover:border-ink-muted hover:bg-paper active:scale-[0.99]",
           "has-[:focus-visible]:border-ink has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ink/25",
           isLoading && "cursor-progress",
         )}
       >
         {preview ? (
           <>
-            <img src={preview} alt="preview" width={80} height={80} className="h-20 w-20 rounded-control object-cover" />
+            <img src={preview} alt="preview" width={80} height={80} className="h-20 w-20 animate-pop rounded-control object-cover shadow-card" />
             <p className="mt-2 text-sm text-ink-muted">Subiendo…</p>
           </>
         ) : (
           <>
-            <CameraIcon className="h-8 w-8 text-ink-muted" />
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-paper text-ink-muted shadow-card ring-1 ring-line transition-transform duration-fast ease-out group-hover:-translate-y-0.5">
+              <CameraIcon className="h-6 w-6" />
+            </span>
             <p className="mt-1 font-bold text-ink">Tocá para elegir una foto</p>
             <p className="text-sm text-ink-muted">
               JPG, PNG o WebP (máx. {MAX_SIZE_MB}MB)

@@ -3,7 +3,7 @@ import { useReportDetailQuery } from '@/hooks/useReportDetailQuery'
 import { useUpdateReport } from '@/hooks/useUpdateReport'
 import { useAuthStore } from '@/stores/auth.store'
 import ReportForm from '@/components/reports/ReportForm'
-import Spinner from '@/components/ui/Spinner'
+import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import { buttonClasses } from '@/components/ui/buttonClasses'
 import type { CreateReportFormData } from '@/types/validators/report.validator'
@@ -18,9 +18,18 @@ export default function EditReportPage() {
 
   if (isLoading) {
     return (
-      <div className='flex min-h-[60vh] items-center justify-center text-ink-muted'>
-        <Spinner size='lg' />
-      </div>
+      <SkeletonGroup className='mx-auto max-w-2xl animate-fade px-4 py-5 sm:px-6 lg:py-8'>
+        <Skeleton className='h-9 w-1/2' />
+        <div className='mt-6 flex flex-col gap-6 sm:card sm:p-6'>
+          {[0, 1, 2].map((key) => (
+            <div key={key} className='flex flex-col gap-2'>
+              <Skeleton className='h-4 w-24' />
+              <Skeleton className='h-11 rounded-control' />
+            </div>
+          ))}
+          <Skeleton className='h-36 rounded-card' />
+        </div>
+      </SkeletonGroup>
     )
   }
 

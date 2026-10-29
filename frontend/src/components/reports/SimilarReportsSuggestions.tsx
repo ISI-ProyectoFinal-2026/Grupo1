@@ -13,7 +13,7 @@ interface SimilarReportsSuggestionsProps {
 }
 
 // mismo verde que "Coincidencia confirmada" en MatchCard (contraste AA)
-const RESOLVED_COLOR = '#176B47'
+const RESOLVED_COLOR = '#1F7A4D'
 
 function formatDistance(meters: number): string {
   if (meters < 1000) return `a ${meters} m`

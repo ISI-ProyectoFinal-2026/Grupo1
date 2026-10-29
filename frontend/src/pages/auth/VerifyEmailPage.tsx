@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import ResendVerificationButton from "@/components/auth/ResendVerificationButton";
-import AuthCard from "@/components/ui/AuthCard";
+import AuthCard, { AuthFrame } from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import { CheckIcon } from "@/components/ui/icons";
@@ -78,19 +78,19 @@ function VerifyEmailPage() {
 
   if (phase === "verifying") {
     return (
-      <div className="flex justify-center px-4 pb-12 pt-4 sm:pt-12">
-        <div className="card flex w-full max-w-sm items-center gap-3 p-5 sm:p-7 text-ink-muted">
+      <AuthFrame>
+        <div className="flex items-center gap-3 text-ink-muted">
           <Spinner size="sm" />
           <p>Verificando tu email...</p>
         </div>
-      </div>
+      </AuthFrame>
     );
   }
 
   if (phase === "verified") {
     return (
       <AuthCard title="Email verificado">
-        <p className="mt-5 flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink">
+        <p data-happy className="mt-5 flex items-start gap-2 rounded-control bg-success-soft px-3 py-2.5 text-sm font-bold text-success-ink">
           <CheckIcon className="h-5 w-5 shrink-0" />
           <span>Tu email quedó verificado.</span>
         </p>

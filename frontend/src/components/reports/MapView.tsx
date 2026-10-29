@@ -24,8 +24,10 @@ export default function MapView({
 
   if (reportsWithLocation.length === 0) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-2 rounded-card border border-dashed border-line px-6 text-center text-ink-muted">
-        <MapIcon className="h-8 w-8" />
+      <div className="flex h-64 animate-fade flex-col items-center justify-center gap-3 rounded-card border border-dashed border-line bg-paper/60 px-6 text-center text-ink-muted">
+        <span className="grid h-14 w-14 place-items-center rounded-full bg-paper text-ink-muted shadow-card ring-1 ring-line">
+          <MapIcon className="h-7 w-7" />
+        </span>
         <p>No hay reportes con ubicación para mostrar</p>
       </div>
     );
@@ -34,7 +36,7 @@ export default function MapView({
   return (
     // `isolate` encierra los z-index altos de Leaflet para que el mapa no se
     // dibuje por encima del header ni de la tab bar.
-    <div className={`isolate overflow-hidden rounded-card border border-line ${MAP_HEIGHT}`}>
+    <div className={`isolate animate-fade overflow-hidden rounded-card border border-line shadow-card ${MAP_HEIGHT}`}>
       <MapContainer center={center} zoom={DEFAULT_MAP_ZOOM} className="h-full w-full">
         <OsmTileLayer />
         {reportsWithLocation.map((report) => (
@@ -61,7 +63,7 @@ export default function MapView({
                 </p>
                 <Link
                   to={`/reports/${report.id}`}
-                  className="mt-1 inline-flex min-h-11 items-center justify-center rounded-control bg-ink px-3 text-sm font-bold !text-white hover:bg-ink/90"
+                  className="press mt-1 inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-4 text-sm font-bold !text-white hover:bg-ink/85"
                 >
                   Ver detalles
                 </Link>

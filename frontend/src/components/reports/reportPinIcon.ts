@@ -4,8 +4,8 @@ import type { ReportType } from "@/types/report.types";
 
 // Perdido en rojo (token danger), encontrado en azul.
 export const PIN_COLORS: Record<ReportType, string> = {
-  lost: "#D93636",
-  found: "#2563EB",
+  lost: "#C4342B",
+  found: "#2457A6",
 };
 
 const PIN_WIDTH = 30;

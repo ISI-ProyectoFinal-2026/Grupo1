@@ -7,7 +7,7 @@ interface ErrorMessageProps {
 
 function ErrorMessage({ message, className = "" }: ErrorMessageProps) {
   return (
-    <p role="alert" className={cn("flex items-start gap-1.5 text-sm font-bold text-danger", className)}>
+    <p role="alert" className={cn("flex animate-drop items-start gap-1.5 text-sm font-bold text-danger", className)}>
       <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 flex-shrink-0">
         <path
           fillRule="evenodd"

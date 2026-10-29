@@ -6,7 +6,8 @@ import { useChatSocket } from '@/hooks/useChatSocket'
 import { useChatsQuery } from '@/hooks/useChatsQuery'
 import { useAuthStore } from '@/stores/auth.store'
 import type { SendMessageInput } from '@/types/chat.types'
-import { ChatIcon, ChevronLeftIcon } from '@/components/ui/icons'
+import { ChevronLeftIcon } from '@/components/ui/icons'
+import { DogFace } from '@/components/ui/canine'
 import { cn } from '@/lib/cn'
 
 function toErrorMessage(error: unknown): string | null {
@@ -92,8 +93,8 @@ function ChatPage() {
             }
           />
         ) : (
-          <div className='flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-ink-muted'>
-            <ChatIcon className='h-10 w-10' strokeWidth={1.5} />
+          <div className='flex h-full flex-col items-center justify-center gap-3 bg-signal-soft/50 px-4 text-center text-ink-muted'>
+            <DogFace className='w-24' />
             <p>Elegí una conversación para ver los mensajes.</p>
           </div>
         )}

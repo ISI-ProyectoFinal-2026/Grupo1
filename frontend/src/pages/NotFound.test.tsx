@@ -27,7 +27,7 @@ describe('NotFound', () => {
     const user = userEvent.setup()
     renderNotFound()
 
-    await user.click(screen.getByRole('button', { name: '← Volver atrás' }))
+    await user.click(screen.getByRole('button', { name: 'Volver atrás' }))
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })

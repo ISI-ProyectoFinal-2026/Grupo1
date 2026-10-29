@@ -7,6 +7,8 @@ const token = (name: string) => `rgb(var(--color-${name}) / <alpha-value>)`;
 
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  // hover: solo con mouse; en touch el :hover queda "pegado" tras el tap.
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {
@@ -14,20 +16,25 @@ export default {
         line: token("line"),
         surface: token("surface"),
         paper: token("paper"),
-        signal: { DEFAULT: token("signal"), deep: token("signal-deep") },
+        signal: { DEFAULT: token("signal"), deep: token("signal-deep"), soft: token("signal-soft"), track: token("signal-track"), ink: token("signal-ink") },
         danger: { DEFAULT: token("danger"), soft: token("danger-soft") },
         success: { DEFAULT: token("success"), ink: token("success-ink"), soft: token("success-soft") },
+        lost: { DEFAULT: token("lost"), soft: token("lost-soft") },
+        found: { DEFAULT: token("found"), soft: token("found-soft") },
+        caramel: { DEFAULT: token("caramel"), soft: token("caramel-soft") },
       },
       fontFamily: {
-        display: ['"Bricolage Grotesque"', ...defaultTheme.fontFamily.sans],
+        display: ['"Atkinson Hyperlegible"', ...defaultTheme.fontFamily.sans],
+        // letra de filete: wordmark y titulos de pagina
+        filete: ['"Abril Fatface"', ...defaultTheme.fontFamily.serif],
         sans: ['"Atkinson Hyperlegible"', ...defaultTheme.fontFamily.sans],
       },
       fontSize: {
         // Escala tipografica: cuerpo 16px, titulos en la fuente display.
-        "display-xl": ["2.75rem", { lineHeight: "1.02", letterSpacing: "-0.03em", fontWeight: "800" }],
-        "display-lg": ["2rem", { lineHeight: "1.08", letterSpacing: "-0.025em", fontWeight: "800" }],
-        "display-md": ["1.5rem", { lineHeight: "1.15", letterSpacing: "-0.02em", fontWeight: "700" }],
-        "display-sm": ["1.125rem", { lineHeight: "1.25", letterSpacing: "-0.01em", fontWeight: "700" }],
+        "display-xl": ["2.875rem", { lineHeight: "1.05", letterSpacing: "0", fontWeight: "400" }],
+        "display-lg": ["2.125rem", { lineHeight: "1.1", letterSpacing: "0", fontWeight: "400" }],
+        "display-md": ["1.5rem", { lineHeight: "1.2", letterSpacing: "-0.01em", fontWeight: "700" }],
+        "display-sm": ["1.125rem", { lineHeight: "1.3", letterSpacing: "0", fontWeight: "700" }],
       },
       borderRadius: {
         card: "16px",
@@ -42,8 +49,37 @@ export default {
         sidebar: "var(--sidebar-w)",
       },
       boxShadow: {
-        sheet: "0 -8px 24px rgb(27 36 48 / 0.12)",
-        pop: "0 12px 32px rgb(27 36 48 / 0.16)",
+        // sin sombra en reposo: las superficies se separan por borde y tono
+        card: "0 0 #0000",
+        lift: "0 16px 36px -12px rgb(74 40 24 / 0.28), 0 3px 8px rgb(74 40 24 / 0.08)",
+        button: "0 0 #0000",
+        sheet: "0 -10px 30px rgb(42 31 26 / 0.22)",
+        pop: "0 16px 40px -8px rgb(74 40 24 / 0.26), 0 2px 6px rgb(74 40 24 / 0.08)",
+      },
+      // Curvas y duraciones: leen los tokens de src/index.css.
+      transitionTimingFunction: {
+        out: "var(--ease-out)",
+        "in-out": "var(--ease-in-out)",
+        drawer: "var(--ease-drawer)",
+      },
+      transitionDuration: {
+        press: "var(--duration-press)",
+        fast: "var(--duration-fast)",
+        base: "var(--duration-base)",
+      },
+      keyframes: {
+        "fade-in": { from: { opacity: "0" } },
+        "rise-in": { from: { opacity: "0", transform: "translateY(8px)" } },
+        "drop-in": { from: { opacity: "0", transform: "translateY(-4px)" } },
+        "pop-in": { from: { opacity: "0", transform: "scale(0.95)" } },
+        "sheet-in": { from: { opacity: "0", transform: "translateY(24px)" } },
+      },
+      animation: {
+        fade: "fade-in var(--duration-base) var(--ease-out) both",
+        rise: "rise-in 280ms var(--ease-out) both",
+        drop: "drop-in var(--duration-fast) var(--ease-out) both",
+        pop: "pop-in var(--duration-fast) var(--ease-out) both",
+        sheet: "sheet-in 260ms var(--ease-drawer) both",
       },
     },
   },

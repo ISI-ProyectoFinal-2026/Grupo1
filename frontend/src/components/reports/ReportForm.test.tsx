@@ -180,11 +180,11 @@ describe('ReportForm: render', () => {
     const user = userEvent.setup()
     renderForm()
 
-    expect(screen.queryByText('✓ Foto subida correctamente')).not.toBeInTheDocument()
+    expect(screen.queryByText('Foto subida correctamente')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
 
-    expect(screen.getByText('✓ Foto subida correctamente')).toBeInTheDocument()
+    expect(screen.getByText('Foto subida correctamente')).toBeInTheDocument()
   })
 
   it('muestra una miniatura de la foto subida', async () => {
@@ -462,7 +462,7 @@ describe('ReportForm: animal screening of the uploaded photo', () => {
     await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent(NO_ANIMAL_MESSAGE)
-    expect(screen.queryByText('✓ Foto subida correctamente')).not.toBeInTheDocument()
+    expect(screen.queryByText('Foto subida correctamente')).not.toBeInTheDocument()
     const submit = screen.getByRole('button', { name: 'Crear Reporte' })
     expect(submit).toBeDisabled()
 
