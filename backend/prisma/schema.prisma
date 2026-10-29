@@ -54,6 +54,7 @@ model User {
   pets          Pet[]
   reports       Report[]
   notifications Notification[]
+  notificationPreference NotificationPreference?
   messages      Message[]
   chatsAsUserA  Chat[]          @relation("ChatUserA")
   chatsAsUserB  Chat[]          @relation("ChatUserB")
@@ -290,6 +291,46 @@ model Notification {
 
   @@index([userId])
   @@map("notifications")
+}
+
+enum LocationConsentStatus {
+  accepted
+  declined
+
+  @@map("location_consent_status")
+}
+
+enum NearbyReportFilter {
+  lost
+  found
+  both
+
+  @@map("nearby_report_filter")
+}
+
+// Preferencias de notificación y ubicación del usuario (1:1 con users). Sin
+// fila = valores por defecto. `locationConsentStatus` null = todavía no se le
+// mostró el modal; `declined` también cubre la revocación.
+model NotificationPreference {
+  userId             Int                 @id @map("user_id")
+  notifyMatch        Boolean             @default(true) @map("notify_match")
+  notifyMessage      Boolean             @default(true) @map("notify_message")
+  notifyStatusChange Boolean             @default(true) @map("notify_status_change")
+  notifyNearby       Boolean             @default(true) @map("notify_nearby")
+  nearbyRadiusKm     Int                 @default(5) @map("nearby_radius_km")
+  nearbyReportType   NearbyReportFilter  @default(both) @map("nearby_report_type")
+  locationConsentStatus LocationConsentStatus? @map("location_consent_status")
+  locationConsentAt  DateTime?           @map("location_consent_at")
+  // Última ubicación detectada (PostGIS, como reports.location). Se maneja con
+  // SQL crudo (ST_DWithin).
+  location           Unsupported("geometry(Point, 4326)")?
+  locationUpdatedAt  DateTime?           @map("location_updated_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
 }
 
 enum BusinessCategory {
