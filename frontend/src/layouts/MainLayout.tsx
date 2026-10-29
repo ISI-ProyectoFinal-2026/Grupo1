@@ -10,6 +10,7 @@ import { useIsModerator } from "@/hooks/useIsModerator";
 import { useLocationSync } from "@/hooks/useLocationSync";
 import { cn } from "@/lib/cn";
 import {
+  BellIcon,
   ChatIcon,
   LogoutIcon,
   MoreIcon,
@@ -133,7 +134,8 @@ function MainLayout() {
     isOwnPetsPath(pathname) ||
     isOwnBusinessPath(pathname) ||
     pathname === "/moderation" ||
-    pathname === "/account/security";
+    pathname === "/account/security" ||
+    pathname === "/account/notifications";
 
   const moreLinkClasses = (active: boolean) =>
     cn(
@@ -278,6 +280,15 @@ function MainLayout() {
             )}
 
             <div className="mt-2 flex flex-col border-t border-line pt-3">
+              <Link
+                to="/account/notifications"
+                onClick={closeMore}
+                aria-current={pathname === "/account/notifications" ? "page" : undefined}
+                className={moreLinkClasses(pathname === "/account/notifications")}
+              >
+                <BellIcon className="h-5 w-5" />
+                Notificaciones
+              </Link>
               <Link
                 to="/account/security"
                 onClick={closeMore}

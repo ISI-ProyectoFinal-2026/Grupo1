@@ -31,6 +31,9 @@ vi.mock('@/pages/auth/TwoFactorResetCancelPage', () => ({
   default: () => <div>pagina cancelar reinicio 2fa</div>,
 }))
 vi.mock('@/pages/account/SecurityPage', () => ({ default: () => <div>pagina seguridad</div> }))
+vi.mock('@/pages/account/NotificationSettingsPage', () => ({
+  default: () => <div>pagina notificaciones</div>,
+}))
 vi.mock('@/pages/reports/FeedPage', () => ({ default: () => <div>pagina feed</div> }))
 vi.mock('@/pages/reports/CreateReportPage', () => ({ default: () => <div>pagina crear reporte</div> }))
 vi.mock('@/pages/reports/ReportDetailPage', () => ({ default: () => <div>pagina detalle reporte</div> }))

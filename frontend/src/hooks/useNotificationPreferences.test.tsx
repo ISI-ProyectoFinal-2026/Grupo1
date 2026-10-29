@@ -7,6 +7,7 @@ import {
   useNotificationPreferences,
   useSetLocationConsent,
   useUpdateLocation,
+  useUpdateNotificationPreferences,
 } from '@/hooks/useNotificationPreferences'
 import type { NotificationPreferencesDTO } from '@/types/notification-preferences.types'
 
@@ -85,5 +86,25 @@ describe('useNotificationPreferences', () => {
 
     expect(service.updateLocation).toHaveBeenCalledWith({ latitude: -34.6, longitude: -58.4 })
     expect(client.getQueryData(notificationPreferencesQueryKey)).toEqual(conUbicacion)
+  })
+
+  it('useUpdateNotificationPreferences actualiza la query con la respuesta', async () => {
+    const actualizada = { ...preferencias, nearbyRadiusKm: 10 as const }
+    vi.mocked(service.updateNotificationPreferences).mockResolvedValue(actualizada)
+    const { Wrapper, client } = createQueryWrapper()
+    const { result } = renderHook(
+      () => ({
+        query: useNotificationPreferences(false),
+        mutation: useUpdateNotificationPreferences(),
+      }),
+      { wrapper: Wrapper }
+    )
+
+    await act(async () => {
+      await result.current.mutation.mutateAsync({ nearbyRadiusKm: 10 })
+    })
+
+    expect(service.updateNotificationPreferences).toHaveBeenCalledWith({ nearbyRadiusKm: 10 })
+    expect(client.getQueryData(notificationPreferencesQueryKey)).toEqual(actualizada)
   })
 })

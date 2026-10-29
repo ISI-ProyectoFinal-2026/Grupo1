@@ -5,6 +5,7 @@ import {
   getNotificationPreferences,
   setLocationConsent,
   updateLocation,
+  updateNotificationPreferences,
 } from '@/services/notification-preferences.service'
 import type { NotificationPreferencesDTO } from '@/types/notification-preferences.types'
 
@@ -64,5 +65,15 @@ describe('notification-preferences.service', () => {
       longitude: -58.4,
     })
     expect(result).toEqual(preferencias)
+  })
+
+  it('updateNotificationPreferences hace PUT a /notification-preferences con el body parcial', async () => {
+    const apagada = { ...preferencias, notifyMessage: false }
+    vi.mocked(api.put).mockResolvedValue(respuesta(apagada))
+
+    const result = await updateNotificationPreferences({ notifyMessage: false })
+
+    expect(api.put).toHaveBeenCalledWith('/notification-preferences', { notifyMessage: false })
+    expect(result).toEqual(apagada)
   })
 })

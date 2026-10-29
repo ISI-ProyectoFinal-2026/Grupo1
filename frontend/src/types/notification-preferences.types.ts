@@ -1,4 +1,5 @@
 export type LocationConsentStatus = 'accepted' | 'declined'
+export type NearbyRadiusKm = 1 | 2 | 5 | 10
 export type NearbyReportType = 'lost' | 'found' | 'both'
 
 export interface UserLocationDTO {
@@ -12,7 +13,7 @@ export interface NotificationPreferencesDTO {
   notifyMessage: boolean
   notifyStatusChange: boolean
   notifyNearby: boolean
-  nearbyRadiusKm: number
+  nearbyRadiusKm: NearbyRadiusKm
   nearbyReportType: NearbyReportType
   // null = nunca se le preguntó
   locationConsentStatus: LocationConsentStatus | null
@@ -24,3 +25,16 @@ export interface UpdateLocationInput {
   latitude: number
   longitude: number
 }
+
+// actualización parcial: al menos un campo
+export type NotificationPreferencesInput = Partial<
+  Pick<
+    NotificationPreferencesDTO,
+    | 'notifyMatch'
+    | 'notifyMessage'
+    | 'notifyStatusChange'
+    | 'notifyNearby'
+    | 'nearbyRadiusKm'
+    | 'nearbyReportType'
+  >
+>
