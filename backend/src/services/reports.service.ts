@@ -292,6 +292,9 @@ export async function remove(id: number, userId: number): Promise<void> {
     if (isPrismaKnownError(error, "P2025")) {
       throw new AppError(404, "Reporte no encontrado");
     }
+    if (isPrismaKnownError(error, "P2003")) {
+      throw new AppError(409, "No se puede eliminar el reporte porque tiene datos asociados");
+    }
     throw error;
   }
 }
