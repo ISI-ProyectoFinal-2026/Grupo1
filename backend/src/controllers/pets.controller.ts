@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import * as petsService from "../services/pets.service";
 import { createPetSchema, petIdParamSchema, updatePetSchema } from "../validators/pets.validator";
 
-export async function list(_req: Request, res: Response): Promise<void> {
-  const pets = await petsService.list();
+export async function list(req: Request, res: Response): Promise<void> {
+  const pets = await petsService.list(req.userId!);
   res.status(200).json(pets);
 }
 
@@ -15,7 +15,7 @@ export async function create(req: Request, res: Response): Promise<void> {
 
 export async function getById(req: Request, res: Response): Promise<void> {
   const { id } = petIdParamSchema.parse(req.params);
-  const pet = await petsService.getById(id);
+  const pet = await petsService.getOwnedById(id, req.userId!);
   res.status(200).json(pet);
 }
 

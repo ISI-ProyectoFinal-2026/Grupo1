@@ -7,8 +7,8 @@ function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
 }
 
-export function list() {
-  return prisma.pet.findMany();
+export function list(userId: number) {
+  return prisma.pet.findMany({ where: { userId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
 }
 
 export async function create(data: CreatePetInput & { userId: number }) {
@@ -26,6 +26,14 @@ export async function getById(id: number) {
   const pet = await prisma.pet.findUnique({ where: { id } });
   if (!pet) {
     throw new AppError(404, "Mascota no encontrada");
+  }
+  return pet;
+}
+
+export async function getOwnedById(id: number, userId: number) {
+  const pet = await getById(id);
+  if (pet.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para ver esta mascota");
   }
   return pet;
 }

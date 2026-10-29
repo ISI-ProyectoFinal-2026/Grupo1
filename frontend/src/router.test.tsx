@@ -48,6 +48,9 @@ vi.mock('@/pages/business/BusinessDirectoryPage', () => ({
 vi.mock('@/pages/business/BusinessProfilePage', () => ({
   default: () => <div>pagina perfil comercio</div>,
 }))
+vi.mock('@/pages/pets/MyPetsPage', () => ({ default: () => <div>pagina mis mascotas</div> }))
+vi.mock('@/pages/pets/CreatePetPage', () => ({ default: () => <div>pagina alta mascota</div> }))
+vi.mock('@/pages/pets/EditPetPage', () => ({ default: () => <div>pagina editar mascota</div> }))
 
 const usuario: AuthUser = {
   id: 7,
@@ -135,6 +138,9 @@ describe('router: rutas protegidas', () => {
     '/businesses/dashboard',
     '/businesses/9',
     '/account/security',
+    '/pets',
+    '/pets/new',
+    '/pets/3/edit',
   ]
 
   it.each(protegidas)('%s manda al login sin token', (ruta) => {
@@ -157,6 +163,9 @@ describe('router: rutas protegidas', () => {
     ['/businesses/dashboard', 'pagina panel comercio'],
     ['/businesses/9', 'pagina perfil comercio'],
     ['/account/security', 'pagina seguridad'],
+    ['/pets', 'pagina mis mascotas'],
+    ['/pets/new', 'pagina alta mascota'],
+    ['/pets/3/edit', 'pagina editar mascota'],
   ])('%s se renderiza con sesion', (ruta, texto) => {
     useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
 
