@@ -279,7 +279,7 @@ model Message {
 model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int      @map("user_id")
-  type      String? // match_suggested | message | report_status_change
+  type      String? // match_suggested | message | report_status_change | nearby_report
   title     String?
   message   String?
   reportId  Int?     @map("report_id")
