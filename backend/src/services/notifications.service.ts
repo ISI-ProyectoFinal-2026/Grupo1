@@ -1,6 +1,7 @@
 import { Chat, Message, Notification } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { isNotificationEnabled } from "./notification-preferences.service";
 
 export async function listByUser(userId: number): Promise<Notification[]> {
   return prisma.notification.findMany({
@@ -73,6 +74,9 @@ export async function createForMatch(data: CreateForMatchInput): Promise<Notific
 
   const notifications: Notification[] = [];
   for (const recipient of recipients) {
+    if (!(await isNotificationEnabled(recipient.userId, "notifyMatch"))) {
+      continue;
+    }
     const existing = await prisma.notification.findFirst({
       where: {
         userId: recipient.userId,
@@ -156,6 +160,9 @@ export async function createForStatusChange(
   if (!report) {
     return null;
   }
+  if (!(await isNotificationEnabled(report.userId, "notifyStatusChange"))) {
+    return null;
+  }
 
   const texts = STATUS_CHANGE_TEXTS[status];
   return prisma.notification.create({
@@ -186,8 +193,11 @@ export function resolveMessageRecipientId(chat: Pick<Chat, "userAId" | "userBId"
  * de envío (REST y Socket.io) para que la notificación se genere siempre, sin
  * importar cómo llegó el mensaje.
  */
-export async function notifyNewMessage(chat: Chat, message: Message): Promise<Notification> {
+export async function notifyNewMessage(chat: Chat, message: Message): Promise<Notification | null> {
   const recipientId = resolveMessageRecipientId(chat, message.senderId);
+  if (!(await isNotificationEnabled(recipientId, "notifyMessage"))) {
+    return null;
+  }
   const content = (message.content ?? "").trim();
   const preview =
     content.length > MESSAGE_PREVIEW_MAX_LENGTH ? `${content.slice(0, MESSAGE_PREVIEW_MAX_LENGTH)}…` : content;

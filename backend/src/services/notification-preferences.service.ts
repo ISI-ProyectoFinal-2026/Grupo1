@@ -50,6 +50,14 @@ export async function get(userId: number): Promise<NotificationPreferencesDTO> {
   };
 }
 
+export type NotificationFlag = "notifyMatch" | "notifyMessage" | "notifyStatusChange" | "notifyNearby";
+
+// Sin fila se asumen los defaults (todo activado)
+export async function isNotificationEnabled(userId: number, flag: NotificationFlag): Promise<boolean> {
+  const row = await prisma.notificationPreference.findUnique({ where: { userId }, select: { [flag]: true } });
+  return row ? row[flag] : true;
+}
+
 export async function update(userId: number, data: UpdatePreferencesInput): Promise<NotificationPreferencesDTO> {
   const current = await get(userId);
   const notifyNearby = data.notifyNearby ?? current.notifyNearby;
