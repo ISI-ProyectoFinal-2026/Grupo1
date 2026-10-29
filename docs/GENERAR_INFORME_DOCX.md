@@ -28,7 +28,7 @@ El `.docx` resultante se sube a Google Drive a mano (en Drive: clic derecho sobr
 - Imágenes: todas las referenciadas en los `.md`, insertadas en su lugar desde el repositorio.
 - Diagramas Mermaid: renderizados a PNG (mermaid-cli, fondo blanco, escala 2) e insertados como imagen.
 - Métricas y gráficos del benchmark: los que estén referenciados en el informe, desde `backend-ia/benchmarks/results/`.
-- Enlaces: a otra página del informe o a un ADR → URL de esa página en el sitio; a cualquier otro archivo del repositorio → `https://github.com/ISI-ProyectoFinal-2026/Grupo1/blob/main/<ruta>`; los externos se conservan.
+- Documento autocontenido (skill `documentacion`): todo `.md` o archivo que una sección cite se desglosa dentro de esa sección. Solo se conservan como enlace las referencias que el lector puede abrir (repositorio, PR, issue, URLs públicas).
 
 ## 4. Formato de tesis
 
@@ -47,7 +47,7 @@ APA 7:
 
 Propios de la tesis:
 
-- Portada en la primera página: Universidad Tecnológica Nacional, Proyecto Final 2026, "PATITAS", "Informe Final", Grupo 1, integrantes (según `docs/pdd/PDD v1.0.docx`) y la fecha de generación. Facultad regional, carrera y docentes quedan como `[COMPLETAR]` mientras no estén en el repositorio.
+- Portada en la primera página: Universidad Tecnológica Nacional, Facultad Regional San Rafael, Ingeniería en Sistemas de Información, Proyecto Final 2026, "PATITAS", "Informe Final", Grupo 1, integrantes (según `docs/pdd/PDD v1.0.docx`), docentes (Hernán Zinik y Matías Varela) y la fecha de generación.
 - Índice de contenidos con números de página, hasta el nivel 5 de título.
 - Índice de figuras e índice de tablas en los capítulos 5 y 6 del template, armados con los epígrafes.
 - Cada capítulo (Título 1) empieza en página nueva.

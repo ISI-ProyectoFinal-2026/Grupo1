@@ -17,6 +17,7 @@ exclude_docs: |
   !/informe/
   !/adr/
   /adr/0000-plantilla.md
+  /adr/evidencia/DECISION/
 
 hooks:
   - tools/informe-site/informe_site.py

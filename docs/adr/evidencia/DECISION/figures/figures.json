@@ -1,0 +1,155 @@
+{
+ "pipeline": {
+  "detections": [
+   [
+    "dog",
+    0.83
+   ],
+   [
+    "bottle",
+    0.68
+   ],
+   [
+    "person",
+    0.61
+   ],
+   [
+    "person",
+    0.54
+   ],
+   [
+    "person",
+    0.48
+   ],
+   [
+    "person",
+    0.39
+   ],
+   [
+    "person",
+    0.38
+   ],
+   [
+    "backpack",
+    0.33
+   ],
+   [
+    "handbag",
+    0.32
+   ],
+   [
+    "person",
+    0.31
+   ],
+   [
+    "person",
+    0.29
+   ],
+   [
+    "person",
+    0.29
+   ],
+   [
+    "bottle",
+    0.29
+   ],
+   [
+    "person",
+    0.28
+   ]
+  ],
+  "best": [
+   "dog",
+   0.83
+  ],
+  "crop": [
+   820,
+   222
+  ]
+ },
+ "retrieval": [
+  {
+   "query": [
+    "bo_dog",
+    "07.png"
+   ],
+   "model": "clip_b32",
+   "top5_same": [
+    false,
+    false,
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "query": [
+    "bo_dog",
+    "07.png"
+   ],
+   "model": "dino_b14_pad",
+   "top5_same": [
+    true,
+    true,
+    true,
+    false,
+    false
+   ]
+  },
+  {
+   "query": [
+    "loki_cat",
+    "00.png"
+   ],
+   "model": "clip_b32",
+   "top5_same": [
+    false,
+    false,
+    false,
+    true,
+    false
+   ]
+  },
+  {
+   "query": [
+    "loki_cat",
+    "00.png"
+   ],
+   "model": "dino_b14_pad",
+   "top5_same": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ]
+  }
+ ],
+ "distributions": {
+  "clip_b32": {
+   "mean_pos": 0.664,
+   "mean_neg": 0.475
+  },
+  "clip_l14_pad": {
+   "mean_pos": 0.779,
+   "mean_neg": 0.577
+  },
+  "dino_b14_pad": {
+   "mean_pos": 0.625,
+   "mean_neg": 0.088
+  }
+ },
+ "degradation": {
+  "photo": "champ_dog/08",
+  "detected": [
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   true,
+   false
+  ]
+ }
+}
