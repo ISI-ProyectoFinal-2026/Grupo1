@@ -108,13 +108,14 @@ describe("reports.service create() image screening", () => {
     expect(triggerSpy).toHaveBeenCalled();
   });
 
-  test("does not analyze anything when the report has no image", async () => {
-    const { imageUrl, ...withoutImage } = reportData;
+  test("never stamps publishedAt on creation: moderation publishes it later", async () => {
+    analyzeSpy.mockResolvedValue("animal");
 
-    await reportsService.create(withoutImage);
+    await reportsService.create(reportData);
 
-    expect(analyzeSpy).not.toHaveBeenCalled();
-    expect(reportCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ status: "published" }) });
+    expect(reportCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: "pending", publishedAt: null }),
+    });
   });
 
   // Editing must not become a way around the screening: a report published with

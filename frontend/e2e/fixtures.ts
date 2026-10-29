@@ -1,7 +1,7 @@
 import { test as base, type Page } from '@playwright/test'
 import * as api from './support/api.ts'
 import { closeDb, deleteUsersByEmail, markEmailVerified } from './support/db.ts'
-import { E2E_EMAIL_DOMAIN, E2E_EMAIL_PREFIX, E2E_PASSWORD } from './support/env.ts'
+import { E2E_EMAIL_DOMAIN, E2E_EMAIL_PREFIX, E2E_IMAGE_URL, E2E_PASSWORD, FRONTEND_URL, R2_PUBLIC_URL } from './support/env.ts'
 
 /** zustand persist key of frontend/src/stores/auth.store.ts */
 const AUTH_STORAGE_KEY = 'patitas-auth'
@@ -39,7 +39,19 @@ export async function stubExternalServices(page: Page): Promise<void> {
   )
   // Map tiles (FeedPage/MapView): never hit the public OSM servers from tests.
   await page.route(/tile\.openstreetmap\.org/, (route) => route.fulfill({ status: 204 }))
+  // Report photo upload (mandatory): presign and the PUT to R2 are faked, so no
+  // R2 credentials are needed. /uploads/analyze still hits the backend (AI stub).
+  await page.route('**/api/uploads/presign', (route) =>
+    route.fulfill({
+      json: { uploadUrl: `${FRONTEND_URL}/e2e-r2-upload`, publicUrl: E2E_IMAGE_URL, key: 'pets/e2e-photo.jpg' },
+    }),
+  )
+  await page.route('**/e2e-r2-upload', (route) => route.fulfill({ status: 200 }))
+  await page.route(`${R2_PUBLIC_URL}/**`, (route) => route.fulfill({ status: 204 }))
 }
+
+/** Small valid JPEG-typed file for the photo input (content is irrelevant, R2 is faked). */
+export const E2E_PHOTO = { name: 'e2e-photo.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('e2e-photo') }
 
 export const test = base.extend<Fixtures>({
   page: async ({ page }, use) => {

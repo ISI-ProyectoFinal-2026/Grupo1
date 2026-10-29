@@ -146,9 +146,7 @@ function triggerModeration(reportId: number, imageUrl: string): void {
 }
 
 export async function create(data: CreateReportInput & { userId: number }): Promise<ReportDTO> {
-  if (data.imageUrl) {
-    await assertImageHasAnimal(data.imageUrl);
-  }
+  await assertImageHasAnimal(data.imageUrl);
 
   const reportId = await prisma.$transaction(async (tx) => {
     let created;
@@ -158,19 +156,16 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
           userId: data.userId,
           petId: data.petId ?? null,
           reportType: data.reportType,
-          // POC de moderación de contenido (issue #19): si hay imagen,
+          // Moderación de contenido (issue #19): la foto es obligatoria, así que
           // el reporte queda "pending" hasta que el Backend IA confirme
           // (vía triggerEmbeddingGeneration) que detectó una mascota.
-          // Sin imagen no hay nada que validar, se publica directo.
-          status: data.imageUrl ? "pending" : "published",
+          status: "pending",
           title: data.title,
           description: data.description ?? null,
-          imageUrl: data.imageUrl ?? null,
+          imageUrl: data.imageUrl,
           locationAddress: data.locationAddress ?? null,
-          // Solo se sella la fecha si el reporte nace publicado. Si queda en
-          // "pending", lo publica (y sella la fecha) matching.service al recibir
-          // el veredicto del Backend IA.
-          publishedAt: data.imageUrl ? null : new Date(),
+          // La fecha la sella matching.service al publicar tras el veredicto del Backend IA.
+          publishedAt: null,
         },
       });
     } catch (error) {
@@ -188,9 +183,7 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
   });
 
   const report = await getById(reportId);
-  if (report.imageUrl) {
-    triggerModeration(report.id, report.imageUrl);
-  }
+  triggerModeration(report.id, data.imageUrl);
   return report;
 }
 

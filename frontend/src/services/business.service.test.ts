@@ -64,6 +64,7 @@ describe('business.service', () => {
       address: creado.address,
       phone: creado.phone,
       category: creado.category,
+      location: { lat: -34.6251, lng: -68.3221 },
     })
 
     expect(api.post).toHaveBeenCalledWith('/businesses', {
@@ -72,6 +73,7 @@ describe('business.service', () => {
       address: creado.address,
       phone: creado.phone,
       category: creado.category,
+      location: { lat: -34.6251, lng: -68.3221 },
     })
     expect(resultado).toEqual(creado)
   })

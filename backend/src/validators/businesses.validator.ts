@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BusinessCategory } from "@prisma/client";
+import { locationSchema } from "./shared.validator";
 
 /**
  * `plan` no es parte del alta: todo comercio nace `FREE` (default de
@@ -20,6 +21,7 @@ export const createBusinessSchema = z.object({
     BusinessCategory.PET_SHOP,
     BusinessCategory.OTRO,
   ]),
+  location: locationSchema,
 });
 
 /**

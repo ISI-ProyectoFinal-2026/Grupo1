@@ -3,21 +3,21 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportForm from '@/components/reports/ReportForm'
-import { createReport } from '@/services/reports.service'
+import { createReport, findSimilarReports } from '@/services/reports.service'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ReportDTO } from '@/types/report.types'
 import * as authService from '@/services/auth.service'
 import { listMyPets } from '@/services/pets.service'
 import type { PetDTO } from '@/types/pet.types'
 
-vi.mock('@/services/reports.service', () => ({ createReport: vi.fn() }))
+vi.mock('@/services/reports.service', () => ({ createReport: vi.fn(), findSimilarReports: vi.fn() }))
 vi.mock('@/services/auth.service')
 vi.mock('@/services/pets.service')
 
 // LocationPicker y ImageUploader arrastran leaflet y el flujo de subida a R2:
 // nada de eso hace falta para probar la validacion y el envio del formulario.
 // Los dobles exponen un boton por callback para dispararlos desde el test.
-vi.mock('@/components/reports/LocationPicker', () => ({
+vi.mock('@/components/maps/LocationPicker', () => ({
   default: ({
     onLocationSelect,
   }: {
@@ -121,9 +121,11 @@ function renderForm(initialData?: Parameters<typeof ReportForm>[0]['initialData'
   )
 }
 
+// La foto es obligatoria: el minimo para enviar incluye titulo, ubicacion y foto.
 async function completarMinimo(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Título *'), 'Perro perdido en Nueva Córdoba')
   await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+  await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
 }
 
 function mascota(overrides: Partial<PetDTO> = {}): PetDTO {
@@ -146,6 +148,7 @@ function mascota(overrides: Partial<PetDTO> = {}): PetDTO {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listMyPets).mockResolvedValue([])
+  vi.mocked(findSimilarReports).mockResolvedValue([])
 })
 
 describe('ReportForm: render', () => {
@@ -214,6 +217,18 @@ describe('ReportForm: validacion', () => {
     expect(createReport).not.toHaveBeenCalled()
   })
 
+  it('pide la foto junto al campo y no llama a la API cuando falta', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Título *'), 'Perro perdido en Nueva Córdoba')
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByText('Sube una foto de la mascota')).toBeInTheDocument()
+    expect(createReport).not.toHaveBeenCalled()
+  })
+
   it('explica como cargar la ubicacion cuando falta', async () => {
     const user = userEvent.setup()
     renderForm()
@@ -222,7 +237,7 @@ describe('ReportForm: validacion', () => {
     await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
 
     expect(
-      await screen.findByText('Indicá la ubicación con el botón de arriba')
+      await screen.findByText('Marcá la ubicación en el mapa o usá tu ubicación actual')
     ).toBeInTheDocument()
     expect(createReport).not.toHaveBeenCalled()
   })
@@ -586,5 +601,116 @@ describe('ReportForm: email sin verificar (403 EMAIL_NOT_VERIFIED)', () => {
 
     expect(await screen.findByText('Reporte duplicado')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reenviar email de verificación' })).toBeNull()
+  })
+})
+
+describe('ReportForm: reportes similares (#211)', () => {
+  const QUESTION = '¿Alguno de estos coincide con tu avistamiento?'
+  const similar = {
+    id: 21,
+    title: 'Perro marrón visto en el parque',
+    reportType: 'lost' as const,
+    status: 'published' as const,
+    imageUrl: null,
+    distanceMeters: 300,
+    similarity: null,
+    isOwn: false,
+  }
+
+  it('sugiere reportes del mismo tipo apenas se marca la ubicacion', async () => {
+    vi.mocked(findSimilarReports).mockResolvedValue([similar])
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(findSimilarReports).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+
+    expect(await screen.findByText(QUESTION)).toBeInTheDocument()
+    expect(screen.getByText('Perro marrón visto en el parque')).toBeInTheDocument()
+    expect(findSimilarReports).toHaveBeenCalledWith({
+      reportType: 'lost',
+      location: { lat: -31.42, lng: -64.18 },
+    })
+  })
+
+  it('vuelve a buscar con la foto cuando se sube despues del pin', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await waitFor(() => expect(findSimilarReports).toHaveBeenCalled())
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+
+    await waitFor(() =>
+      expect(findSimilarReports).toHaveBeenLastCalledWith({
+        reportType: 'lost',
+        location: { lat: -31.42, lng: -64.18 },
+        imageUrl: 'https://cdn/foto.jpg',
+      })
+    )
+  })
+
+  it('no usa una foto rechazada por no tener animales', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+
+    await waitFor(() => expect(findSimilarReports).toHaveBeenCalled())
+    expect(findSimilarReports).not.toHaveBeenCalledWith(
+      expect.objectContaining({ imageUrl: expect.anything() })
+    )
+  })
+
+  it('busca del tipo elegido', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.selectOptions(screen.getByRole('combobox'), 'found')
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+
+    await waitFor(() =>
+      expect(findSimilarReports).toHaveBeenCalledWith(expect.objectContaining({ reportType: 'found' }))
+    )
+  })
+
+  it('"Sí, es este" abre el reporte existente sin crear el nuevo', async () => {
+    vi.mocked(findSimilarReports).mockResolvedValue([similar])
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(await screen.findByRole('button', { name: /Sí, es este/ }))
+
+    expect(await screen.findByText('Detalle del reporte')).toBeInTheDocument()
+    expect(createReport).not.toHaveBeenCalled()
+  })
+
+  it('el formulario se envia igual si la busqueda de similares falla', async () => {
+    vi.mocked(findSimilarReports).mockRejectedValue(new Error('caida'))
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await waitFor(() => expect(findSimilarReports).toHaveBeenCalled())
+    expect(screen.queryByText(QUESTION)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByText('Reporte creado exitosamente')).toBeInTheDocument()
+  })
+
+  it('el formulario se envia aunque haya sugerencias sin elegir', async () => {
+    vi.mocked(findSimilarReports).mockResolvedValue([similar])
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await screen.findByText(QUESTION)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByText('Reporte creado exitosamente')).toBeInTheDocument()
   })
 })

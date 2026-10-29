@@ -121,4 +121,5 @@ nav:
       - adr/0018-criterio-evolucion-tecnologica.md
       - adr/0019-comercio-perfil-no-rol.md
       - adr/0020-sitio-web-del-informe.md
+      - adr/0021-modelo-embeddings-dinov2.md
   - Registro: informe/README.md
