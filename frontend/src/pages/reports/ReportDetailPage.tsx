@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
@@ -13,6 +13,7 @@ import Button from "@/components/ui/Button";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import Spinner from "@/components/ui/Spinner";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import SuccessMessage from "@/components/ui/SuccessMessage";
 import { CalendarIcon, ChatIcon, ChevronLeftIcon, PawIcon, PinIcon } from "@/components/ui/icons";
 import EmailNotVerifiedNotice from "@/components/auth/EmailNotVerifiedNotice";
 import { getApiErrorCode } from "@/services/api";
@@ -31,6 +32,8 @@ const sectionTitle = "font-display text-display-sm text-ink";
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Aviso que deja la pantalla anterior (alta o edición del reporte).
+  const flashMessage = (useLocation().state as { message?: string } | null)?.message;
 
   const { data: report, isLoading, error } = useReportDetailQuery(id ? Number(id) : undefined);
   const { data: matches, isLoading: isLoadingMatches } = useReportMatchesQuery(
@@ -121,7 +124,7 @@ export default function ReportDetailPage() {
   const canFlag = isPublished && currentUserId !== undefined && !isOwner;
   const canContact = currentUserId !== undefined && currentUserId !== report.userId;
   const canClose = isOwner && isPublished;
-  const hasActions = canContact || canClose || canFlag;
+  const hasActions = canContact || isOwner || canFlag;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-4 pt-2 sm:px-6 lg:py-6">
@@ -132,6 +135,8 @@ export default function ReportDetailPage() {
         <ChevronLeftIcon className="h-5 w-5" />
         Volver
       </Link>
+
+      {flashMessage && <SuccessMessage message={flashMessage} className="mt-2" />}
 
       {/* Una sola grilla: en mobile el panel de acciones queda último en el
           flujo y se pega abajo (sticky) sobre la tab bar; en desktop pasa a la
@@ -345,6 +350,13 @@ export default function ReportDetailPage() {
                 isPending={closeReport.isPending}
                 error={closeReport.error}
               />
+            )}
+
+            {/* El backend deja editar en cualquier estado: solo exige ser el dueño. */}
+            {isOwner && (
+              <Link to={`/reports/${report.id}/edit`} className={buttonClasses("secondary", "md", "w-full")}>
+                Editar reporte
+              </Link>
             )}
 
             {canFlag && (

@@ -15,6 +15,7 @@ import RequireRole from "./components/RequireRole";
 import FeedPage from "./pages/reports/FeedPage";
 import CreateReportPage from "./pages/reports/CreateReportPage";
 import ReportDetailPage from "./pages/reports/ReportDetailPage";
+import EditReportPage from "./pages/reports/EditReportPage";
 import ChatPage from "./pages/chat/ChatPage";
 import BusinessRegisterPage from "./pages/business/BusinessRegisterPage";
 import BusinessDashboardPage from "./pages/business/BusinessDashboardPage";
@@ -52,6 +53,7 @@ export const router = createBrowserRouter([
           { path: "reports", element: <FeedPage /> },
           { path: "reports/new", element: <CreateReportPage /> },
           { path: "reports/:id", element: <ReportDetailPage /> },
+          { path: "reports/:id/edit", element: <EditReportPage /> },
           { path: "chats", element: <ChatPage /> },
           { path: "chats/:id", element: <ChatPage /> },
           { path: "account/security", element: <SecurityPage /> },

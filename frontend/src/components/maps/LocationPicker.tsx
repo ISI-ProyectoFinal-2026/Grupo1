@@ -9,6 +9,9 @@ interface LocationPickerProps {
   onLocationSelect: (location: GeoPoint, address: string) => void;
   // false: no consulta Nominatim y la etiqueta son las coordenadas
   resolveAddress?: boolean;
+  // ubicacion ya guardada (edicion): pin inicial hasta que se elija otra
+  initialLocation?: GeoPoint | null;
+  initialAddress?: string;
 }
 
 const REVERSE_GEOCODE_TIMEOUT_MS = 5000;
@@ -32,9 +35,11 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
 export default function LocationPicker({
   onLocationSelect,
   resolveAddress = true,
+  initialLocation,
+  initialAddress,
 }: LocationPickerProps) {
-  const [location, setLocation] = useState<GeoPoint | null>(null);
-  const [address, setAddress] = useState<string>("");
+  const [location, setLocation] = useState<GeoPoint | null>(initialLocation ?? null);
+  const [address, setAddress] = useState<string>(initialAddress ?? "");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // id de la ultima consulta a Nominatim: descarta respuestas de un pin viejo

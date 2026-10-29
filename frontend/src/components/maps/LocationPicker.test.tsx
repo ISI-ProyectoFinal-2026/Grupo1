@@ -148,6 +148,47 @@ describe('LocationPicker: mapa', () => {
   })
 })
 
+describe('LocationPicker: ubicacion inicial (edicion)', () => {
+  const guardada = { lat: -31.42, lng: -64.18 }
+
+  it('arranca con el pin en la ubicacion guardada y el mapa centrado ahi', () => {
+    const onLocationSelect = vi.fn()
+    render(
+      <LocationPicker
+        onLocationSelect={onLocationSelect}
+        initialLocation={guardada}
+        initialAddress='Nueva Córdoba'
+      />
+    )
+
+    expect(screen.getByTestId('map')).toHaveAttribute('data-center', '-31.42,-64.18')
+    expect(screen.getByTestId('map')).toHaveAttribute('data-zoom', '16')
+    expect(screen.getByTestId('marker')).toHaveAttribute('data-position', '-31.42,-64.18')
+    expect(screen.getByText('Ubicación seleccionada')).toBeInTheDocument()
+    expect(screen.getByText('Nueva Córdoba')).toBeInTheDocument()
+    expect(onLocationSelect).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('mover el pin reemplaza la ubicacion guardada', () => {
+    fetchMock.mockReturnValue(new Promise(() => {}))
+    const onLocationSelect = vi.fn()
+    render(
+      <LocationPicker
+        onLocationSelect={onLocationSelect}
+        initialLocation={guardada}
+        initialAddress='Nueva Córdoba'
+      />
+    )
+
+    dragPinTo(-31.43, -64.19)
+
+    expect(screen.getByTestId('marker')).toHaveAttribute('data-position', '-31.43,-64.19')
+    expect(onLocationSelect).toHaveBeenCalledWith({ lat: -31.43, lng: -64.19 }, '-31.4300, -64.1900')
+    expect(screen.queryByText('Nueva Córdoba')).not.toBeInTheDocument()
+  })
+})
+
 describe('LocationPicker: ubicacion actual', () => {
   function stubGeolocation(impl: Geolocation['getCurrentPosition'] | undefined) {
     vi.stubGlobal('navigator', {

@@ -53,6 +53,10 @@ export interface CreateReportInput {
   locationAddress?: string
 }
 
+// PUT /reports/:id is partial. `status` is left out on purpose: closing goes
+// through POST /reports/:id/close.
+export type UpdateReportInput = Partial<CreateReportInput>
+
 export interface ListReportsQuery {
   type?: ReportType
   status?: ReportStatus
