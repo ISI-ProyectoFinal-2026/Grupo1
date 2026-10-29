@@ -36,9 +36,9 @@ export interface ReportTag {
 }
 
 const REPORT_TAG_COLORS: Record<ReportTagLabel, string> = {
-  PERDIDO: "#EF4444",
-  ENCONTRADO: "#3B82F6",
-  RESUELTO: "#22C55E",
+  PERDIDO: "#C4342B",
+  ENCONTRADO: "#2457A6",
+  RESUELTO: "#1F7A4D",
 };
 
 function toReportTag(reportType: ReportType, status: ReportStatus): ReportTag {
