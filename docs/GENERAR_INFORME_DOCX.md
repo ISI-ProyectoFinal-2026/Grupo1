@@ -52,7 +52,20 @@ El `.docx` resultante se sube a Google Drive a mano (en Drive: clic derecho sobr
 - Los índices de contenidos, figuras y tablas se generan al abrir el archivo.
 - Revisión visual de una muestra de páginas (portada, índice, una tabla ancha, un diagrama).
 
-## 6. Entrega
+## 6. Generador
+
+`tools/informe-docx/informe_docx.py` implementa las secciones 1 a 3 y aplica los estilos del template. El formato de tesis de la sección 4 todavía no está implementado en el generador.
+
+```bash
+pip install -r requirements-docs.txt
+npm i -g @mermaid-js/mermaid-cli@11.4.2
+python tools/informe-docx/informe_docx.py --out <ruta>/Patitas-Informe-Final-AAAA-MM-DD.docx
+python -m pytest tools/informe-docx
+```
+
+`--mmdc` indica el ejecutable de mermaid-cli si no está en el PATH.
+
+## 7. Entrega
 
 - Archivo: `Patitas-Informe-Final-AAAA-MM-DD.docx` en el Escritorio del usuario.
 - Informe breve: commit de `main` usado, secciones con contenido, cantidad de imágenes, diagramas y tablas, `[COMPLETAR]` pendientes y cualquier diferencia con el sitio.
