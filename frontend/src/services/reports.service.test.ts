@@ -5,6 +5,7 @@ import {
   closeReport,
   confirmMatch,
   createReport,
+  deleteReport,
   findSimilarReports,
   getFlyer,
   getMatches,
@@ -119,6 +120,14 @@ describe('reports.service escritura', () => {
 
     expect(api.put).toHaveBeenCalledWith('/reports/5', { title: 'Perro encontrado en Guemes' })
     expect(resultado).toEqual(editado)
+  })
+
+  it('elimina el reporte contra DELETE /reports/:id', async () => {
+    vi.mocked(api.delete).mockResolvedValue(respuesta(undefined))
+
+    await deleteReport(5)
+
+    expect(api.delete).toHaveBeenCalledWith('/reports/5')
   })
 })
 

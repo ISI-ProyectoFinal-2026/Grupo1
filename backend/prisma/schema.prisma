@@ -190,7 +190,7 @@ model ReportFlag {
   status    ReportFlagStatus  @default(pending)
   createdAt DateTime          @default(now()) @map("created_at")
 
-  report Report @relation(fields: [reportId], references: [id])
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id])
 
   @@unique([reportId, userId])
@@ -208,7 +208,7 @@ model ReportEmbedding {
   embedding Unsupported("vector(768)")
   createdAt DateTime @default(now()) @map("created_at")
 
-  report Report @relation(fields: [reportId], references: [id])
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@map("report_embeddings")
 }
@@ -230,8 +230,8 @@ model ReportMatch {
   createdAt       DateTime    @default(now()) @map("created_at")
   confirmedAt     DateTime?   @map("confirmed_at")
 
-  reportLost  Report @relation("MatchLost", fields: [reportLostId], references: [id])
-  reportFound Report @relation("MatchFound", fields: [reportFoundId], references: [id])
+  reportLost  Report @relation("MatchLost", fields: [reportLostId], references: [id], onDelete: Cascade)
+  reportFound Report @relation("MatchFound", fields: [reportFoundId], references: [id], onDelete: Cascade)
 
   @@unique([reportLostId, reportFoundId])
   @@index([reportFoundId])

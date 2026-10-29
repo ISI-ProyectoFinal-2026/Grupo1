@@ -160,6 +160,65 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     expect(getRes.status).toBe(404);
   });
 
+  // #242: embedding, coincidencias y denuncias se borran en cascada con el reporte
+  describe("DELETE /api/reports/:id con filas dependientes (#242)", () => {
+    async function deleteAsOwner(id: number) {
+      return request(app).delete(`/api/reports/${id}`).set("Authorization", `Bearer ${token}`);
+    }
+
+    test("borra el embedding del reporte", async () => {
+      const created = await createPublishedReport(token, { userId, ...baseReportData });
+      createdReportIds.push(created.id);
+      const literal = `[${Array(768).fill(0.1).join(",")}]`;
+      await prisma.$executeRaw`
+        INSERT INTO report_embeddings (report_id, embedding) VALUES (${created.id}, ${literal}::vector)
+      `;
+
+      const res = await deleteAsOwner(created.id);
+      expect(res.status).toBe(204);
+
+      const embeddings = await prisma.$queryRaw<{ count: bigint }[]>`
+        SELECT COUNT(*) AS count FROM report_embeddings WHERE report_id = ${created.id}
+      `;
+      expect(Number(embeddings[0].count)).toBe(0);
+    });
+
+    test.each(["lost", "found"] as const)(
+      "borra las coincidencias cuando el reporte eliminado es el %s",
+      async (deletedSide) => {
+        const lost = await createPublishedReport(token, { userId, ...baseReportData, reportType: "lost" });
+        createdReportIds.push(lost.id);
+        const found = await createPublishedReport(token, { userId, ...baseReportData, reportType: "found" });
+        createdReportIds.push(found.id);
+        const match = await prisma.reportMatch.create({
+          data: { reportLostId: lost.id, reportFoundId: found.id, similarityScore: 0.9, status: "pending" },
+        });
+
+        const deleted = deletedSide === "lost" ? lost : found;
+        const kept = deletedSide === "lost" ? found : lost;
+        const res = await deleteAsOwner(deleted.id);
+        expect(res.status).toBe(204);
+
+        expect(await prisma.reportMatch.findUnique({ where: { id: match.id } })).toBeNull();
+        expect(await prisma.report.findUnique({ where: { id: kept.id } })).not.toBeNull();
+      }
+    );
+
+    test("borra las denuncias del reporte", async () => {
+      const created = await createPublishedReport(token, { userId, ...baseReportData });
+      createdReportIds.push(created.id);
+      const flag = await prisma.reportFlag.create({
+        data: { reportId: created.id, userId: otherUserId, reason: "spam" },
+      });
+
+      const res = await deleteAsOwner(created.id);
+      expect(res.status).toBe(204);
+
+      expect(await prisma.reportFlag.findUnique({ where: { id: flag.id } })).toBeNull();
+      expect(await prisma.user.findUnique({ where: { id: otherUserId } })).not.toBeNull();
+    });
+  });
+
   test("DELETE /api/reports/:id responde 404 si no existe", async () => {
     const res = await request(app).delete("/api/reports/999999999").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(404);

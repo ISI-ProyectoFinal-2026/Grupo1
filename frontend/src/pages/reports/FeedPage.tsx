@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { listReports } from "@/services/reports.service";
 import type { ReportType } from "@/types/report.types";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import SuccessMessage from "@/components/ui/SuccessMessage";
 import { ListIcon, MapIcon, PawIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import Spinner from "@/components/ui/Spinner";
@@ -13,6 +14,8 @@ import ReportCard from "@/components/reports/ReportCard";
 import MapView from "@/components/reports/MapView";
 
 export default function FeedPage() {
+  // Aviso que deja la pantalla anterior (por ejemplo, al eliminar un reporte).
+  const flashMessage = (useLocation().state as { message?: string } | null)?.message;
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [type, setType] = useState<ReportType | "">("");
   const [zone, setZone] = useState("");
@@ -72,6 +75,8 @@ export default function FeedPage() {
           </div>
         </div>
       </div>
+
+      {flashMessage && <SuccessMessage message={flashMessage} className="mt-4" />}
 
       <div className="mt-4">
         <FilterBar

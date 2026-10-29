@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../src/db/client";
 import { AppError } from "../../src/errors/app-error";
 import * as reportsService from "../../src/services/reports.service";
@@ -191,6 +192,20 @@ describe("reports.service", () => {
     createdReportIds.push(report.id);
 
     await expect(reportsService.remove(report.id, userId + 1)).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  // FK restrictiva futura (#242)
+  test("remove() lanza AppError 409 si otra tabla todavía referencia al reporte", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+    jest.spyOn(prisma.report, "delete").mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Foreign key constraint failed", {
+        code: "P2003",
+        clientVersion: Prisma.prismaVersion.client,
+      })
+    );
+
+    await expect(reportsService.remove(report.id, userId)).rejects.toMatchObject({ statusCode: 409 });
   });
 
   test("create() con reportType found expone tag ENCONTRADO", async () => {

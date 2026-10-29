@@ -188,3 +188,25 @@ describe('FeedPage: vista de mapa', () => {
     expect(screen.getByText('Perra perdida en Caballito')).toBeInTheDocument()
   })
 })
+
+describe('FeedPage: aviso de la pantalla anterior', () => {
+  it('muestra el aviso que llega en el state, por ejemplo al eliminar un reporte', async () => {
+    const { Wrapper } = createQueryWrapper()
+    render(
+      <Wrapper>
+        <MemoryRouter initialEntries={[{ pathname: '/reports', state: { message: 'Reporte eliminado' } }]}>
+          <FeedPage />
+        </MemoryRouter>
+      </Wrapper>
+    )
+
+    expect(await screen.findByText('Reporte eliminado')).toBeInTheDocument()
+  })
+
+  it('sin aviso no muestra nada extra', async () => {
+    renderPage()
+
+    await waitFor(() => expect(reportsService.listReports).toHaveBeenCalled())
+    expect(screen.queryByText('Reporte eliminado')).not.toBeInTheDocument()
+  })
+})

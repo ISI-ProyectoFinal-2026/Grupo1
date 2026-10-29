@@ -6,6 +6,7 @@ import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
 import { useMatchActions } from "@/hooks/useMatchActions";
 import { useCloseReport } from "@/hooks/useCloseReport";
 import { useFlagReport } from "@/hooks/useFlagReport";
+import { useDeleteReport } from "@/hooks/useDeleteReport";
 import { getFlyer, uploadCustomFlyer } from "@/services/reports.service";
 import { createChat } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
@@ -22,6 +23,7 @@ import PendingBanner from "@/components/reports/PendingBanner";
 import MatchCard from "@/components/reports/MatchCard";
 import ImageUploader from "@/components/reports/ImageUploader";
 import CloseReportButton from "@/components/reports/CloseReportButton";
+import DeleteReportButton from "@/components/reports/DeleteReportButton";
 import FlagReportForm from "@/components/reports/FlagReportForm";
 import LocationMap from "@/components/maps/LocationMap";
 import { cn } from "@/lib/cn";
@@ -43,6 +45,9 @@ export default function ReportDetailPage() {
   const matchActions = useMatchActions(Number(id));
   const closeReport = useCloseReport(Number(id));
   const flagReport = useFlagReport(Number(id));
+  const deleteReport = useDeleteReport(Number(id), () =>
+    navigate("/reports", { replace: true, state: { message: "Reporte eliminado" } }),
+  );
   const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
   const [customFlyerError, setCustomFlyerError] = useState<string | null>(null);
   const flyerMutation = useMutation({
@@ -352,11 +357,19 @@ export default function ReportDetailPage() {
               />
             )}
 
-            {/* El backend deja editar en cualquier estado: solo exige ser el dueño. */}
+            {/* El backend deja editar y eliminar en cualquier estado: solo exige
+                ser el dueño. */}
             {isOwner && (
-              <Link to={`/reports/${report.id}/edit`} className={buttonClasses("secondary", "md", "w-full")}>
-                Editar reporte
-              </Link>
+              <div className="grid grid-cols-1 gap-2">
+                <Link to={`/reports/${report.id}/edit`} className={buttonClasses("secondary", "md", "w-full")}>
+                  Editar reporte
+                </Link>
+                <DeleteReportButton
+                  onConfirm={deleteReport.remove}
+                  isPending={deleteReport.isPending}
+                  error={deleteReport.error}
+                />
+              </div>
             )}
 
             {canFlag && (
