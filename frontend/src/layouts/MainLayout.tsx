@@ -35,6 +35,7 @@ const isReportsPath = (path: string) =>
   path === "/reports" || (path.startsWith("/reports/") && path !== "/reports/new");
 const isOwnBusinessPath = (path: string) =>
   path === "/businesses/dashboard" || path === "/businesses/register";
+const isOwnPetsPath = (path: string) => path === "/pets" || path.startsWith("/pets/");
 
 const PRIMARY_ITEMS: NavItemConfig[] = [
   { to: "/reports", label: "Reportes", icon: ListIcon, isActive: isReportsPath },
@@ -125,7 +126,10 @@ function MainLayout() {
   const closeMore = () => setIsMoreOpen(false);
   const isReportarActive = pathname === "/reports/new";
   const isMoreActive =
-    isOwnBusinessPath(pathname) || pathname === "/moderation" || pathname === "/account/security";
+    isOwnPetsPath(pathname) ||
+    isOwnBusinessPath(pathname) ||
+    pathname === "/moderation" ||
+    pathname === "/account/security";
 
   const moreLinkClasses = (active: boolean) =>
     cn(
@@ -239,6 +243,15 @@ function MainLayout() {
               "lg:static lg:mt-auto lg:flex lg:rounded-none lg:shadow-none",
             )}
           >
+            <Link
+              to="/pets"
+              onClick={closeMore}
+              aria-current={isOwnPetsPath(pathname) ? "page" : undefined}
+              className={moreLinkClasses(isOwnPetsPath(pathname))}
+            >
+              <PawIcon className="h-5 w-5" />
+              Mis mascotas
+            </Link>
             <Link
               to="/businesses/dashboard"
               onClick={closeMore}

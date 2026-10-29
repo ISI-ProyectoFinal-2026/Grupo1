@@ -38,3 +38,7 @@ blob-report/
 
 # Sitio web del informe (mkdocs build)
 site/
+
+# Informe en docx (tools/informe-docx)
+.informe-docx-work/
+Patitas-Informe-Final-*.docx

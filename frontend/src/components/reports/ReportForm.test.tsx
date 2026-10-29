@@ -7,9 +7,12 @@ import { createReport, findSimilarReports } from '@/services/reports.service'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ReportDTO } from '@/types/report.types'
 import * as authService from '@/services/auth.service'
+import { listMyPets } from '@/services/pets.service'
+import type { PetDTO } from '@/types/pet.types'
 
 vi.mock('@/services/reports.service', () => ({ createReport: vi.fn(), findSimilarReports: vi.fn() }))
 vi.mock('@/services/auth.service')
+vi.mock('@/services/pets.service')
 
 // LocationPicker y ImageUploader arrastran leaflet y el flujo de subida a R2:
 // nada de eso hace falta para probar la validacion y el envio del formulario.
@@ -136,8 +139,26 @@ async function completarMinimo(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
 }
 
+function mascota(overrides: Partial<PetDTO> = {}): PetDTO {
+  return {
+    id: 3,
+    userId: 7,
+    name: 'Firulais',
+    species: 'dog',
+    breed: 'Labrador',
+    age: 3,
+    color: 'Marrón',
+    description: null,
+    photoUrls: ['https://pub.r2.dev/pets/a.jpg'],
+    microchipId: null,
+    createdAt: '2026-10-01T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(listMyPets).mockResolvedValue([])
   vi.mocked(findSimilarReports).mockResolvedValue([])
 })
 
@@ -338,6 +359,73 @@ describe('ReportForm: envio', () => {
     await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
 
     expect(await screen.findByText('Error al crear el reporte')).toBeInTheDocument()
+  })
+})
+
+describe('ReportForm: mascota vinculada (#225)', () => {
+  it('ofrece elegir una de mis mascotas, sin ninguna elegida por defecto', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([
+      mascota(),
+      mascota({ id: 4, name: 'Michi', breed: null }),
+    ])
+    renderForm()
+
+    const selector = await screen.findByLabelText('Mascota')
+    expect(selector).toHaveValue('')
+    expect(screen.getByRole('option', { name: 'Ninguna' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Firulais (Labrador)' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Michi' })).toBeInTheDocument()
+  })
+
+  it('manda el petId de la mascota elegida', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([mascota()])
+    vi.mocked(createReport).mockResolvedValue(reporte({ petId: 3 }))
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.selectOptions(await screen.findByLabelText('Mascota'), 'Firulais (Labrador)')
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0].petId).toBe(3)
+  })
+
+  it('no manda petId si se vuelve a "Ninguna"', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([mascota()])
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    const selector = await screen.findByLabelText('Mascota')
+    await user.selectOptions(selector, 'Firulais (Labrador)')
+    await user.selectOptions(selector, 'Ninguna')
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0].petId).toBeUndefined()
+  })
+
+  it('no muestra el selector si no tengo mascotas', async () => {
+    renderForm()
+
+    await waitFor(() => expect(listMyPets).toHaveBeenCalled())
+    expect(screen.queryByLabelText('Mascota')).not.toBeInTheDocument()
+  })
+
+  it('permite crear el reporte aunque falle la carga de mascotas', async () => {
+    vi.mocked(listMyPets).mockRejectedValue(new Error('Error del servidor'))
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(screen.queryByLabelText('Mascota')).not.toBeInTheDocument()
+    expect(vi.mocked(createReport).mock.calls[0][0].petId).toBeUndefined()
   })
 })
 
