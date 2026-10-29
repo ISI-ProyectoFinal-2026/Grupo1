@@ -5,7 +5,9 @@ import { getApiErrorDetails } from "@/services/api";
 import { useCreateBusinessMutation, useMyBusinessQuery } from "@/hooks/useBusiness";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import ErrorMessage from "@/components/ui/ErrorMessage";
+import LocationPicker from "@/components/maps/LocationPicker";
 import type { BusinessCategory } from "@/types/business.types";
+import type { GeoPoint } from "@/types/geo.types";
 
 const CATEGORY_OPTIONS: Array<{ value: BusinessCategory; label: string }> = [
   { value: "VETERINARIA", label: "Veterinaria" },
@@ -24,6 +26,7 @@ function BusinessRegisterPage() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [category, setCategory] = useState<BusinessCategory>("VETERINARIA");
+  const [location, setLocation] = useState<GeoPoint | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
 
@@ -36,8 +39,13 @@ function BusinessRegisterPage() {
     setError(null);
     setFieldErrors([]);
 
+    if (!location) {
+      setError("Marcá la ubicación del comercio en el mapa");
+      return;
+    }
+
     try {
-      await createBusiness.mutateAsync({ name, cuit, address, phone, category });
+      await createBusiness.mutateAsync({ name, cuit, address, phone, category, location });
       navigate("/businesses/dashboard");
     } catch (err) {
       const details = getApiErrorDetails(err);
@@ -107,6 +115,12 @@ function BusinessRegisterPage() {
               className="field"
             />
           </div>
+
+          {/* el domicilio es texto libre: el mapa solo aporta las coordenadas */}
+          <fieldset className="flex flex-col gap-2">
+            <legend className="field-label mb-1.5">Ubicación en el mapa</legend>
+            <LocationPicker onLocationSelect={setLocation} resolveAddress={false} />
+          </fieldset>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="phone" className="field-label">

@@ -66,3 +66,21 @@ export interface ListReportsQuery {
   dateTo?: string
   order?: 'asc' | 'desc'
 }
+
+// posible duplicado sugerido al crear un reporte (#211)
+export interface SimilarReportDTO {
+  id: number
+  title: string
+  reportType: ReportType
+  status: ReportStatus
+  imageUrl: string | null
+  distanceMeters: number
+  similarity: number | null
+  isOwn: boolean
+}
+
+export interface SimilarReportsQuery {
+  reportType: ReportType
+  location: ReportLocation
+  imageUrl?: string
+}

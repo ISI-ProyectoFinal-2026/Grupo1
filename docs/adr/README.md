@@ -29,13 +29,14 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0009](0009-mapas-leaflet-osm-nominatim-postgis.md) | Mapas con Leaflet y OpenStreetMap, Nominatim y PostGIS | Aceptada | Gabriel Valdivieso; Agustín Díaz; Matías Alvarado | C09 | — |
 | [ADR-0010](0010-flujo-git-ramas-personales.md) | Flujo de trabajo con Git, ramas personales y revisión obligatoria | Aceptada | Matías Alvarado | C10 | — |
 | [ADR-0011](0011-imagen-docker-postgres.md) | Imagen Docker de PostgreSQL con base oficial y PGDG | Aceptada | Gabriel Valdivieso | C11 | — |
-| [ADR-0013](0013-dimension-embedding-512.md) | Dimensión del embedding de 512 | Aceptada | Agustín Díaz; Matías Alvarado; Gabriel Valdivieso | C13 | — |
+| [ADR-0013](0013-dimension-embedding-512.md) | Dimensión del embedding de 512 | Reemplazada | Agustín Díaz; Matías Alvarado; Gabriel Valdivieso | C13 | Reemplazada por [ADR-0021](0021-modelo-embeddings-dinov2.md) |
 | [ADR-0014](0014-parametros-matching.md) | Parámetros del matching | Pendiente | Agustín Díaz; Gabriel Valdivieso; Matías Alvarado | C14 | — |
 | [ADR-0016](0016-moderacion-hibrida.md) | Moderación híbrida con filtro automático por IA y denuncias de usuarios | Aceptada | Franco Marín; Agustín Díaz; Matías Alvarado; Gabriel Valdivieso | C16 | — |
 | [ADR-0017](0017-flyers-canvas.md) | Flyers con plantilla fija dibujada con canvas | Aceptada | Matías Alvarado; Agustín Díaz | C17 | — |
 | [ADR-0018](0018-criterio-evolucion-tecnologica.md) | Criterio de evolución tecnológica | Aceptada | Equipo (Matías Alvarado, PM) | CX01 | — |
 | [ADR-0019](0019-comercio-perfil-no-rol.md) | El comercio es un perfil del usuario y no un rol | Aceptada | Agustín Díaz; Matías Alvarado | C28 (parte) | — |
 | [ADR-0020](0020-sitio-web-del-informe.md) | Sitio web del informe con Material for MkDocs en GitHub Pages | Pendiente | Matías Alvarado | — | — |
+| [ADR-0021](0021-modelo-embeddings-dinov2.md) | Modelo de embeddings DINOv2 ViT-B/14 para el matching | Aceptada | Agustín Díaz | C13 | Reemplaza a [ADR-0013](0013-dimension-embedding-512.md) |
 
 ## Pendientes
 

@@ -6,6 +6,7 @@ import {
   confirmMatch,
   createReport,
   deleteReport,
+  findSimilarReports,
   getFlyer,
   getMatches,
   getReport,
@@ -14,7 +15,7 @@ import {
   updateReport,
   uploadCustomFlyer,
 } from '@/services/reports.service'
-import type { MatchDTO, MatchDecisionDTO, ReportDTO } from '@/types/report.types'
+import type { MatchDTO, MatchDecisionDTO, ReportDTO, SimilarReportDTO } from '@/types/report.types'
 
 vi.mock('@/services/api', () => ({
   api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
@@ -205,5 +206,35 @@ describe('reports.service flyer', () => {
       flyerUrl: 'https://cdn/propio.png',
     })
     expect(resultado.customFlyerUrl).toBe('https://cdn/propio.png')
+  })
+})
+
+describe('reports.service reportes similares', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('pide los similares con tipo, ubicacion y foto y devuelve la lista', async () => {
+    const similares: SimilarReportDTO[] = [
+      {
+        id: 3,
+        title: 'Perro encontrado',
+        reportType: 'found',
+        status: 'published',
+        imageUrl: null,
+        distanceMeters: 300,
+        similarity: 0.9,
+        isOwn: false,
+      },
+    ]
+    vi.mocked(api.post).mockResolvedValue(respuesta(similares))
+    const input = {
+      reportType: 'found' as const,
+      location: { lat: -31.42, lng: -64.18 },
+      imageUrl: 'https://cdn/foto.jpg',
+    }
+
+    await expect(findSimilarReports(input)).resolves.toEqual(similares)
+    expect(api.post).toHaveBeenCalledWith('/reports/similar', input)
   })
 })

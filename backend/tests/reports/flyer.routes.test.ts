@@ -1,5 +1,6 @@
 import request from "supertest";
 import { createTestUser } from "../helpers/users";
+import { createPublishedReport, mockImageModeration } from "../helpers/reports";
 import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const sendMock = jest.fn();
@@ -89,18 +90,19 @@ describe("GET /api/reports/:id/flyer", () => {
     userId = user.user.id;
     token = user.token;
 
-    const res = await request(app)
-      .post("/api/reports")
-      .set("Authorization", `Bearer ${token}`)
-      .send({
-        userId,
-        reportType: "lost",
-        title: "Gato gris perdido en San Telmo",
-        description: "Collar rojo",
-        location: { lat: -34.6037, lng: -58.3816 },
-        locationAddress: "San Telmo, CABA",
-      });
-    reportId = res.body.id;
+    mockImageModeration();
+    const report = await createPublishedReport(token, {
+      userId,
+      reportType: "lost",
+      title: "Gato gris perdido en San Telmo",
+      description: "Collar rojo",
+      location: { lat: -34.6037, lng: -58.3816 },
+      locationAddress: "San Telmo, CABA",
+    });
+    reportId = report.id;
+    // sin foto en la base: el flyer no intenta bajar la imagen por red
+    await prisma.report.update({ where: { id: reportId }, data: { imageUrl: null } });
+    jest.restoreAllMocks();
   });
 
   afterAll(async () => {
@@ -282,18 +284,19 @@ describe("PUT /api/reports/:id/flyer/custom", () => {
     otherUserId = otherUser.user.id;
     otherToken = otherUser.token;
 
-    const res = await request(app)
-      .post("/api/reports")
-      .set("Authorization", `Bearer ${token}`)
-      .send({
-        userId,
-        reportType: "lost",
-        title: "Gato gris perdido en San Telmo",
-        description: "Collar rojo",
-        location: { lat: -34.6037, lng: -58.3816 },
-        locationAddress: "San Telmo, CABA",
-      });
-    reportId = res.body.id;
+    mockImageModeration();
+    const report = await createPublishedReport(token, {
+      userId,
+      reportType: "lost",
+      title: "Gato gris perdido en San Telmo",
+      description: "Collar rojo",
+      location: { lat: -34.6037, lng: -58.3816 },
+      locationAddress: "San Telmo, CABA",
+    });
+    reportId = report.id;
+    // sin foto en la base: el flyer no intenta bajar la imagen por red
+    await prisma.report.update({ where: { id: reportId }, data: { imageUrl: null } });
+    jest.restoreAllMocks();
   });
 
   afterAll(async () => {

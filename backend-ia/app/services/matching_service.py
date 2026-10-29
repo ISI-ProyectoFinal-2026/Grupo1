@@ -17,12 +17,27 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# El POC (docs/pocs/poc_similitudes.md) midió, con OpenCLIP+YOLO: misma
-# mascota ≈ 85-89% similitud coseno, mascotas distintas ≈ 65%, dejando
-# pendiente calibrar el umbral exacto dentro de ese rango. Se usa el punto
-# medio del rango, 75% similitud (distancia coseno < 0.25), como constante
-# documentada y fácil de ajustar — no es un valor definitivo.
-SIMILARITY_THRESHOLD = 0.75
+# Umbrales calibrados con el benchmark de identidad sobre el pipeline de
+# producción (DINOv2 @224px, 596 fotos de 92 perros y gatos, foto de consulta
+# degradada a 480px + JPEG q50): misma mascota ≈ 0.63 de media, mascotas
+# distintas ≈ 0.09. Calibrados a ciegas con validación cruzada por animal, el
+# 3% y el 0.3% de falsos positivos caen en 0.42 y 0.61. Ninguna similitud
+# global es infalible (misma raza + mismo color se confunden), así que hay dos
+# niveles:
+#
+# - MATCH_THRESHOLD (0.45): se persiste como "posible coincidencia" para que
+#   los dueños la revisen y la confirmen o rechacen. Con 20 reportes cercanos
+#   y el umbral calibrado (0.42), la mascota correcta se encontró en el 88% de
+#   los casos.
+# - NOTIFY_THRESHOLD (0.63): además se notifica activamente a los dueños (con
+#   el umbral calibrado, 0.61, hubo 0.06 notificaciones falsas por reporte).
+#
+# Dependen de pipeline.DINO_INPUT_SIZE: cambiar la resolución mueve la escala.
+#
+# Valores provisionales: el benchmark usa fotos prolijas de animales famosos;
+# recalibrar con matches confirmados/rechazados reales.
+MATCH_THRESHOLD = 0.45
+NOTIFY_THRESHOLD = 0.63
 
 
 async def _notify_match(lost_id: int, found_id: int, similarity: float) -> None:
@@ -57,7 +72,8 @@ async def _notify_match(lost_id: int, found_id: int, similarity: float) -> None:
 
 async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
     """Busca candidatos a match para `report_id` (recién procesado) y
-    persiste los que superen SIMILARITY_THRESHOLD en `report_matches`.
+    persiste los que superen MATCH_THRESHOLD en `report_matches`. Solo los
+    que además superen NOTIFY_THRESHOLD disparan la notificación.
 
     Devuelve la cantidad de matches creados/actualizados.
     """
@@ -80,11 +96,11 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
         text(
             """
             -- `<=>` es distancia COSENO en pgvector, así que `1 - (a <=> b)` es
-            -- la similitud coseno que mide el POC y con la que se calibró
-            -- SIMILARITY_THRESHOLD. NO usar `<->`: ese es distancia L2 y, aun
-            -- con embeddings normalizados, `1 - L2` no es la similitud coseno
-            -- (dos fotos de la misma mascota con coseno 0.87 dan L2 0.51, o sea
-            -- 0.49 "similitud", debajo del umbral: no matchearía nunca).
+            -- la similitud coseno con la que se calibraron MATCH_THRESHOLD y
+            -- NOTIFY_THRESHOLD. NO usar `<->`: ese es distancia L2 y, aun con
+            -- embeddings normalizados, `1 - L2` no es la similitud coseno
+            -- (dos fotos de la misma mascota con coseno 0.70 dan L2 0.77, o sea
+            -- 0.23 "similitud", debajo de ambos umbrales: no matchearía nunca).
             -- `<=>` es además el operador que puede usar el índice HNSW, creado
             -- con `vector_cosine_ops` (ver backend/prisma/migrations/
             -- 20260813000000_fix_report_embedding_dimension).
@@ -115,7 +131,7 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
 
     matches_created = 0
     for candidate in candidates_result.mappings():
-        if candidate["similarity"] < SIMILARITY_THRESHOLD:
+        if candidate["similarity"] < MATCH_THRESHOLD:
             continue
 
         if source["report_type"] == "lost":
@@ -138,7 +154,8 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
         )
         if upsert_result.first() is not None:
             matches_created += 1
-            await _notify_match(lost_id, found_id, candidate["similarity"])
+            if candidate["similarity"] >= NOTIFY_THRESHOLD:
+                await _notify_match(lost_id, found_id, candidate["similarity"])
 
     await session.commit()
     return matches_created

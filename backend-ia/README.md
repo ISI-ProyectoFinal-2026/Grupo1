@@ -72,19 +72,46 @@ POST /reports/{report_id}/embedding
 Internamente (`app/services/embedding_service.py` + `app/services/matching_service.py`), en la misma request:
 
 1. Descarga la imagen y corre **YOLOv8n** (`app/ml/pipeline.py`) para detectar y recortar el animal (cualquier clase animal de COCO: `bird`, `cat`, `dog`, `horse`, etc.).
-2. Genera el embedding con **OpenCLIP ViT-B-32** (pretrained `laion2b_s34b_b79k` — **no** `openai`, da otra dimensión) y lo guarda en `report_embeddings` (`vector(512)`).
-3. Busca candidatos por similitud coseno (pgvector) entre reportes de tipo opuesto (lost↔found), dentro de 5km / 30 días / publicados, y guarda los que superen `SIMILARITY_THRESHOLD` (0.75, constante documentada en `matching_service.py` — valor provisional, ver `docs/pocs/poc_similitudes.md`) en `report_matches`.
+2. Genera el embedding con **DINOv2 ViT-B/14** (`vit_base_patch14_dinov2.lvd142m` vía `timm`, entrada a 224px) y lo guarda en `report_embeddings` (`vector(768)`). La inferencia corre en un thread (`asyncio.to_thread`) para no bloquear el event loop.
+3. Busca candidatos por similitud coseno (pgvector) entre reportes de tipo opuesto (lost↔found), dentro de 5km / 30 días / publicados, **los 5 más parecidos** (`LIMIT 5`), y guarda en `report_matches` los que superen `MATCH_THRESHOLD` (0.45). Los que además superen `NOTIFY_THRESHOLD` (0.63) disparan la notificación a los dueños (ver `NODE_BACKEND_URL`). Ambas constantes están documentadas en `matching_service.py` y calibradas con un benchmark propio (FPR 3% / 0.3%).
 
 La similitud se calcula con `1 - (a <=> b)`: **`<=>` es distancia coseno**, y es el único operador que puede usar el índice HNSW (creado con `vector_cosine_ops`). No cambiarlo por `<->` (distancia L2): aun con embeddings normalizados `1 - L2` no es la similitud coseno y el umbral deja de tener sentido — dos fotos de la misma mascota con coseno 0.87 dan L2 0.51, o sea 0.49 de "similitud", y no matchearían nunca.
 
-Modelo y umbral están validados contra `docs/pocs/POC_Similitudes.ipynb` — no cambiar el checkpoint de OpenCLIP ni el modelo YOLO sin volver a correr esa validación, ya que la dimensión del embedding y los porcentajes de similitud dependen del checkpoint exacto.
+Modelo y umbrales dependen del checkpoint exacto: no cambiar el modelo de embeddings ni YOLO sin volver a validar contra un set etiquetado, porque cambian la dimensión del vector y la escala de los porcentajes.
 
-**No implementado todavía:** cola Redis (hoy es síncrono dentro de la request), notificación al usuario cuando hay un match, y confirmar/rechazar un match desde el frontend (`GET /api/reports/:id/matches` en el Backend Principal es de solo lectura).
+**Límites conocidos:**
 
+- Perros de la misma raza pueden puntuar por encima de otra foto del mismo perro (en la validación, ~0.52–0.62 contra ~0.39–0.47). Es un límite del modelo con estos umbrales, no un bug.
+- Con `LIMIT 5` los matches visibles dependen del orden de carga: un reporte con más de 5 candidatos sobre el umbral solo guarda los 5 mejores; el resto aparece cuando se recalcula desde el otro lado (por ejemplo con el script de re-embedding).
+- `NODE_BACKEND_URL` vacío desactiva las notificaciones de match sin avisar, y la respuesta HTTP del Backend Principal no se verifica (una `INTERNAL_API_KEY` distinta devuelve 401 y se ignora).
+
+**No implementado todavía:** cola Redis (hoy es síncrono dentro de la request).
+
+## Cambiar de modelo de embeddings (migración a DINOv2)
+
+Los vectores de modelos distintos viven en espacios distintos: no se pueden convertir ni comparar. Por eso la migración `20261014000000_dinov2_embedding_dimension` cambia la columna a `vector(768)` y **vacía `report_embeddings`** (no guarda copia: los vectores viejos no sirven con el modelo nuevo y se regeneran desde las imágenes). Hasta regenerarlos, ningún reporte matchea.
+
+Pasos al actualizar un entorno (en este orden):
+
+```bash
+# 1. dependencias (sale open_clip_torch, entra timm)
+cd backend-ia && pip install -r requirements.txt
+
+# 2. migrar la base (borra los embeddings)
+cd ../backend && npx prisma migrate deploy
+
+# 3. regenerar embeddings y matches con el modelo nuevo
+cd ../backend-ia && python -m scripts.reembed_reports        # solo publicados
+python -m scripts.reembed_reports --all                      # todos los que tienen imagen
+```
+
+- El primer arranque descarga los pesos de DINOv2 (necesita internet).
+- Si actualizás el código sin migrar, los inserts fallan: la columna sigue en 512 dimensiones y el vector nuevo tiene 768.
+- Borrá los matches `pending` viejos antes del paso 3 si querés descartar los calculados con el modelo anterior: el upsert no elimina los que ahora quedan bajo el umbral.
 ## Tests
 
 ```bash
 python -m pytest
 ```
 
-Corre contra la misma base de datos de desarrollo (real, sin mocks de DB); los modelos YOLO/OpenCLIP se mockean en los tests para no depender de pesos descargados ni de inferencia real (ver `tests/conftest.py`).
+Corre contra la misma base de datos de desarrollo (real, sin mocks de DB); los modelos YOLO/DINOv2 se mockean en los tests para no depender de pesos descargados ni de inferencia real (ver `tests/conftest.py`).

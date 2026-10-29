@@ -2,7 +2,8 @@
  * Test setup through the real backend API (not the UI): only the journey under
  * test goes through the browser, everything else is arranged here.
  */
-import { BACKEND_URL, INTERNAL_API_KEY } from './env.ts'
+import { publishReport } from './db.ts'
+import { BACKEND_URL, E2E_IMAGE_URL, INTERNAL_API_KEY } from './env.ts'
 import { totpNow } from './totp.ts'
 
 export interface ApiUser {
@@ -107,18 +108,29 @@ interface NewReport {
   reportType: 'lost' | 'found'
   title: string
   description?: string
+  location?: { lat: number; lng: number }
 }
 
-/** Without image: the backend publishes it right away, no AI involved. */
-export function createReport(token: string, report: NewReport): Promise<ApiReport> {
-  return expectStatus(
+/**
+ * The photo is mandatory, so the backend creates the report as pending and the
+ * AI stub never publishes it (409): publish it straight in the DB instead.
+ */
+export async function createPublishedReport(token: string, report: NewReport): Promise<ApiReport> {
+  const created = await expectStatus(
     201,
     'create report',
     call<ApiReport>('POST', '/reports', {
       token,
-      body: { ...report, location: { lat: -34.6037, lng: -58.3816 }, locationAddress: 'Buenos Aires' },
+      body: {
+        imageUrl: E2E_IMAGE_URL,
+        location: { lat: -34.6037, lng: -58.3816 },
+        locationAddress: 'Buenos Aires',
+        ...report,
+      },
     }),
   )
+  await publishReport(created.id)
+  return { ...created, status: 'published' }
 }
 
 export function getReport(token: string, reportId: number): Promise<{ status: number; body: ApiReport }> {

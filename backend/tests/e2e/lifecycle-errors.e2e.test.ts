@@ -1,6 +1,7 @@
 import request from "supertest";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
+import { createPublishedReport, mockImageModeration } from "../helpers/reports";
 import { createE2EContext, E2EUser } from "./helpers/factories";
 
 /**
@@ -27,15 +28,11 @@ describe("E2E: errores del ciclo de vida de un reporte (B6)", () => {
 
   const auth = (user: E2EUser) => ({ Authorization: `Bearer ${user.token}` });
 
-  // Sin imagen el reporte nace published: no hace falta el Backend IA.
+  // La foto es obligatoria: el reporte nace pending y se publica directo (sin Backend IA).
   async function createReport(user: E2EUser, reportType: "lost" | "found", title: string): Promise<number> {
-    const res = await request(app)
-      .post("/api/reports")
-      .set(auth(user))
-      .send({ reportType, title, location: { lat: -34.6, lng: -58.38 } });
-    expect(res.status).toBe(201);
-    ctx.trackReport(res.body.id);
-    return res.body.id;
+    const report = await createPublishedReport(user.token, { reportType, title, location: { lat: -34.6, lng: -58.38 } });
+    ctx.trackReport(report.id);
+    return report.id;
   }
 
   beforeAll(async () => {
@@ -45,9 +42,11 @@ describe("E2E: errores del ciclo de vida de un reporte (B6)", () => {
     finder = await ctx.registerAndLogin("finder");
     stranger = await ctx.registerAndLogin("stranger");
 
+    mockImageModeration();
     lostReportId = await createReport(owner, "lost", "Gata perdida en Recoleta");
     foundReportId = await createReport(finder, "found", "Gata encontrada en Recoleta");
     strangerLostReportId = await createReport(stranger, "lost", "Gato perdido en Belgrano");
+    jest.restoreAllMocks();
 
     matchId = (
       await prisma.reportMatch.create({

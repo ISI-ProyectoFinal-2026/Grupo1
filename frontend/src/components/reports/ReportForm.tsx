@@ -11,7 +11,8 @@ import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
 import { getApiErrorCode } from "@/services/api";
 import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import ImageUploader from "./ImageUploader";
-import LocationPicker from "./LocationPicker";
+import SimilarReportsSuggestions from "./SimilarReportsSuggestions";
+import LocationPicker from "@/components/maps/LocationPicker";
 
 // "create" posts a new report and opens it. "edit" hands the validated data to
 // the caller, which owns the PUT and the navigation afterwards.
@@ -69,6 +70,7 @@ export default function ReportForm(props: ReportFormProps) {
     setFormData((prev) => ({ ...prev, imageUrl: publicUrl }));
     setImageRejection(rejection);
     setFormError(null);
+    setFieldErrors((prev) => ({ ...prev, imageUrl: "" }));
   };
 
   const handleImageUploadError = (error: string, code?: string) => {
@@ -197,6 +199,8 @@ export default function ReportForm(props: ReportFormProps) {
         )}
         {imageRejection ? (
           <ErrorMessage message={imageRejection} />
+        ) : fieldErrors.imageUrl ? (
+          <ErrorMessage message={fieldErrors.imageUrl} />
         ) : (
           formData.imageUrl &&
           (isCurrentImage ? (
@@ -226,6 +230,14 @@ export default function ReportForm(props: ReportFormProps) {
           initialAddress={initialData?.locationAddress}
         />
         {fieldErrors.location && <ErrorMessage message={fieldErrors.location} />}
+        {/* edit: the report already exists and would be suggested as its own duplicate */}
+        {!isEdit && (
+          <SimilarReportsSuggestions
+            reportType={formData.reportType ?? "lost"}
+            location={formData.location}
+            imageUrl={imageRejection ? undefined : formData.imageUrl}
+          />
+        )}
       </fieldset>
 
       <Button

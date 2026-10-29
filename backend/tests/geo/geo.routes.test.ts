@@ -2,6 +2,7 @@ import request from "supertest";
 import { createTestUser } from "../helpers/users";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
+import { createPublishedReport, mockImageModeration } from "../helpers/reports";
 
 describe("GET /api/geo/nearby y GET /api/geo/map", () => {
   let userId: number;
@@ -13,7 +14,7 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
   }
 
   function createReport(lat: number, lng: number, title: string) {
-    return request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send(reportAt(lat, lng, title));
+    return createPublishedReport(token, reportAt(lat, lng, title));
   }
 
   beforeAll(async () => {
@@ -22,7 +23,12 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
     token = user.token;
   });
 
+  beforeEach(() => {
+    mockImageModeration();
+  });
+
   afterEach(async () => {
+    jest.restoreAllMocks();
     while (createdReportIds.length > 0) {
       const id = createdReportIds.pop();
       if (id !== undefined) {
@@ -38,24 +44,24 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
 
   test("GET /api/geo/nearby responde 200 con reportes dentro del radio y excluye los lejanos", async () => {
     const inside = await createReport(-34.6037, -58.3816, "Cerca del Obelisco");
-    createdReportIds.push(inside.body.id);
+    createdReportIds.push(inside.id);
     const outside = await createReport(-38.0055, -57.5426, "En Mar del Plata");
-    createdReportIds.push(outside.body.id);
+    createdReportIds.push(outside.id);
 
     const res = await request(app).get("/api/geo/nearby?lat=-34.6037&lng=-58.3816&radius=5");
 
     expect(res.status).toBe(200);
-    expect(res.body.some((r: { id: number }) => r.id === inside.body.id)).toBe(true);
-    expect(res.body.some((r: { id: number }) => r.id === outside.body.id)).toBe(false);
+    expect(res.body.some((r: { id: number }) => r.id === inside.id)).toBe(true);
+    expect(res.body.some((r: { id: number }) => r.id === outside.id)).toBe(false);
   });
 
   test("GET /api/geo/nearby incluye las coordenadas lat/lng de cada reporte", async () => {
     const created = await createReport(-34.6037, -58.3816, "Con coordenadas");
-    createdReportIds.push(created.body.id);
+    createdReportIds.push(created.id);
 
     const res = await request(app).get("/api/geo/nearby?lat=-34.6037&lng=-58.3816&radius=5");
 
-    const found = res.body.find((r: { id: number }) => r.id === created.body.id);
+    const found = res.body.find((r: { id: number }) => r.id === created.id);
     expect(found.location).toEqual({ lat: expect.any(Number), lng: expect.any(Number) });
   });
 
@@ -77,24 +83,24 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
 
   test("GET /api/geo/map responde 200 con reportes dentro del bounding box y excluye los que quedan afuera", async () => {
     const inside = await createReport(-34.6037, -58.3816, "Dentro del bbox");
-    createdReportIds.push(inside.body.id);
+    createdReportIds.push(inside.id);
     const outside = await createReport(-38.0055, -57.5426, "Fuera del bbox");
-    createdReportIds.push(outside.body.id);
+    createdReportIds.push(outside.id);
 
     const res = await request(app).get("/api/geo/map?bounds=-34.7,-58.5,-34.5,-58.3");
 
     expect(res.status).toBe(200);
-    expect(res.body.some((r: { id: number }) => r.id === inside.body.id)).toBe(true);
-    expect(res.body.some((r: { id: number }) => r.id === outside.body.id)).toBe(false);
+    expect(res.body.some((r: { id: number }) => r.id === inside.id)).toBe(true);
+    expect(res.body.some((r: { id: number }) => r.id === outside.id)).toBe(false);
   });
 
   test("GET /api/geo/map incluye las coordenadas lat/lng de cada reporte", async () => {
     const created = await createReport(-34.6037, -58.3816, "Con coordenadas");
-    createdReportIds.push(created.body.id);
+    createdReportIds.push(created.id);
 
     const res = await request(app).get("/api/geo/map?bounds=-34.7,-58.5,-34.5,-58.3");
 
-    const found = res.body.find((r: { id: number }) => r.id === created.body.id);
+    const found = res.body.find((r: { id: number }) => r.id === created.id);
     expect(found.location).toEqual({ lat: expect.any(Number), lng: expect.any(Number) });
   });
 

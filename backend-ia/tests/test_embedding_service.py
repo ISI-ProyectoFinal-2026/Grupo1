@@ -6,6 +6,7 @@ para no depender de los modelos reales; el foco acá es la persistencia
 
 import io
 import logging
+import threading
 import uuid
 from unittest.mock import AsyncMock
 
@@ -15,6 +16,7 @@ from PIL import Image
 from sqlalchemy import text
 
 from app.db import async_session_factory
+from app.ml.pipeline import EMBEDDING_DIM
 from app.services import embedding_service
 
 
@@ -109,7 +111,7 @@ async def test_process_report_image_devuelve_false_si_no_se_detecta_mascota(monk
 
 @pytest.mark.asyncio
 async def test_process_report_image_inserta_el_embedding(monkeypatch, report_id):
-    fake_embedding = [0.001 * i for i in range(512)]
+    fake_embedding = [0.001 * i for i in range(EMBEDDING_DIM)]
     monkeypatch.setattr(embedding_service, "detect_and_crop", lambda image: image)
     monkeypatch.setattr(embedding_service, "generate_embedding", lambda crop: fake_embedding)
 
@@ -128,7 +130,7 @@ async def test_process_report_image_inserta_el_embedding(monkeypatch, report_id)
 
 @pytest.mark.asyncio
 async def test_process_report_image_dispara_find_and_store_matches_tras_guardar_el_embedding(monkeypatch, report_id):
-    fake_embedding = [0.001 * i for i in range(512)]
+    fake_embedding = [0.001 * i for i in range(EMBEDDING_DIM)]
     monkeypatch.setattr(embedding_service, "detect_and_crop", lambda image: image)
     monkeypatch.setattr(embedding_service, "generate_embedding", lambda crop: fake_embedding)
 
@@ -142,7 +144,7 @@ async def test_process_report_image_dispara_find_and_store_matches_tras_guardar_
 
 @pytest.mark.asyncio
 async def test_process_report_image_devuelve_exito_aunque_find_and_store_matches_falle(monkeypatch, report_id):
-    fake_embedding = [0.001 * i for i in range(512)]
+    fake_embedding = [0.001 * i for i in range(EMBEDDING_DIM)]
     monkeypatch.setattr(embedding_service, "detect_and_crop", lambda image: image)
     monkeypatch.setattr(embedding_service, "generate_embedding", lambda crop: fake_embedding)
     monkeypatch.setattr(
@@ -165,7 +167,7 @@ async def test_process_report_image_devuelve_exito_aunque_find_and_store_matches
 
 @pytest.mark.asyncio
 async def test_process_report_image_loguea_la_excepcion_antes_del_rollback(monkeypatch, report_id, caplog):
-    fake_embedding = [0.001 * i for i in range(512)]
+    fake_embedding = [0.001 * i for i in range(EMBEDDING_DIM)]
     monkeypatch.setattr(embedding_service, "detect_and_crop", lambda image: image)
     monkeypatch.setattr(embedding_service, "generate_embedding", lambda crop: fake_embedding)
     monkeypatch.setattr(
@@ -185,8 +187,8 @@ async def test_process_report_image_loguea_la_excepcion_antes_del_rollback(monke
 
 @pytest.mark.asyncio
 async def test_process_report_image_llamado_dos_veces_actualiza_en_vez_de_fallar(monkeypatch, report_id):
-    first_embedding = [0.001 * i for i in range(512)]
-    second_embedding = [0.002 * i for i in range(512)]
+    first_embedding = [0.001 * i for i in range(EMBEDDING_DIM)]
+    second_embedding = [0.002 * i for i in range(EMBEDDING_DIM)]
 
     monkeypatch.setattr(embedding_service, "detect_and_crop", lambda image: image)
 
@@ -210,3 +212,29 @@ async def test_process_report_image_llamado_dos_veces_actualiza_en_vez_de_fallar
             text("SELECT COUNT(*) FROM report_embeddings WHERE report_id = :id"), {"id": report_id}
         )
         assert result.scalar_one() == 1
+
+
+@pytest.mark.asyncio
+async def test_process_report_image_corre_la_inferencia_fuera_del_event_loop(monkeypatch, report_id):
+    """YOLO + DINOv2 tardan ~0.4s por imagen en CPU: en el thread del event
+    loop congelarían todas las demás requests del servicio (incluida
+    /analyze-image, que el usuario espera mientras completa el formulario)."""
+    loop_thread = threading.get_ident()
+    seen_threads = []
+
+    def fake_detect(image):
+        seen_threads.append(threading.get_ident())
+        return image
+
+    def fake_embed(crop):
+        seen_threads.append(threading.get_ident())
+        return [0.001 * i for i in range(EMBEDDING_DIM)]
+
+    monkeypatch.setattr(embedding_service, "detect_and_crop", fake_detect)
+    monkeypatch.setattr(embedding_service, "generate_embedding", fake_embed)
+
+    async with async_session_factory() as session:
+        await embedding_service.process_report_image(report_id, "https://example.com/foto.jpg", session)
+
+    assert len(seen_threads) == 2
+    assert all(thread != loop_thread for thread in seen_threads)

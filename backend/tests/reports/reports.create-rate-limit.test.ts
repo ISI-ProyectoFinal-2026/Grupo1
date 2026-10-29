@@ -2,6 +2,7 @@ import request from "supertest";
 import { REPORT_CREATE_RATE_LIMIT } from "../../src/middlewares/rate-limit";
 import { prisma } from "../../src/db/client";
 import { createTestUser } from "../helpers/users";
+import { TEST_IMAGE_URL, TEST_R2_PUBLIC_URL } from "../helpers/reports";
 
 // Este archivo prueba solo el limiter de creación: el service se mockea para
 // no depender de la base, R2 ni el Backend IA.
@@ -22,10 +23,12 @@ const validReport = {
   reportType: "lost",
   title: "Perro perdido en la plaza",
   location: { lat: -34.6, lng: -58.38 },
+  imageUrl: TEST_IMAGE_URL,
 };
 
 describe("POST /api/reports — rate limit por usuario", () => {
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalR2Url = process.env.R2_PUBLIC_URL;
   // requireAuth valida el token contra la base: los usuarios tienen que existir.
   let spammerId: number;
   let spammerToken: string;
@@ -53,10 +56,13 @@ describe("POST /api/reports — rate limit por usuario", () => {
 
   beforeEach(() => {
     process.env.NODE_ENV = "development";
+    process.env.R2_PUBLIC_URL = TEST_R2_PUBLIC_URL;
   });
 
   afterEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+    if (originalR2Url === undefined) delete process.env.R2_PUBLIC_URL;
+    else process.env.R2_PUBLIC_URL = originalR2Url;
   });
 
   test(`responde 429 al reporte ${REPORT_CREATE_RATE_LIMIT + 1} del mismo usuario, sin bloquear a otro`, async () => {

@@ -2,7 +2,7 @@ import request from "supertest";
 import { createTestUser } from "../helpers/users";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
-import * as matchingService from "../../src/services/matching.service";
+import { createPublishedReport, mockImageModeration, TEST_IMAGE_URL } from "../helpers/reports";
 
 describe("GET/POST/PUT/DELETE /api/reports", () => {
   let userId: number;
@@ -32,8 +32,7 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
 
   // las imágenes tienen que venir del bucket R2 (#229)
   beforeEach(() => {
-    process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
-    jest.spyOn(matchingService, "analyzeImage").mockResolvedValue("animal");
+    mockImageModeration();
   });
 
   afterEach(async () => {
@@ -51,11 +50,13 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
     await prisma.$disconnect();
   });
 
-  test("POST /api/reports crea un reporte y responde 201 con status published", async () => {
-    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
+  test("POST /api/reports crea un reporte y responde 201 con status pending", async () => {
+    const res = await request(app)
+      .post("/api/reports").set("Authorization", `Bearer ${token}`)
+      .send({ userId, ...baseReportData, imageUrl: TEST_IMAGE_URL });
 
     expect(res.status).toBe(201);
-    expect(res.body.status).toBe("published");
+    expect(res.body.status).toBe("pending");
     expect(res.body.petId).toBeNull();
     expect(res.body.location).toEqual({ lat: expect.any(Number), lng: expect.any(Number) });
     createdReportIds.push(res.body.id);
@@ -63,14 +64,20 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
 
   test("POST /api/reports responde 400 si falta location (PIN de coordenadas)", async () => {
     const { location, ...withoutLocation } = baseReportData;
-    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...withoutLocation });
+    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...withoutLocation, imageUrl: TEST_IMAGE_URL });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  test("POST /api/reports responde 400 si falta imageUrl (la foto es obligatoria)", async () => {
+    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
   });
 
   test("POST /api/reports responde 400 si falta title", async () => {
     const { title, ...withoutTitle } = baseReportData;
-    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...withoutTitle });
+    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...withoutTitle, imageUrl: TEST_IMAGE_URL });
     expect(res.status).toBe(400);
   });
 
@@ -83,31 +90,31 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   });
 
   test("GET /api/reports responde 200 con un array e incluye el creado", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
     const res = await request(app).get("/api/reports");
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.some((r: { id: number }) => r.id === created.body.id)).toBe(true);
+    expect(res.body.some((r: { id: number }) => r.id === created.id)).toBe(true);
   });
 
   test("GET /api/reports?type=found filtra por tipo", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
     const res = await request(app).get("/api/reports?type=found&status=published");
     expect(res.status).toBe(200);
-    expect(res.body.some((r: { id: number }) => r.id === created.body.id)).toBe(true);
+    expect(res.body.some((r: { id: number }) => r.id === created.id)).toBe(true);
   });
 
   test("GET /api/reports/:id responde 200 con el reporte", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
-    const res = await request(app).get(`/api/reports/${created.body.id}`);
+    const res = await request(app).get(`/api/reports/${created.id}`);
     expect(res.status).toBe(200);
-    expect(res.body.id).toBe(created.body.id);
+    expect(res.body.id).toBe(created.id);
   });
 
   test("GET /api/reports/:id responde 404 si no existe", async () => {
@@ -121,10 +128,10 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   });
 
   test("PUT /api/reports/:id actualiza el reporte", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
-    const res = await request(app).put(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${token}`).send({ title: "Actualizado" });
+    const res = await request(app).put(`/api/reports/${created.id}`).set("Authorization", `Bearer ${token}`).send({ title: "Actualizado" });
     expect(res.status).toBe(200);
     expect(res.body.title).toBe("Actualizado");
   });
@@ -135,21 +142,21 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   });
 
   test("PUT /api/reports/:id responde 403 si el usuario no es el autor", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
     const res = await request(app)
-      .put(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${otherToken}`)
+      .put(`/api/reports/${created.id}`).set("Authorization", `Bearer ${otherToken}`)
       .send({ title: "Robado" });
     expect(res.status).toBe(403);
   });
 
   test("DELETE /api/reports/:id elimina el reporte y responde 204", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    const res = await request(app).delete(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${token}`);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    const res = await request(app).delete(`/api/reports/${created.id}`).set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(204);
 
-    const getRes = await request(app).get(`/api/reports/${created.body.id}`);
+    const getRes = await request(app).get(`/api/reports/${created.id}`);
     expect(getRes.status).toBe(404);
   });
 
@@ -159,24 +166,24 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   });
 
   test("DELETE /api/reports/:id responde 403 si el usuario no es el autor", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
-    const res = await request(app).delete(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${otherToken}`);
+    const res = await request(app).delete(`/api/reports/${created.id}`).set("Authorization", `Bearer ${otherToken}`);
     expect(res.status).toBe(403);
   });
 
   test("POST /api/reports responde con tag ENCONTRADO cuando reportType es found", async () => {
-    const res = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(res.body.id);
-    expect(res.body.tag).toEqual({ label: "ENCONTRADO", color: expect.any(String) });
+    const res = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(res.id);
+    expect(res.tag).toEqual({ label: "ENCONTRADO", color: expect.any(String) });
   });
 
   test("PUT /api/reports/:id con status resolved responde con tag RESUELTO", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
-    const res = await request(app).put(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${token}`).send({ status: "resolved" });
+    const res = await request(app).put(`/api/reports/${created.id}`).set("Authorization", `Bearer ${token}`).send({ status: "resolved" });
     expect(res.body.tag.label).toBe("RESUELTO");
   });
 
@@ -185,18 +192,18 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   test.each(["published", "pending", "rejected"])(
     "PUT /api/reports/:id responde 400 al intentar forzar status %s",
     async (status) => {
-      const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-      createdReportIds.push(created.body.id);
+      const created = await createPublishedReport(token, { userId, ...baseReportData });
+      createdReportIds.push(created.id);
 
       const res = await request(app)
-        .put(`/api/reports/${created.body.id}`)
+        .put(`/api/reports/${created.id}`)
         .set("Authorization", `Bearer ${token}`)
         .send({ status });
 
       expect(res.status).toBe(400);
 
-      const stored = await request(app).get(`/api/reports/${created.body.id}`);
-      expect(stored.body.status).toBe(created.body.status);
+      const stored = await request(app).get(`/api/reports/${created.id}`);
+      expect(stored.body.status).toBe(created.status);
     }
   );
 
@@ -210,47 +217,43 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   });
 
   test("GET /api/reports/:id/matches responde 200 con la lista de matches sugeridos", async () => {
-    const lost = await request(app)
-      .post("/api/reports").set("Authorization", `Bearer ${token}`)
-      .send({ userId, ...baseReportData, reportType: "lost", title: "Perdido cerca de Once" });
-    createdReportIds.push(lost.body.id);
-    const found = await request(app)
-      .post("/api/reports").set("Authorization", `Bearer ${token}`)
-      .send({ userId, ...baseReportData, reportType: "found", title: "Encontrado en Once" });
-    createdReportIds.push(found.body.id);
+    const lost = await createPublishedReport(token, { userId, ...baseReportData, reportType: "lost", title: "Perdido cerca de Once" });
+    createdReportIds.push(lost.id);
+    const found = await createPublishedReport(token, { userId, ...baseReportData, reportType: "found", title: "Encontrado en Once" });
+    createdReportIds.push(found.id);
 
     await prisma.reportMatch.create({
-      data: { reportLostId: lost.body.id, reportFoundId: found.body.id, similarityScore: 0.81, status: "pending" },
+      data: { reportLostId: lost.id, reportFoundId: found.id, similarityScore: 0.81, status: "pending" },
     });
 
-    const res = await request(app).get(`/api/reports/${lost.body.id}/matches`).set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(`/api/reports/${lost.id}/matches`).set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
     expect(res.body[0]).toMatchObject({
-      reportId: found.body.id,
+      reportId: found.id,
       title: "Encontrado en Once",
       reportType: "found",
       similarityScore: 0.81,
       status: "pending",
     });
 
-    await prisma.reportMatch.deleteMany({ where: { reportLostId: lost.body.id, reportFoundId: found.body.id } });
+    await prisma.reportMatch.deleteMany({ where: { reportLostId: lost.id, reportFoundId: found.id } });
   });
 
   test("GET /api/reports/:id/matches responde 200 con un array vacío si no hay matches", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
-    const res = await request(app).get(`/api/reports/${created.body.id}/matches`).set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get(`/api/reports/${created.id}/matches`).set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
   });
 
   test("GET /api/reports/:id/matches responde 401 sin token (no scrapeable por anónimos)", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
-    const res = await request(app).get(`/api/reports/${created.body.id}/matches`);
+    const res = await request(app).get(`/api/reports/${created.id}/matches`);
     expect(res.status).toBe(401);
   });
 
@@ -260,24 +263,22 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   });
 
   test("GET /api/reports sin filtros solo trae reportes activos (published)", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
-    await request(app).put(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${token}`).send({ status: "resolved" });
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
+    await request(app).put(`/api/reports/${created.id}`).set("Authorization", `Bearer ${token}`).send({ status: "resolved" });
 
     const res = await request(app).get("/api/reports");
     expect(res.status).toBe(200);
-    expect(res.body.some((r: { id: number }) => r.id === created.body.id)).toBe(false);
+    expect(res.body.some((r: { id: number }) => r.id === created.id)).toBe(false);
   });
 
   test("GET /api/reports?zone= filtra por zona", async () => {
-    const created = await request(app)
-      .post("/api/reports").set("Authorization", `Bearer ${token}`)
-      .send({ userId, ...baseReportData, locationAddress: "Plaza de Mayo, CABA" });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData, locationAddress: "Plaza de Mayo, CABA" });
+    createdReportIds.push(created.id);
 
     const res = await request(app).get("/api/reports?zone=Plaza de Mayo");
     expect(res.status).toBe(200);
-    expect(res.body.some((r: { id: number }) => r.id === created.body.id)).toBe(true);
+    expect(res.body.some((r: { id: number }) => r.id === created.id)).toBe(true);
   });
 
   test("GET /api/reports?order=asc responde 200 y acepta el parámetro", async () => {
@@ -286,10 +287,10 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   });
 
   test("POST /api/reports/:id/close responde 200 con status resolved", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
-    const res = await request(app).post(`/api/reports/${created.body.id}/close`).set("Authorization", `Bearer ${token}`).send({ userId });
+    const res = await request(app).post(`/api/reports/${created.id}/close`).set("Authorization", `Bearer ${token}`).send({ userId });
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("resolved");
     expect(res.body.tag.label).toBe("RESUELTO");
@@ -301,30 +302,30 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   });
 
   test("POST /api/reports/:id/close responde 403 si el usuario no es el autor", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
 
-    const res = await request(app).post(`/api/reports/${created.body.id}/close`).set("Authorization", `Bearer ${otherToken}`).send({});
+    const res = await request(app).post(`/api/reports/${created.id}/close`).set("Authorization", `Bearer ${otherToken}`).send({});
     expect(res.status).toBe(403);
   });
 
   test("POST /api/reports/:id/close responde 409 si el reporte ya está resuelto", async () => {
-    const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-    createdReportIds.push(created.body.id);
-    await request(app).post(`/api/reports/${created.body.id}/close`).set("Authorization", `Bearer ${token}`).send({ userId });
+    const created = await createPublishedReport(token, { userId, ...baseReportData });
+    createdReportIds.push(created.id);
+    await request(app).post(`/api/reports/${created.id}/close`).set("Authorization", `Bearer ${token}`).send({ userId });
 
-    const res = await request(app).post(`/api/reports/${created.body.id}/close`).set("Authorization", `Bearer ${token}`).send({ userId });
+    const res = await request(app).post(`/api/reports/${created.id}/close`).set("Authorization", `Bearer ${token}`).send({ userId });
     expect(res.status).toBe(409);
   });
 
   test.each(["pending", "rejected"] as const)(
     "POST /api/reports/:id/close responde 409 si el reporte está %s",
     async (status) => {
-      const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-      createdReportIds.push(created.body.id);
-      await prisma.report.update({ where: { id: created.body.id }, data: { status } });
+      const created = await createPublishedReport(token, { userId, ...baseReportData });
+      createdReportIds.push(created.id);
+      await prisma.report.update({ where: { id: created.id }, data: { status } });
 
-      const res = await request(app).post(`/api/reports/${created.body.id}/close`).set("Authorization", `Bearer ${token}`).send({});
+      const res = await request(app).post(`/api/reports/${created.id}/close`).set("Authorization", `Bearer ${token}`).send({});
       expect(res.status).toBe(409);
       expect(res.body.error.message).toBe("Solo se pueden cerrar reportes publicados");
     }
@@ -333,11 +334,11 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   test.each(["pending", "rejected"] as const)(
     "PUT /api/reports/:id con status resolved responde 409 si el reporte está %s",
     async (status) => {
-      const created = await request(app).post("/api/reports").set("Authorization", `Bearer ${token}`).send({ userId, ...baseReportData });
-      createdReportIds.push(created.body.id);
-      await prisma.report.update({ where: { id: created.body.id }, data: { status } });
+      const created = await createPublishedReport(token, { userId, ...baseReportData });
+      createdReportIds.push(created.id);
+      await prisma.report.update({ where: { id: created.id }, data: { status } });
 
-      const res = await request(app).put(`/api/reports/${created.body.id}`).set("Authorization", `Bearer ${token}`).send({ status: "resolved" });
+      const res = await request(app).put(`/api/reports/${created.id}`).set("Authorization", `Bearer ${token}`).send({ status: "resolved" });
       expect(res.status).toBe(409);
     }
   );
@@ -345,7 +346,7 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
   test("POST /api/reports con imageUrl crea el reporte con status pending y GET /api/reports?status=pending lo incluye", async () => {
     const created = await request(app)
       .post("/api/reports").set("Authorization", `Bearer ${token}`)
-      .send({ userId, ...baseReportData, imageUrl: "https://pub-test.r2.dev/pets/hallazgo.jpg" });
+      .send({ userId, ...baseReportData, imageUrl: TEST_IMAGE_URL });
     createdReportIds.push(created.body.id);
 
     expect(created.status).toBe(201);
@@ -366,7 +367,7 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
       const created = await request(app)
         .post("/api/reports")
         .set("Authorization", `Bearer ${token}`)
-        .send({ userId, ...baseReportData, imageUrl: "https://pub-test.r2.dev/pets/hallazgo.jpg" });
+        .send({ userId, ...baseReportData, imageUrl: TEST_IMAGE_URL });
       createdReportIds.push(created.body.id);
       if (status === "rejected") {
         await prisma.report.update({ where: { id: created.body.id }, data: { status: "rejected" } });

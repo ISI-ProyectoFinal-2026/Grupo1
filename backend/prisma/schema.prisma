@@ -202,10 +202,10 @@ model ReportFlag {
 model ReportEmbedding {
   id        Int      @id @default(autoincrement())
   reportId  Int      @unique @map("report_id")
-  // OpenCLIP output. Escrito por el Backend IA, consumido por el Backend
+  // DINOv2 ViT-B/14 output. Escrito por el Backend IA, consumido por el Backend
   // Principal para el matching por similitud (distancia coseno de pgvector,
   // operador `<=>`, que es el que usa el indice HNSW vector_cosine_ops).
-  embedding Unsupported("vector(512)")
+  embedding Unsupported("vector(768)")
   createdAt DateTime @default(now()) @map("created_at")
 
   report Report @relation(fields: [reportId], references: [id])
@@ -317,6 +317,9 @@ model Business {
   address       String
   phone         String
   category      BusinessCategory
+  // pin del mapa (#208); null en comercios previos
+  latitude      Float?
+  longitude     Float?
   plan          BusinessPlan     @default(FREE)
   planExpiresAt DateTime?        @map("plan_expires_at")
   createdAt     DateTime         @default(now()) @map("created_at")
