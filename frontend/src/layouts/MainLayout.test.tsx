@@ -74,6 +74,39 @@ describe('MainLayout', () => {
     )
   })
 
+  it('ofrece el acceso a mis mascotas con sesion', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout()
+
+    expect(await screen.findByRole('link', { name: 'Mis mascotas' })).toHaveAttribute(
+      'href',
+      '/pets'
+    )
+  })
+
+  it.each(['/pets', '/pets/new', '/pets/3/edit'])(
+    'marca mis mascotas como pagina actual en %s',
+    async (ruta) => {
+      useAuthStore.setState({ token: 'token', user: usuario })
+      vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+      const { Wrapper } = createQueryWrapper()
+
+      render(
+        <Wrapper>
+          <MemoryRouter initialEntries={[ruta]}>
+            <MainLayout />
+          </MemoryRouter>
+        </Wrapper>
+      )
+
+      expect(await screen.findByRole('link', { name: 'Mis mascotas' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      )
+    }
+  )
+
   it('no ofrece el panel de moderacion a un usuario regular', async () => {
     useAuthStore.setState({ token: 'token', user: usuario })
 

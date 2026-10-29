@@ -21,6 +21,9 @@ import BusinessDashboardPage from "./pages/business/BusinessDashboardPage";
 import BusinessDirectoryPage from "./pages/business/BusinessDirectoryPage";
 import BusinessProfilePage from "./pages/business/BusinessProfilePage";
 import ModerationPage from "./pages/moderation/ModerationPage";
+import MyPetsPage from "./pages/pets/MyPetsPage";
+import CreatePetPage from "./pages/pets/CreatePetPage";
+import EditPetPage from "./pages/pets/EditPetPage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -56,6 +59,9 @@ export const router = createBrowserRouter([
           { path: "businesses/register", element: <BusinessRegisterPage /> },
           { path: "businesses/dashboard", element: <BusinessDashboardPage /> },
           { path: "businesses/:id", element: <BusinessProfilePage /> },
+          { path: "pets", element: <MyPetsPage /> },
+          { path: "pets/new", element: <CreatePetPage /> },
+          { path: "pets/:id/edit", element: <EditPetPage /> },
           // El panel de moderación queda anidado: ProtectedRoute exige sesión y
           // RequireRole exige el rol. La autorización real la hace cumplir el
           // backend (`requireRole`); esto solo evita mostrar una pantalla que

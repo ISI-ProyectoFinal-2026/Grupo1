@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ZodError } from "zod";
 import { createReportSchema, type CreateReportFormData } from "@/types/validators/report.validator";
 import { createReport } from "@/services/reports.service";
+import PetSelect from "./PetSelect";
 import type { ReportLocation } from "@/types/report.types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -131,6 +132,11 @@ export default function ReportForm({ initialData }: ReportFormProps) {
           <option value="found">Mascota Encontrada</option>
         </select>
       </div>
+
+      <PetSelect
+        value={formData.petId}
+        onChange={(petId) => setFormData((prev) => ({ ...prev, petId }))}
+      />
 
       <div className="flex flex-col gap-2">
         <Input
