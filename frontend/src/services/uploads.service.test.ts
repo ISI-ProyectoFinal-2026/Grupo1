@@ -117,14 +117,24 @@ describe('analyzeImage', () => {
     expect(api.post).toHaveBeenCalledWith('/uploads/analyze', { imageUrl: 'https://cdn/perro.jpg' })
   })
 
-  it.each([true, null])('returns hasAnimal=%s as answered by the backend', async (hasAnimal) => {
-    vi.mocked(api.post).mockResolvedValue(respuesta({ hasAnimal }))
+  it.each([
+    { hasAnimal: true, lowQuality: false },
+    { hasAnimal: null, lowQuality: null },
+  ])('returns %o as answered by the backend', async (analysis) => {
+    vi.mocked(api.post).mockResolvedValue(respuesta(analysis))
 
-    await expect(analyzeImage('https://cdn/foto.jpg')).resolves.toEqual({ hasAnimal })
+    await expect(analyzeImage('https://cdn/foto.jpg')).resolves.toEqual(analysis)
+  })
+
+  it('returns the quality warning sent by the backend for a blurry photo', async () => {
+    const warning = { hasAnimal: true, lowQuality: true, qualityMessage: 'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.' }
+    vi.mocked(api.post).mockResolvedValue(respuesta(warning))
+
+    await expect(analyzeImage('https://cdn/borrosa.jpg')).resolves.toEqual(warning)
   })
 
   it('returns the rejection message sent by the backend when no animal is detected', async () => {
-    const rejection = { hasAnimal: false, message: 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM' }
+    const rejection = { hasAnimal: false, lowQuality: false, message: 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM' }
     vi.mocked(api.post).mockResolvedValue(respuesta(rejection))
 
     await expect(analyzeImage('https://cdn/paisaje.jpg')).resolves.toEqual(rejection)
