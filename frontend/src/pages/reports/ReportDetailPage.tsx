@@ -252,15 +252,19 @@ export default function ReportDetailPage() {
                   >
                     Generar flyer
                   </Button>
-                  <p className="text-sm text-ink-muted">o subí tu propio flyer</p>
-                  <ImageUploader
-                    onSuccess={handleCustomFlyerUpload}
-                    onError={(message, code) => {
-                      // El uploader ya muestra el aviso de email sin verificar.
-                      if (code !== EMAIL_NOT_VERIFIED) setCustomFlyerError(message);
-                    }}
-                  />
-                  {customFlyerError && <ErrorMessage message={customFlyerError} />}
+                  {isOwner && (
+                    <>
+                      <p className="text-sm text-ink-muted">o subí tu propio flyer</p>
+                      <ImageUploader
+                        onSuccess={handleCustomFlyerUpload}
+                        onError={(message, code) => {
+                          // El uploader ya muestra el aviso de email sin verificar.
+                          if (code !== EMAIL_NOT_VERIFIED) setCustomFlyerError(message);
+                        }}
+                      />
+                      {customFlyerError && <ErrorMessage message={customFlyerError} />}
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start">

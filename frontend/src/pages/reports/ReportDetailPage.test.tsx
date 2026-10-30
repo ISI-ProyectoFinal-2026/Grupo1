@@ -228,3 +228,33 @@ describe('ReportDetailPage mapa', () => {
     expect(screen.queryByRole('region', { name: 'Mapa de la ubicación' })).not.toBeInTheDocument()
   })
 })
+
+describe('ReportDetailPage flyer propio', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte())
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
+  it('el dueño ve la opción de subir su propio flyer', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario(DUENO_ID) })
+    renderPage()
+
+    expect(await screen.findByText('o subí tu propio flyer')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['otro usuario logueado', usuario(DUENO_ID + 1)],
+    ['un visitante sin sesión', null],
+  ])('%s no ve la opción de subir un flyer propio', async (_caso, user) => {
+    useAuthStore.setState({ token: user ? 'token' : null, user })
+    renderPage()
+
+    expect(await screen.findByText('Flyer para compartir')).toBeInTheDocument()
+    expect(screen.queryByText('o subí tu propio flyer')).not.toBeInTheDocument()
+  })
+})
