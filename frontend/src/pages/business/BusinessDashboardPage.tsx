@@ -9,6 +9,8 @@ import {
   useUpdateBusinessMutation,
 } from "@/hooks/useBusiness";
 import type { Business, BusinessCategory } from "@/types/business.types";
+import type { GeoPoint } from "@/types/geo.types";
+import LocationPicker from "@/components/maps/LocationPicker";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Spinner from "@/components/ui/Spinner";
@@ -42,6 +44,8 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
   const [address, setAddress] = useState(business.address);
   const [phone, setPhone] = useState(business.phone);
   const [category, setCategory] = useState<BusinessCategory>(business.category);
+  // solo se envía si el dueño toca el pin; null conserva las coordenadas guardadas
+  const [newLocation, setNewLocation] = useState<GeoPoint | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
   const [success, setSuccess] = useState(false);
@@ -54,7 +58,13 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
 
     try {
       // Sin `plan`: PUT /businesses/me lo ignora; el cambio de plan pertenece al flujo de pago.
-      await updateBusiness.mutateAsync({ name, address, phone, category });
+      await updateBusiness.mutateAsync({
+        name,
+        address,
+        phone,
+        category,
+        ...(newLocation && { location: newLocation }),
+      });
       setSuccess(true);
     } catch (err) {
       const details = getApiErrorDetails(err);
@@ -67,6 +77,10 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
   }
 
   const isLoading = updateBusiness.isPending;
+  const savedLocation: GeoPoint | null =
+    business.latitude !== null && business.longitude !== null
+      ? { lat: business.latitude, lng: business.longitude }
+      : null;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -114,6 +128,16 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
           className="field"
         />
       </div>
+
+      {/* el domicilio es texto libre: el mapa solo aporta las coordenadas */}
+      <fieldset className="flex flex-col gap-2">
+        <legend className="field-label mb-1.5">Ubicación en el mapa</legend>
+        <LocationPicker
+          onLocationSelect={setNewLocation}
+          resolveAddress={false}
+          initialLocation={savedLocation}
+        />
+      </fieldset>
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="phone" className="field-label">

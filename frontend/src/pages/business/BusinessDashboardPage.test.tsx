@@ -9,6 +9,25 @@ import type { Business } from '@/types/business.types'
 
 vi.mock('@/services/business.service')
 
+// doble del selector: expone el pin inicial y un boton que dispara un pin nuevo
+vi.mock('@/components/maps/LocationPicker', () => ({
+  default: ({
+    onLocationSelect,
+    initialLocation,
+  }: {
+    onLocationSelect: (loc: { lat: number; lng: number }, address: string) => void
+    initialLocation?: { lat: number; lng: number } | null
+  }) => (
+    <button
+      type='button'
+      data-initial-location={initialLocation ? `${initialLocation.lat},${initialLocation.lng}` : ''}
+      onClick={() => onLocationSelect({ lat: -34.6251, lng: -68.3221 }, '-34.6251, -68.3221')}
+    >
+      Mover ubicación
+    </button>
+  ),
+}))
+
 function comercio(overrides: Partial<Business> = {}): Business {
   return {
     id: 1,
@@ -18,6 +37,8 @@ function comercio(overrides: Partial<Business> = {}): Business {
     address: 'Av. Siempre Viva 123',
     phone: '1122334455',
     category: 'VETERINARIA',
+    latitude: null,
+    longitude: null,
     plan: 'FREE',
     planExpiresAt: null,
     createdAt: '2026-09-01T10:00:00.000Z',
@@ -74,6 +95,50 @@ describe('BusinessDashboardPage', () => {
         address: 'Av. Siempre Viva 123',
         phone: '1199998888',
         category: 'VETERINARIA',
+      })
+    )
+    expect(await screen.findByText(/cambios guardados/i)).toBeInTheDocument()
+  })
+
+  it('precarga el pin con las coordenadas guardadas del comercio', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(
+      comercio({ latitude: -34.6, longitude: -58.4 })
+    )
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    renderPage()
+
+    const picker = await screen.findByRole('button', { name: 'Mover ubicación' })
+    expect(picker).toHaveAttribute('data-initial-location', '-34.6,-58.4')
+  })
+
+  it('no precarga pin si el comercio no tiene coordenadas', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(comercio())
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    renderPage()
+
+    const picker = await screen.findByRole('button', { name: 'Mover ubicación' })
+    expect(picker).toHaveAttribute('data-initial-location', '')
+  })
+
+  it('envia la ubicacion nueva al mover el pin y guardar', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(comercio())
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    vi.mocked(businessService.updateMyBusiness).mockResolvedValue(
+      comercio({ latitude: -34.6251, longitude: -68.3221 })
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Mover ubicación' }))
+    await user.click(screen.getByRole('button', { name: /guardar/i }))
+
+    await waitFor(() =>
+      expect(businessService.updateMyBusiness).toHaveBeenCalledWith({
+        name: 'Veterinaria San Roque',
+        address: 'Av. Siempre Viva 123',
+        phone: '1122334455',
+        category: 'VETERINARIA',
+        location: { lat: -34.6251, lng: -68.3221 },
       })
     )
     expect(await screen.findByText(/cambios guardados/i)).toBeInTheDocument()
