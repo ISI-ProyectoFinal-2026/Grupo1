@@ -38,6 +38,7 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0020](0020-sitio-web-del-informe.md) | Sitio web del informe con Material for MkDocs en GitHub Pages | Pendiente | Matías Alvarado | — | — |
 | [ADR-0021](0021-modelo-embeddings-dinov2.md) | Modelo de embeddings DINOv2 ViT-B/14 para el matching | Aceptada | Agustín Díaz | C13 | Reemplaza a [ADR-0013](0013-dimension-embedding-512.md) |
 | [ADR-0022](0022-preferencias-notificacion-tabla-propia.md) | Preferencias de notificación y ubicación en una tabla propia | Aceptada | Franco Marín | — | — |
+| [ADR-0023](0023-aviso-calidad-imagen.md) | Aviso no bloqueante por foto borrosa o movida | Aceptada | Agustín Díaz | — | — |
 
 ## Pendientes
 
