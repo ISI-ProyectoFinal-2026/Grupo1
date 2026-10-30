@@ -14,7 +14,7 @@ from app.config import settings
 from app.db import get_db
 from app.main import app
 from app.services import embedding_service, image_analysis_service
-from app.services.image_analysis_service import ImageUnavailableError
+from app.services.image_analysis_service import ImageAnalysis, ImageUnavailableError
 
 VALID_KEY = "test-internal-key"
 AUTH_HEADERS = {"X-Internal-Key": VALID_KEY}
@@ -133,8 +133,8 @@ def test_health_no_requiere_autenticacion(client):
 
 @pytest.fixture
 def analyze_mock(monkeypatch):
-    mock = AsyncMock(return_value=True)
-    monkeypatch.setattr(image_analysis_service, "image_has_animal", mock)
+    mock = AsyncMock(return_value=ImageAnalysis(has_animal=True, low_quality=False))
+    monkeypatch.setattr(image_analysis_service, "analyze_image", mock)
     return mock
 
 
@@ -146,12 +146,26 @@ def test_analyze_returns_has_animal_true_for_an_animal_image(analyze_mock, clien
     )
 
     assert response.status_code == 200
-    assert response.json() == {"has_animal": True}
+    assert response.json() == {"has_animal": True, "low_quality": False}
     analyze_mock.assert_awaited_once_with("https://example.com/dog.jpg")
 
 
+# Low quality is only a warning for the user (#212): still a 200, never a 422.
+def test_analyze_flags_a_blurry_animal_photo_as_low_quality(analyze_mock, client):
+    analyze_mock.return_value = ImageAnalysis(has_animal=True, low_quality=True)
+
+    response = client.post(
+        "/images/analyze",
+        json={"image_url": "https://example.com/blurry-dog.jpg"},
+        headers=AUTH_HEADERS,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"has_animal": True, "low_quality": True}
+
+
 def test_analyze_returns_has_animal_false_for_a_non_animal_image(analyze_mock, client):
-    analyze_mock.return_value = False
+    analyze_mock.return_value = ImageAnalysis(has_animal=False, low_quality=False)
 
     response = client.post(
         "/images/analyze",
@@ -160,7 +174,7 @@ def test_analyze_returns_has_animal_false_for_a_non_animal_image(analyze_mock, c
     )
 
     assert response.status_code == 200
-    assert response.json() == {"has_animal": False}
+    assert response.json() == {"has_animal": False, "low_quality": False}
 
 
 def test_analyze_returns_422_when_the_image_cannot_be_processed(analyze_mock, client):

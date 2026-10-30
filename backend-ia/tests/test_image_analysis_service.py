@@ -1,6 +1,6 @@
 """Tests for app.services.image_analysis_service.
 
-The HTTP download goes through httpx.MockTransport and `contains_animal` is
+The HTTP download goes through httpx.MockTransport and `detect_and_crop` is
 mocked: the focus is the download/decode wiring, its limits and how failures
 are reported, not the ML model.
 """
@@ -13,7 +13,7 @@ import pytest
 from PIL import Image
 
 from app.services import image_analysis_service
-from app.services.image_analysis_service import MAX_IMAGE_BYTES, ImageUnavailableError
+from app.services.image_analysis_service import MAX_IMAGE_BYTES, ImageAnalysis, ImageUnavailableError
 
 _RealAsyncClient = httpx.AsyncClient
 
@@ -38,19 +38,41 @@ def _serve_bytes(monkeypatch, content: bytes, status_code: int = 200):
 
 
 @pytest.mark.asyncio
-async def test_returns_true_when_the_image_contains_an_animal(monkeypatch):
+async def test_reports_an_animal_and_a_sharp_photo(monkeypatch):
     _serve_bytes(monkeypatch, _png_bytes())
-    monkeypatch.setattr(image_analysis_service, "contains_animal", lambda image: True)
+    crop = object()
+    monkeypatch.setattr(image_analysis_service, "detect_and_crop", lambda image: crop)
+    monkeypatch.setattr(image_analysis_service, "is_low_quality", lambda image: image is not crop)
 
-    assert await image_analysis_service.image_has_animal("https://example.com/dog.png") is True
+    result = await image_analysis_service.analyze_image("https://example.com/dog.png")
+
+    assert result == ImageAnalysis(has_animal=True, low_quality=False)
+
+
+# Sharpness is measured on the pet crop, not on the whole photo (#212).
+@pytest.mark.asyncio
+async def test_reports_a_blurry_pet_crop_as_low_quality(monkeypatch):
+    _serve_bytes(monkeypatch, _png_bytes())
+    crop = object()
+    monkeypatch.setattr(image_analysis_service, "detect_and_crop", lambda image: crop)
+    monkeypatch.setattr(image_analysis_service, "is_low_quality", lambda image: image is crop)
+
+    result = await image_analysis_service.analyze_image("https://example.com/blurry-dog.png")
+
+    assert result == ImageAnalysis(has_animal=True, low_quality=True)
 
 
 @pytest.mark.asyncio
-async def test_returns_false_when_the_image_has_no_animal(monkeypatch):
+async def test_reports_no_animal_and_skips_the_quality_check(monkeypatch):
     _serve_bytes(monkeypatch, _png_bytes())
-    monkeypatch.setattr(image_analysis_service, "contains_animal", lambda image: False)
+    checked = []
+    monkeypatch.setattr(image_analysis_service, "detect_and_crop", lambda image: None)
+    monkeypatch.setattr(image_analysis_service, "is_low_quality", lambda image: checked.append(image))
 
-    assert await image_analysis_service.image_has_animal("https://example.com/car.png") is False
+    result = await image_analysis_service.analyze_image("https://example.com/car.png")
+
+    assert result == ImageAnalysis(has_animal=False, low_quality=False)
+    assert checked == []
 
 
 @pytest.mark.asyncio
@@ -61,13 +83,13 @@ async def test_runs_inference_off_the_event_loop_thread(monkeypatch):
     loop_thread = threading.get_ident()
     seen_threads = []
 
-    def fake_contains_animal(image):
+    def fake_detect_and_crop(image):
         seen_threads.append(threading.get_ident())
-        return True
+        return None
 
-    monkeypatch.setattr(image_analysis_service, "contains_animal", fake_contains_animal)
+    monkeypatch.setattr(image_analysis_service, "detect_and_crop", fake_detect_and_crop)
 
-    await image_analysis_service.image_has_animal("https://example.com/dog.png")
+    await image_analysis_service.analyze_image("https://example.com/dog.png")
 
     assert seen_threads and seen_threads[0] != loop_thread
 
@@ -80,7 +102,7 @@ async def test_raises_image_unavailable_when_the_download_fails(monkeypatch):
     _serve(monkeypatch, handler)
 
     with pytest.raises(ImageUnavailableError):
-        await image_analysis_service.image_has_animal("https://example.com/x.png")
+        await image_analysis_service.analyze_image("https://example.com/x.png")
 
 
 @pytest.mark.asyncio
@@ -88,7 +110,7 @@ async def test_raises_image_unavailable_on_http_error_status(monkeypatch):
     _serve_bytes(monkeypatch, b"", status_code=404)
 
     with pytest.raises(ImageUnavailableError):
-        await image_analysis_service.image_has_animal("https://example.com/missing.png")
+        await image_analysis_service.analyze_image("https://example.com/missing.png")
 
 
 @pytest.mark.asyncio
@@ -96,13 +118,13 @@ async def test_raises_image_unavailable_when_the_bytes_are_not_an_image(monkeypa
     _serve_bytes(monkeypatch, b"not an image")
 
     with pytest.raises(ImageUnavailableError):
-        await image_analysis_service.image_has_animal("https://example.com/file.txt")
+        await image_analysis_service.analyze_image("https://example.com/file.txt")
 
 
 @pytest.mark.asyncio
 async def test_raises_image_unavailable_when_the_download_exceeds_the_size_cap(monkeypatch):
     contains = []
-    monkeypatch.setattr(image_analysis_service, "contains_animal", lambda image: contains.append(1))
+    monkeypatch.setattr(image_analysis_service, "detect_and_crop", lambda image: contains.append(1))
 
     def handler(request):
         # A streamed body without Content-Length: the cap must apply while reading.
@@ -116,7 +138,7 @@ async def test_raises_image_unavailable_when_the_download_exceeds_the_size_cap(m
     _serve(monkeypatch, handler)
 
     with pytest.raises(ImageUnavailableError):
-        await image_analysis_service.image_has_animal("https://example.com/huge.png")
+        await image_analysis_service.analyze_image("https://example.com/huge.png")
     assert contains == []
 
 
@@ -130,7 +152,7 @@ async def test_rejects_early_when_content_length_exceeds_the_size_cap(monkeypatc
     )
 
     with pytest.raises(ImageUnavailableError):
-        await image_analysis_service.image_has_animal("https://example.com/huge.png")
+        await image_analysis_service.analyze_image("https://example.com/huge.png")
 
 
 @pytest.mark.asyncio
@@ -140,7 +162,7 @@ async def test_raises_image_unavailable_on_a_decompression_bomb(monkeypatch):
     _serve_bytes(monkeypatch, _png_bytes(64))
 
     with pytest.raises(ImageUnavailableError):
-        await image_analysis_service.image_has_animal("https://example.com/bomb.png")
+        await image_analysis_service.analyze_image("https://example.com/bomb.png")
 
 
 # --- embed_image ------------------------------------------------------------

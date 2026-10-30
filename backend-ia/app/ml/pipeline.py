@@ -43,8 +43,9 @@ MIN_RELATIVE_AREA = 0.25
 PAD_COLOR = (124, 116, 104)
 
 # Every COCO animal class (ids 14-23), by name to avoid magic indices. The upload
-# screening (contains_animal) and the async moderation (detect_and_crop) share it:
-# with different criteria a photo accepted on upload could end up rejected later.
+# screening and the async moderation (both detect_and_crop) and contains_animal
+# share it: with different criteria a photo accepted on upload could end up
+# rejected later.
 _ANIMAL_LABELS = {
     "bird",
     "cat",
