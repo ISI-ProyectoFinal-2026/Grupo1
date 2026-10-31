@@ -29,6 +29,8 @@ function comercio(overrides: Partial<Business> = {}): Business {
     address: 'Av. Siempre Viva 123',
     phone: '1122334455',
     category: 'VETERINARIA',
+    latitude: null,
+    longitude: null,
     plan: 'FREE',
     planExpiresAt: null,
     createdAt: '2026-09-01T10:00:00.000Z',

@@ -15,6 +15,9 @@ export interface Business {
   address: string
   phone: string
   category: BusinessCategory
+  // pin del mapa (#208); null en comercios previos
+  latitude: number | null
+  longitude: number | null
   plan: BusinessPlan
   planExpiresAt: string | null
   createdAt: string
