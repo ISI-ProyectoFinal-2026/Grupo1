@@ -40,6 +40,8 @@ export default function ReportForm(props: ReportFormProps) {
   // Set when the screening found no animal in the uploaded photo: the report
   // cannot be submitted until the user uploads a different one.
   const [imageRejection, setImageRejection] = useState<string | null>(null);
+  // Blurry or moved photo (#212): only a warning, the report can still be sent.
+  const [imageQualityWarning, setImageQualityWarning] = useState<string | null>(null);
   // While the photo uploads and is analyzed there is no imageUrl nor verdict yet:
   // submitting then would create the report without image, skipping the screening.
   const [isImageUploading, setIsImageUploading] = useState(false);
@@ -68,9 +70,14 @@ export default function ReportForm(props: ReportFormProps) {
     }
   };
 
-  const handleImageUploadSuccess = (publicUrl: string, rejection: string | null) => {
+  const handleImageUploadSuccess = (
+    publicUrl: string,
+    rejection: string | null,
+    qualityWarning: string | null
+  ) => {
     setFormData((prev) => ({ ...prev, imageUrl: publicUrl }));
     setImageRejection(rejection);
+    setImageQualityWarning(qualityWarning);
     setFormError(null);
     setFieldErrors((prev) => ({ ...prev, imageUrl: "" }));
   };
@@ -229,6 +236,14 @@ export default function ReportForm(props: ReportFormProps) {
               </p>
             </div>
           ))
+        )}
+        {!imageRejection && imageQualityWarning && (
+          <p
+            role="status"
+            className="animate-drop rounded-control border border-signal bg-signal/15 px-3 py-2.5 text-sm text-ink"
+          >
+            {imageQualityWarning}
+          </p>
         )}
       </fieldset>
 

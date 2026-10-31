@@ -21,6 +21,8 @@ export const AI_STUB_URL = `http://localhost:${AI_STUB_PORT}`
 // backend is started with this public URL and the specs send images under it.
 export const R2_PUBLIC_URL = process.env.E2E_R2_PUBLIC_URL ?? 'https://pub-e2e.r2.dev'
 export const E2E_IMAGE_URL = `${R2_PUBLIC_URL}/pets/e2e-photo.jpg`
+// The AI stub answers low_quality: true for this one (blurry-photo warning, #212).
+export const E2E_LOW_QUALITY_IMAGE_URL = `${R2_PUBLIC_URL}/pets/e2e-low-quality.jpg`
 
 // Local default = docker-compose.yml (host port 5433). The backend is started
 // with this same DATABASE_URL, overriding whatever backend/.env says.

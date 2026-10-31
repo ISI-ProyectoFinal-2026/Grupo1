@@ -36,7 +36,7 @@ describe('ImageUploader', () => {
       key: 'foto.jpg',
     })
     vi.mocked(uploadsService.uploadToR2).mockResolvedValue(undefined)
-    vi.mocked(uploadsService.analyzeImage).mockResolvedValue({ hasAnimal: true })
+    vi.mocked(uploadsService.analyzeImage).mockResolvedValue({ hasAnimal: true, lowQuality: false })
     const onSuccess = vi.fn()
 
     const { container } = render(<ImageUploader onSuccess={onSuccess} onError={vi.fn()} />)
@@ -45,7 +45,7 @@ describe('ImageUploader', () => {
     await user.upload(input, makeFile())
 
     await waitFor(() =>
-      expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', null)
+      expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', null, null)
     )
 
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
@@ -92,20 +92,40 @@ describe('ImageUploader', () => {
     }
 
     it('analyzes the uploaded public URL and reports an animal photo as accepted', async () => {
-      vi.mocked(uploadsService.analyzeImage).mockResolvedValue({ hasAnimal: true })
+      vi.mocked(uploadsService.analyzeImage).mockResolvedValue({ hasAnimal: true, lowQuality: false })
 
       const { onSuccess } = await uploadWith()
 
-      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', null))
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', null, null))
       expect(uploadsService.analyzeImage).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg')
     })
 
-    it('reports a photo without animals as rejected, with the message sent by the backend', async () => {
-      vi.mocked(uploadsService.analyzeImage).mockResolvedValue({ hasAnimal: false, message: 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM' })
+    // #212: only a warning, the photo is still accepted.
+    it('passes the quality warning sent by the backend for a blurry animal photo', async () => {
+      vi.mocked(uploadsService.analyzeImage).mockResolvedValue({
+        hasAnimal: true,
+        lowQuality: true,
+        qualityMessage: 'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.',
+      })
 
       const { onSuccess, onError } = await uploadWith()
 
-      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM'))
+      await waitFor(() =>
+        expect(onSuccess).toHaveBeenCalledWith(
+          'https://cdn.example.com/foto.jpg',
+          null,
+          'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.'
+        )
+      )
+      expect(onError).not.toHaveBeenCalled()
+    })
+
+    it('reports a photo without animals as rejected, with the message sent by the backend', async () => {
+      vi.mocked(uploadsService.analyzeImage).mockResolvedValue({ hasAnimal: false, lowQuality: false, message: 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM' })
+
+      const { onSuccess, onError } = await uploadWith()
+
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM', null))
       expect(onError).not.toHaveBeenCalled()
     })
 
@@ -123,7 +143,7 @@ describe('ImageUploader', () => {
       await waitFor(() => expect(onUploadingChange).toHaveBeenLastCalledWith(true))
       expect(onSuccess).not.toHaveBeenCalled()
 
-      finishAnalysis({ hasAnimal: true })
+      finishAnalysis({ hasAnimal: true, lowQuality: false })
 
       await waitFor(() => expect(onUploadingChange).toHaveBeenLastCalledWith(false))
       expect(onSuccess).toHaveBeenCalled()
@@ -145,7 +165,7 @@ describe('ImageUploader', () => {
 
       await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, makeFile())
 
-      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', null))
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', null, null))
       expect(uploadsService.analyzeImage).not.toHaveBeenCalled()
     })
 
@@ -154,7 +174,7 @@ describe('ImageUploader', () => {
 
       const { onSuccess, onError } = await uploadWith()
 
-      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', null))
+      await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('https://cdn.example.com/foto.jpg', null, null))
       expect(onError).not.toHaveBeenCalled()
     })
   })

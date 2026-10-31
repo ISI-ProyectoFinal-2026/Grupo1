@@ -146,7 +146,8 @@ export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): 
     });
 }
 
-export type ImageAnalysisResult = "animal" | "no_animal" | "unavailable";
+// "animal_low_quality": blurry or moved photo (#212), only a warning for the user.
+export type ImageAnalysisResult = "animal" | "animal_low_quality" | "no_animal" | "unavailable";
 
 // Short and without retries: the user is waiting on this answer (upload screening
 // and report creation). If the AI service is slow or down, the caller falls back
@@ -179,12 +180,14 @@ export async function analyzeImage(imageUrl: string): Promise<ImageAnalysisResul
       console.error(`[matching] image analysis inconclusive (status ${response.status}) for ${imageUrl}`);
       return "unavailable";
     }
-    const body = (await response.json()) as { has_animal?: unknown };
+    const body = (await response.json()) as { has_animal?: unknown; low_quality?: unknown };
     if (typeof body.has_animal !== "boolean") {
       console.error(`[matching] image analysis returned a malformed body for ${imageUrl}`);
       return "unavailable";
     }
-    return body.has_animal ? "animal" : "no_animal";
+    if (!body.has_animal) return "no_animal";
+    // missing or non-boolean low_quality (AI service without #212): no warning
+    return body.low_quality === true ? "animal_low_quality" : "animal";
   } catch (error) {
     console.error(`[matching] image analysis failed for ${imageUrl}:`, error);
     return "unavailable";
