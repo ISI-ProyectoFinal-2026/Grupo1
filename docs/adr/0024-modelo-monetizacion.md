@@ -55,7 +55,7 @@ Tabla 2. Decisiones sobre planes y suscripción. Fuente: equipo, issue #30.
 | --- | --- |
 | Contenido del anuncio | Imagen, título y texto corto. El clic lleva al perfil del comercio dentro de la plataforma. El perfil suma una descripción y enlaces a la web y a las redes del comercio. |
 | Dónde se muestra | Detalle del reporte (bloque de comercios cercanos y banner), feed de reportes (banner intercalado con la etiqueta "Publicidad") y directorio (comercios Premium primero, marcados como destacados). No se muestra al crear o editar reportes, en chats, autenticación, seguridad, moderación ni en el flyer. |
-| Comercios cercanos y directorio | Incluyen todos los comercios, gratuitos y Premium. Los Premium aparecen primero como destacados; el resto se ordena por distancia. |
+| Comercios cercanos y directorio | Incluyen todos los comercios, gratuitos y Premium. Los Premium aparecen primero como destacados; el resto se ordena por distancia. El bloque de comercios cercanos muestra hasta 5, dentro de 20 km del reporte. |
 | Segmentación | Solo por cercanía. En el detalle del reporte, desde la ubicación del reporte; en el feed, desde la ubicación que el usuario aceptó compartir. Un anuncio es elegible si el punto cae dentro de su radio, medido desde el comercio. |
 | Usuario sin ubicación compartida | Igual ve publicidad: un anuncio sin segmentar, elegido al azar entre los activos. Rechazar el permiso no evita los anuncios. |
 | Privacidad | Solo se usan la ubicación del reporte y la ubicación ya consentida. El comercio ve totales, nunca la identidad ni la ubicación de quien vio el anuncio. Los eventos se registran sin usuario y sin coordenadas. Si el usuario revoca el consentimiento, el feed deja de segmentarse. |

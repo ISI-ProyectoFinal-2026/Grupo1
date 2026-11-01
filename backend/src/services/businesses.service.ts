@@ -126,7 +126,10 @@ export async function listPublic(filters: ListBusinessesQuery): Promise<PublicBu
     select: publicBusinessWithExpirySelect,
     orderBy: { name: "asc" },
   });
-  return businesses.map(toPublicBusiness);
+  // Premium vigente primero (destacados); sort estable conserva el orden por nombre
+  return businesses
+    .map(toPublicBusiness)
+    .sort((a, b) => Number(b.plan === "PREMIUM") - Number(a.plan === "PREMIUM"));
 }
 
 export async function getPublicById(id: number): Promise<PublicBusiness> {

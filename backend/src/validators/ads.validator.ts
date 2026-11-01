@@ -26,5 +26,11 @@ export const adIdParamSchema = z.object({
   adId: z.coerce.number().int().positive(),
 });
 
+// el detalle del reporte segmenta por su ubicación: exige reportId
+export const adQuerySchema = z.discriminatedUnion("placement", [
+  z.object({ placement: z.literal("feed"), reportId: z.undefined().optional() }),
+  z.object({ placement: z.literal("report_detail"), reportId: z.coerce.number().int().positive() }),
+]);
+
 export type CreateAdInput = z.infer<typeof createAdSchema>;
 export type UpdateAdInput = z.infer<typeof updateAdSchema>;
