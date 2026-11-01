@@ -10,7 +10,8 @@ export const MAX_ACTIVE_ADS = 3;
 
 type Tx = Prisma.TransactionClient;
 
-async function getOwnAd(userId: number, adId: number): Promise<Ad> {
+// 404 también si el anuncio es de otro comercio: no revela que existe
+export async function getOwnAd(userId: number, adId: number): Promise<Ad> {
   const business = await businessesService.getByUserId(userId);
   const ad = await prisma.ad.findFirst({ where: { id: adId, businessId: business.id } });
   if (!ad) {

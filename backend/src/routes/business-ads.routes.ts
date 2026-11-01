@@ -11,3 +11,4 @@ businessAdsRouter.post("/", requireAuth, requireVerifiedEmail, businessAdsContro
 businessAdsRouter.put("/:adId", requireAuth, requireVerifiedEmail, businessAdsController.update);
 businessAdsRouter.patch("/:adId/status", requireAuth, requireVerifiedEmail, businessAdsController.setStatus);
 businessAdsRouter.delete("/:adId", requireAuth, businessAdsController.remove);
+businessAdsRouter.get("/:adId/stats", requireAuth, businessAdsController.getStats);

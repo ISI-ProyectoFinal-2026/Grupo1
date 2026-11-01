@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AdStatus } from "@prisma/client";
+import { AdEventType, AdPlacement, AdStatus } from "@prisma/client";
 import { r2ImageUrlSchema } from "./shared.validator";
 
 // límites del anuncio (ADR-0024)
@@ -31,6 +31,11 @@ export const adQuerySchema = z.discriminatedUnion("placement", [
   z.object({ placement: z.literal("feed"), reportId: z.undefined().optional() }),
   z.object({ placement: z.literal("report_detail"), reportId: z.coerce.number().int().positive() }),
 ]);
+
+export const adEventSchema = z.object({
+  type: z.enum([AdEventType.impression, AdEventType.click]),
+  placement: z.enum([AdPlacement.feed, AdPlacement.report_detail]),
+});
 
 export type CreateAdInput = z.infer<typeof createAdSchema>;
 export type UpdateAdInput = z.infer<typeof updateAdSchema>;

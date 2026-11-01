@@ -432,10 +432,40 @@ model Ad {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  events   AdEvent[]
 
   @@index([businessId, status])
   @@map("ads")
+}
+
+enum AdEventType {
+  impression
+  click
+
+  @@map("ad_event_type")
+}
+
+// ubicaciones de la plataforma con banner
+enum AdPlacement {
+  feed
+  report_detail
+
+  @@map("ad_placement")
+}
+
+// Métricas de campaña. Sin usuario ni coordenadas: el comercio solo ve totales (ADR-0024)
+model AdEvent {
+  id        Int         @id @default(autoincrement())
+  adId      Int         @map("ad_id")
+  type      AdEventType
+  placement AdPlacement
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  ad Ad @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@index([adId, createdAt])
+  @@map("ad_events")
 }
 
 enum BusinessEventType {
