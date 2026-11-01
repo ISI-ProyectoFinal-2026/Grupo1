@@ -81,8 +81,23 @@ describe("POST /api/uploads/analyze", () => {
     const res = await analyze({ imageUrl: "https://pub-test.r2.dev/pets/dog.jpg" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ hasAnimal: true });
+    expect(res.body).toEqual({ hasAnimal: true, lowQuality: false });
     expect(analyzeSpy).toHaveBeenCalledWith("https://pub-test.r2.dev/pets/dog.jpg");
+  });
+
+  // Only a warning (#212): the frontend shows it as-is and still lets the user publish.
+  test("responds lowQuality=true with the quality message for a blurry animal photo", async () => {
+    analyzeSpy.mockResolvedValue("animal_low_quality");
+
+    const res = await analyze({ imageUrl: "https://pub-test.r2.dev/pets/blurry-dog.jpg" });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      hasAnimal: true,
+      lowQuality: true,
+      qualityMessage:
+        "La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.",
+    });
   });
 
   // The frontend shows this message as-is, so the wording lives only in the backend.
@@ -95,6 +110,7 @@ describe("POST /api/uploads/analyze", () => {
     expect(res.body).toEqual({
       hasAnimal: false,
       message: "Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM",
+      lowQuality: false,
     });
   });
 
@@ -104,6 +120,6 @@ describe("POST /api/uploads/analyze", () => {
     const res = await analyze({ imageUrl: "https://pub-test.r2.dev/pets/dog.jpg" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ hasAnimal: null });
+    expect(res.body).toEqual({ hasAnimal: null, lowQuality: null });
   });
 });

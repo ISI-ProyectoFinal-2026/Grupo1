@@ -85,6 +85,17 @@ describe("reports.service create() image screening", () => {
     expect(triggerSpy).toHaveBeenCalledWith(99, reportData.imageUrl);
   });
 
+  // Low quality is only a warning shown on upload (#212): it never blocks the report.
+  test("creates the report as pending when the photo is flagged as low quality", async () => {
+    analyzeSpy.mockResolvedValue("animal_low_quality");
+
+    const report = await reportsService.create(reportData);
+
+    expect(report.id).toBe(99);
+    expect(reportCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ status: "pending" }) });
+    expect(triggerSpy).toHaveBeenCalledWith(99, reportData.imageUrl);
+  });
+
   test("still creates the report as pending when the analysis is unavailable", async () => {
     analyzeSpy.mockResolvedValue("unavailable");
 
@@ -134,7 +145,7 @@ describe("reports.service create() image screening", () => {
       expect(triggerSpy).not.toHaveBeenCalled();
     });
 
-    test.each(["animal", "unavailable"] as const)(
+    test.each(["animal", "animal_low_quality", "unavailable"] as const)(
       "sends the report back to pending and re-runs the async moderation when the new image is %s",
       async (verdict) => {
         analyzeSpy.mockResolvedValue(verdict);

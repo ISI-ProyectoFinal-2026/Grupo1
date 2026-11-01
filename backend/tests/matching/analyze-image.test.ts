@@ -51,6 +51,36 @@ describe("matching.service analyzeImage", () => {
     await expect(analyzeImage("https://cdn.example.com/landscape.jpg")).resolves.toBe("no_animal");
   });
 
+  // Low quality is only a warning (#212): it never turns into a rejection.
+  test("returns 'animal_low_quality' when the AI service flags the animal photo as low quality", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { has_animal: true, low_quality: true }));
+
+    await expect(analyzeImage("https://cdn.example.com/blurry-dog.jpg")).resolves.toBe("animal_low_quality");
+  });
+
+  test("returns 'animal' when the animal photo is not low quality", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { has_animal: true, low_quality: false }));
+
+    await expect(analyzeImage("https://cdn.example.com/dog.jpg")).resolves.toBe("animal");
+  });
+
+  test("returns 'no_animal' even if low_quality is set", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, { has_animal: false, low_quality: true }));
+
+    await expect(analyzeImage("https://cdn.example.com/landscape.jpg")).resolves.toBe("no_animal");
+  });
+
+  // An AI service without #212 answers only has_animal: the animal verdict still
+  // holds and no warning is shown.
+  test.each([undefined, null, "true", 1])(
+    "returns 'animal' when low_quality is missing or not a boolean (%p)",
+    async (lowQuality) => {
+      fetchMock.mockResolvedValue(jsonResponse(200, { has_animal: true, low_quality: lowQuality }));
+
+      await expect(analyzeImage("https://cdn.example.com/dog.jpg")).resolves.toBe("animal");
+    }
+  );
+
   test("returns 'unavailable' without calling fetch when AI_SERVICE_URL is not configured", async () => {
     delete process.env.AI_SERVICE_URL;
 

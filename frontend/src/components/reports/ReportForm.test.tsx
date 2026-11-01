@@ -49,7 +49,7 @@ vi.mock('@/components/reports/ImageUploader', () => ({
     onError,
     onUploadingChange,
   }: {
-    onSuccess: (url: string, rejection: string | null) => void
+    onSuccess: (url: string, rejection: string | null, qualityWarning: string | null) => void
     onError: (error: string, code?: string) => void
     onUploadingChange?: (uploading: boolean) => void
   }) => (
@@ -60,16 +60,22 @@ vi.mock('@/components/reports/ImageUploader', () => ({
       <button
         type='button'
         onClick={() => {
-          onSuccess('https://cdn/foto.jpg', null)
+          onSuccess('https://cdn/foto.jpg', null, null)
           onUploadingChange?.(false)
         }}
       >
         Simular foto subida
       </button>
-      <button type='button' onClick={() => onSuccess('https://cdn/paisaje.jpg', 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM')}>
+      <button type='button' onClick={() => onSuccess('https://cdn/paisaje.jpg', 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM', null)}>
         Simular foto sin animales
       </button>
-      <button type='button' onClick={() => onSuccess('https://cdn/foto.jpg', null)}>
+      <button
+        type='button'
+        onClick={() => onSuccess('https://cdn/borrosa.jpg', null, 'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.')}
+      >
+        Simular foto borrosa
+      </button>
+      <button type='button' onClick={() => onSuccess('https://cdn/foto.jpg', null, null)}>
         Simular analisis no disponible
       </button>
       <button type='button' onClick={() => onError('No se pudo subir la imagen (HTTP 403)')}>
@@ -507,6 +513,58 @@ describe('ReportForm: animal screening of the uploaded photo', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(NO_ANIMAL_MESSAGE)
     expect(screen.queryByText('Detalle del reporte')).not.toBeInTheDocument()
+  })
+})
+
+// #212: a blurry or moved photo only gets a warning, the report can still be published.
+describe('ReportForm: low quality photo warning', () => {
+  const QUALITY_MESSAGE =
+    'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.'
+
+  it('shows a non-blocking warning and still creates the report with that photo', async () => {
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Simular foto borrosa' }))
+
+    expect(screen.getByText(QUALITY_MESSAGE).closest('[role="status"]')).not.toBeNull()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Foto subida' })).toHaveAttribute('src', 'https://cdn/borrosa.jpg')
+    const submit = screen.getByRole('button', { name: 'Crear Reporte' })
+    expect(submit).toBeEnabled()
+
+    await user.click(submit)
+
+    await waitFor(() =>
+      expect(createReport).toHaveBeenCalledWith(
+        expect.objectContaining({ imageUrl: 'https://cdn/borrosa.jpg' })
+      )
+    )
+  })
+
+  it('clears the warning once a sharper photo replaces the blurry one', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto borrosa' }))
+    expect(screen.getByText(QUALITY_MESSAGE)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+
+    expect(screen.queryByText(QUALITY_MESSAGE)).not.toBeInTheDocument()
+  })
+
+  it('shows the rejection instead of the warning when the new photo has no animal', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Simular foto borrosa' }))
+    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
+
+    expect(screen.queryByText(QUALITY_MESSAGE)).not.toBeInTheDocument()
+    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 })
 

@@ -133,17 +133,17 @@ async def analyze_image(
     body: ImageAnalysisRequest,
     _: None = Depends(verify_internal_key),
 ) -> dict[str, bool]:
-    """Tell whether an uploaded image contains any animal.
+    """Tell whether an uploaded image contains any animal and whether it looks blurry.
 
-    200 with `has_animal` on success, 422 if the image cannot be downloaded
-    or decoded.
+    200 with `has_animal` and `low_quality` on success (low quality is only a
+    warning, #212), 422 if the image cannot be downloaded or decoded.
     """
     try:
-        has_animal = await image_analysis_service.image_has_animal(body.image_url)
+        analysis = await image_analysis_service.analyze_image(body.image_url)
     except ImageUnavailableError as exc:
         raise HTTPException(status_code=422, detail="No se pudo procesar la imagen") from exc
 
-    return {"has_animal": has_animal}
+    return {"has_animal": analysis.has_animal, "low_quality": analysis.low_quality}
 
 
 @app.post("/images/embedding")

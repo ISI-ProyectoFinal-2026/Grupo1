@@ -109,6 +109,22 @@ describe("E2E: moderación de imágenes con el Backend IA (B2-B4)", () => {
     });
   });
 
+  // #212: la baja calidad es solo un aviso al subir la foto, nunca un rechazo.
+  describe("B3b: el screening sincrónico marca la foto como de baja calidad", () => {
+    test("POST /reports responde 201 y el reporte se publica como cualquier otro", async () => {
+      ai.respond("analyze", { status: 200, body: { has_animal: true, low_quality: true } });
+
+      const res = await postReport(owner, "Perro en foto movida", "e2e-b3b.jpg");
+
+      expect(res.status).toBe(201);
+      expect(res.body.status).toBe("pending");
+      ctx.trackReport(res.body.id);
+      expect(ai.callsTo("analyze")).toHaveLength(1);
+
+      await waitForReportStatus(app, res.body.id, "published", owner.token);
+    });
+  });
+
   describe("B4: el Backend IA está caído", () => {
     let consoleError: jest.SpyInstance;
 

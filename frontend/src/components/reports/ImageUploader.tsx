@@ -16,9 +16,10 @@ interface ImageUploaderProps {
   /**
    * `rejection` is the message to show when the screening found no animal in the
    * uploaded photo; null means it was accepted, or the analysis was unavailable
-   * or not requested.
+   * or not requested. `qualityWarning` is a non-blocking notice for a blurry or
+   * moved photo (#212), null otherwise.
    */
-  onSuccess: (publicUrl: string, rejection: string | null) => void;
+  onSuccess: (publicUrl: string, rejection: string | null, qualityWarning: string | null) => void;
   /** `code` is the backend machine code (e.g. EMAIL_NOT_VERIFIED) when there is one. */
   onError: (error: string, code?: string) => void;
   /**
@@ -30,15 +31,25 @@ interface ImageUploaderProps {
   screenForAnimals?: boolean;
 }
 
+interface Screening {
+  rejection: string | null;
+  qualityWarning: string | null;
+}
+
+const NO_SCREENING: Screening = { rejection: null, qualityWarning: null };
+
 // Best-effort: the upload itself already succeeded, so a failed analysis is an
 // unknown verdict (no rejection) rather than an upload error. The backend
 // re-checks the image when the report is created anyway.
-async function getRejection(publicUrl: string): Promise<string | null> {
+async function screenImage(publicUrl: string): Promise<Screening> {
   try {
     const analysis = await analyzeImage(publicUrl);
-    return analysis.hasAnimal === false ? analysis.message : null;
+    return {
+      rejection: analysis.hasAnimal === false ? analysis.message : null,
+      qualityWarning: analysis.lowQuality === true ? analysis.qualityMessage : null,
+    };
   } catch {
-    return null;
+    return NO_SCREENING;
   }
 }
 
@@ -86,8 +97,10 @@ export default function ImageUploader({
         file.size
       );
       await uploadToR2(presignData.uploadUrl, file);
-      const rejection = screenForAnimals ? await getRejection(presignData.publicUrl) : null;
-      onSuccess(presignData.publicUrl, rejection);
+      const { rejection, qualityWarning } = screenForAnimals
+        ? await screenImage(presignData.publicUrl)
+        : NO_SCREENING;
+      onSuccess(presignData.publicUrl, rejection, qualityWarning);
       URL.revokeObjectURL(previewUrl);
       setPreview(null);
     } catch (err) {
