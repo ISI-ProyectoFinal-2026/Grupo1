@@ -17,3 +17,10 @@ export function formatRelativeDate(value: string, now: Date = new Date()): strin
   }
   return shortDate.format(date);
 }
+
+const longDate = new Intl.DateTimeFormat("es-AR", { year: "numeric", month: "long", day: "numeric" });
+
+// fecha completa, ej. "1 de diciembre de 2026"
+export function formatLongDate(value: string): string {
+  return longDate.format(new Date(value));
+}

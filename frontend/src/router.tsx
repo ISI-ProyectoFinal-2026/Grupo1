@@ -20,6 +20,7 @@ import EditReportPage from "./pages/reports/EditReportPage";
 import ChatPage from "./pages/chat/ChatPage";
 import BusinessRegisterPage from "./pages/business/BusinessRegisterPage";
 import BusinessDashboardPage from "./pages/business/BusinessDashboardPage";
+import BusinessPlanPage from "./pages/business/BusinessPlanPage";
 import BusinessDirectoryPage from "./pages/business/BusinessDirectoryPage";
 import BusinessProfilePage from "./pages/business/BusinessProfilePage";
 import ModerationPage from "./pages/moderation/ModerationPage";
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
           { path: "businesses", element: <BusinessDirectoryPage /> },
           { path: "businesses/register", element: <BusinessRegisterPage /> },
           { path: "businesses/dashboard", element: <BusinessDashboardPage /> },
+          { path: "businesses/plan", element: <BusinessPlanPage /> },
           { path: "businesses/:id", element: <BusinessProfilePage /> },
           { path: "pets", element: <MyPetsPage /> },
           { path: "pets/new", element: <CreatePetPage /> },

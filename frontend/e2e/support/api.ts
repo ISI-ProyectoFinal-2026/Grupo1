@@ -152,3 +152,29 @@ export function notifyMatch(lostReportId: number, foundReportId: number, similar
     }),
   )
 }
+
+interface ApiBusiness {
+  id: number
+  name: string
+  plan: 'FREE' | 'PREMIUM'
+  planExpiresAt: string | null
+}
+
+/** Registers a business for the user, on the map near the default report location. */
+export function createBusiness(token: string, name: string): Promise<ApiBusiness> {
+  return expectStatus(
+    201,
+    'create business',
+    call<ApiBusiness>('POST', '/businesses', {
+      token,
+      body: {
+        name,
+        cuit: `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        address: 'Av. E2E 123',
+        phone: '1122334455',
+        category: 'VETERINARIA',
+        location: { lat: -34.6037, lng: -58.3816 },
+      },
+    }),
+  )
+}

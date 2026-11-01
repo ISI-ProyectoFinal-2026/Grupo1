@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
+import { formatLongDate } from "@/lib/format";
 import { getApiErrorDetails } from "@/services/api";
 import {
   hasNoBusiness,
@@ -8,7 +9,7 @@ import {
   useMyBusinessStatsQuery,
   useUpdateBusinessMutation,
 } from "@/hooks/useBusiness";
-import type { Business, BusinessCategory } from "@/types/business.types";
+import type { Business, BusinessCategory, BusinessPlan } from "@/types/business.types";
 import type { GeoPoint } from "@/types/geo.types";
 import LocationPicker from "@/components/maps/LocationPicker";
 import { buttonClasses } from "@/components/ui/buttonClasses";
@@ -23,15 +24,7 @@ const CATEGORY_OPTIONS: Array<{ value: BusinessCategory; label: string }> = [
   { value: "OTRO", label: "Otro" },
 ];
 
-const PLAN_LABELS: Record<string, string> = { FREE: "Gratis", PRO: "Pro", PREMIUM: "Premium" };
-
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("es-AR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
+const PLAN_LABELS: Record<BusinessPlan, string> = { FREE: "Gratis", PREMIUM: "Premium" };
 
 interface BusinessEditFormProps {
   business: Business;
@@ -57,7 +50,7 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
     setSuccess(false);
 
     try {
-      // Sin `plan`: PUT /businesses/me lo ignora; el cambio de plan pertenece al flujo de pago.
+      // Sin `plan`: PUT /businesses/me lo ignora; el plan cambia solo con una compra.
       await updateBusiness.mutateAsync({
         name,
         address,
@@ -259,10 +252,19 @@ function BusinessDashboardPage() {
             <p className="mt-2 text-ink">
               Plan: <span data-testid="current-plan" className="font-bold">{PLAN_LABELS[business.plan] ?? business.plan}</span>
             </p>
-            {business.planExpiresAt && (
-              <p className="text-ink-muted">Vence: {formatDate(business.planExpiresAt)}</p>
+            {business.plan === "PREMIUM" && business.planExpiresAt && (
+              <p className="text-ink-muted">Vence: {formatLongDate(business.planExpiresAt)}</p>
             )}
             <p className="mt-2 text-sm text-ink-muted">Solo el plan Premium permite publicar anuncios.</p>
+            {business.plan === "PREMIUM" ? (
+              <Link to="/businesses/plan" className={buttonClasses("secondary", "md", "mt-3 w-full")}>
+                Renovar
+              </Link>
+            ) : (
+              <Link to="/businesses/plan" className={buttonClasses("primary", "md", "mt-3 w-full")}>
+                Pasar a Premium
+              </Link>
+            )}
           </section>
         </div>
 

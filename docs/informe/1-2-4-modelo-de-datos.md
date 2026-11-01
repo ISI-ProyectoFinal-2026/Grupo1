@@ -30,9 +30,10 @@ El sistema usa una única base PostgreSQL 16 con las extensiones PostGIS y pgvec
 | `Subscription` | `subscriptions` | Compra del plan Premium: período, monto en USD, proveedor de pago (`fake` mientras no haya pasarela), referencia, estado y período cubierto (nulo si el pago se rechazó) | índice `business_id`; cascada con el comercio |
 | `Ad` | `ads` | Anuncio de un comercio: título (hasta 60 caracteres), texto (hasta 200), imagen del bucket propio, radio de 1 a 20 km y estado (`ACTIVE` y `PAUSED` los maneja el dueño; `REMOVED` es una baja por moderación). Hasta 3 activos por comercio, que exigen Premium vigente y la ubicación del comercio cargada | índice `(business_id, status)`; cascada con el comercio |
 | `AdEvent` | `ad_events` | Impresión o clic de un anuncio y la ubicación de la plataforma donde ocurrió (`feed` o `report_detail`). No guarda usuario ni coordenadas: el comercio solo ve totales ([ADR-0024](../adr/0024-modelo-monetizacion.md)) | índice `(ad_id, created_at)`; cascada con el anuncio |
+| `AdFlag` | `ad_flags` | Denuncia de un usuario sobre un anuncio, con motivo y estado: pendiente, anuncio dado de baja (`removed`) o denuncia desestimada (`dismissed`) | único `(ad_id, user_id)`; índice `status`; cascada con el anuncio |
 | `BusinessEvent` | `business_events` | Registro de visitas y contactos al perfil de un comercio; `user_id` nulo para visitantes anónimos | índice `(business_id, type)`; cascada con el comercio |
 
-Fuente: `backend/prisma/schema.prisma`, líneas 26-494.
+Fuente: `backend/prisma/schema.prisma`, líneas 26-522.
 
 ## Relaciones
 
@@ -41,7 +42,7 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-494.
 - `Report` se relaciona 1:N con `ReportFlag`, `Chat` y `Notification`, y 1:1 con `ReportEmbedding`.
 - `ReportMatch` une dos reportes: uno perdido (`report_lost_id`) y uno encontrado (`report_found_id`).
 - `Chat` une a dos usuarios (`user_a_id`, `user_b_id`) y, opcionalmente, a un reporte; contiene 1:N `Message`.
-- `Business` se relaciona 1:N con `BusinessEvent`, `Subscription` y `Ad`; `Ad` se relaciona 1:N con `AdEvent`.
+- `Business` se relaciona 1:N con `BusinessEvent`, `Subscription` y `Ad`; `Ad` se relaciona 1:N con `AdEvent` y `AdFlag`. `User` se relaciona además 1:N con `AdFlag`.
 
 ## Enumeraciones
 
@@ -61,6 +62,7 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-494.
 | `ad_status` | `ACTIVE`, `PAUSED`, `REMOVED` |
 | `ad_event_type` | `impression`, `click` |
 | `ad_placement` | `feed`, `report_detail` |
+| `ad_flag_status` | `pending`, `removed`, `dismissed` |
 
 ## Tipos geoespaciales y vectoriales
 
@@ -95,5 +97,6 @@ El servicio de IA mapea con SQLAlchemy dos tablas del esquema ([`backend-ia/app/
 | `20261101010000_business_profile_links` | Columnas `description`, `website` y `social_links` en `businesses` |
 | `20261101020000_add_ads` | Tabla `ads` y la enumeración `ad_status` |
 | `20261101030000_add_ad_events` | Tabla `ad_events` y sus enumeraciones |
+| `20261101040000_add_ad_flags` | Tabla `ad_flags` y la enumeración `ad_flag_status` |
 
 Fuente: `backend/prisma/migrations/*/migration.sql`.

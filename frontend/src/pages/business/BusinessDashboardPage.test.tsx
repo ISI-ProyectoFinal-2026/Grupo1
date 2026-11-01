@@ -154,6 +154,28 @@ describe('BusinessDashboardPage', () => {
     expect(screen.getByTestId('current-plan')).toHaveTextContent('Gratis')
   })
 
+  it('un comercio Gratis ve la invitación a pasar a Premium', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(comercio())
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: 'Pasar a Premium' })
+    expect(link).toHaveAttribute('href', '/businesses/plan')
+    expect(screen.getByText('Solo el plan Premium permite publicar anuncios.')).toBeInTheDocument()
+  })
+
+  it('un comercio Premium ve el vencimiento y la opción de renovar', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(
+      comercio({ plan: 'PREMIUM', planExpiresAt: '2026-12-01T12:00:00.000Z' })
+    )
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Renovar' })).toHaveAttribute('href', '/businesses/plan')
+    expect(screen.getByText(/1 de diciembre de 2026/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Pasar a Premium' })).not.toBeInTheDocument()
+  })
+
   it('redirige al registro si el usuario no tiene comercio', async () => {
     vi.mocked(businessService.getMyBusiness).mockRejectedValue(
       Object.assign(new Error('Comercio no encontrado'), { status: 404 })

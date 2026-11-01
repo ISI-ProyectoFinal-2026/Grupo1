@@ -7,7 +7,9 @@ import {
   getBusiness,
   getMyBusiness,
   getMyBusinessStats,
+  getPlans,
   listBusinesses,
+  subscribe,
   updateMyBusiness,
 } from '@/services/business.service'
 import type { Business, PublicBusiness } from '@/types/business.types'
@@ -144,5 +146,28 @@ describe('business.service', () => {
     await contactBusiness(9)
 
     expect(api.post).toHaveBeenCalledWith('/businesses/9/contact')
+  })
+
+  it('trae los precios de Premium desde GET /plans', async () => {
+    const planes = [
+      { plan: 'PREMIUM' as const, period: 'MONTHLY' as const, months: 1, priceUsd: 30 },
+      { plan: 'PREMIUM' as const, period: 'ANNUAL' as const, months: 12, priceUsd: 300 },
+    ]
+    vi.mocked(api.get).mockResolvedValue(respuesta(planes))
+
+    const resultado = await getPlans()
+
+    expect(api.get).toHaveBeenCalledWith('/plans')
+    expect(resultado).toEqual(planes)
+  })
+
+  it('compra Premium contra POST /businesses/me/subscription', async () => {
+    const compra = { business: comercio({ plan: 'PREMIUM', planExpiresAt: '2026-12-01T12:00:00.000Z' }), subscription: { id: 1 } }
+    vi.mocked(api.post).mockResolvedValue(respuesta(compra))
+
+    const resultado = await subscribe('ANNUAL')
+
+    expect(api.post).toHaveBeenCalledWith('/businesses/me/subscription', { period: 'ANNUAL' })
+    expect(resultado).toEqual(compra)
   })
 })

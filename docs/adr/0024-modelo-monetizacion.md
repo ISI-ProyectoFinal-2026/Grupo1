@@ -59,7 +59,7 @@ Tabla 2. Decisiones sobre planes y suscripción. Fuente: equipo, issue #30.
 | Segmentación | Solo por cercanía. En el detalle del reporte, desde la ubicación del reporte; en el feed, desde la ubicación que el usuario aceptó compartir. Un anuncio es elegible si el punto cae dentro de su radio, medido desde el comercio. |
 | Usuario sin ubicación compartida | Igual ve publicidad: un anuncio sin segmentar, elegido al azar entre los activos. Rechazar el permiso no evita los anuncios. |
 | Privacidad | Solo se usan la ubicación del reporte y la ubicación ya consentida. El comercio ve totales, nunca la identidad ni la ubicación de quien vio el anuncio. Los eventos se registran sin usuario y sin coordenadas. Si el usuario revoca el consentimiento, el feed deja de segmentarse. |
-| Aprobación | Publicación inmediata, sin aprobación previa. Los usuarios pueden denunciar un anuncio; la denuncia entra en la cola de moderación y el moderador puede darlo de baja. |
+| Aprobación | Publicación inmediata, sin aprobación previa. Los usuarios pueden denunciar un anuncio; la denuncia entra en la cola de moderación y el moderador puede darlo de baja o desestimar la denuncia. Dar de baja cierra las demás denuncias pendientes del anuncio, y un anuncio dado de baja no se puede editar ni reactivar. |
 | Métricas | Impresiones (cuando el banner entra en pantalla), clics, tasa de clics, por día y por ubicación en la plataforma. Las conversiones no se miden. |
 | Texto "Solo el plan Premium permite publicar anuncios." | Se mantiene, porque pasa a ser cierto. Un comercio gratuito ve además una invitación a pasar a Premium. |
 

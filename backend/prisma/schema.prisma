@@ -59,6 +59,7 @@ model User {
   chatsAsUserA  Chat[]          @relation("ChatUserA")
   chatsAsUserB  Chat[]          @relation("ChatUserB")
   reportFlags   ReportFlag[]
+  adFlags       AdFlag[]
   business      Business?
   businessEvents BusinessEvent[]
 
@@ -434,9 +435,36 @@ model Ad {
 
   business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   events   AdEvent[]
+  flags    AdFlag[]
 
   @@index([businessId, status])
   @@map("ads")
+}
+
+// removed = el moderador dio de baja el anuncio; dismissed = denuncia desestimada
+enum AdFlagStatus {
+  pending
+  removed
+  dismissed
+
+  @@map("ad_flag_status")
+}
+
+// Denuncia de un usuario sobre un anuncio (moderación posterior, ADR-0024)
+model AdFlag {
+  id        Int          @id @default(autoincrement())
+  adId      Int          @map("ad_id")
+  userId    Int          @map("user_id")
+  reason    String
+  status    AdFlagStatus @default(pending)
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  ad   Ad   @relation(fields: [adId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([adId, userId])
+  @@index([status])
+  @@map("ad_flags")
 }
 
 enum AdEventType {
