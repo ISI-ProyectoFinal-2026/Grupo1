@@ -3,11 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FeedPage from '@/pages/reports/FeedPage'
+import * as geoService from '@/services/geo.service'
 import * as reportsService from '@/services/reports.service'
+import { moveMapTo, resetLeafletMock } from '@/test/react-leaflet-mock'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ReportDTO } from '@/types/report.types'
 
 vi.mock('@/services/reports.service')
+vi.mock('@/services/geo.service')
+vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
 
 function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
   return {
@@ -43,7 +47,9 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  resetLeafletMock()
   vi.mocked(reportsService.listReports).mockResolvedValue([reporte()])
+  vi.mocked(geoService.listMapReports).mockResolvedValue([])
 })
 
 describe('FeedPage: listado', () => {
@@ -166,15 +172,79 @@ describe('FeedPage: filtros', () => {
 })
 
 describe('FeedPage: vista de mapa', () => {
-  it('avisa que no hay ubicaciones si ningun reporte tiene coordenadas', async () => {
+  const area = { swLat: -34.7, swLng: -68.4, neLat: -34.5, neLng: -68.2 }
+
+  async function abrirMapa() {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Perra perdida en Caballito')
-
     await user.click(screen.getByRole('button', { name: /Mapa/ }))
+    return user
+  }
 
-    expect(screen.getByText('No hay reportes con ubicación para mostrar')).toBeInTheDocument()
+  it('carga los reportes del area visible con los endpoints geo, sin usar el listado', async () => {
+    vi.mocked(geoService.listMapReports).mockResolvedValue([
+      reporte({ id: 9, location: { lat: -34.62, lng: -68.33 } }),
+    ])
+    vi.mocked(reportsService.listReports).mockClear()
+
+    await abrirMapa()
+
+    await waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1))
+    expect(geoService.listMapReports).toHaveBeenCalledWith(
+      area,
+      { type: undefined, zone: undefined, dateFrom: undefined, dateTo: undefined },
+      expect.any(AbortSignal)
+    )
+  })
+
+  it('al mover el mapa pide el area nueva una sola vez, cuando deja de moverse', async () => {
+    await abrirMapa()
+    await waitFor(() => expect(geoService.listMapReports).toHaveBeenCalledTimes(1))
+
+    moveMapTo({ south: -35, west: -69, north: -34.9, east: -68.9 })
+    moveMapTo({ south: -35.1, west: -69.1, north: -35, east: -69 })
+
+    expect(geoService.listMapReports).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(geoService.listMapReports).toHaveBeenCalledTimes(2))
+    expect(geoService.listMapReports).toHaveBeenLastCalledWith(
+      { swLat: -35.1, swLng: -69.1, neLat: -35, neLng: -69 },
+      expect.any(Object),
+      expect.any(AbortSignal)
+    )
+  })
+
+  it('respeta los filtros activos al cargar el area visible', async () => {
+    const user = await abrirMapa()
+    await waitFor(() => expect(geoService.listMapReports).toHaveBeenCalled())
+
+    await user.selectOptions(screen.getByLabelText('Tipo'), 'found')
+    await user.type(screen.getByLabelText('Zona'), 'Centro')
+
+    await waitFor(() =>
+      expect(geoService.listMapReports).toHaveBeenLastCalledWith(
+        area,
+        { type: 'found', zone: 'Centro', dateFrom: undefined, dateTo: undefined },
+        expect.any(AbortSignal)
+      )
+    )
+  })
+
+  it('avisa que no hay reportes en la zona sin sacar el mapa', async () => {
+    await abrirMapa()
+
+    expect(await screen.findByText('No hay reportes en esta zona del mapa')).toBeInTheDocument()
+    expect(screen.getByTestId('map')).toBeInTheDocument()
     expect(screen.queryByText('Perra perdida en Caballito')).not.toBeInTheDocument()
+  })
+
+  it('muestra el error si falla la carga del mapa', async () => {
+    vi.mocked(geoService.listMapReports).mockRejectedValue(new Error('boom'))
+
+    await abrirMapa()
+
+    expect(await screen.findByText(/Error al cargar reportes/)).toBeInTheDocument()
+    expect(screen.getByTestId('map')).toBeInTheDocument()
   })
 
   it('vuelve a la lista al elegir "Lista"', async () => {
