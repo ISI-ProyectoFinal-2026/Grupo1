@@ -178,3 +178,13 @@ export function createBusiness(token: string, name: string): Promise<ApiBusiness
     }),
   )
 }
+
+/** Buys Premium through the simulated payment provider. */
+export function subscribePremium(token: string, period: 'MONTHLY' | 'ANNUAL' = 'MONTHLY'): Promise<unknown> {
+  return expectStatus(201, 'subscribe premium', call('POST', '/businesses/me/subscription', { token, body: { period } }))
+}
+
+/** Records an anonymous ad impression or click, as the banner does. */
+export function recordAdEvent(adId: number, type: 'impression' | 'click', placement: 'feed' | 'report_detail'): Promise<unknown> {
+  return expectStatus(204, 'record ad event', call('POST', `/ads/${adId}/events`, { body: { type, placement } }))
+}

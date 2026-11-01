@@ -35,6 +35,9 @@ function comercio(overrides: Partial<Business> = {}): Business {
     longitude: null,
     plan: 'FREE',
     planExpiresAt: null,
+    description: null,
+    website: null,
+    socialLinks: [],
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }
@@ -48,6 +51,9 @@ function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusines
     phone: '1122334455',
     category: 'VETERINARIA',
     plan: 'FREE',
+    description: null,
+    website: null,
+    socialLinks: [],
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }

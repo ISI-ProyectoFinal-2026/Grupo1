@@ -41,6 +41,10 @@ export interface Business {
   // pin del mapa (#208); null en comercios previos
   latitude: number | null
   longitude: number | null
+  // perfil público (ADR-0024)
+  description: string | null
+  website: string | null
+  socialLinks: string[]
   plan: BusinessPlan
   planExpiresAt: string | null
   createdAt: string
@@ -55,6 +59,9 @@ export interface PublicBusiness {
   address: string
   phone: string
   category: BusinessCategory
+  description: string | null
+  website: string | null
+  socialLinks: string[]
   plan: BusinessPlan
   createdAt: string
 }
@@ -69,7 +76,11 @@ export interface CreateBusinessInput {
   location: GeoPoint
 }
 
-export type UpdateBusinessInput = Partial<CreateBusinessInput>
+export type UpdateBusinessInput = Partial<CreateBusinessInput> & {
+  description?: string | null
+  website?: string | null
+  socialLinks?: string[]
+}
 
 export interface BusinessStats {
   views: number
