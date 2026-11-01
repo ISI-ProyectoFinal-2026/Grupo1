@@ -1,0 +1,30 @@
+import { z } from "zod";
+import { AdStatus } from "@prisma/client";
+import { r2ImageUrlSchema } from "./shared.validator";
+
+// límites del anuncio (ADR-0024)
+export const MIN_AD_RADIUS_KM = 1;
+export const MAX_AD_RADIUS_KM = 20;
+const MAX_TITLE_LENGTH = 60;
+const MAX_BODY_LENGTH = 200;
+
+export const createAdSchema = z.object({
+  title: z.string().trim().min(1).max(MAX_TITLE_LENGTH),
+  body: z.string().trim().min(1).max(MAX_BODY_LENGTH),
+  imageUrl: r2ImageUrlSchema,
+  radiusKm: z.number().int().min(MIN_AD_RADIUS_KM).max(MAX_AD_RADIUS_KM),
+});
+
+export const updateAdSchema = createAdSchema.partial();
+
+// REMOVED solo lo asigna moderación
+export const setAdStatusSchema = z.object({
+  status: z.enum([AdStatus.ACTIVE, AdStatus.PAUSED]),
+});
+
+export const adIdParamSchema = z.object({
+  adId: z.coerce.number().int().positive(),
+});
+
+export type CreateAdInput = z.infer<typeof createAdSchema>;
+export type UpdateAdInput = z.infer<typeof updateAdSchema>;

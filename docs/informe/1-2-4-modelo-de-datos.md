@@ -28,9 +28,10 @@ El sistema usa una única base PostgreSQL 16 con las extensiones PostGIS y pgvec
 | `Notification` | `notifications` | Aviso a un usuario (sugerencia de coincidencia, mensaje, cambio de estado) | índice `user_id` |
 | `Business` | `businesses` | Comercio de un usuario: nombre, CUIT, dirección, teléfono, categoría, descripción, sitio web, hasta 5 enlaces a redes (`social_links`, solo URLs http o https), plan y vencimiento. Un `PREMIUM` vencido o sin vencimiento cuenta como `FREE` ([ADR-0024](../adr/0024-modelo-monetizacion.md)) | `user_id` y `cuit` únicos |
 | `Subscription` | `subscriptions` | Compra del plan Premium: período, monto en USD, proveedor de pago (`fake` mientras no haya pasarela), referencia, estado y período cubierto (nulo si el pago se rechazó) | índice `business_id`; cascada con el comercio |
+| `Ad` | `ads` | Anuncio de un comercio: título (hasta 60 caracteres), texto (hasta 200), imagen del bucket propio, radio de 1 a 20 km y estado (`ACTIVE` y `PAUSED` los maneja el dueño; `REMOVED` es una baja por moderación). Hasta 3 activos por comercio, que exigen Premium vigente y la ubicación del comercio cargada | índice `(business_id, status)`; cascada con el comercio |
 | `BusinessEvent` | `business_events` | Registro de visitas y contactos al perfil de un comercio; `user_id` nulo para visitantes anónimos | índice `(business_id, type)`; cascada con el comercio |
 
-Fuente: `backend/prisma/schema.prisma`, líneas 26-436.
+Fuente: `backend/prisma/schema.prisma`, líneas 26-464.
 
 ## Relaciones
 
@@ -39,7 +40,7 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-436.
 - `Report` se relaciona 1:N con `ReportFlag`, `Chat` y `Notification`, y 1:1 con `ReportEmbedding`.
 - `ReportMatch` une dos reportes: uno perdido (`report_lost_id`) y uno encontrado (`report_found_id`).
 - `Chat` une a dos usuarios (`user_a_id`, `user_b_id`) y, opcionalmente, a un reporte; contiene 1:N `Message`.
-- `Business` se relaciona 1:N con `BusinessEvent` y `Subscription`.
+- `Business` se relaciona 1:N con `BusinessEvent`, `Subscription` y `Ad`.
 
 ## Enumeraciones
 
@@ -56,6 +57,7 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-436.
 | `business_event_type` | `VIEW`, `CONTACT` |
 | `subscription_period` | `MONTHLY`, `ANNUAL` |
 | `subscription_status` | `APPROVED`, `REJECTED` |
+| `ad_status` | `ACTIVE`, `PAUSED`, `REMOVED` |
 
 ## Tipos geoespaciales y vectoriales
 
@@ -88,5 +90,6 @@ El servicio de IA mapea con SQLAlchemy dos tablas del esquema ([`backend-ia/app/
 | `20261013000000_two_factor_auth` | Columnas de 2FA en `users`; tabla `two_factor_recovery_codes`; tres tipos nuevos en `auth_token_type` |
 | `20261101000000_premium_subscriptions` | Se elimina `PRO` de `business_plan` (los comercios con `PRO` pasan a `FREE`); tabla `subscriptions` y sus enumeraciones |
 | `20261101010000_business_profile_links` | Columnas `description`, `website` y `social_links` en `businesses` |
+| `20261101020000_add_ads` | Tabla `ads` y la enumeración `ad_status` |
 
 Fuente: `backend/prisma/migrations/*/migration.sql`.
