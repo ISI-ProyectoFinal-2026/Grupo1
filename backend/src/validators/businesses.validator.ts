@@ -1,6 +1,21 @@
 import { z } from "zod";
 import { BusinessCategory, SubscriptionPeriod } from "@prisma/client";
-import { locationSchema } from "./shared.validator";
+import { locationSchema, safeHttpUrlSchema } from "./shared.validator";
+
+// enlaces del perfil público
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_URL_LENGTH = 300;
+const MAX_SOCIAL_LINKS = 5;
+
+const profileUrlSchema = z.string().trim().max(MAX_URL_LENGTH).pipe(safeHttpUrlSchema);
+
+// texto vacío = sin descripción
+const descriptionSchema = z
+  .string()
+  .trim()
+  .max(MAX_DESCRIPTION_LENGTH)
+  .transform((value) => value || null)
+  .nullable();
 
 /**
  * `plan` no es parte del alta: todo comercio nace `FREE` (default de
@@ -22,6 +37,9 @@ export const createBusinessSchema = z.object({
     BusinessCategory.OTRO,
   ]),
   location: locationSchema,
+  description: descriptionSchema.optional(),
+  website: profileUrlSchema.nullable().optional(),
+  socialLinks: z.array(profileUrlSchema).max(MAX_SOCIAL_LINKS).optional(),
 });
 
 /**

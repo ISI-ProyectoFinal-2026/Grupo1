@@ -651,7 +651,7 @@ Tabla 1.2.2-18. Historias del módulo de comercios. Fuente: `gh issue list` (com
 | Regla | Valor | Fuente |
 |---|---|---|
 | Categorías | `VETERINARIA`, `REFUGIO`, `PET_SHOP`, `OTRO` | `backend/prisma/schema.prisma:295-302` |
-| Planes | `FREE` y `PREMIUM`; todo comercio nace `FREE` y pasa a `PREMIUM` solo con una compra aprobada (pago simulado). Un `PREMIUM` vencido cuenta como `FREE` | `backend/prisma/schema.prisma:346`, `backend/src/services/businesses.service.ts:136`, `backend/src/services/business-plan.ts:4` |
+| Planes | `FREE` y `PREMIUM`; todo comercio nace `FREE` y pasa a `PREMIUM` solo con una compra aprobada (pago simulado). Un `PREMIUM` vencido cuenta como `FREE` | `backend/prisma/schema.prisma:346`, `backend/src/services/businesses.service.ts:150`, `backend/src/services/business-plan.ts:4` |
 | Cantidad | Un comercio por usuario (409) | `backend/src/services/businesses.service.ts:50` |
 | CUIT | Único (409) | `backend/src/services/businesses.service.ts:47-48` |
 | Métricas | Las visitas del dueño no cuentan | `backend/src/services/businesses.service.ts:125-129` |

@@ -18,6 +18,9 @@ const publicBusinessSelect = {
   address: true,
   phone: true,
   category: true,
+  description: true,
+  website: true,
+  socialLinks: true,
   plan: true,
   createdAt: true,
 } satisfies Prisma.BusinessSelect;
@@ -59,10 +62,21 @@ function toCoordinates(location: { lat: number; lng: number }) {
 export async function create(data: CreateBusinessInput & { userId: number }): Promise<Business> {
   // Campos explícitos en vez de pasar `data` entero: si un caller cuela `plan`
   // (u otra columna) igual no llega a Prisma. Todo comercio nace FREE.
-  const { userId, name, cuit, address, phone, category, location } = data;
+  const { userId, name, cuit, address, phone, category, location, description, website, socialLinks } = data;
   try {
     return await prisma.business.create({
-      data: { userId, name, cuit, address, phone, category, ...toCoordinates(location) },
+      data: {
+        userId,
+        name,
+        cuit,
+        address,
+        phone,
+        category,
+        description,
+        website,
+        socialLinks,
+        ...toCoordinates(location),
+      },
     });
   } catch (error) {
     if (isPrismaKnownError(error, "P2002")) {

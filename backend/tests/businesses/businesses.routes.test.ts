@@ -183,6 +183,78 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(res.status).toBe(401);
   });
 
+  test("POST /api/businesses guarda descripción y enlaces, y el perfil público los muestra", async () => {
+    const profile = {
+      description: "Atención 24 hs y guardia de emergencias.",
+      website: "https://vetsanroque.com.ar",
+      socialLinks: ["https://instagram.com/vetsanroque", "https://facebook.com/vetsanroque"],
+    };
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), ...profile });
+    createdBusinessIds.push(created.body.id);
+
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject(profile);
+
+    const res = await request(app).get(`/api/businesses/${created.body.id}`);
+    expect(res.body).toMatchObject(profile);
+  });
+
+  test("POST /api/businesses sin descripción ni enlaces los deja vacíos", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    expect(created.body).toMatchObject({ description: null, website: null, socialLinks: [] });
+  });
+
+  test("PUT /api/businesses/me edita y borra la descripción y los enlaces", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), description: "Vieja", website: "https://viejo.com" });
+    createdBusinessIds.push(created.body.id);
+
+    const updated = await request(app)
+      .put("/api/businesses/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ description: "Nueva", socialLinks: ["https://instagram.com/nuevo"] });
+    expect(updated.body).toMatchObject({
+      description: "Nueva",
+      website: "https://viejo.com",
+      socialLinks: ["https://instagram.com/nuevo"],
+    });
+
+    const cleared = await request(app)
+      .put("/api/businesses/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ description: "   ", website: null, socialLinks: [] });
+    expect(cleared.body).toMatchObject({ description: null, website: null, socialLinks: [] });
+  });
+
+  test.each([
+    ["un enlace con javascript:", { website: "javascript:alert(1)" }],
+    ["una red con data:", { socialLinks: ["data:text/html,<script>alert(1)</script>"] }],
+    ["un texto que no es URL", { website: "mi sitio" }],
+    ["más de 5 redes", { socialLinks: Array.from({ length: 6 }, (_, i) => `https://red${i}.com`) }],
+    ["una descripción de más de 500 caracteres", { description: "a".repeat(501) }],
+    ["una URL de más de 300 caracteres", { website: `https://a.com/${"a".repeat(300)}` }],
+  ])("PUT /api/businesses/me rechaza %s con 400", async (_label, body) => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app).put("/api/businesses/me").set("Authorization", `Bearer ${token}`).send(body);
+
+    expect(res.status).toBe(400);
+  });
+
   test("PUT /api/businesses/me actualiza los datos del comercio", async () => {
     const created = await request(app)
       .post("/api/businesses")

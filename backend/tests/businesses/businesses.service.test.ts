@@ -264,6 +264,26 @@ describe("businesses.service", () => {
     expect(found!.name).toBe(baseBusinessData.name);
   });
 
+  test("listPublic() expone la descripción y los enlaces", async () => {
+    const business = await businessesService.create({
+      userId,
+      ...baseBusinessData,
+      cuit: uniqueCuit(),
+      description: "Pet shop con peluquería",
+      website: "https://petshop.com",
+      socialLinks: ["https://instagram.com/petshop"],
+    });
+    createdBusinessIds.push(business.id);
+
+    const found = (await businessesService.listPublic({})).find((item) => item.id === business.id);
+
+    expect(found).toMatchObject({
+      description: "Pet shop con peluquería",
+      website: "https://petshop.com",
+      socialLinks: ["https://instagram.com/petshop"],
+    });
+  });
+
   test("listPublic() filtra por categoría", async () => {
     const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(business.id);
