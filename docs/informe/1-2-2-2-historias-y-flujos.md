@@ -651,7 +651,7 @@ Tabla 1.2.2-18. Historias del módulo de comercios. Fuente: `gh issue list` (com
 | Regla | Valor | Fuente |
 |---|---|---|
 | Categorías | `VETERINARIA`, `REFUGIO`, `PET_SHOP`, `OTRO` | `backend/prisma/schema.prisma:295-302` |
-| Planes | `FREE`, `PRO`, `PREMIUM`; todo comercio nace `FREE` y no hay flujo de pago | `backend/prisma/schema.prisma:304-310`, `backend/src/services/businesses.service.ts:39-43` |
+| Planes | `FREE` y `PREMIUM`; todo comercio nace `FREE` y pasa a `PREMIUM` solo con una compra aprobada (pago simulado). Un `PREMIUM` vencido cuenta como `FREE` | `backend/prisma/schema.prisma:346`, `backend/src/services/businesses.service.ts:136`, `backend/src/services/business-plan.ts:4` |
 | Cantidad | Un comercio por usuario (409) | `backend/src/services/businesses.service.ts:50` |
 | CUIT | Único (409) | `backend/src/services/businesses.service.ts:47-48` |
 | Métricas | Las visitas del dueño no cuentan | `backend/src/services/businesses.service.ts:125-129` |
@@ -664,6 +664,6 @@ Tabla 1.2.2-19. Reglas del módulo de comercios. Fuente: archivos de la columna 
 
 ### Limitaciones conocidas
 
-- No hay publicidad segmentada ([#30](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/30)), ni suscripción ni pago ([#29](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/29)).
+- No hay publicidad segmentada ([#30](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/30)). La compra de Premium usa un proveedor de pago simulado: no hay pasarela real ([ADR-0024](../adr/0024-modelo-monetizacion.md)).
 - La ubicación del comercio es un texto sin validar ([#208](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/208)).
 - "Comercio" no es un rol del sistema ([#31](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/31)).

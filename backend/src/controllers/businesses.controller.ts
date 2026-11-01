@@ -4,6 +4,7 @@ import {
   businessIdParamSchema,
   createBusinessSchema,
   listBusinessesQuerySchema,
+  subscribeSchema,
   updateBusinessSchema,
 } from "../validators/businesses.validator";
 
@@ -41,6 +42,12 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
   const data = updateBusinessSchema.parse(req.body);
   const business = await businessesService.updateByUserId(req.userId!, data);
   res.status(200).json(business);
+}
+
+export async function subscribe(req: Request, res: Response): Promise<void> {
+  const { period } = subscribeSchema.parse(req.body);
+  const result = await businessesService.subscribe(req.userId!, period);
+  res.status(201).json(result);
 }
 
 export async function getStats(req: Request, res: Response): Promise<void> {

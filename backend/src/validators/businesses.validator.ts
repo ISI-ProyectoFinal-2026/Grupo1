@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { BusinessCategory } from "@prisma/client";
+import { BusinessCategory, SubscriptionPeriod } from "@prisma/client";
 import { locationSchema } from "./shared.validator";
 
 /**
  * `plan` no es parte del alta: todo comercio nace `FREE` (default de
  * `Business.plan` en `schema.prisma`). Aceptarlo dejaba que cualquiera se
  * registrara directo en PREMIUM con un `POST /api/businesses`, sin pago ni
- * autorización. El cambio de plan pertenece al futuro flujo de pago.
+ * autorización. El plan solo cambia con `POST /api/businesses/me/subscription`.
  *
  * Zod descarta las claves no declaradas, así que enviarlo se ignora.
  */
@@ -29,8 +29,7 @@ export const createBusinessSchema = z.object({
  *
  * `plan` ya no está en `createBusinessSchema` (ver arriba). Aceptarlo en el
  * update dejaba que cualquier dueño se auto-otorgara PREMIUM con un
- * `PUT /api/businesses/me`; `businessesService.updateByUserId` sigue
- * soportándolo para cuando exista el flujo de pago.
+ * `PUT /api/businesses/me`.
  *
  * `cuit` es la identidad fiscal del comercio: el dashboard ya lo presenta como
  * `disabled`, pero esa restricción era solo del lado del cliente.
@@ -52,6 +51,10 @@ export const listBusinessesQuerySchema = z.object({
       BusinessCategory.OTRO,
     ])
     .optional(),
+});
+
+export const subscribeSchema = z.object({
+  period: z.enum([SubscriptionPeriod.MONTHLY, SubscriptionPeriod.ANNUAL]),
 });
 
 export type CreateBusinessInput = z.infer<typeof createBusinessSchema>;

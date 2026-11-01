@@ -342,12 +342,46 @@ enum BusinessCategory {
   @@map("business_category")
 }
 
+// Un único plan pago (ADR-0024)
 enum BusinessPlan {
   FREE
-  PRO
   PREMIUM
 
   @@map("business_plan")
+}
+
+enum SubscriptionPeriod {
+  MONTHLY
+  ANNUAL
+
+  @@map("subscription_period")
+}
+
+enum SubscriptionStatus {
+  APPROVED
+  REJECTED
+
+  @@map("subscription_status")
+}
+
+// Compras del plan Premium; `provider` = "fake" mientras no haya pasarela real.
+// Período null en las rechazadas.
+model Subscription {
+  id          Int                @id @default(autoincrement())
+  businessId  Int                @map("business_id")
+  period      SubscriptionPeriod
+  amountUsd   Decimal            @map("amount_usd") @db.Decimal(10, 2)
+  provider    String
+  reference   String
+  status      SubscriptionStatus
+  periodStart DateTime?          @map("period_start")
+  periodEnd   DateTime?          @map("period_end")
+  createdAt   DateTime           @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("subscriptions")
 }
 
 model Business {
@@ -365,8 +399,9 @@ model Business {
   planExpiresAt DateTime?        @map("plan_expires_at")
   createdAt     DateTime         @default(now()) @map("created_at")
 
-  user   User            @relation(fields: [userId], references: [id])
-  events BusinessEvent[]
+  user          User            @relation(fields: [userId], references: [id])
+  events        BusinessEvent[]
+  subscriptions Subscription[]
 
   @@map("businesses")
 }

@@ -363,6 +363,64 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(res.status).toBe(400);
   });
 
+  test("POST /api/businesses/me/subscription compra Premium mensual", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app)
+      .post("/api/businesses/me/subscription")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ period: "MONTHLY" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.business.plan).toBe("PREMIUM");
+    expect(res.body.business.planExpiresAt).toEqual(expect.any(String));
+    expect(res.body.subscription).toMatchObject({ period: "MONTHLY", status: "APPROVED", provider: "fake" });
+  });
+
+  test("POST /api/businesses/me/subscription responde 400 con un período inválido", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app)
+      .post("/api/businesses/me/subscription")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ period: "WEEKLY" });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/businesses/me/subscription responde 401 sin sesión", async () => {
+    const res = await request(app).post("/api/businesses/me/subscription").send({ period: "MONTHLY" });
+
+    expect(res.status).toBe(401);
+  });
+
+  test("POST /api/businesses/me/subscription responde 404 si el usuario no tiene comercio", async () => {
+    const res = await request(app)
+      .post("/api/businesses/me/subscription")
+      .set("Authorization", `Bearer ${otherToken}`)
+      .send({ period: "MONTHLY" });
+
+    expect(res.status).toBe(404);
+  });
+
+  test("GET /api/plans devuelve los precios de Premium sin exigir sesión", async () => {
+    const res = await request(app).get("/api/plans");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      { plan: "PREMIUM", period: "MONTHLY", months: 1, priceUsd: 30 },
+      { plan: "PREMIUM", period: "ANNUAL", months: 12, priceUsd: 300 },
+    ]);
+  });
+
   test("POST /api/businesses/:id/contact responde 404 si el comercio no existe", async () => {
     const res = await request(app)
       .post("/api/businesses/999999999/contact")

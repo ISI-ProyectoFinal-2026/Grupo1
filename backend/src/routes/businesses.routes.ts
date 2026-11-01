@@ -11,6 +11,7 @@ businessesRouter.post("/", requireAuth, businessesController.create);
 businessesRouter.get("/me", requireAuth, businessesController.getMe);
 businessesRouter.put("/me", requireAuth, businessesController.updateMe);
 businessesRouter.get("/me/stats", requireAuth, businessesController.getStats);
+businessesRouter.post("/me/subscription", requireAuth, businessesController.subscribe);
 
 businessesRouter.get("/", businessesController.list);
 businessesRouter.get("/:id", optionalAuth, businessesController.getById);
