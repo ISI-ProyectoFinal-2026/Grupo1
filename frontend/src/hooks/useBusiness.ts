@@ -5,11 +5,18 @@ import {
   getBusiness,
   getMyBusiness,
   getMyBusinessStats,
+  getPlans,
   listBusinesses,
+  subscribe,
   updateMyBusiness,
 } from "@/services/business.service";
 import { getApiErrorStatus } from "@/services/api";
-import type { BusinessCategory, CreateBusinessInput, UpdateBusinessInput } from "@/types/business.types";
+import type {
+  BusinessCategory,
+  CreateBusinessInput,
+  SubscriptionPeriod,
+  UpdateBusinessInput,
+} from "@/types/business.types";
 
 const businessQueryKey = ["business", "me"] as const;
 const businessStatsQueryKey = ["business", "me", "stats"] as const;
@@ -71,5 +78,25 @@ export function useUpdateBusinessMutation() {
   return useMutation({
     mutationFn: (input: UpdateBusinessInput) => updateMyBusiness(input),
     onSuccess: (business) => queryClient.setQueryData(businessQueryKey, business),
+  });
+}
+
+export function usePlansQuery() {
+  return useQuery({
+    queryKey: ["plans"],
+    queryFn: getPlans,
+    staleTime: Infinity,
+  });
+}
+
+// el plan cambia /me y el directorio (orden y marca de destacado)
+export function useSubscribeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (period: SubscriptionPeriod) => subscribe(period),
+    onSuccess: (result) => {
+      queryClient.setQueryData(businessQueryKey, result.business);
+      return queryClient.invalidateQueries({ queryKey: businessesQueryKey });
+    },
   });
 }

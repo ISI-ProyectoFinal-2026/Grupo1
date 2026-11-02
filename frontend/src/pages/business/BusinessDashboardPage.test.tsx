@@ -4,10 +4,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import * as businessService from '@/services/business.service'
+import * as adsService from '@/services/ads.service'
 import BusinessDashboardPage from '@/pages/business/BusinessDashboardPage'
 import type { Business } from '@/types/business.types'
 
 vi.mock('@/services/business.service')
+vi.mock('@/services/ads.service')
 
 // doble del selector: expone el pin inicial y un boton que dispara un pin nuevo
 vi.mock('@/components/maps/LocationPicker', () => ({
@@ -41,6 +43,9 @@ function comercio(overrides: Partial<Business> = {}): Business {
     longitude: null,
     plan: 'FREE',
     planExpiresAt: null,
+    description: null,
+    website: null,
+    socialLinks: [],
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }
@@ -63,6 +68,7 @@ function renderPage() {
 describe('BusinessDashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(adsService.listMyAds).mockResolvedValue([])
   })
 
   it('muestra las estadisticas y el plan actual', async () => {
@@ -95,6 +101,9 @@ describe('BusinessDashboardPage', () => {
         address: 'Av. Siempre Viva 123',
         phone: '1199998888',
         category: 'VETERINARIA',
+        description: '',
+        website: null,
+        socialLinks: [],
       })
     )
     expect(await screen.findByText(/cambios guardados/i)).toBeInTheDocument()
@@ -138,6 +147,9 @@ describe('BusinessDashboardPage', () => {
         address: 'Av. Siempre Viva 123',
         phone: '1122334455',
         category: 'VETERINARIA',
+        description: '',
+        website: null,
+        socialLinks: [],
         location: { lat: -34.6251, lng: -68.3221 },
       })
     )
@@ -152,6 +164,69 @@ describe('BusinessDashboardPage', () => {
     await screen.findByLabelText('Teléfono')
     expect(screen.queryByLabelText('Plan')).not.toBeInTheDocument()
     expect(screen.getByTestId('current-plan')).toHaveTextContent('Gratis')
+  })
+
+  it('edita la descripción, la web y las redes del perfil', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(comercio({ description: 'Vieja' }))
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    vi.mocked(businessService.updateMyBusiness).mockImplementation(async (input) => comercio({ ...input } as Partial<Business>))
+    const user = userEvent.setup()
+    renderPage()
+
+    const description = await screen.findByLabelText('Descripción')
+    expect(description).toHaveValue('Vieja')
+    await user.clear(description)
+    await user.type(description, 'Guardia 24 hs')
+    await user.type(screen.getByLabelText('Sitio web'), 'https://vet.com')
+    await user.type(screen.getByLabelText('Redes sociales'), 'https://instagram.com/vet{enter}{enter}https://facebook.com/vet')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() =>
+      expect(businessService.updateMyBusiness).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Guardia 24 hs',
+          website: 'https://vet.com',
+          socialLinks: ['https://instagram.com/vet', 'https://facebook.com/vet'],
+        })
+      )
+    )
+  })
+
+  it('un sitio web vacío se envía como null para borrarlo', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(comercio({ website: 'https://vieja.com' }))
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    vi.mocked(businessService.updateMyBusiness).mockResolvedValue(comercio())
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.clear(await screen.findByLabelText('Sitio web'))
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() =>
+      expect(businessService.updateMyBusiness).toHaveBeenCalledWith(expect.objectContaining({ website: null }))
+    )
+  })
+
+  it('un comercio Gratis ve la invitación a pasar a Premium', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(comercio())
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: 'Pasar a Premium' })
+    expect(link).toHaveAttribute('href', '/businesses/plan')
+    expect(screen.getByText('Solo el plan Premium permite publicar anuncios.')).toBeInTheDocument()
+  })
+
+  it('un comercio Premium ve el vencimiento y la opción de renovar', async () => {
+    vi.mocked(businessService.getMyBusiness).mockResolvedValue(
+      comercio({ plan: 'PREMIUM', planExpiresAt: '2026-12-01T12:00:00.000Z' })
+    )
+    vi.mocked(businessService.getMyBusinessStats).mockResolvedValue({ views: 0, contacts: 0 })
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: 'Renovar' })).toHaveAttribute('href', '/businesses/plan')
+    expect(screen.getByText(/1 de diciembre de 2026/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Pasar a Premium' })).not.toBeInTheDocument()
   })
 
   it('redirige al registro si el usuario no tiene comercio', async () => {

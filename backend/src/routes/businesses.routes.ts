@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as businessesController from "../controllers/businesses.controller";
 import { optionalAuth, requireAuth } from "../middlewares/auth.middleware";
+import { businessAdsRouter } from "./business-ads.routes";
 
 export const businessesRouter = Router();
 
@@ -11,6 +12,8 @@ businessesRouter.post("/", requireAuth, businessesController.create);
 businessesRouter.get("/me", requireAuth, businessesController.getMe);
 businessesRouter.put("/me", requireAuth, businessesController.updateMe);
 businessesRouter.get("/me/stats", requireAuth, businessesController.getStats);
+businessesRouter.post("/me/subscription", requireAuth, businessesController.subscribe);
+businessesRouter.use("/me/ads", businessAdsRouter);
 
 businessesRouter.get("/", businessesController.list);
 businessesRouter.get("/:id", optionalAuth, businessesController.getById);

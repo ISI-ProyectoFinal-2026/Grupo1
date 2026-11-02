@@ -27,6 +27,8 @@ describe("E2E: ciclo de vida de un reporte (B1 camino feliz)", () => {
 
   const auth = (user: E2EUser) => ({ Authorization: `Bearer ${user.token}` });
 
+  // Cada registerAndLogin hace bcrypt (12 rondas) dos veces: con las suites
+  // corriendo en paralelo el hook supera los 5s por defecto de Jest.
   beforeAll(async () => {
     process.env.R2_PUBLIC_URL = R2_PUBLIC_URL;
     process.env.AI_SERVICE_URL = "http://ai-e2e.test";
@@ -36,7 +38,7 @@ describe("E2E: ciclo de vida de un reporte (B1 camino feliz)", () => {
 
     owner = await ctx.registerAndLogin("owner");
     finder = await ctx.registerAndLogin("finder");
-  });
+  }, 30_000);
 
   afterAll(async () => {
     ai.restore();

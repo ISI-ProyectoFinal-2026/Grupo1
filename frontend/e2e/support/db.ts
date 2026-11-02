@@ -210,6 +210,8 @@ export async function deleteUsersByEmail(emails: string[]): Promise<void> {
         ['DELETE FROM report_embeddings WHERE report_id IN (SELECT id FROM e2e_reports)', []],
         ['DELETE FROM reports WHERE id IN (SELECT id FROM e2e_reports)', []],
         ['DELETE FROM pets WHERE user_id = ANY($1)', [userIds]],
+        // ads, subscriptions, ad events and ad flags cascade with the business
+        ['DELETE FROM ad_flags WHERE user_id = ANY($1)', [userIds]],
         ['DELETE FROM businesses WHERE user_id = ANY($1)', [userIds]],
         ['DELETE FROM users WHERE id = ANY($1)', [userIds]],
       ]

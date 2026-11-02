@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
+import { formatLongDate } from "@/lib/format";
 import { getApiErrorDetails } from "@/services/api";
 import {
   hasNoBusiness,
@@ -8,9 +9,10 @@ import {
   useMyBusinessStatsQuery,
   useUpdateBusinessMutation,
 } from "@/hooks/useBusiness";
-import type { Business, BusinessCategory } from "@/types/business.types";
+import type { Business, BusinessCategory, BusinessPlan } from "@/types/business.types";
 import type { GeoPoint } from "@/types/geo.types";
 import LocationPicker from "@/components/maps/LocationPicker";
+import AdsSection from "@/components/business/AdsSection";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Spinner from "@/components/ui/Spinner";
@@ -23,15 +25,11 @@ const CATEGORY_OPTIONS: Array<{ value: BusinessCategory; label: string }> = [
   { value: "OTRO", label: "Otro" },
 ];
 
-const PLAN_LABELS: Record<string, string> = { FREE: "Gratis", PRO: "Pro", PREMIUM: "Premium" };
+const PLAN_LABELS: Record<BusinessPlan, string> = { FREE: "Gratis", PREMIUM: "Premium" };
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("es-AR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
+// límites del perfil público (validados también en el backend)
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_SOCIAL_LINKS = 5;
 
 interface BusinessEditFormProps {
   business: Business;
@@ -44,6 +42,9 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
   const [address, setAddress] = useState(business.address);
   const [phone, setPhone] = useState(business.phone);
   const [category, setCategory] = useState<BusinessCategory>(business.category);
+  const [description, setDescription] = useState(business.description ?? "");
+  const [website, setWebsite] = useState(business.website ?? "");
+  const [socialLinks, setSocialLinks] = useState(business.socialLinks.join("\n"));
   // solo se envía si el dueño toca el pin; null conserva las coordenadas guardadas
   const [newLocation, setNewLocation] = useState<GeoPoint | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,12 +58,19 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
     setSuccess(false);
 
     try {
-      // Sin `plan`: PUT /businesses/me lo ignora; el cambio de plan pertenece al flujo de pago.
+      // Sin `plan`: PUT /businesses/me lo ignora; el plan cambia solo con una compra.
       await updateBusiness.mutateAsync({
         name,
         address,
         phone,
         category,
+        // vacío = sin descripción ni web (el backend guarda null)
+        description,
+        website: website.trim() || null,
+        socialLinks: socialLinks
+          .split("\n")
+          .map((link) => link.trim())
+          .filter(Boolean),
         ...(newLocation && { location: newLocation }),
       });
       setSuccess(true);
@@ -174,6 +182,52 @@ function BusinessEditForm({ business }: BusinessEditFormProps) {
         </select>
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="description" className="field-label">
+          Descripción
+        </label>
+        <textarea
+          id="description"
+          rows={3}
+          maxLength={MAX_DESCRIPTION_LENGTH}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          className="field"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="website" className="field-label">
+          Sitio web
+        </label>
+        <input
+          id="website"
+          type="url"
+          inputMode="url"
+          placeholder="https://"
+          value={website}
+          onChange={(event) => setWebsite(event.target.value)}
+          className="field"
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="socialLinks" className="field-label">
+          Redes sociales
+        </label>
+        <textarea
+          id="socialLinks"
+          rows={3}
+          aria-describedby="socialLinks-hint"
+          value={socialLinks}
+          onChange={(event) => setSocialLinks(event.target.value)}
+          className="field"
+        />
+        <p id="socialLinks-hint" className="text-sm text-ink-muted">
+          Un enlace por línea, hasta {MAX_SOCIAL_LINKS} (Instagram, Facebook, WhatsApp...).
+        </p>
+      </div>
+
       {fieldErrors.length > 0 && (
         <ul role="alert" className="flex flex-col gap-1 border-l-4 border-danger pl-3 text-sm font-bold text-danger">
           {fieldErrors.map((message) => (
@@ -259,11 +313,22 @@ function BusinessDashboardPage() {
             <p className="mt-2 text-ink">
               Plan: <span data-testid="current-plan" className="font-bold">{PLAN_LABELS[business.plan] ?? business.plan}</span>
             </p>
-            {business.planExpiresAt && (
-              <p className="text-ink-muted">Vence: {formatDate(business.planExpiresAt)}</p>
+            {business.plan === "PREMIUM" && business.planExpiresAt && (
+              <p className="text-ink-muted">Vence: {formatLongDate(business.planExpiresAt)}</p>
             )}
             <p className="mt-2 text-sm text-ink-muted">Solo el plan Premium permite publicar anuncios.</p>
+            {business.plan === "PREMIUM" ? (
+              <Link to="/businesses/plan" className={buttonClasses("secondary", "md", "mt-3 w-full")}>
+                Renovar
+              </Link>
+            ) : (
+              <Link to="/businesses/plan" className={buttonClasses("primary", "md", "mt-3 w-full")}>
+                Pasar a Premium
+              </Link>
+            )}
           </section>
+
+          <AdsSection business={business} />
         </div>
 
         <section className="sm:card sm:p-5">

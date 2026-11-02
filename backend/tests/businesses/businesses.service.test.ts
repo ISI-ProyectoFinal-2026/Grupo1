@@ -1,6 +1,8 @@
 import { prisma } from "../../src/db/client";
 import { AppError } from "../../src/errors/app-error";
 import * as businessesService from "../../src/services/businesses.service";
+import { addMonths } from "../../src/services/business-plan";
+import type { PaymentProvider } from "../../src/services/payments";
 
 describe("businesses.service", () => {
   let userId: number;
@@ -139,13 +141,96 @@ describe("businesses.service", () => {
     expect(business.plan).toBe("FREE");
   });
 
-  test("updateByUserId() con plan PREMIUM cambia un comercio FREE a premium", async () => {
+  test("subscribe() pasa un comercio FREE a PREMIUM por un mes y registra el pago", async () => {
     const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(business.id);
-    expect(business.plan).toBe("FREE");
 
-    const updated = await businessesService.updateByUserId(userId, { plan: "PREMIUM" });
+    const before = Date.now();
+    const { business: updated, subscription } = await businessesService.subscribe(userId, "MONTHLY");
+
     expect(updated.plan).toBe("PREMIUM");
+    const expected = addMonths(new Date(before), 1).getTime();
+    expect(Math.abs(updated.planExpiresAt!.getTime() - expected)).toBeLessThan(60_000);
+    expect(subscription).toMatchObject({
+      businessId: business.id,
+      period: "MONTHLY",
+      status: "APPROVED",
+      provider: "fake",
+    });
+    expect(Number(subscription.amountUsd)).toBe(30);
+    expect(subscription.periodEnd!.getTime()).toBe(updated.planExpiresAt!.getTime());
+  });
+
+  test("subscribe() con el plan vigente suma el período al vencimiento actual", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+    const currentExpiry = addMonths(new Date(), 2);
+    await prisma.business.update({ where: { id: business.id }, data: { plan: "PREMIUM", planExpiresAt: currentExpiry } });
+
+    const { business: updated } = await businessesService.subscribe(userId, "ANNUAL");
+
+    expect(updated.planExpiresAt!.getTime()).toBe(addMonths(currentExpiry, 12).getTime());
+  });
+
+  test("subscribe() con el pago rechazado no cambia el plan y responde 402", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+    const rejectingProvider: PaymentProvider = {
+      charge: async () => ({ status: "REJECTED", provider: "test", reference: "test-rejected" }),
+    };
+
+    await expect(businessesService.subscribe(userId, "MONTHLY", rejectingProvider)).rejects.toMatchObject({
+      statusCode: 402,
+    });
+
+    const after = await businessesService.getByUserId(userId);
+    expect(after.plan).toBe("FREE");
+    const subscriptions = await prisma.subscription.findMany({ where: { businessId: business.id } });
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0].status).toBe("REJECTED");
+  });
+
+  test("subscribe() lanza AppError 404 si el usuario no tiene comercio registrado", async () => {
+    await expect(businessesService.subscribe(otherUserId, "MONTHLY")).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test("getByUserId() informa FREE cuando el PREMIUM ya venció", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { plan: "PREMIUM", planExpiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const found = await businessesService.getByUserId(userId);
+
+    expect(found.plan).toBe("FREE");
+  });
+
+  test("getPublicById() y listPublic() informan FREE cuando el PREMIUM ya venció", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { plan: "PREMIUM", planExpiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const publicBusiness = await businessesService.getPublicById(business.id);
+    const listed = (await businessesService.listPublic({})).find((item) => item.id === business.id);
+
+    expect(publicBusiness.plan).toBe("FREE");
+    expect(listed!.plan).toBe("FREE");
+    expect(publicBusiness).not.toHaveProperty("planExpiresAt");
+  });
+
+  test("borrar el comercio elimina en cascada sus suscripciones", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    await businessesService.subscribe(userId, "MONTHLY");
+
+    await prisma.business.delete({ where: { id: business.id } });
+
+    const subscriptions = await prisma.subscription.findMany({ where: { businessId: business.id } });
+    expect(subscriptions).toHaveLength(0);
   });
 
   test("updateByUserId() lanza AppError 404 si el usuario no tiene comercio registrado", async () => {
@@ -188,6 +273,26 @@ describe("businesses.service", () => {
 
     expect(found!.latitude).toBeCloseTo(-34.6251, 5);
     expect(found!.longitude).toBeCloseTo(-68.3221, 5);
+  });
+
+  test("listPublic() expone la descripción y los enlaces", async () => {
+    const business = await businessesService.create({
+      userId,
+      ...baseBusinessData,
+      cuit: uniqueCuit(),
+      description: "Pet shop con peluquería",
+      website: "https://petshop.com",
+      socialLinks: ["https://instagram.com/petshop"],
+    });
+    createdBusinessIds.push(business.id);
+
+    const found = (await businessesService.listPublic({})).find((item) => item.id === business.id);
+
+    expect(found).toMatchObject({
+      description: "Pet shop con peluquería",
+      website: "https://petshop.com",
+      socialLinks: ["https://instagram.com/petshop"],
+    });
   });
 
   test("listPublic() filtra por categoría", async () => {

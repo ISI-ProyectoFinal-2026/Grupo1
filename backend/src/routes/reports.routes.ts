@@ -2,6 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import * as reportsController from "../controllers/reports.controller";
 import * as reportFlagsController from "../controllers/report-flags.controller";
+import * as adServingController from "../controllers/ad-serving.controller";
 import { optionalAuth, requireAuth, requireVerifiedEmail } from "../middlewares/auth.middleware";
 import { reportCreateLimiter, similarReportsLimiter } from "../middlewares/rate-limit";
 
@@ -22,6 +23,8 @@ reportsRouter.post("/", requireAuth, requireVerifiedEmail, reportCreateLimiter, 
 // Posibles duplicados mientras se completa el formulario de alta (#211).
 reportsRouter.post("/similar", requireAuth, requireVerifiedEmail, similarReportsLimiter, reportsController.similar);
 reportsRouter.get("/:id", optionalAuth, reportsController.getById);
+// comercios adheridos cerca del reporte (ADR-0024)
+reportsRouter.get("/:id/nearby-businesses", optionalAuth, adServingController.getNearbyBusinesses);
 // Las coincidencias sugeridas por la IA se derivan del reporte pero exigen
 // sesión: el reporte en sí es público (material compartible, flyer), pero el
 // grafo de matches no debe ser scrapeable por un anónimo. No se chequea

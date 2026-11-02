@@ -59,3 +59,16 @@ export const reportCreateLimiter = rateLimit({
   message: { error: { message: "Límite de creación de reportes alcanzado, esperá unos minutos" } },
   skip: () => process.env.NODE_ENV === "test",
 });
+
+// Impresiones y clics de anuncios: por IP, porque los anónimos también suman.
+// Frena el inflado de métricas sin cortar una sesión normal del feed.
+export const AD_EVENTS_RATE_LIMIT = 60;
+
+export const adEventsLimiter = rateLimit({
+  windowMs: 60_000,
+  max: AD_EVENTS_RATE_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: "Demasiados eventos de anuncios, esperá un minuto" } },
+  skip: () => process.env.NODE_ENV === "test",
+});

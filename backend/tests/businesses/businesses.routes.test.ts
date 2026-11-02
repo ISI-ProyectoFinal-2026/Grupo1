@@ -183,6 +183,94 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(res.status).toBe(401);
   });
 
+  test("POST /api/businesses guarda descripción y enlaces, y el perfil público los muestra", async () => {
+    const profile = {
+      description: "Atención 24 hs y guardia de emergencias.",
+      website: "https://vetsanroque.com.ar",
+      socialLinks: ["https://instagram.com/vetsanroque", "https://facebook.com/vetsanroque"],
+    };
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), ...profile });
+    createdBusinessIds.push(created.body.id);
+
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject(profile);
+
+    const res = await request(app).get(`/api/businesses/${created.body.id}`);
+    expect(res.body).toMatchObject(profile);
+  });
+
+  test("POST /api/businesses sin descripción ni enlaces los deja vacíos", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    expect(created.body).toMatchObject({ description: null, website: null, socialLinks: [] });
+  });
+
+  test("PUT /api/businesses/me edita y borra la descripción y los enlaces", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), description: "Vieja", website: "https://viejo.com" });
+    createdBusinessIds.push(created.body.id);
+
+    const updated = await request(app)
+      .put("/api/businesses/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ description: "Nueva", socialLinks: ["https://instagram.com/nuevo"] });
+    expect(updated.body).toMatchObject({
+      description: "Nueva",
+      website: "https://viejo.com",
+      socialLinks: ["https://instagram.com/nuevo"],
+    });
+
+    const cleared = await request(app)
+      .put("/api/businesses/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ description: "   ", website: null, socialLinks: [] });
+    expect(cleared.body).toMatchObject({ description: null, website: null, socialLinks: [] });
+  });
+
+  test("PUT /api/businesses/me trata los campos de enlace vacíos como borrados, igual que la descripción", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), website: "https://viejo.com" });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app)
+      .put("/api/businesses/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ website: "  ", socialLinks: ["", "https://instagram.com/vet", "  "] });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ website: null, socialLinks: ["https://instagram.com/vet"] });
+  });
+
+  test.each([
+    ["un enlace con javascript:", { website: "javascript:alert(1)" }],
+    ["una red con data:", { socialLinks: ["data:text/html,<script>alert(1)</script>"] }],
+    ["un texto que no es URL", { website: "mi sitio" }],
+    ["más de 5 redes", { socialLinks: Array.from({ length: 6 }, (_, i) => `https://red${i}.com`) }],
+    ["una descripción de más de 500 caracteres", { description: "a".repeat(501) }],
+    ["una URL de más de 300 caracteres", { website: `https://a.com/${"a".repeat(300)}` }],
+  ])("PUT /api/businesses/me rechaza %s con 400", async (_label, body) => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app).put("/api/businesses/me").set("Authorization", `Bearer ${token}`).send(body);
+
+    expect(res.status).toBe(400);
+  });
+
   test("PUT /api/businesses/me actualiza los datos del comercio", async () => {
     const created = await request(app)
       .post("/api/businesses")
@@ -361,6 +449,64 @@ describe("POST/GET/PUT /api/businesses", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(400);
+  });
+
+  test("POST /api/businesses/me/subscription compra Premium mensual", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app)
+      .post("/api/businesses/me/subscription")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ period: "MONTHLY" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.business.plan).toBe("PREMIUM");
+    expect(res.body.business.planExpiresAt).toEqual(expect.any(String));
+    expect(res.body.subscription).toMatchObject({ period: "MONTHLY", status: "APPROVED", provider: "fake", amountUsd: 30 });
+  });
+
+  test("POST /api/businesses/me/subscription responde 400 con un período inválido", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app)
+      .post("/api/businesses/me/subscription")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ period: "WEEKLY" });
+
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/businesses/me/subscription responde 401 sin sesión", async () => {
+    const res = await request(app).post("/api/businesses/me/subscription").send({ period: "MONTHLY" });
+
+    expect(res.status).toBe(401);
+  });
+
+  test("POST /api/businesses/me/subscription responde 404 si el usuario no tiene comercio", async () => {
+    const res = await request(app)
+      .post("/api/businesses/me/subscription")
+      .set("Authorization", `Bearer ${otherToken}`)
+      .send({ period: "MONTHLY" });
+
+    expect(res.status).toBe(404);
+  });
+
+  test("GET /api/plans devuelve los precios de Premium sin exigir sesión", async () => {
+    const res = await request(app).get("/api/plans");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      { plan: "PREMIUM", period: "MONTHLY", months: 1, priceUsd: 30 },
+      { plan: "PREMIUM", period: "ANNUAL", months: 12, priceUsd: 300 },
+    ]);
   });
 
   test("POST /api/businesses/:id/contact responde 404 si el comercio no existe", async () => {

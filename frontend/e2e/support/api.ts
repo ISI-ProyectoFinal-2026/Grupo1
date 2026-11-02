@@ -33,6 +33,9 @@ interface ApiReport {
   reportType: 'lost' | 'found'
 }
 
+/** Default point for reports and businesses created by the specs (Buenos Aires). */
+const DEFAULT_LOCATION = { lat: -34.6037, lng: -58.3816 }
+
 async function call<T>(method: string, path: string, options: { token?: string; body?: unknown; headers?: Record<string, string> } = {}): Promise<{ status: number; body: T }> {
   const response = await fetch(`${BACKEND_URL}/api${path}`, {
     method,
@@ -123,7 +126,7 @@ export async function createPublishedReport(token: string, report: NewReport): P
       token,
       body: {
         imageUrl: E2E_IMAGE_URL,
-        location: { lat: -34.6037, lng: -58.3816 },
+        location: DEFAULT_LOCATION,
         locationAddress: 'Buenos Aires',
         ...report,
       },
@@ -151,4 +154,76 @@ export function notifyMatch(lostReportId: number, foundReportId: number, similar
       body: { lostReportId, foundReportId, similarityScore },
     }),
   )
+}
+
+interface ApiBusiness {
+  id: number
+  name: string
+  plan: 'FREE' | 'PREMIUM'
+  planExpiresAt: string | null
+}
+
+/** Registers a business for the user; by default on the map at the default report location. */
+export function createBusiness(
+  token: string,
+  name: string,
+  location: { lat: number; lng: number } = DEFAULT_LOCATION,
+): Promise<ApiBusiness> {
+  return expectStatus(
+    201,
+    'create business',
+    call<ApiBusiness>('POST', '/businesses', {
+      token,
+      body: {
+        name,
+        cuit: `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        address: 'Av. E2E 123',
+        phone: '1122334455',
+        category: 'VETERINARIA',
+        location,
+      },
+    }),
+  )
+}
+
+/** Buys Premium through the simulated payment provider. */
+export function subscribePremium(token: string, period: 'MONTHLY' | 'ANNUAL' = 'MONTHLY'): Promise<unknown> {
+  return expectStatus(201, 'subscribe premium', call('POST', '/businesses/me/subscription', { token, body: { period } }))
+}
+
+/** Records an anonymous ad impression or click, as the banner does. */
+export function recordAdEvent(adId: number, type: 'impression' | 'click', placement: 'feed' | 'report_detail'): Promise<unknown> {
+  return expectStatus(204, 'record ad event', call('POST', `/ads/${adId}/events`, { body: { type, placement } }))
+}
+
+interface ApiAd {
+  id: number
+  title: string
+  status: string
+}
+
+/** Publishes an ad for the user's (Premium) business, with an image from the E2E bucket. */
+export function createAd(token: string, title: string, radiusKm = 10): Promise<ApiAd> {
+  return expectStatus(
+    201,
+    'create ad',
+    call<ApiAd>('POST', '/businesses/me/ads', {
+      token,
+      body: { title, body: 'Promo E2E para vecinos.', imageUrl: E2E_IMAGE_URL, radiusKm },
+    }),
+  )
+}
+
+/** Accepts location sharing and stores a location, as the consent modal would. */
+export async function shareLocation(token: string, location: { lat: number; lng: number }): Promise<void> {
+  await expectStatus(200, 'location consent', call('PUT', '/notification-preferences/location-consent', { token, body: { status: 'accepted' } }))
+  await expectStatus(
+    200,
+    'location',
+    call('PUT', '/notification-preferences/location', { token, body: { latitude: location.lat, longitude: location.lng } }),
+  )
+}
+
+export function getAdStats(token: string, adId: number): Promise<{ impressions: number; clicks: number }> {
+  return expectStatus(200, 'ad stats', call('GET', `/businesses/me/ads/${adId}/stats`, { token }))
 }

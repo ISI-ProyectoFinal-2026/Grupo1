@@ -59,6 +59,7 @@ model User {
   chatsAsUserA  Chat[]          @relation("ChatUserA")
   chatsAsUserB  Chat[]          @relation("ChatUserB")
   reportFlags   ReportFlag[]
+  adFlags       AdFlag[]
   business      Business?
   businessEvents BusinessEvent[]
 
@@ -342,12 +343,46 @@ enum BusinessCategory {
   @@map("business_category")
 }
 
+// Un único plan pago (ADR-0024)
 enum BusinessPlan {
   FREE
-  PRO
   PREMIUM
 
   @@map("business_plan")
+}
+
+enum SubscriptionPeriod {
+  MONTHLY
+  ANNUAL
+
+  @@map("subscription_period")
+}
+
+enum SubscriptionStatus {
+  APPROVED
+  REJECTED
+
+  @@map("subscription_status")
+}
+
+// Compras del plan Premium; `provider` = "fake" mientras no haya pasarela real.
+// Período null en las rechazadas.
+model Subscription {
+  id          Int                @id @default(autoincrement())
+  businessId  Int                @map("business_id")
+  period      SubscriptionPeriod
+  amountUsd   Decimal            @map("amount_usd") @db.Decimal(10, 2)
+  provider    String
+  reference   String
+  status      SubscriptionStatus
+  periodStart DateTime?          @map("period_start")
+  periodEnd   DateTime?          @map("period_end")
+  createdAt   DateTime           @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@map("subscriptions")
 }
 
 model Business {
@@ -361,14 +396,104 @@ model Business {
   // pin del mapa (#208); null en comercios previos
   latitude      Float?
   longitude     Float?
+  // perfil público (ADR-0024)
+  description   String?
+  website       String?
+  socialLinks   String[]         @default([]) @map("social_links")
   plan          BusinessPlan     @default(FREE)
   planExpiresAt DateTime?        @map("plan_expires_at")
   createdAt     DateTime         @default(now()) @map("created_at")
 
-  user   User            @relation(fields: [userId], references: [id])
-  events BusinessEvent[]
+  user          User            @relation(fields: [userId], references: [id])
+  events        BusinessEvent[]
+  subscriptions Subscription[]
+  ads           Ad[]
 
   @@map("businesses")
+}
+
+// ACTIVE/PAUSED los maneja el dueño; REMOVED = baja por moderación.
+// Con el Premium vencido un ACTIVE no se muestra, pero no cambia de estado (ADR-0024).
+enum AdStatus {
+  ACTIVE
+  PAUSED
+  REMOVED
+
+  @@map("ad_status")
+}
+
+model Ad {
+  id         Int      @id @default(autoincrement())
+  businessId Int      @map("business_id")
+  title      String
+  body       String
+  imageUrl   String   @map("image_url")
+  radiusKm   Int      @map("radius_km")
+  status     AdStatus @default(ACTIVE)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  events   AdEvent[]
+  flags    AdFlag[]
+
+  @@index([businessId, status])
+  @@map("ads")
+}
+
+// removed = el moderador dio de baja el anuncio; dismissed = denuncia desestimada
+enum AdFlagStatus {
+  pending
+  removed
+  dismissed
+
+  @@map("ad_flag_status")
+}
+
+// Denuncia de un usuario sobre un anuncio (moderación posterior, ADR-0024)
+model AdFlag {
+  id        Int          @id @default(autoincrement())
+  adId      Int          @map("ad_id")
+  userId    Int          @map("user_id")
+  reason    String
+  status    AdFlagStatus @default(pending)
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  ad   Ad   @relation(fields: [adId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([adId, userId])
+  @@index([status])
+  @@map("ad_flags")
+}
+
+enum AdEventType {
+  impression
+  click
+
+  @@map("ad_event_type")
+}
+
+// ubicaciones de la plataforma con banner
+enum AdPlacement {
+  feed
+  report_detail
+
+  @@map("ad_placement")
+}
+
+// Métricas de campaña. Sin usuario ni coordenadas: el comercio solo ve totales (ADR-0024)
+model AdEvent {
+  id        Int         @id @default(autoincrement())
+  adId      Int         @map("ad_id")
+  type      AdEventType
+  placement AdPlacement
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  ad Ad @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@index([adId, createdAt])
+  @@map("ad_events")
 }
 
 enum BusinessEventType {

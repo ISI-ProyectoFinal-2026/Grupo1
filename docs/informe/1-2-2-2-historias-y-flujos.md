@@ -313,7 +313,7 @@ stateDiagram-v2
   rejected --> [*]
 ```
 
-Figura 1.2.2-5. Estados de una coincidencia (`MatchStatus`). Fuente: `backend/prisma/schema.prisma:217-223`, `backend-ia/app/services/matching_service.py:142-154`, `backend/src/services/matching.service.ts:365-410`.
+Figura 1.2.2-5. Estados de una coincidencia (`MatchStatus`). Fuente: `backend/prisma/schema.prisma:218-224`, `backend-ia/app/services/matching_service.py:142-154`, `backend/src/services/matching.service.ts:365-410`.
 
 ### Reglas de negocio
 
@@ -365,11 +365,11 @@ Tabla 1.2.2-8. Historias del módulo de notificaciones. Fuente: `gh issue list` 
 
 ### Flujo punta a punta
 
-1. **Preferencias y ubicación.** Cada usuario tiene una fila opcional en `notification_preferences`; sin fila rigen los valores por defecto (`backend/prisma/schema.prisma:314`, `backend/src/services/notification-preferences.service.ts:24`, [ADR-0022](../adr/0022-preferencias-notificacion-tabla-propia.md)).
+1. **Preferencias y ubicación.** Cada usuario tiene una fila opcional en `notification_preferences`; sin fila rigen los valores por defecto (`backend/prisma/schema.prisma:315`, `backend/src/services/notification-preferences.service.ts:24`, [ADR-0022](../adr/0022-preferencias-notificacion-tabla-propia.md)).
    - La primera vez que un usuario con sesión abre la app, `LocationConsentModal` le pregunta si acepta compartir su ubicación ("Aceptar" o "Ahora no"); la respuesta queda registrada y el modal no vuelve a aparecer (`frontend/src/components/account/LocationConsentModal.tsx`).
    - Con el consentimiento aceptado, `useLocationSync` envía la ubicación del navegador una vez por carga de página y el backend guarda solo la última, con su fecha (`frontend/src/hooks/useLocationSync.ts`, `backend/src/services/notification-preferences.service.ts:102`). Si el usuario revoca el consentimiento, se borra la ubicación y se desactiva el aviso de zona (`backend/src/services/notification-preferences.service.ts:76`).
    - En `/account/notifications`, enlazada desde el menú "Más", el usuario activa o desactiva cada tipo de aviso y, para el de zona, elige radio y tipo de reporte (`frontend/src/pages/account/NotificationSettingsPage.tsx`). Los endpoints son `GET` y `PUT /api/notification-preferences`, `PUT .../location-consent` y `PUT .../location`, todos con JWT y limitados a las preferencias del propio usuario (`backend/src/routes/notification-preferences.routes.ts:7-10`).
-2. **Generación.** Toda notificación es una fila en `notifications` con un `type` de texto (`backend/prisma/schema.prisma:282`). Antes de crearla se consulta la preferencia del destinatario y, si ese tipo está desactivado, no se crea; la acción que la origina no cambia (`backend/src/services/notification-preferences.service.ts:56`). Hay cuatro orígenes:
+2. **Generación.** Toda notificación es una fila en `notifications` con un `type` de texto (`backend/prisma/schema.prisma:283`). Antes de crearla se consulta la preferencia del destinatario y, si ese tipo está desactivado, no se crea; la acción que la origina no cambia (`backend/src/services/notification-preferences.service.ts:56`). Hay cuatro orígenes:
    - `match_suggested`: el Backend IA llama a `POST /api/notifications/internal/match`, protegido con `X-Internal-Key` (`backend/src/routes/notifications.routes.ts:14`). `notifyMatch` y `createForMatch` crean una notificación por autor, apuntando al otro reporte, y no repiten una existente para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:59-139`).
    - `report_status_change`: al aplicar el veredicto de la IA ("Tu reporte fue publicado" o "Tu reporte no fue publicado") (`backend/src/services/notifications.service.ts:155-177`).
    - `message`: por cada mensaje de chat, para el receptor, con una vista previa (`backend/src/services/notifications.service.ts:196-214`).
@@ -385,7 +385,7 @@ Tabla 1.2.2-8. Historias del módulo de notificaciones. Fuente: `gh issue list` 
 | Duplicados de coincidencia | Una por usuario y reporte; si ambos reportes son del mismo usuario, una sola | `backend/src/services/notifications.service.ts:62-90` |
 | Vista previa del mensaje | Hasta 80 caracteres | `backend/src/services/notifications.service.ts:179` |
 | Propiedad | Solo el destinatario lee, marca o borra | `backend/src/services/notifications.service.ts:13-22` |
-| Valores por defecto | Todos los avisos activados, radio de 5 km y reportes perdidos y encontrados | `backend/prisma/schema.prisma:314` |
+| Valores por defecto | Todos los avisos activados, radio de 5 km y reportes perdidos y encontrados | `backend/prisma/schema.prisma:315` |
 | Radio del aviso de zona | 1, 2, 5 o 10 km | `backend/src/validators/notification-preferences.validator.ts` |
 | Aviso de zona sin consentimiento | No se puede activar (409) ni guardar la ubicación (403) | `backend/src/services/notification-preferences.service.ts:61`, `:102` |
 | Duplicados del aviso de zona | Uno por usuario y reporte, también si el reporte se vuelve a publicar | `backend/src/services/notifications.service.ts:224-263` |
@@ -632,7 +632,7 @@ Tabla 1.2.2-17. Reglas del módulo de mapa. Fuente: archivos de la columna Fuent
 |---|---|---|---|
 | [#28](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/28) | Como comercio quiero registrarme con un perfil distinto para participar como comercio | Cerrado | Parcial: perfil con nombre, CUIT, dirección, teléfono y categoría; sin logo, descripción ni rol propio |
 | [#29](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/29) | Como comercio quiero un dashboard para gestionar mi cuenta | Cerrado | Parcial: datos y estadísticas; sin suscripción ni pasarela de pago |
-| [#30](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/30) | Como comercio quiero crear publicidad segmentada por zona para llegar a usuarios cercanos | Abierto | No implementada |
+| [#30](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/30) | Como comercio quiero crear publicidad segmentada por zona para llegar a usuarios cercanos | Abierto | Implementada ([ADR-0024](../adr/0024-modelo-monetizacion.md)) |
 | [#69](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/69) | Como dueño de un comercio quiero registrar mi negocio en PATITAS para ofrecer servicios | Cerrado | Implementada (`frontend/src/pages/business/BusinessRegisterPage.tsx`) |
 | [#70](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/70) | Como dueño de un comercio quiero un panel para ver las interacciones con mi negocio | Cerrado | Implementada (`frontend/src/pages/business/BusinessDashboardPage.tsx:182`) |
 
@@ -640,30 +640,30 @@ Tabla 1.2.2-18. Historias del módulo de comercios. Fuente: `gh issue list` (com
 
 ### Flujo punta a punta
 
-1. **Registro.** En `/businesses/register`, `POST /api/businesses` (sesión, sin exigir email verificado) llega a `create` (`backend/src/services/businesses.service.ts:38-56`): nombre, CUIT, dirección, teléfono y categoría; el plan es siempre `FREE`. Inserta en `businesses`.
-2. **Directorio.** `/businesses` pide `GET /api/businesses` con la categoría opcional; `listPublic` ordena por nombre y omite `cuit` y `user_id` (`backend/src/services/businesses.service.ts:91-97`).
-3. **Perfil.** `GET /api/businesses/:id` registra un evento `VIEW` en `business_events`, salvo que lo mire el dueño (`backend/src/controllers/businesses.controller.ts:19`, `backend/src/services/businesses.service.ts:125-135`). El perfil muestra domicilio y teléfono.
-4. **Contacto.** "Contactar" llama a `POST /api/businesses/:id/contact`, que registra un evento `CONTACT` (400 si es el propio comercio) (`backend/src/services/businesses.service.ts:141-149`); la pantalla confirma y repite el teléfono (`frontend/src/pages/business/BusinessProfilePage.tsx:84`).
-5. **Panel.** `/businesses/dashboard` usa `GET` y `PUT /api/businesses/me` (el plan no se puede cambiar) y `GET /api/businesses/me/stats`, que cuenta visitas y contactos (`backend/src/services/businesses.service.ts:157-171`, `frontend/src/pages/business/BusinessDashboardPage.tsx:56`).
+1. **Registro.** En `/businesses/register`, `POST /api/businesses` (sesión, sin exigir email verificado) llega a `create` (`backend/src/services/businesses.service.ts:62-94`): nombre, CUIT, dirección, teléfono y categoría; el plan es siempre `FREE`. Inserta en `businesses`.
+2. **Directorio.** `/businesses` pide `GET /api/businesses` con la categoría opcional; `listPublic` ordena por nombre y omite `cuit` y `user_id` (`backend/src/services/businesses.service.ts:123-133`).
+3. **Perfil.** `GET /api/businesses/:id` registra un evento `VIEW` en `business_events`, salvo que lo mire el dueño (`backend/src/controllers/businesses.controller.ts:19`, `backend/src/services/businesses.service.ts:206-215`). El perfil muestra domicilio y teléfono.
+4. **Contacto.** "Contactar" llama a `POST /api/businesses/:id/contact`, que registra un evento `CONTACT` (400 si es el propio comercio) (`backend/src/services/businesses.service.ts:222-231`); la pantalla confirma y repite el teléfono (`frontend/src/pages/business/BusinessProfilePage.tsx:84`).
+5. **Panel.** `/businesses/dashboard` usa `GET` y `PUT /api/businesses/me` (el plan no se puede cambiar) y `GET /api/businesses/me/stats`, que cuenta visitas y contactos (`backend/src/services/businesses.service.ts:238-254`, `frontend/src/pages/business/BusinessDashboardPage.tsx:56`).
 
 ### Reglas de negocio
 
 | Regla | Valor | Fuente |
 |---|---|---|
 | Categorías | `VETERINARIA`, `REFUGIO`, `PET_SHOP`, `OTRO` | `backend/prisma/schema.prisma:295-302` |
-| Planes | `FREE`, `PRO`, `PREMIUM`; todo comercio nace `FREE` y no hay flujo de pago | `backend/prisma/schema.prisma:304-310`, `backend/src/services/businesses.service.ts:39-43` |
-| Cantidad | Un comercio por usuario (409) | `backend/src/services/businesses.service.ts:50` |
-| CUIT | Único (409) | `backend/src/services/businesses.service.ts:47-48` |
-| Métricas | Las visitas del dueño no cuentan | `backend/src/services/businesses.service.ts:125-129` |
+| Planes | `FREE` y `PREMIUM`; todo comercio nace `FREE` y pasa a `PREMIUM` solo con una compra aprobada (pago simulado). Un `PREMIUM` vencido cuenta como `FREE` | `backend/prisma/schema.prisma:347`, `backend/src/services/businesses.service.ts:150`, `backend/src/services/business-plan.ts:4` |
+| Cantidad | Un comercio por usuario (409) | `backend/src/services/businesses.service.ts:87` |
+| CUIT | Único (409) | `backend/src/services/businesses.service.ts:84-85` |
+| Métricas | Las visitas del dueño no cuentan | `backend/src/services/businesses.service.ts:206-210` |
 
 Tabla 1.2.2-19. Reglas del módulo de comercios. Fuente: archivos de la columna Fuente.
 
 ### Qué pasa si algo falla
 
-- Un usuario sin comercio que abre el panel recibe 404 de `GET /api/businesses/me` (`backend/src/services/businesses.service.ts:59-63`).
+- Un usuario sin comercio que abre el panel recibe 404 de `GET /api/businesses/me` (`backend/src/services/businesses.service.ts:96-102`).
 
 ### Limitaciones conocidas
 
-- No hay publicidad segmentada ([#30](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/30)), ni suscripción ni pago ([#29](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/29)).
+- La compra de Premium usa un proveedor de pago simulado: no hay pasarela real ([ADR-0024](../adr/0024-modelo-monetizacion.md)).
 - La ubicación del comercio es un texto sin validar ([#208](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/208)).
 - "Comercio" no es un rol del sistema ([#31](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/31)).

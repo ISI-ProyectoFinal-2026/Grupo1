@@ -26,6 +26,8 @@ import CloseReportButton from "@/components/reports/CloseReportButton";
 import DeleteReportButton from "@/components/reports/DeleteReportButton";
 import FlagReportForm from "@/components/reports/FlagReportForm";
 import LocationMap from "@/components/maps/LocationMap";
+import AdBanner from "@/components/ads/AdBanner";
+import NearbyBusinesses from "@/components/business/NearbyBusinesses";
 import { cn } from "@/lib/cn";
 import { DogFace } from "@/components/ui/canine";
 import { tagTone } from "@/lib/tag-tone";
@@ -346,6 +348,12 @@ export default function ReportDetailPage() {
                     No se encontraron coincidencias todavía
                   </p>
                 )}
+              </div>
+
+              {/* publicidad y comercios cerca de la ubicación del reporte (ADR-0024) */}
+              <div className="mt-6 flex flex-col gap-4">
+                <NearbyBusinesses reportId={report.id} />
+                <AdBanner placement="report_detail" reportId={report.id} />
               </div>
             </>
           )}

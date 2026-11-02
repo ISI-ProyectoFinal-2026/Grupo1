@@ -2,10 +2,32 @@ import type { GeoPoint } from './geo.types'
 
 export type BusinessCategory = 'VETERINARIA' | 'REFUGIO' | 'PET_SHOP' | 'OTRO'
 
-// El plan no se elige vía API: todo comercio nace FREE y ni el alta ni la
-// edición aceptan `plan` (#179). El cambio de plan pertenece al futuro flujo de
-// pago. PRO existe en el enum de Prisma pero queda sin uso.
-export type BusinessPlan = 'FREE' | 'PREMIUM' | 'PRO'
+// Plan vigente: el backend ya informa FREE si el Premium venció. Solo cambia
+// con una compra (POST /businesses/me/subscription), nunca al editar (ADR-0024).
+export type BusinessPlan = 'FREE' | 'PREMIUM'
+
+export type SubscriptionPeriod = 'MONTHLY' | 'ANNUAL'
+
+// precios de GET /plans
+export interface PlanOffer {
+  plan: 'PREMIUM'
+  period: SubscriptionPeriod
+  months: number
+  priceUsd: number
+}
+
+export interface Subscription {
+  id: number
+  period: SubscriptionPeriod
+  amountUsd: number
+  status: 'APPROVED' | 'REJECTED'
+  provider: string
+}
+
+export interface SubscribeResult {
+  business: Business
+  subscription: Subscription
+}
 
 export interface Business {
   id: number
@@ -18,6 +40,10 @@ export interface Business {
   // pin del mapa (#208); null en comercios previos
   latitude: number | null
   longitude: number | null
+  // perfil público (ADR-0024)
+  description: string | null
+  website: string | null
+  socialLinks: string[]
   plan: BusinessPlan
   planExpiresAt: string | null
   createdAt: string
@@ -35,6 +61,9 @@ export interface PublicBusiness {
   // pin del mapa (#233); null en comercios previos
   latitude: number | null
   longitude: number | null
+  description: string | null
+  website: string | null
+  socialLinks: string[]
   plan: BusinessPlan
   createdAt: string
 }
@@ -49,7 +78,11 @@ export interface CreateBusinessInput {
   location: GeoPoint
 }
 
-export type UpdateBusinessInput = Partial<CreateBusinessInput>
+export type UpdateBusinessInput = Partial<CreateBusinessInput> & {
+  description?: string | null
+  website?: string | null
+  socialLinks?: string[]
+}
 
 export interface BusinessStats {
   views: number

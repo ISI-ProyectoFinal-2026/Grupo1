@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { listMapReports } from "@/services/geo.service";
@@ -17,6 +17,10 @@ import FilterBar from "@/components/reports/FilterBar";
 import ReportCard from "@/components/reports/ReportCard";
 import ReportCardSkeleton from "@/components/reports/ReportCardSkeleton";
 import MapView from "@/components/reports/MapView";
+import AdBanner from "@/components/ads/AdBanner";
+
+// el banner va después de esta cantidad de tarjetas (o al final si hay menos)
+const AD_SLOT_INDEX = 3;
 
 // espera tras el ultimo movimiento del mapa antes de pedir el area visible
 const MAP_DEBOUNCE_MS = 300;
@@ -177,15 +181,18 @@ export default function FeedPage() {
             </p>
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {sortedReports.map((report, index) => (
-                <li
-                  key={report.id}
-                  className="animate-rise"
-                  // stagger corto y con tope: la lista nunca tarda en estar completa
-                  style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
-                >
-                  <ReportCard report={report} />
-                </li>
+                <Fragment key={report.id}>
+                  {index === AD_SLOT_INDEX && <AdBanner placement="feed" asListItem />}
+                  <li
+                    className="animate-rise"
+                    // stagger corto y con tope: la lista nunca tarda en estar completa
+                    style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+                  >
+                    <ReportCard report={report} />
+                  </li>
+                </Fragment>
               ))}
+              {sortedReports.length <= AD_SLOT_INDEX && <AdBanner placement="feed" asListItem />}
             </ul>
           </>
         )}

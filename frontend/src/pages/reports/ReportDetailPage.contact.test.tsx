@@ -13,6 +13,14 @@ import type { ChatDTO } from '@/types/chat.types'
 vi.mock('@/services/reports.service')
 vi.mock('@/services/chats.service')
 
+// publicidad (#30): sin anuncios ni comercios cercanos salvo que el test los pida
+vi.mock('@/services/ads.service', () => ({
+  getAdFor: vi.fn().mockResolvedValue(null),
+  getNearbyBusinesses: vi.fn().mockResolvedValue([]),
+  recordAdEvent: vi.fn().mockResolvedValue(undefined),
+  flagAd: vi.fn().mockResolvedValue(undefined),
+}))
+
 const REPORT_ID = 5
 const AUTHOR_ID = 20
 const VIEWER_ID = 10
