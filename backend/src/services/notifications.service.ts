@@ -140,7 +140,10 @@ export async function notifyMatch(data: NotifyMatchInput): Promise<Notification[
 
 export type ModerationVerdict = "published" | "rejected";
 
-const STATUS_CHANGE_TEXTS: Record<ModerationVerdict, { title: string; message: (reportTitle: string) => string }> = {
+// hidden_by_flag: un moderador aceptó una denuncia (#223)
+export type StatusChange = ModerationVerdict | "hidden_by_flag";
+
+const STATUS_CHANGE_TEXTS: Record<StatusChange, { title: string; message: (reportTitle: string) => string }> = {
   published: {
     title: "Tu reporte fue publicado",
     message: (reportTitle) => `"${reportTitle}" ya es visible para la comunidad.`,
@@ -150,11 +153,16 @@ const STATUS_CHANGE_TEXTS: Record<ModerationVerdict, { title: string; message: (
     message: (reportTitle) =>
       `"${reportTitle}" no pasó la moderación de contenido y no es visible para la comunidad.`,
   },
+  hidden_by_flag: {
+    title: "Tu reporte fue ocultado",
+    message: (reportTitle) =>
+      `"${reportTitle}" fue denunciado, la moderación aceptó la denuncia y ya no es visible para la comunidad.`,
+  },
 };
 
 export async function createForStatusChange(
   reportId: number,
-  status: ModerationVerdict
+  status: StatusChange
 ): Promise<Notification | null> {
   const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true, title: true } });
   if (!report) {

@@ -56,6 +56,7 @@ describe("report-flags routes", () => {
       const id = createdFlagIds.pop()!;
       await prisma.reportFlag.deleteMany({ where: { id } });
     }
+    await prisma.notification.deleteMany({ where: { reportId } });
     await prisma.report.update({ where: { id: reportId }, data: { status: "published" } });
   });
 
@@ -168,7 +169,8 @@ describe("report-flags routes", () => {
       createdFlagIds.push(created.body.id);
 
       await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`);
+        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
+        .send({ action: "accept" });
 
       const res = await request(app)
         .get("/api/report-flags?status=reviewed").set("Authorization", `Bearer ${moderatorToken}`);
@@ -196,14 +198,43 @@ describe("report-flags routes", () => {
       expect(res.status).toBe(403);
     });
 
-    test("un moderador resuelve el flag: queda reviewed y el reporte queda rejected", async () => {
+    test("responde 400 sin una acción válida", async () => {
+      const created = await request(app)
+        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
+        .send({ reason: "Publicación falsa" });
+      createdFlagIds.push(created.body.id);
+
+      for (const body of [{}, { action: "hide" }]) {
+        const res = await request(app)
+          .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
+          .send(body);
+        expect(res.status).toBe(400);
+      }
+    });
+
+    test("un moderador descarta el flag: queda dismissed y el reporte sigue publicado", async () => {
+      const created = await request(app)
+        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
+        .send({ reason: "Publicación falsa" });
+      createdFlagIds.push(created.body.id);
+
+      const res = await request(app)
+        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
+        .send({ action: "dismiss" });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ status: "dismissed", report: { id: reportId, status: "published" } });
+    });
+
+    test("un moderador acepta el flag: queda reviewed y el reporte queda rejected", async () => {
       const created = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
         .send({ userId: reporterId, reason: "Publicación falsa" });
       createdFlagIds.push(created.body.id);
 
       const res = await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`);
+        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
+        .send({ action: "accept" });
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe("reviewed");
@@ -219,16 +250,19 @@ describe("report-flags routes", () => {
       createdFlagIds.push(created.body.id);
 
       await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`);
+        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
+        .send({ action: "accept" });
       const res = await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`);
+        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
+        .send({ action: "accept" });
 
       expect(res.status).toBe(409);
     });
 
     test("responde 404 si el flag no existe", async () => {
       const res = await request(app)
-        .patch("/api/report-flags/999999999").set("Authorization", `Bearer ${moderatorToken}`);
+        .patch("/api/report-flags/999999999").set("Authorization", `Bearer ${moderatorToken}`)
+        .send({ action: "accept" });
       expect(res.status).toBe(404);
     });
   });

@@ -52,7 +52,7 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-522.
 | `auth_token_type` | `email_verification`, `password_reset`, `two_factor_login`, `two_factor_reset`, `two_factor_reset_cancel` |
 | `report_type` | `lost`, `found` |
 | `report_status` | `pending`, `published`, `rejected`, `resolved` |
-| `report_flag_status` | `pending`, `reviewed` |
+| `report_flag_status` | `pending`, `reviewed`, `dismissed` |
 | `match_status` | `pending`, `confirmed`, `rejected` |
 | `business_category` | `VETERINARIA`, `REFUGIO`, `PET_SHOP`, `OTRO` |
 | `business_plan` | `FREE`, `PREMIUM` |
@@ -98,5 +98,6 @@ El servicio de IA mapea con SQLAlchemy dos tablas del esquema ([`backend-ia/app/
 | `20261101020000_add_ads` | Tabla `ads` y la enumeración `ad_status` |
 | `20261101030000_add_ad_events` | Tabla `ad_events` y sus enumeraciones |
 | `20261101040000_add_ad_flags` | Tabla `ad_flags` y la enumeración `ad_flag_status` |
+| `20261102000000_report_flag_dismissed` | Valor `dismissed` en `report_flag_status` |
 
 Fuente: `backend/prisma/migrations/*/migration.sql`.

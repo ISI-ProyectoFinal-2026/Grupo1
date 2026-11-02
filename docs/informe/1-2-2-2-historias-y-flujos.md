@@ -531,53 +531,59 @@ Tabla 1.2.2-13. Reglas del módulo de flyers. Fuente: archivos de la columna Fue
 
 | Issue | Historia | Estado del issue | Estado en el código |
 |---|---|---|---|
-| [#20](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/20) | Como usuario quiero reportar una publicación inapropiada o falsa para que sea revisada | Cerrado | Implementada (`backend/src/services/report-flags.service.ts:16`) |
+| [#20](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/20) | Como usuario quiero reportar una publicación inapropiada o falsa para que sea revisada | Cerrado | Implementada (`backend/src/services/report-flags.service.ts:21`) |
 | [#38](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/38) | Como sistema quiero suspender usuarios con publicaciones inapropiadas para proteger la comunidad | Abierto | No implementada |
-| [#183](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/183) | Como moderador quiero listar y accionar las publicaciones denunciadas para ocultar contenido inapropiado | Cerrado | Implementada (`backend/src/services/report-flags.service.ts:52`, `:67`) |
+| [#183](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/183) | Como moderador quiero listar y accionar las publicaciones denunciadas para ocultar contenido inapropiado | Cerrado | Implementada (`backend/src/services/report-flags.service.ts:57`, `:67`) |
 | [#186](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/186) | Como moderador quiero una pantalla para ver y accionar las publicaciones denunciadas | Cerrado | Implementada (`frontend/src/pages/moderation/ModerationPage.tsx`) |
 | [#218](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/218) | Ocultamiento automático de reportes por acumulación de denuncias | Abierto | No implementada |
-| [#223](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/223) | Moderación manual: descartar una denuncia sin ocultar el reporte | Abierto | No implementada |
+| [#223](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/223) | Moderación manual: descartar una denuncia sin ocultar el reporte | Abierto | Implementada (`backend/src/services/report-flags.service.ts:67`, `frontend/src/components/moderation/ReportFlagList.tsx`) |
 
 Tabla 1.2.2-14. Historias del módulo de moderación comunitaria. Fuente: `gh issue list` (comando al inicio de la sección).
 
 ### Flujo punta a punta
 
-1. **Denuncia.** Un usuario con sesión que no es el autor de un reporte `published` completa el motivo (`frontend/src/pages/reports/ReportDetailPage.tsx:120`, `:341`). `POST /api/reports/:id/flags` llega a `create` (`backend/src/services/report-flags.service.ts:16-45`): solo reportes `published` (404 en otro caso), no el propio (403), una vez por usuario y reporte (409). Inserta en `report_flags` con estado `pending`.
-2. **Cola.** El moderador abre `/moderation` y la pantalla pide `GET /api/report-flags?status=pending` (`frontend/src/hooks/useReportFlagsQuery.ts:9`), que devuelve las denuncias con el título y el estado del reporte (`backend/src/services/report-flags.service.ts:52-59`).
-3. **Resolución.** `PATCH /api/report-flags/:id` llega a `resolve` (`backend/src/services/report-flags.service.ts:67-87`): en una transacción, la denuncia pasa a `reviewed` y el reporte a `rejected`. Una segunda resolución responde 409.
-4. **Resultado.** El reporte sale del feed y su detalle responde 404 a todos menos al autor (`backend/src/services/reports.service.ts:112-120`).
+1. **Denuncia.** Un usuario con sesión que no es el autor de un reporte `published` completa el motivo (`frontend/src/pages/reports/ReportDetailPage.tsx:120`, `:341`). `POST /api/reports/:id/flags` llega a `create` (`backend/src/services/report-flags.service.ts:21-50`): solo reportes `published` (404 en otro caso), no el propio (403), una vez por usuario y reporte (409). Inserta en `report_flags` con estado `pending`.
+2. **Cola.** El moderador abre `/moderation` y la pantalla pide `GET /api/report-flags?status=pending` (`frontend/src/hooks/useReportFlagsQuery.ts:9`), que devuelve las denuncias con el título y el estado del reporte (`backend/src/services/report-flags.service.ts:57-63`).
+3. **Resolución.** El moderador elige "Ocultar reporte" o "Descartar" (`frontend/src/components/moderation/ReportFlagList.tsx`). `PATCH /api/report-flags/:id` con `{ action: "accept" | "dismiss" }` llega a `resolve` (`backend/src/services/report-flags.service.ts:67-105`):
+   - `accept`: en una transacción, la denuncia y las demás denuncias pendientes del mismo reporte pasan a `reviewed`, y el reporte a `rejected`. Después se avisa al autor con una notificación `report_status_change` ("Tu reporte fue ocultado"), si no la desactivó en sus preferencias (`backend/src/services/notifications.service.ts:156-160`).
+   - `dismiss`: solo esa denuncia pasa a `dismissed`; el reporte sigue publicado y las demás denuncias siguen pendientes.
+
+   Una segunda resolución de la misma denuncia responde 409.
+4. **Resultado.** Si se aceptó, el reporte sale del feed y su detalle responde 404 a todos menos al autor (`backend/src/services/reports.service.ts:112-120`).
 
 ```mermaid
 stateDiagram-v2
   [*] --> pending : un usuario denuncia un reporte publicado
-  pending --> reviewed : un moderador la resuelve y el reporte pasa a rejected
+  pending --> reviewed : un moderador la acepta (o acepta otra del mismo reporte) y el reporte pasa a rejected
+  pending --> dismissed : un moderador la descarta y el reporte sigue publicado
   reviewed --> [*]
+  dismissed --> [*]
 ```
 
-Figura 1.2.2-7. Estados de una denuncia (`ReportFlagStatus`). Fuente: `backend/prisma/schema.prisma:178-183`, `backend/src/services/report-flags.service.ts:16-87`.
+Figura 1.2.2-7. Estados de una denuncia (`ReportFlagStatus`). Fuente: `backend/prisma/schema.prisma:180-186`, `backend/src/services/report-flags.service.ts:21-105`.
 
 ### Reglas de negocio
 
 | Regla | Valor | Fuente |
 |---|---|---|
-| Quién denuncia | Usuario con sesión, no autor; no exige email verificado | `backend/src/routes/reports.routes.ts:45`, `backend/src/services/report-flags.service.ts:21-26` |
+| Quién denuncia | Usuario con sesión, no autor; no exige email verificado | `backend/src/routes/reports.routes.ts:45`, `backend/src/services/report-flags.service.ts:26-31` |
 | Motivo | Texto de al menos 1 carácter | `backend/src/validators/report-flags.validator.ts:5` |
-| Unicidad | Una denuncia por usuario y reporte | `backend/src/services/report-flags.service.ts:37-38` |
+| Unicidad | Una denuncia por usuario y reporte | `backend/src/services/report-flags.service.ts:42-43` |
 | Quién resuelve | `moderador` o `admin` | `backend/src/routes/report-flags.routes.ts:10-11` |
-| Efecto | Denuncia `reviewed` y reporte `rejected`, siempre | `backend/src/services/report-flags.service.ts:68-84` |
+| Acciones | `accept` oculta el reporte, cierra sus demás denuncias pendientes y avisa al autor; `dismiss` cierra solo esa denuncia | `backend/src/validators/report-flags.validator.ts:17-19`, `backend/src/services/report-flags.service.ts:68-101` |
 
 Tabla 1.2.2-15. Reglas del módulo de moderación comunitaria. Fuente: archivos de la columna Fuente.
 
 ### Qué pasa si algo falla
 
-- Dos moderadores que resuelven la misma denuncia: gana el primero y el segundo recibe 409 (`backend/src/services/report-flags.service.ts:69-80`).
+- Dos moderadores que resuelven la misma denuncia: gana el primero y el segundo recibe 409 (`backend/src/services/report-flags.service.ts:71-82`).
+- Si falla la notificación al autor, la denuncia queda resuelta igual y el error se registra en el log (`backend/src/services/report-flags.service.ts:97-102`).
 - Un usuario sin rol que llama a la API recibe 403; la interfaz no le muestra la pantalla (`frontend/src/router.tsx:63-66`).
 
 ### Limitaciones conocidas
 
-- No se puede descartar una denuncia sin ocultar el reporte, y el autor no recibe aviso ([#223](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/223)).
 - No hay ocultamiento automático por acumulación ni restauración ([#218](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/218)), ni suspensión de cuentas ([#38](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/38)).
-- Al resolver una denuncia, las demás denuncias pendientes del mismo reporte siguen en la cola (`backend/src/services/report-flags.service.ts:69-72`).
+- Un reporte oculto por una denuncia no se puede restaurar desde el panel; la restauración se alinea con [#218](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/218).
 
 ## 1.2.2.2.8 Módulo de Mapa y geolocalización
 

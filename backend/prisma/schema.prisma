@@ -179,7 +179,8 @@ model Report {
 
 enum ReportFlagStatus {
   pending
-  reviewed
+  reviewed // aceptada: el reporte se oculta
+  dismissed // descartada: el reporte sigue publicado
 
   @@map("report_flag_status")
 }

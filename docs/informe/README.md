@@ -119,7 +119,7 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 1.2.2-12 | Tabla | Historias del módulo de flyers | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | `gh issue list --label "type: story"` |
 | Tabla 1.2.2-13 | Tabla | Reglas del módulo de flyers | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | código citado en la tabla |
 | Tabla 1.2.2-14 | Tabla | Historias del módulo de moderación comunitaria | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | `gh issue list --label "type: story"` |
-| Figura 1.2.2-7 | Figura | Estados de una denuncia (`ReportFlagStatus`) | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | `backend/prisma/schema.prisma:178-183` |
+| Figura 1.2.2-7 | Figura | Estados de una denuncia (`ReportFlagStatus`) | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | `backend/prisma/schema.prisma:180-186` |
 | Tabla 1.2.2-15 | Tabla | Reglas del módulo de moderación comunitaria | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | código citado en la tabla |
 | Tabla 1.2.2-16 | Tabla | Historias del módulo de mapa | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | `gh issue list --label "type: story"` |
 | Tabla 1.2.2-17 | Tabla | Reglas del módulo de mapa | 1.2.2.2 ([`1-2-2-2-historias-y-flujos.md`](1-2-2-2-historias-y-flujos.md)) | código citado en la tabla |
