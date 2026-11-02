@@ -10,15 +10,11 @@ function ModerationPage() {
   const flagsQuery = useReportFlagsQuery()
   const resolveFlag = useResolveReportFlagMutation()
 
-  // El estado de la mutacion alcanza como feedback: no hace falta duplicarlo en
-  // estado local, y al disparar la siguiente resolucion se limpia solo.
-  const resolvingId = resolveFlag.isPending ? (resolveFlag.variables ?? null) : null
-
   return (
     <div className='mx-auto max-w-3xl px-4 py-5 sm:px-6 lg:py-8'>
       <h1 className='font-display text-display-lg'>Panel de moderación</h1>
       <p className='mt-2 max-w-prose text-ink-muted'>
-        Publicaciones denunciadas pendientes de revisión. Resolver una denuncia oculta el reporte.
+        Publicaciones denunciadas pendientes de revisión. Aceptar una denuncia oculta el reporte; descartarla lo deja publicado.
       </p>
 
       <div className='mt-6' aria-live='polite'>
@@ -45,14 +41,16 @@ function ModerationPage() {
             {resolveFlag.isSuccess && (
               <p className='mb-3 flex items-center gap-2 font-bold text-success-ink'>
                 <CheckIcon className='h-5 w-5' />
-                Reporte ocultado y denuncia resuelta
+                {resolveFlag.data.status === 'reviewed'
+                  ? 'Reporte ocultado y denuncia aceptada'
+                  : 'Denuncia descartada, el reporte sigue publicado'}
               </p>
             )}
 
             <ReportFlagList
               flags={flagsQuery.data}
-              onResolve={(id) => resolveFlag.mutate(id)}
-              resolvingId={resolvingId}
+              onResolve={(id, action) => resolveFlag.mutate({ id, action })}
+              isResolving={resolveFlag.isPending}
             />
           </>
         )}

@@ -1,5 +1,10 @@
 import { api } from './api'
-import type { CreatedReportFlagDTO, ReportFlagDTO, ReportFlagStatus } from '@/types/moderation.types'
+import type {
+  CreatedReportFlagDTO,
+  ReportFlagDTO,
+  ReportFlagStatus,
+  ResolveReportFlagAction,
+} from '@/types/moderation.types'
 
 // Cola de moderacion. Ambos endpoints exigen rol moderador/admin: sin el, el
 // backend responde 403.
@@ -10,10 +15,9 @@ export async function listReportFlags(status?: ReportFlagStatus): Promise<Report
   return data
 }
 
-// PATCH sin cuerpo: el backend marca el flag como reviewed y deja el reporte
-// denunciado en rejected (oculto) en una sola transaccion.
-export async function resolveReportFlag(id: number): Promise<ReportFlagDTO> {
-  const { data } = await api.patch<ReportFlagDTO>(`/report-flags/${id}`)
+// accept oculta el reporte y cierra sus demas denuncias; dismiss lo deja publicado
+export async function resolveReportFlag(id: number, action: ResolveReportFlagAction): Promise<ReportFlagDTO> {
+  const { data } = await api.patch<ReportFlagDTO>(`/report-flags/${id}`, { action })
   return data
 }
 

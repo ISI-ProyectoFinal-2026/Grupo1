@@ -21,7 +21,7 @@ function flag(overrides: Partial<ReportFlagDTO> = {}): ReportFlagDTO {
 function renderList(props: Partial<React.ComponentProps<typeof ReportFlagList>> = {}) {
   return render(
     <MemoryRouter>
-      <ReportFlagList flags={[flag()]} onResolve={vi.fn()} resolvingId={null} {...props} />
+      <ReportFlagList flags={[flag()]} onResolve={vi.fn()} isResolving={false} {...props} />
     </MemoryRouter>
   )
 }
@@ -50,28 +50,35 @@ describe('ReportFlagList', () => {
     )
   })
 
-  it('avisa con el id del flag cuando se resuelve', async () => {
+  it.each([
+    ['Ocultar reporte', 'accept'],
+    ['Descartar', 'dismiss'],
+  ] as const)('"%s" avisa con el id del flag y la accion %s', async (boton, accion) => {
     const user = userEvent.setup()
     const onResolve = vi.fn()
     renderList({ flags: [flag({ id: 42 })], onResolve })
 
-    await user.click(screen.getByRole('button', { name: 'Resolver y ocultar' }))
+    await user.click(screen.getByRole('button', { name: boton }))
 
-    expect(onResolve).toHaveBeenCalledWith(42)
+    expect(onResolve).toHaveBeenCalledWith(42, accion)
   })
 
-  it('deshabilita solo el flag que se esta resolviendo', () => {
-    renderList({ flags: [flag({ id: 1 }), flag({ id: 2, reportId: 20 })], resolvingId: 1 })
+  // aceptar cierra las demas denuncias del reporte: se bloquean todas mientras tanto
+  it('deshabilita todas las acciones mientras se resuelve una denuncia', () => {
+    renderList({ flags: [flag({ id: 1 }), flag({ id: 2, reportId: 20 })], isResolving: true })
 
-    const botones = screen.getAllByRole('button', { name: 'Resolver y ocultar' })
-    expect(botones[0]).toBeDisabled()
-    expect(botones[1]).toBeEnabled()
+    for (const boton of screen.getAllByRole('button')) {
+      expect(boton).toBeDisabled()
+    }
   })
 
-  it('no ofrece resolver un flag ya revisado', () => {
-    renderList({ flags: [flag({ status: 'reviewed' })] })
+  it.each([
+    ['reviewed', 'Aceptada'],
+    ['dismissed', 'Descartada'],
+  ] as const)('no ofrece acciones sobre un flag %s', (status, etiqueta) => {
+    renderList({ flags: [flag({ status })] })
 
-    expect(screen.queryByRole('button', { name: 'Resolver y ocultar' })).not.toBeInTheDocument()
-    expect(screen.getByText('Revisado')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByText(etiqueta)).toBeInTheDocument()
   })
 })

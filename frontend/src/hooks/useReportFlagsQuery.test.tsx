@@ -53,10 +53,10 @@ describe('useResolveReportFlagMutation', () => {
     const invalidate = vi.spyOn(client, 'invalidateQueries')
 
     const { result } = renderHook(() => useResolveReportFlagMutation(), { wrapper: Wrapper })
-    result.current.mutate(42)
+    result.current.mutate({ id: 42, action: 'dismiss' })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(moderationService.resolveReportFlag).toHaveBeenCalledWith(42)
+    expect(moderationService.resolveReportFlag).toHaveBeenCalledWith(42, 'dismiss')
     expect(invalidate).toHaveBeenCalledWith({ queryKey: reportFlagsQueryKey })
   })
 })

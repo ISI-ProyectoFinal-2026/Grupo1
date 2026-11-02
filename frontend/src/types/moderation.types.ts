@@ -1,7 +1,10 @@
 import type { ReportStatus } from '@/types/report.types'
 
 // valores segun el enum ReportFlagStatus de Prisma
-export type ReportFlagStatus = 'pending' | 'reviewed'
+export type ReportFlagStatus = 'pending' | 'reviewed' | 'dismissed'
+
+// accept = ocultar el reporte; dismiss = descartar la denuncia (#223)
+export type ResolveReportFlagAction = 'accept' | 'dismiss'
 
 // contexto del reporte denunciado que GET /api/report-flags incluye
 export interface ReportFlagReport {

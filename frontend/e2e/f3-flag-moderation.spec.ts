@@ -2,7 +2,7 @@ import { dismissLocationConsent, expect, loginAs, stubExternalServices, test } f
 import * as api from './support/api.ts'
 import { setRole } from './support/db.ts'
 
-test('F3: a user flags a report and a moderator resolves it, hiding the report', async ({ page, browser, users }) => {
+test('F3: a user flags a report and a moderator accepts it, hiding the report and notifying the owner', async ({ page, browser, users }) => {
   const owner = await users.create('f3-owner')
   const reporter = await users.create('f3-reporter')
   const moderator = await users.create('f3-mod')
@@ -35,9 +35,9 @@ test('F3: a user flags a report and a moderator resolves it, hiding the report',
     // The queue is shared with any other pending flag in the DB: scope to ours.
     const flagItem = moderatorPage.getByRole('listitem').filter({ hasText: reason })
     await expect(flagItem.getByRole('link', { name: report.title })).toBeVisible()
-    await flagItem.getByRole('button', { name: 'Resolver y ocultar' }).click()
+    await flagItem.getByRole('button', { name: 'Ocultar reporte' }).click()
 
-    await expect(moderatorPage.getByText('Reporte ocultado y denuncia resuelta')).toBeVisible()
+    await expect(moderatorPage.getByText('Reporte ocultado y denuncia aceptada')).toBeVisible()
     await expect(moderatorPage.getByRole('listitem').filter({ hasText: reason })).toHaveCount(0)
   } finally {
     await moderatorContext.close()
@@ -48,6 +48,36 @@ test('F3: a user flags a report and a moderator resolves it, hiding the report',
   expect(asOwner.body.status).toBe('rejected')
   const asReporter = await api.getReport(reporter.token, report.id)
   expect(asReporter.status).toBe(404)
+
+  // The owner is told why the report disappeared (#223).
+  const notifications = await api.listNotifications(owner.token)
+  expect(notifications.body).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ type: 'report_status_change', title: 'Tu reporte fue ocultado', reportId: report.id }),
+    ])
+  )
+})
+
+test('F3: a moderator dismisses an unfounded flag and the report stays published', async ({ page, users }) => {
+  const owner = await users.create('f3d-owner')
+  const reporter = await users.create('f3d-reporter')
+  const moderator = await users.create('f3d-mod')
+  const report = await api.createPublishedReport(owner.token, { reportType: 'lost', title: `Perro perdido F3 ${Date.now()}` })
+  const reason = `Denuncia infundada ${Date.now()}`
+  expect((await api.flagReport(reporter.token, report.id, reason)).status).toBe(201)
+
+  await setRole(moderator.user.id, 'moderador')
+  await loginAs(page, await users.relogin(moderator.email))
+  await page.goto('/moderation')
+  const flagItem = page.getByRole('listitem').filter({ hasText: reason })
+  await flagItem.getByRole('button', { name: 'Descartar' }).click()
+
+  await expect(page.getByText('Denuncia descartada, el reporte sigue publicado')).toBeVisible()
+  await expect(page.getByRole('listitem').filter({ hasText: reason })).toHaveCount(0)
+
+  // Still visible to the community.
+  const asReporter = await api.getReport(reporter.token, report.id)
+  expect(asReporter.body.status).toBe('published')
 })
 
 test('F3: a regular user cannot open the moderation panel', async ({ page, users }) => {
