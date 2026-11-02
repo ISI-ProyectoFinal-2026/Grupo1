@@ -50,6 +50,8 @@ function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusines
     address: 'Av. Siempre Viva 123',
     phone: '1122334455',
     category: 'VETERINARIA',
+    latitude: -34.6251,
+    longitude: -68.3221,
     plan: 'FREE',
     description: null,
     website: null,

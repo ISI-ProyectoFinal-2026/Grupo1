@@ -18,6 +18,8 @@ const publicBusinessSelect = {
   address: true,
   phone: true,
   category: true,
+  latitude: true,
+  longitude: true,
   description: true,
   website: true,
   socialLinks: true,

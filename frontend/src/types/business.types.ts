@@ -58,6 +58,9 @@ export interface PublicBusiness {
   address: string
   phone: string
   category: BusinessCategory
+  // pin del mapa (#233); null en comercios previos
+  latitude: number | null
+  longitude: number | null
   description: string | null
   website: string | null
   socialLinks: string[]

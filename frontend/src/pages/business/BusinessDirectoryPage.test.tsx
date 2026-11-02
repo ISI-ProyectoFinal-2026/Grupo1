@@ -8,6 +8,7 @@ import BusinessDirectoryPage from '@/pages/business/BusinessDirectoryPage'
 import type { PublicBusiness } from '@/types/business.types'
 
 vi.mock('@/services/business.service')
+vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
 
 function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusiness {
   return {
@@ -16,6 +17,8 @@ function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusines
     address: 'Av. Siempre Viva 123',
     phone: '1122334455',
     category: 'VETERINARIA',
+    latitude: -34.6251,
+    longitude: -68.3221,
     plan: 'FREE',
     description: null,
     website: null,
@@ -51,8 +54,32 @@ describe('BusinessDirectoryPage', () => {
     ])
     renderPage()
 
-    expect(await screen.findByText('Veterinaria San Roque')).toBeInTheDocument()
-    expect(screen.getByText('Refugio Esperanza')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Veterinaria San Roque' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Refugio Esperanza' })).toBeInTheDocument()
+  })
+
+  it('dibuja en el mapa solo los comercios con ubicacion', async () => {
+    vi.mocked(businessService.listBusinesses).mockResolvedValue([
+      comercioPublico({ id: 1, name: 'Veterinaria San Roque' }),
+      comercioPublico({ id: 2, name: 'Refugio Esperanza', latitude: null, longitude: null }),
+    ])
+    renderPage()
+
+    await screen.findByRole('heading', { level: 2, name: 'Refugio Esperanza' })
+
+    expect(screen.getAllByTestId('marker')).toHaveLength(1)
+    expect(screen.getByTestId('marker')).toHaveAttribute('data-position', '-34.6251,-68.3221')
+  })
+
+  it('no muestra el mapa si ningun comercio tiene ubicacion', async () => {
+    vi.mocked(businessService.listBusinesses).mockResolvedValue([
+      comercioPublico({ latitude: null, longitude: null }),
+    ])
+    renderPage()
+
+    await screen.findByRole('heading', { level: 2, name: 'Veterinaria San Roque' })
+
+    expect(screen.queryByTestId('map')).not.toBeInTheDocument()
   })
 
   it('marca como destacados a los comercios Premium', async () => {
@@ -79,7 +106,7 @@ describe('BusinessDirectoryPage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await screen.findByText('Veterinaria San Roque')
+    await screen.findByRole('heading', { level: 2, name: 'Veterinaria San Roque' })
     await user.selectOptions(screen.getByLabelText('Rubro'), 'REFUGIO')
 
     await waitFor(() =>
