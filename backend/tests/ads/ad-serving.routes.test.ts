@@ -3,6 +3,8 @@ import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 import { addMonths } from "../../src/services/business-plan";
 import { createTestUser } from "../helpers/users";
+import { isPremiumActive } from "../../src/services/ad-serving.service";
+import { signAccessToken } from "../../src/utils/jwt";
 
 // Ushuaia: lejos de los datos de las demás suites
 const ORIGIN = { lat: -54.8019, lng: -68.303 };
@@ -186,6 +188,41 @@ describe("selección de anuncios y comercios cercanos", () => {
       const res = await getAd({ placement: "feed" }, viewerToken);
 
       expect(res.body).toMatchObject({ segmented: false });
+    });
+
+    test("indica si el anuncio es del propio usuario (para no ofrecerle denunciarlo)", async () => {
+      const business = await createBusiness("feed-own", NEAR);
+      const ad = await createAd(business.id, 10);
+      const owner = await prisma.user.findUniqueOrThrow({ where: { id: business.userId } });
+      const ownerToken = signAccessToken(owner);
+      await setViewerLocation(ORIGIN);
+
+      const forViewer = await getAd({ placement: "feed" }, viewerToken);
+      const forOwner = await getAd({ placement: "feed" });
+
+      expect(forViewer.body).toMatchObject({ id: ad.id, isOwn: false });
+      expect(forOwner.body.isOwn).toBe(false);
+      const ownView = await request(app)
+        .get("/api/ads")
+        .query({ placement: "report_detail", reportId: (await createReport(ORIGIN)).id })
+        .set("Authorization", `Bearer ${ownerToken}`);
+      expect(ownView.body).toMatchObject({ id: ad.id, isOwn: true });
+    });
+
+    test("el vencimiento se compara en UTC aunque la sesión de Postgres use otra zona", async () => {
+      const business = await createBusiness("feed-tz", NEAR, "PREMIUM", new Date(Date.now() - 60 * 60 * 1000));
+      await createAd(business.id, 10);
+      await setViewerLocation(ORIGIN);
+
+      // con la sesión en UTC-3, comparar contra now() sin pasar a UTC daría el plan por vigente
+      const [row] = await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe("SET LOCAL TIME ZONE 'America/Argentina/Buenos_Aires'");
+        return tx.$queryRaw<{ active: boolean }[]>`
+          SELECT ${isPremiumActive} AS active FROM businesses b WHERE b.id = ${business.id}
+        `;
+      });
+
+      expect(row.active).toBe(false);
     });
 
     test("un placement desconocido responde 400", async () => {

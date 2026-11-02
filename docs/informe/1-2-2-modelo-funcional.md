@@ -13,7 +13,7 @@ El modelo funcional describe qué hace el sistema y cómo lo hace. La sección 1
 
 ## 1.2.2.1 Diagrama de casos de uso
 
-Los diagramas describen el sistema tal como está implementado. Reemplazan a los seis diagramas del PDD v1.0, que preveían actores y casos que no existen (el rol `comercio`, la pasarela de pago, la gamificación y la publicidad; ver [1.2.1](1-2-1-objetivos-y-alcances.md)). Las rutas son relativas a la raíz del repositorio y `archivo:línea` remite a la línea donde empieza el elemento citado.
+Los diagramas describen el sistema tal como está implementado. Reemplazan a los seis diagramas del PDD v1.0, que preveían actores y casos que no existen (el rol `comercio`, la pasarela de pago y la gamificación; ver [1.2.1](1-2-1-objetivos-y-alcances.md)). Las rutas son relativas a la raíz del repositorio y `archivo:línea` remite a la línea donde empieza el elemento citado.
 
 **Notación.** Mermaid no tiene un diagrama de casos de uso; se aproxima con `flowchart LR`:
 
@@ -265,8 +265,13 @@ flowchart LR
     B7(["Gestionar el panel del comercio"])
     B8(["Editar los datos del comercio"])
     B9(["Consultar métricas de visitas y contactos"])
+    B10(["Comprar o renovar el plan Premium"])
+    B11(["Gestionar anuncios"])
+    B12(["Consultar métricas de anuncios"])
+    B13(["Ver un anuncio cercano"])
+    B14(["Denunciar un anuncio"])
   end
-  N1>"Sin suscripción, pagos ni publicidad: fuera del MVP, diseño pendiente en el issue 30"]
+  N1>"Pago simulado: sin pasarela real (ADR-0024)"]
   REG --- B1
   REG --- B2
   REG --- B3
@@ -276,10 +281,15 @@ flowchart LR
   TIT --- B7
   B7 -.->|"«include»"| B9
   B8 -.->|"«extend»"| B7
-  B7 -.- N1
+  TIT --- B10
+  TIT --- B11
+  B11 -.->|"«include»"| B12
+  REG --- B13
+  B14 -.->|"«extend»"| B13
+  B10 -.- N1
 ```
 
-Figura 1.2.2-13. Casos de uso de comercios. Fuente: `backend/src/routes/businesses.routes.ts:10-17`, `backend/src/services/businesses.service.ts:38`, `:91`, `:125-135`, `:141`, `:157`.
+Figura 1.2.2-13. Casos de uso de comercios. Fuente: `backend/src/routes/businesses.routes.ts`, `backend/src/services/businesses.service.ts:62`, `:150`, `:206`, `:222`, `:238`, `backend/src/services/ads.service.ts:70`, `backend/src/services/ad-serving.service.ts:92`, `backend/src/services/ad-events.service.ts:36`, `backend/src/services/ad-flags.service.ts:23`.
 
 ### 1.2.2.1.1 Lista de Requerimientos
 
@@ -322,10 +332,10 @@ Cada requerimiento funcional (RF) del PDD v1.0 se traza hasta el issue, el códi
 | RF-30 | Chat en tiempo real | [#27](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/27), [#68](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/68) | `backend/src/sockets/chat.socket.ts:83` | `backend/tests/chats/chat-realtime.test.ts`, `backend/tests/sockets/chat.socket.test.ts` | Implementado |
 | RF-31 | Continuar por WhatsApp u otros canales externos | — | `backend/src/validators/chats.validator.ts:15`; `backend/src/validators/chat-socket.validator.ts:15` | No identificada | Implementado, vía chat interno: intercambio voluntario de contacto |
 | RF-32 | [SHOULD] Envío de imágenes en el chat | [#37](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/37) | `frontend/src/components/chat/ChatWindow.tsx:117` | `backend/tests/sockets/chat.socket.test.ts` | Implementado |
-| RF-33 | Registro de comercios con perfil diferenciado | [#28](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/28), [#69](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/69) | `backend/src/services/businesses.service.ts:38` | `backend/tests/businesses/businesses.routes.test.ts` | Implementado, como perfil ([ADR-0019](../adr/0019-comercio-perfil-no-rol.md)) |
+| RF-33 | Registro de comercios con perfil diferenciado | [#28](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/28), [#69](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/69) | `backend/src/services/businesses.service.ts:62` | `backend/tests/businesses/businesses.routes.test.ts` | Implementado, como perfil ([ADR-0019](../adr/0019-comercio-perfil-no-rol.md)) |
 | RF-34 | Suscripción mensual o anual | [#29](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/29), [#30](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/30) | `backend/src/services/businesses.service.ts:150`, `frontend/src/pages/business/BusinessPlanPage.tsx` | `backend/tests/businesses/businesses.service.test.ts`, `frontend/e2e/f11-premium-plan.spec.ts` | Parcial: compra y renovación de Premium desde el panel, con pago simulado y sin pasarela real ([ADR-0024](../adr/0024-modelo-monetizacion.md)) |
-| RF-35 | Publicidad mediante banners segmentados por ubicación | [#30](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/30) | `backend/src/services/ads.service.ts`, `backend/src/services/ad-serving.service.ts` | `backend/tests/ads/business-ads.routes.test.ts`, `backend/tests/ads/ad-serving.routes.test.ts`, `frontend/e2e/f12-business-ads.spec.ts` | Parcial: el comercio Premium gestiona sus anuncios desde el panel (`frontend/src/components/business/AdsSection.tsx`) y el backend los selecciona por cercanía ([ADR-0024](../adr/0024-modelo-monetizacion.md)); sin banners en la interfaz del usuario |
-| RF-36 | Dashboard de métricas para comercios | [#29](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/29), [#70](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/70), [#171](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/171) | `backend/src/services/businesses.service.ts:157` | `backend/tests/businesses/businesses.routes.test.ts`, `backend/tests/ads/ad-events.routes.test.ts`, `frontend/e2e/f12-business-ads.spec.ts` | Implementado: visitas y contactos del perfil, y métricas de campaña por anuncio (impresiones, clics y tasa de clics, por ubicación y por día) en el panel (`frontend/src/components/business/AdStatsPanel.tsx`) |
+| RF-35 | Publicidad mediante banners segmentados por ubicación | [#30](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/30) | `backend/src/services/ads.service.ts`, `backend/src/services/ad-serving.service.ts` | `backend/tests/ads/business-ads.routes.test.ts`, `backend/tests/ads/ad-serving.routes.test.ts`, `frontend/e2e/f12-business-ads.spec.ts`, `frontend/e2e/f13-ads-journey.spec.ts` | Implementado: banners en el feed y en el detalle del reporte segmentados por cercanía, comercios cercanos y destacados, denuncias y moderación de anuncios (`frontend/src/components/ads/AdBanner.tsx`, [ADR-0024](../adr/0024-modelo-monetizacion.md)) |
+| RF-36 | Dashboard de métricas para comercios | [#29](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/29), [#70](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/70), [#171](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/171) | `backend/src/services/businesses.service.ts:238` | `backend/tests/businesses/businesses.routes.test.ts`, `backend/tests/ads/ad-events.routes.test.ts`, `frontend/e2e/f12-business-ads.spec.ts` | Implementado: visitas y contactos del perfil, y métricas de campaña por anuncio (impresiones, clics y tasa de clics, por ubicación y por día) en el panel (`frontend/src/components/business/AdStatsPanel.tsx`) |
 | RF-37 | Puntos por reportes y participación | — | — | — | Fuera de alcance: decisión del equipo, fuera del MVP |
 | RF-38 | Canje de puntos en comercios adheridos | — | — | — | Fuera de alcance: decisión del equipo, fuera del MVP |
 | RF-39 | Leaderboards | — | — | — | Fuera de alcance: decisión del equipo, fuera del MVP |
@@ -338,7 +348,7 @@ Los siguientes requerimientos se agregaron durante el desarrollo y no estaban pr
 | RF | Requerimiento | Issue o PR | Código | Prueba | Estado |
 |---|---|---|---|---|---|
 | RF-41 | Confirmar o rechazar una coincidencia sugerida | [#181](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/181) | `backend/src/services/matching.service.ts:302` | `backend/tests/matching/matching.routes.test.ts`, `frontend/e2e/f2-match-notification.spec.ts` | Implementado |
-| RF-42 | Directorio público de comercios | [#76](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/76) | `backend/src/services/businesses.service.ts:91`; `backend/src/routes/businesses.routes.ts:15` | `backend/tests/businesses/businesses.routes.test.ts` | Implementado |
+| RF-42 | Directorio público de comercios | [#76](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/76) | `backend/src/services/businesses.service.ts:123`; `backend/src/routes/businesses.routes.ts:15` | `backend/tests/businesses/businesses.routes.test.ts` | Implementado |
 | RF-43 | Límites de tasa en la API | [#104](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/104), [#184](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/184) | `backend/src/middlewares/rate-limit.ts:8-41`; `backend/src/routes/auth.routes.ts:10-29` | `backend/tests/app/global-rate-limit.test.ts`, `backend/tests/auth/account.rate-limit.test.ts`, `backend/tests/reports/reports.create-rate-limit.test.ts` | Implementado |
 | RF-44 | Reinicio del 2FA cuando se pierde el acceso al segundo factor | [#203](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/203), PR [#205](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/205) | `backend/src/services/two-factor/reset.ts:42`, `:86`, `:120`, `:144` | `backend/tests/auth/two-factor.reset.test.ts`, `frontend/e2e/f8-two-factor.spec.ts` | Implementado |
 

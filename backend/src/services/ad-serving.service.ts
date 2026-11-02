@@ -19,6 +19,8 @@ export interface ServedAd {
   business: { id: number; name: string; category: BusinessCategory };
   // false = sin punto de referencia o sin anuncios en el radio
   segmented: boolean;
+  // anuncio del propio usuario: no se le ofrece denunciarlo
+  isOwn: boolean;
 }
 
 export interface NearbyBusiness {
@@ -39,6 +41,7 @@ interface AdRow {
   businessId: number;
   businessName: string;
   businessCategory: BusinessCategory;
+  businessUserId: number;
 }
 
 const businessPoint = Prisma.sql`ST_SetSRID(ST_MakePoint(b.longitude, b.latitude), 4326)::geography`;
@@ -46,8 +49,9 @@ const businessPoint = Prisma.sql`ST_SetSRID(ST_MakePoint(b.longitude, b.latitude
 const toGeography = (point: Point) =>
   Prisma.sql`ST_SetSRID(ST_MakePoint(${point.lng}, ${point.lat}), 4326)::geography`;
 
-// Premium vigente calculado en SQL, igual que getEffectivePlan (ADR-0024)
-const isPremiumActive = Prisma.sql`(b.plan = 'PREMIUM'::business_plan AND b.plan_expires_at > now())`;
+// Premium vigente en SQL, igual que getEffectivePlan. plan_expires_at es UTC sin zona:
+// se compara contra now() en UTC para no depender de la zona de la sesión
+export const isPremiumActive = Prisma.sql`(b.plan = 'PREMIUM'::business_plan AND b.plan_expires_at > (now() AT TIME ZONE 'UTC'))`;
 
 // elegibles: activo, Premium vigente y comercio con ubicación; rotación aleatoria
 async function pickAd(point: Point | null): Promise<AdRow | null> {
@@ -56,7 +60,8 @@ async function pickAd(point: Point | null): Promise<AdRow | null> {
     : Prisma.empty;
   const rows = await prisma.$queryRaw<AdRow[]>`
     SELECT a.id, a.title, a.body, a.image_url AS "imageUrl",
-           b.id AS "businessId", b.name AS "businessName", b.category AS "businessCategory"
+           b.id AS "businessId", b.name AS "businessName", b.category AS "businessCategory",
+           b.user_id AS "businessUserId"
     FROM ads a
     JOIN businesses b ON b.id = a.business_id
     WHERE a.status = 'ACTIVE'::ad_status
@@ -83,11 +88,7 @@ async function getReferencePoint(placement: AdPlacement, reportId?: number, view
   return { lat: preferences.location.latitude, lng: preferences.location.longitude };
 }
 
-/**
- * Anuncio para una ubicación de la plataforma. Sin punto de referencia (usuario
- * sin ubicación consentida) o sin anuncios en el radio se sirve uno sin
- * segmentar: rechazar la ubicación no evita la publicidad (ADR-0024).
- */
+// sin punto de referencia o sin anuncios en el radio se sirve uno sin segmentar (ADR-0024)
 export async function getAdFor(placement: AdPlacement, reportId?: number, viewerId?: number): Promise<ServedAd | null> {
   const point = await getReferencePoint(placement, reportId, viewerId);
   const segmented = point ? await pickAd(point) : null;
@@ -102,6 +103,7 @@ export async function getAdFor(placement: AdPlacement, reportId?: number, viewer
     imageUrl: row.imageUrl,
     business: { id: row.businessId, name: row.businessName, category: row.businessCategory },
     segmented: segmented !== null,
+    isOwn: viewerId !== undefined && row.businessUserId === viewerId,
   };
 }
 

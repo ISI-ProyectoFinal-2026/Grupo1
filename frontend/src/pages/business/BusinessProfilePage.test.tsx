@@ -82,6 +82,15 @@ describe('BusinessProfilePage', () => {
     expect(screen.getByRole('link', { name: 'instagram.com/vetsanroque' })).toBeInTheDocument()
   })
 
+  it('no repite un enlace cargado como web y como red', async () => {
+    vi.mocked(businessService.getBusiness).mockResolvedValue(
+      comercioPublico({ website: 'https://vet.com', socialLinks: ['https://vet.com', 'https://instagram.com/vet'] })
+    )
+    renderPage()
+
+    expect(await screen.findAllByRole('link', { name: 'vet.com' })).toHaveLength(1)
+  })
+
   it('sin descripción ni enlaces no muestra esas secciones', async () => {
     vi.mocked(businessService.getBusiness).mockResolvedValue(comercioPublico())
     renderPage()

@@ -2,7 +2,7 @@ import { AdFlag, AdFlagStatus, AdStatus, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { CreateAdFlagInput, ListAdFlagsQuery, ResolveAdFlagAction } from "../validators/ad-flags.validator";
-import { getEffectivePlan } from "./business-plan";
+import { getServableAd } from "./ads.service";
 
 const adFlagWithAdInclude = {
   ad: {
@@ -21,16 +21,8 @@ export type AdFlagWithAd = Prisma.AdFlagGetPayload<{ include: typeof adFlagWithA
 
 // solo se denuncia lo que se está mostrando
 export async function create(adId: number, data: CreateAdFlagInput & { userId: number }): Promise<AdFlag> {
-  const ad = await prisma.ad.findUnique({
-    where: { id: adId },
-    select: { status: true, business: { select: { userId: true, plan: true, planExpiresAt: true } } },
-  });
-  const servable =
-    ad?.status === AdStatus.ACTIVE && getEffectivePlan(ad.business.plan, ad.business.planExpiresAt) === "PREMIUM";
-  if (!ad || !servable) {
-    throw new AppError(404, "Anuncio no encontrado");
-  }
-  if (ad.business.userId === data.userId) {
+  const { ownerId } = await getServableAd(adId);
+  if (ownerId === data.userId) {
     throw new AppError(403, "No podés denunciar tu propio anuncio");
   }
 
@@ -52,11 +44,7 @@ export async function list(filters: ListAdFlagsQuery = {}): Promise<AdFlagWithAd
   });
 }
 
-/**
- * Escritura condicional, como report-flags.service `resolve`: si dos
- * moderadores resuelven a la vez, solo el primero gana. Dar de baja cierra
- * además las otras denuncias pendientes del mismo anuncio.
- */
+// escritura condicional: con dos moderadores a la vez gana el primero; dar de baja cierra las demás
 export async function resolve(id: number, action: ResolveAdFlagAction): Promise<AdFlagWithAd> {
   const status = action === "remove" ? AdFlagStatus.removed : AdFlagStatus.dismissed;
 

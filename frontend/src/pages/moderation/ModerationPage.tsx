@@ -3,6 +3,8 @@ import ReportFlagList from '@/components/moderation/ReportFlagList'
 import Spinner from '@/components/ui/Spinner'
 import { CheckIcon } from '@/components/ui/icons'
 import { useReportFlagsQuery, useResolveReportFlagMutation } from '@/hooks/useReportFlagsQuery'
+import { useAdFlagsQuery, useResolveAdFlagMutation } from '@/hooks/useServedAds'
+import AdFlagList from '@/components/moderation/AdFlagList'
 
 function ModerationPage() {
   const flagsQuery = useReportFlagsQuery()
@@ -55,7 +57,51 @@ function ModerationPage() {
           </>
         )}
       </div>
+
+      <AdModerationSection />
     </div>
+  )
+}
+
+// denuncias de anuncios: dar de baja o desestimar (ADR-0024)
+function AdModerationSection() {
+  const adFlagsQuery = useAdFlagsQuery()
+  const resolveAdFlag = useResolveAdFlagMutation()
+
+  return (
+    <section className='mt-10' aria-labelledby='ad-moderation'>
+      <h2 id='ad-moderation' className='font-display text-display-md'>
+        Anuncios denunciados
+      </h2>
+      <p className='mt-2 max-w-prose text-ink-muted'>
+        Dar de baja oculta el anuncio y cierra sus demás denuncias. Desestimar deja el anuncio publicado.
+      </p>
+
+      <div className='mt-4' aria-live='polite'>
+        {adFlagsQuery.isPending && (
+          <div className='flex justify-center py-10 text-ink-muted'>
+            <Spinner />
+          </div>
+        )}
+        {adFlagsQuery.isError && <ErrorMessage message='No se pudieron cargar las denuncias de anuncios' />}
+        {adFlagsQuery.isSuccess && (
+          <>
+            {resolveAdFlag.isError && <ErrorMessage className='mb-3' message={resolveAdFlag.error.message} />}
+            {resolveAdFlag.isSuccess && (
+              <p className='mb-3 flex items-center gap-2 font-bold text-success-ink'>
+                <CheckIcon className='h-5 w-5' />
+                {resolveAdFlag.data.status === 'removed' ? 'Anuncio dado de baja' : 'Denuncia desestimada'}
+              </p>
+            )}
+            <AdFlagList
+              flags={adFlagsQuery.data}
+              onResolve={(id, action) => resolveAdFlag.mutate({ id, action })}
+              isResolving={resolveAdFlag.isPending}
+            />
+          </>
+        )}
+      </div>
+    </section>
   )
 }
 

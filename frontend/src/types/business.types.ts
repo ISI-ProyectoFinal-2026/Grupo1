@@ -19,8 +19,7 @@ export interface PlanOffer {
 export interface Subscription {
   id: number
   period: SubscriptionPeriod
-  // Decimal serializado como texto
-  amountUsd: string
+  amountUsd: number
   status: 'APPROVED' | 'REJECTED'
   provider: string
 }

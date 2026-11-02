@@ -9,6 +9,20 @@ const MAX_SOCIAL_LINKS = 5;
 
 const profileUrlSchema = z.string().trim().max(MAX_URL_LENGTH).pipe(safeHttpUrlSchema);
 
+// texto vacío = sin web, como la descripción
+const websiteSchema = z
+  .string()
+  .trim()
+  .transform((value) => value || null)
+  .pipe(profileUrlSchema.nullable())
+  .nullable();
+
+// las líneas vacías se descartan
+const socialLinksSchema = z
+  .array(z.string())
+  .transform((links) => links.map((link) => link.trim()).filter(Boolean))
+  .pipe(z.array(profileUrlSchema).max(MAX_SOCIAL_LINKS));
+
 // texto vacío = sin descripción
 const descriptionSchema = z
   .string()
@@ -38,8 +52,8 @@ export const createBusinessSchema = z.object({
   ]),
   location: locationSchema,
   description: descriptionSchema.optional(),
-  website: profileUrlSchema.nullable().optional(),
-  socialLinks: z.array(profileUrlSchema).max(MAX_SOCIAL_LINKS).optional(),
+  website: websiteSchema.optional(),
+  socialLinks: socialLinksSchema.optional(),
 });
 
 /**

@@ -16,8 +16,11 @@ export function addMonths(date: Date, months: number): Date {
   return result;
 }
 
-// Con el plan vigente la renovación se suma al vencimiento actual; si no, arranca ahora
+// Con el plan vigente la renovación arranca en el vencimiento actual; si no, ahora
+export function planPeriodStart(plan: BusinessPlan, expiresAt: Date | null, now: Date = new Date()): Date {
+  return getEffectivePlan(plan, expiresAt, now) === "PREMIUM" ? expiresAt! : now;
+}
+
 export function nextPlanExpiry(plan: BusinessPlan, expiresAt: Date | null, months: number, now: Date = new Date()): Date {
-  const start = getEffectivePlan(plan, expiresAt, now) === "PREMIUM" ? expiresAt! : now;
-  return addMonths(start, months);
+  return addMonths(planPeriodStart(plan, expiresAt, now), months);
 }

@@ -1,8 +1,6 @@
 import { AdEventType, AdPlacement } from "@prisma/client";
 import { prisma } from "../db/client";
-import { AppError } from "../errors/app-error";
-import { getOwnAd } from "./ads.service";
-import { getEffectivePlan } from "./business-plan";
+import { getOwnAd, getServableAd } from "./ads.service";
 
 // ventana del desglose diario, en hora de Argentina
 export const STATS_DAYS = 30;
@@ -21,21 +19,10 @@ export interface AdStats extends AdCounts {
   byPlacement: (AdCounts & { placement: AdPlacement })[];
 }
 
-/**
- * Solo suman los anuncios que se pueden mostrar (activo y Premium vigente). Los
- * eventos del propio dueño se descartan, como las visitas a su perfil.
- */
+// solo suman anuncios servibles; los eventos del propio dueño se descartan
 export async function record(adId: number, type: AdEventType, placement: AdPlacement, viewerId?: number): Promise<void> {
-  const ad = await prisma.ad.findUnique({
-    where: { id: adId },
-    select: { status: true, business: { select: { userId: true, plan: true, planExpiresAt: true } } },
-  });
-  const servable =
-    ad?.status === "ACTIVE" && getEffectivePlan(ad.business.plan, ad.business.planExpiresAt) === "PREMIUM";
-  if (!ad || !servable) {
-    throw new AppError(404, "Anuncio no encontrado");
-  }
-  if (viewerId !== undefined && viewerId === ad.business.userId) {
+  const { ownerId } = await getServableAd(adId);
+  if (viewerId !== undefined && viewerId === ownerId) {
     return;
   }
   await prisma.adEvent.create({ data: { adId, type, placement } });

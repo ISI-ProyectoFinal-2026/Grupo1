@@ -1,4 +1,4 @@
-import { addMonths, getEffectivePlan, nextPlanExpiry } from "../../src/services/business-plan";
+import { addMonths, getEffectivePlan, nextPlanExpiry, planPeriodStart } from "../../src/services/business-plan";
 
 const now = new Date("2026-11-01T12:00:00.000Z");
 
@@ -47,5 +47,16 @@ describe("nextPlanExpiry", () => {
   test("con el plan vigente suma el período al vencimiento actual", () => {
     const currentExpiry = new Date("2026-11-20T00:00:00.000Z");
     expect(nextPlanExpiry("PREMIUM", currentExpiry, 1, now).toISOString()).toBe("2026-12-20T00:00:00.000Z");
+  });
+});
+
+describe("planPeriodStart", () => {
+  test("sin plan vigente el período arranca ahora", () => {
+    expect(planPeriodStart("FREE", null, now)).toEqual(now);
+  });
+
+  test("con el plan vigente arranca en el vencimiento actual", () => {
+    const currentExpiry = new Date("2026-11-20T00:00:00.000Z");
+    expect(planPeriodStart("PREMIUM", currentExpiry, now)).toEqual(currentExpiry);
   });
 });

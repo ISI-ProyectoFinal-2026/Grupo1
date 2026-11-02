@@ -7,7 +7,7 @@ import {
   ListBusinessesQuery,
   UpdateBusinessInput,
 } from "../validators/businesses.validator";
-import { getEffectivePlan, nextPlanExpiry } from "./business-plan";
+import { addMonths, getEffectivePlan, planPeriodStart } from "./business-plan";
 import { getPaymentProvider, PaymentProvider } from "./payments";
 
 // Proyección pública de un comercio: deja afuera `cuit` y `userId`, que son
@@ -142,14 +142,11 @@ export async function getPublicById(id: number): Promise<PublicBusiness> {
 
 export interface SubscribeResult {
   business: Business;
-  subscription: Subscription;
+  // el monto viaja como número, igual que priceUsd en GET /plans
+  subscription: Omit<Subscription, "amountUsd"> & { amountUsd: number };
 }
 
-/**
- * Compra de Premium. El cobro va fuera de la transacción (llamada externa); el
- * vencimiento se recalcula con la fila bloqueada para no perder una renovación
- * concurrente.
- */
+// cobro fuera de la transacción; vencimiento recalculado con la fila bloqueada (renovaciones simultáneas)
 export async function subscribe(
   userId: number,
   period: SubscriptionPeriod,
@@ -174,8 +171,8 @@ export async function subscribe(
     await tx.$queryRaw`SELECT id FROM businesses WHERE id = ${business.id} FOR UPDATE`;
     const current = await tx.business.findUniqueOrThrow({ where: { id: business.id } });
     const now = new Date();
-    const periodStart = getEffectivePlan(current.plan, current.planExpiresAt, now) === "PREMIUM" ? current.planExpiresAt! : now;
-    const periodEnd = nextPlanExpiry(current.plan, current.planExpiresAt, PERIOD_MONTHS[period], now);
+    const periodStart = planPeriodStart(current.plan, current.planExpiresAt, now);
+    const periodEnd = addMonths(periodStart, PERIOD_MONTHS[period]);
 
     const subscription = await tx.subscription.create({
       data: { ...payment, status: "APPROVED", periodStart, periodEnd },
@@ -184,7 +181,7 @@ export async function subscribe(
       where: { id: business.id },
       data: { plan: "PREMIUM", planExpiresAt: periodEnd },
     });
-    return { business: withEffectivePlan(updated), subscription };
+    return { business: withEffectivePlan(updated), subscription: { ...subscription, amountUsd: Number(subscription.amountUsd) } };
   });
 }
 

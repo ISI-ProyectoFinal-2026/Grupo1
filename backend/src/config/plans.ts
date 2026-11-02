@@ -1,4 +1,5 @@
 import type { SubscriptionPeriod } from "@prisma/client";
+import { getPaymentProvider } from "../services/payments";
 
 // precios de Premium (ADR-0024)
 const DEFAULT_MONTHLY_PRICE_USD = 30;
@@ -40,4 +41,10 @@ export function getPlanOffers(env: NodeJS.ProcessEnv = process.env): PlanOffer[]
       priceUsd: parsePlanPrice("PREMIUM_ANNUAL_PRICE_USD", env.PREMIUM_ANNUAL_PRICE_USD, DEFAULT_ANNUAL_PRICE_USD),
     },
   ];
+}
+
+// se llama al arrancar: una configuración inválida corta el inicio en vez de dar 500 en cada compra
+export function assertMonetizationConfig(env: NodeJS.ProcessEnv = process.env): void {
+  getPlanOffers(env);
+  getPaymentProvider(env);
 }

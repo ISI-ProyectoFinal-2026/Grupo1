@@ -20,17 +20,27 @@ export async function getOwnAd(userId: number, adId: number): Promise<Ad> {
   return ad;
 }
 
+// anuncio que se puede mostrar (activo y Premium vigente); 404 si no. Devuelve el dueño
+export async function getServableAd(adId: number): Promise<{ ownerId: number }> {
+  const ad = await prisma.ad.findUnique({
+    where: { id: adId },
+    select: { status: true, business: { select: { userId: true, plan: true, planExpiresAt: true } } },
+  });
+  const servable =
+    ad?.status === AdStatus.ACTIVE && getEffectivePlan(ad.business.plan, ad.business.planExpiresAt) === "PREMIUM";
+  if (!ad || !servable) {
+    throw new AppError(404, "Anuncio no encontrado");
+  }
+  return { ownerId: ad.business.userId };
+}
+
 function assertNotRemoved(ad: Ad): void {
   if (ad.status === AdStatus.REMOVED) {
     throw new AppError(409, "El anuncio fue dado de baja por moderación", undefined, "AD_REMOVED");
   }
 }
 
-/**
- * Bloquea la fila del comercio y valida que pueda tener un anuncio activo más:
- * Premium vigente, ubicación cargada y menos de MAX_ACTIVE_ADS activos. El lock
- * serializa altas y reactivaciones simultáneas para que el límite no se pase.
- */
+// valida Premium, ubicación y límite con la fila del comercio bloqueada (altas simultáneas)
 async function assertCanActivate(tx: Tx, businessId: number): Promise<void> {
   await tx.$queryRaw`SELECT id FROM businesses WHERE id = ${businessId} FOR UPDATE`;
   const business = await tx.business.findUniqueOrThrow({ where: { id: businessId } });

@@ -155,6 +155,16 @@ describe('MainLayout', () => {
     )
   })
 
+  it('en la página del plan Premium marca Mi comercio y no Comercios', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout('/businesses/plan')
+
+    expect(await screen.findByRole('link', { name: 'Mi comercio' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Comercios' })).not.toHaveAttribute('aria-current')
+  })
+
   it('sin sesion no hay enlace a las notificaciones', async () => {
     renderLayout()
 

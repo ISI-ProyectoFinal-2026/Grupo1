@@ -1,4 +1,4 @@
-import { getPlanOffers, parsePlanPrice } from "../../src/config/plans";
+import { assertMonetizationConfig, getPlanOffers, parsePlanPrice } from "../../src/config/plans";
 
 describe("parsePlanPrice", () => {
   test("sin valor usa el precio por defecto", () => {
@@ -26,5 +26,18 @@ describe("getPlanOffers", () => {
   test("toma los precios de las variables de entorno", () => {
     const offers = getPlanOffers({ PREMIUM_MONTHLY_PRICE_USD: "35", PREMIUM_ANNUAL_PRICE_USD: "350" });
     expect(offers.map((offer) => offer.priceUsd)).toEqual([35, 350]);
+  });
+});
+
+describe("assertMonetizationConfig", () => {
+  test("con la configuración por defecto no falla", () => {
+    expect(() => assertMonetizationConfig({})).not.toThrow();
+  });
+
+  test.each([
+    ["un precio inválido", { PREMIUM_MONTHLY_PRICE_USD: "30,00" }, /PREMIUM_MONTHLY_PRICE_USD/],
+    ["un proveedor desconocido", { PAYMENT_PROVIDER: "mercadopago" }, /PAYMENT_PROVIDER/],
+  ])("falla al arrancar con %s", (_label, env, message) => {
+    expect(() => assertMonetizationConfig(env)).toThrow(message);
   });
 });

@@ -60,7 +60,8 @@ function BusinessProfilePage() {
     );
   }
 
-  const links = [...(business.website ? [business.website] : []), ...business.socialLinks];
+  // sin repetidos: la web puede figurar también entre las redes
+  const links = [...new Set([...(business.website ? [business.website] : []), ...business.socialLinks])];
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-6 pt-2 sm:px-6 lg:py-6">

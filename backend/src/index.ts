@@ -3,6 +3,9 @@ import { createServer } from "http";
 import { app } from "./app";
 import { initChatSocket } from "./sockets/chat.socket";
 import { startPendingReportsReconciliation } from "./services/matching.service";
+import { assertMonetizationConfig } from "./config/plans";
+
+assertMonetizationConfig();
 
 const PORT = process.env.PORT ?? 3001;
 

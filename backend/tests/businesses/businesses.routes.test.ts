@@ -236,6 +236,22 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(cleared.body).toMatchObject({ description: null, website: null, socialLinks: [] });
   });
 
+  test("PUT /api/businesses/me trata los campos de enlace vacíos como borrados, igual que la descripción", async () => {
+    const created = await request(app)
+      .post("/api/businesses")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ...baseBusinessData, cuit: uniqueCuit(), website: "https://viejo.com" });
+    createdBusinessIds.push(created.body.id);
+
+    const res = await request(app)
+      .put("/api/businesses/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ website: "  ", socialLinks: ["", "https://instagram.com/vet", "  "] });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ website: null, socialLinks: ["https://instagram.com/vet"] });
+  });
+
   test.each([
     ["un enlace con javascript:", { website: "javascript:alert(1)" }],
     ["una red con data:", { socialLinks: ["data:text/html,<script>alert(1)</script>"] }],
@@ -450,7 +466,7 @@ describe("POST/GET/PUT /api/businesses", () => {
     expect(res.status).toBe(201);
     expect(res.body.business.plan).toBe("PREMIUM");
     expect(res.body.business.planExpiresAt).toEqual(expect.any(String));
-    expect(res.body.subscription).toMatchObject({ period: "MONTHLY", status: "APPROVED", provider: "fake" });
+    expect(res.body.subscription).toMatchObject({ period: "MONTHLY", status: "APPROVED", provider: "fake", amountUsd: 30 });
   });
 
   test("POST /api/businesses/me/subscription responde 400 con un período inválido", async () => {

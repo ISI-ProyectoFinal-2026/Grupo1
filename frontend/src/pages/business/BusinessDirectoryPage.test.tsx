@@ -55,6 +55,18 @@ describe('BusinessDirectoryPage', () => {
     expect(screen.getByText('Refugio Esperanza')).toBeInTheDocument()
   })
 
+  it('marca como destacados a los comercios Premium', async () => {
+    vi.mocked(businessService.listBusinesses).mockResolvedValue([
+      comercioPublico({ id: 1, name: 'Zoo Pet Shop', plan: 'PREMIUM' }),
+      comercioPublico({ id: 2, name: 'Refugio Esperanza', category: 'REFUGIO' }),
+    ])
+    renderPage()
+
+    const premium = await screen.findByRole('link', { name: /Zoo Pet Shop/ })
+    expect(premium).toHaveTextContent('Destacado')
+    expect(screen.getByRole('link', { name: /Refugio Esperanza/ })).not.toHaveTextContent('Destacado')
+  })
+
   it('muestra el estado vacio cuando no hay comercios', async () => {
     vi.mocked(businessService.listBusinesses).mockResolvedValue([])
     renderPage()

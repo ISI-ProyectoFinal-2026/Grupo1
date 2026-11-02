@@ -89,11 +89,14 @@ export function usePlansQuery() {
   });
 }
 
-// el plan cambia los datos del comercio: se reemplaza la cache de /me
+// el plan cambia /me y el directorio (orden y marca de destacado)
 export function useSubscribeMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (period: SubscriptionPeriod) => subscribe(period),
-    onSuccess: (result) => queryClient.setQueryData(businessQueryKey, result.business),
+    onSuccess: (result) => {
+      queryClient.setQueryData(businessQueryKey, result.business);
+      return queryClient.invalidateQueries({ queryKey: businessesQueryKey });
+    },
   });
 }

@@ -76,7 +76,7 @@ describe('BusinessPlanPage', () => {
     vi.mocked(businessService.getMyBusiness).mockResolvedValue(comercio())
     vi.mocked(businessService.subscribe).mockResolvedValue({
       business: comercio({ plan: 'PREMIUM', planExpiresAt: '2027-11-15T12:00:00.000Z' }),
-      subscription: { id: 1, period: 'ANNUAL', amountUsd: '300', status: 'APPROVED', provider: 'fake' },
+      subscription: { id: 1, period: 'ANNUAL', amountUsd: 300, status: 'APPROVED', provider: 'fake' },
     })
     const user = userEvent.setup()
     renderPage()

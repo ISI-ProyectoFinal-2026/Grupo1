@@ -32,12 +32,12 @@ interface NavItemConfig {
 }
 
 // El match de cada item se resuelve a mano en lugar de con NavLink: /reports/new
-// pertenece a "Reportar" (no a "Reportes") y /businesses/dashboard a "Mi comercio"
+// pertenece a "Reportar" (no a "Reportes") y /businesses/dashboard o /plan a "Mi comercio"
 // (no a "Comercios"), cosa que el match por prefijo de NavLink no distingue.
 const isReportsPath = (path: string) =>
   path === "/reports" || (path.startsWith("/reports/") && path !== "/reports/new");
 const isOwnBusinessPath = (path: string) =>
-  path === "/businesses/dashboard" || path === "/businesses/register";
+  path === "/businesses/dashboard" || path === "/businesses/register" || path === "/businesses/plan";
 const isOwnPetsPath = (path: string) => path === "/pets" || path.startsWith("/pets/");
 
 const PRIMARY_ITEMS: NavItemConfig[] = [
