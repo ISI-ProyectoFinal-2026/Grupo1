@@ -67,6 +67,16 @@ export interface ListReportsQuery {
   order?: 'asc' | 'desc'
 }
 
+// area visible del mapa (#234)
+export interface GeoBounds {
+  swLat: number
+  swLng: number
+  neLat: number
+  neLng: number
+}
+
+export type GeoMapFilters = Pick<ListReportsQuery, 'type' | 'zone' | 'dateFrom' | 'dateTo'>
+
 // posible duplicado sugerido al crear un reporte (#211)
 export interface SimilarReportDTO {
   id: number

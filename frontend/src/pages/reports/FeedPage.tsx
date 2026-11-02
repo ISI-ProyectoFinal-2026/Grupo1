@@ -1,8 +1,10 @@
 import { Fragment, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
+import { listMapReports } from "@/services/geo.service";
 import { listReports } from "@/services/reports.service";
-import type { ReportType } from "@/types/report.types";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import type { GeoBounds, ReportType } from "@/types/report.types";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import SuccessMessage from "@/components/ui/SuccessMessage";
@@ -20,6 +22,9 @@ import AdBanner from "@/components/ads/AdBanner";
 // el banner va después de esta cantidad de tarjetas (o al final si hay menos)
 const AD_SLOT_INDEX = 3;
 
+// espera tras el ultimo movimiento del mapa antes de pedir el area visible
+const MAP_DEBOUNCE_MS = 300;
+
 export default function FeedPage() {
   // Aviso que deja la pantalla anterior (por ejemplo, al eliminar un reporte).
   const flashMessage = (useLocation().state as { message?: string } | null)?.message;
@@ -29,16 +34,29 @@ export default function FeedPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
+  const [mapBounds, setMapBounds] = useState<GeoBounds>();
+  const debouncedBounds = useDebouncedValue(mapBounds, MAP_DEBOUNCE_MS);
+  const isMap = viewMode === "map";
+
+  const filters = {
+    type: type || undefined,
+    zone: zone || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  };
+
   const { data: reports = [], isLoading, error } = useQuery({
     queryKey: ["reports", { type, zone, dateFrom, dateTo }],
-    queryFn: () =>
-      listReports({
-        status: "published",
-        type: type || undefined,
-        zone: zone || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-      }),
+    queryFn: () => listReports({ status: "published", ...filters }),
+    enabled: !isMap,
+  });
+
+  // el mapa trae solo el area visible; la lista sigue usando /reports
+  const { data: mapReports = [], isFetching: isMapFetching, error: mapError } = useQuery({
+    queryKey: ["reports-map", debouncedBounds, { type, zone, dateFrom, dateTo }],
+    queryFn: ({ signal }) => listMapReports(debouncedBounds!, filters, signal),
+    enabled: isMap && debouncedBounds !== undefined,
+    placeholderData: keepPreviousData,
   });
 
   const sortedReports = [...reports].sort(
@@ -112,7 +130,21 @@ export default function FeedPage() {
       </div>
 
       <div className="mt-5" aria-live="polite">
-        {isLoading ? (
+        {isMap ? (
+          <>
+            {mapError && (
+              <ErrorMessage
+                message="Error al cargar reportes. Intentá de nuevo."
+                className="card mb-3 p-4"
+              />
+            )}
+            <MapView
+              reports={mapReports}
+              loading={debouncedBounds === undefined || isMapFetching}
+              onBoundsChange={setMapBounds}
+            />
+          </>
+        ) : isLoading ? (
           <SkeletonGroup className="animate-fade">
             <p aria-hidden="true" className="mb-3 flex h-5 items-center gap-1.5 text-sm text-ink-muted">
               <PawPrint className="h-3.5 w-3.5" />
@@ -129,8 +161,6 @@ export default function FeedPage() {
             message="Error al cargar reportes. Intentá de nuevo."
             className="card p-4"
           />
-        ) : viewMode === "map" ? (
-          <MapView reports={sortedReports} />
         ) : sortedReports.length === 0 ? (
           <EmptyState
             action={

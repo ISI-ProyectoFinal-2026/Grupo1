@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MapView from '@/components/reports/MapView'
 import { PIN_COLORS } from '@/components/reports/reportPinIcon'
 import { PILOT_ZONE_CENTER } from '@/lib/map'
+import { moveMapTo, resetLeafletMock } from '@/test/react-leaflet-mock'
 import type { ReportDTO } from '@/types/report.types'
 
 vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
@@ -36,6 +37,8 @@ function renderMap(props: Parameters<typeof MapView>[0]) {
     </MemoryRouter>
   )
 }
+
+beforeEach(() => resetLeafletMock())
 
 describe('MapView', () => {
   it('arranca centrado en la zona del piloto', () => {
@@ -71,6 +74,38 @@ describe('MapView', () => {
     const html = screen.getByTestId('marker').getAttribute('data-icon-html')
     expect(html).toContain(PIN_COLORS.found)
     expect(html).not.toContain(PIN_COLORS.lost)
+  })
+
+  it('avisa el area visible al montarse', () => {
+    const onBoundsChange = vi.fn()
+
+    renderMap({ reports: [reporte()], onBoundsChange })
+
+    expect(onBoundsChange).toHaveBeenCalledTimes(1)
+    expect(onBoundsChange).toHaveBeenCalledWith({ swLat: -34.7, swLng: -68.4, neLat: -34.5, neLng: -68.2 })
+  })
+
+  it('avisa el nuevo area cuando el mapa termina de moverse', () => {
+    const onBoundsChange = vi.fn()
+    renderMap({ reports: [reporte()], onBoundsChange })
+
+    moveMapTo({ south: -35, west: -69, north: -34.9, east: -68.9 })
+
+    expect(onBoundsChange).toHaveBeenLastCalledWith({ swLat: -35, swLng: -69, neLat: -34.9, neLng: -68.9 })
+  })
+
+  it('sigue mostrando el mapa y avisa cuando el area visible no tiene reportes', () => {
+    renderMap({ reports: [] })
+
+    expect(screen.getByTestId('map')).toBeInTheDocument()
+    expect(screen.getByText('No hay reportes en esta zona del mapa')).toBeInTheDocument()
+  })
+
+  it('no avisa que esta vacio mientras busca reportes', () => {
+    renderMap({ reports: [], loading: true })
+
+    expect(screen.getByText('Buscando reportes…')).toBeInTheDocument()
+    expect(screen.queryByText('No hay reportes en esta zona del mapa')).not.toBeInTheDocument()
   })
 
   it('usa un color distinto para cada tipo en el mismo mapa', () => {
