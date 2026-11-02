@@ -6,6 +6,11 @@ import { FlagIcon } from '@/components/ui/icons'
 
 interface FlagReportFormProps {
   onSubmit: (reason: string) => void
+  // textos e id del campo: también se usa para denunciar anuncios (#30)
+  inputId?: string
+  triggerLabel?: string
+  formLabel?: string
+  placeholder?: string
   isPending?: boolean
   isSent?: boolean
   // enviada o ya denunciada antes (409): no tiene sentido volver a intentar
@@ -15,6 +20,10 @@ interface FlagReportFormProps {
 
 export default function FlagReportForm({
   onSubmit,
+  inputId = 'flag-reason',
+  triggerLabel = 'Denunciar',
+  formLabel = 'Denunciar reporte',
+  placeholder = 'Ej: la foto no es de una mascota…',
   isPending = false,
   isSent = false,
   isDone = false,
@@ -45,22 +54,22 @@ export default function FlagReportForm({
         onClick={() => setIsOpen(true)}
       >
         <FlagIcon className='h-5 w-5' />
-        Denunciar
+        {triggerLabel}
       </Button>
 
       {isOpen && !isDone && (
         <form
-          aria-label='Denunciar reporte'
+          aria-label={formLabel}
           noValidate
           onSubmit={handleSubmit}
           className='flex flex-col gap-3'
         >
           <Input
-            id='flag-reason'
+            id={inputId}
             name='reason'
             label='Motivo de la denuncia'
             autoComplete='off'
-            placeholder='Ej: la foto no es de una mascota…'
+            placeholder={placeholder}
             value={reason}
             error={validationError ?? undefined}
             onChange={(event) => setReason(event.target.value)}

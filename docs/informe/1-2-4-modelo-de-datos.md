@@ -26,10 +26,14 @@ El sistema usa una única base PostgreSQL 16 con las extensiones PostGIS y pgvec
 | `Chat` | `chats` | Conversación entre dos usuarios por reporte; el par se guarda normalizado (id menor en `user_a_id`) | único `(user_a_id, user_b_id, report_id)`; `report_id` opcional |
 | `Message` | `messages` | Mensaje de texto y/o imagen dentro de un chat | FK a `chats` y `users` |
 | `Notification` | `notifications` | Aviso a un usuario (sugerencia de coincidencia, mensaje, cambio de estado) | índice `user_id` |
-| `Business` | `businesses` | Comercio de un usuario: nombre, CUIT, dirección, teléfono, categoría, plan y vencimiento | `user_id` y `cuit` únicos |
+| `Business` | `businesses` | Comercio de un usuario: nombre, CUIT, dirección, teléfono, categoría, descripción, sitio web, hasta 5 enlaces a redes (`social_links`, solo URLs http o https), plan y vencimiento. Un `PREMIUM` vencido o sin vencimiento cuenta como `FREE` ([ADR-0024](../adr/0024-modelo-monetizacion.md)) | `user_id` y `cuit` únicos |
+| `Subscription` | `subscriptions` | Compra del plan Premium: período, monto en USD, proveedor de pago (`fake` mientras no haya pasarela), referencia, estado y período cubierto (nulo si el pago se rechazó) | índice `business_id`; cascada con el comercio |
+| `Ad` | `ads` | Anuncio de un comercio: título (hasta 60 caracteres), texto (hasta 200), imagen del bucket propio, radio de 1 a 20 km y estado (`ACTIVE` y `PAUSED` los maneja el dueño; `REMOVED` es una baja por moderación). Hasta 3 activos por comercio, que exigen Premium vigente y la ubicación del comercio cargada | índice `(business_id, status)`; cascada con el comercio |
+| `AdEvent` | `ad_events` | Impresión o clic de un anuncio y la ubicación de la plataforma donde ocurrió (`feed` o `report_detail`). No guarda usuario ni coordenadas: el comercio solo ve totales ([ADR-0024](../adr/0024-modelo-monetizacion.md)) | índice `(ad_id, created_at)`; cascada con el anuncio |
+| `AdFlag` | `ad_flags` | Denuncia de un usuario sobre un anuncio, con motivo y estado: pendiente, anuncio dado de baja (`removed`) o denuncia desestimada (`dismissed`) | único `(ad_id, user_id)`; índice `status`; cascada con el anuncio |
 | `BusinessEvent` | `business_events` | Registro de visitas y contactos al perfil de un comercio; `user_id` nulo para visitantes anónimos | índice `(business_id, type)`; cascada con el comercio |
 
-Fuente: `backend/prisma/schema.prisma`, líneas 26-353.
+Fuente: `backend/prisma/schema.prisma`, líneas 26-522.
 
 ## Relaciones
 
@@ -38,7 +42,7 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-353.
 - `Report` se relaciona 1:N con `ReportFlag`, `Chat` y `Notification`, y 1:1 con `ReportEmbedding`.
 - `ReportMatch` une dos reportes: uno perdido (`report_lost_id`) y uno encontrado (`report_found_id`).
 - `Chat` une a dos usuarios (`user_a_id`, `user_b_id`) y, opcionalmente, a un reporte; contiene 1:N `Message`.
-- `Business` se relaciona 1:N con `BusinessEvent`.
+- `Business` se relaciona 1:N con `BusinessEvent`, `Subscription` y `Ad`; `Ad` se relaciona 1:N con `AdEvent` y `AdFlag`. `User` se relaciona además 1:N con `AdFlag`.
 
 ## Enumeraciones
 
@@ -51,8 +55,14 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-353.
 | `report_flag_status` | `pending`, `reviewed` |
 | `match_status` | `pending`, `confirmed`, `rejected` |
 | `business_category` | `VETERINARIA`, `REFUGIO`, `PET_SHOP`, `OTRO` |
-| `business_plan` | `FREE`, `PRO`, `PREMIUM` |
+| `business_plan` | `FREE`, `PREMIUM` |
 | `business_event_type` | `VIEW`, `CONTACT` |
+| `subscription_period` | `MONTHLY`, `ANNUAL` |
+| `subscription_status` | `APPROVED`, `REJECTED` |
+| `ad_status` | `ACTIVE`, `PAUSED`, `REMOVED` |
+| `ad_event_type` | `impression`, `click` |
+| `ad_placement` | `feed`, `report_detail` |
+| `ad_flag_status` | `pending`, `removed`, `dismissed` |
 
 ## Tipos geoespaciales y vectoriales
 
@@ -83,5 +93,10 @@ El servicio de IA mapea con SQLAlchemy dos tablas del esquema ([`backend-ia/app/
 | `20260928020000_email_verification_and_auth_tokens` | `email_verified_at` y `token_version` en `users`; tabla `auth_tokens` |
 | `20261012000000_backfill_email_verified_at` | Las cuentas anteriores a la verificación se marcan como verificadas (solo datos) |
 | `20261013000000_two_factor_auth` | Columnas de 2FA en `users`; tabla `two_factor_recovery_codes`; tres tipos nuevos en `auth_token_type` |
+| `20261101000000_premium_subscriptions` | Se elimina `PRO` de `business_plan` (los comercios con `PRO` pasan a `FREE`); tabla `subscriptions` y sus enumeraciones |
+| `20261101010000_business_profile_links` | Columnas `description`, `website` y `social_links` en `businesses` |
+| `20261101020000_add_ads` | Tabla `ads` y la enumeración `ad_status` |
+| `20261101030000_add_ad_events` | Tabla `ad_events` y sus enumeraciones |
+| `20261101040000_add_ad_flags` | Tabla `ad_flags` y la enumeración `ad_flag_status` |
 
 Fuente: `backend/prisma/migrations/*/migration.sql`.

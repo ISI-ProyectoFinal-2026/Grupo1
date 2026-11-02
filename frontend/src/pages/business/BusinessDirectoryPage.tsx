@@ -6,6 +6,7 @@ import type { BusinessCategory } from "@/types/business.types";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Spinner from "@/components/ui/Spinner";
 import { PinIcon, StoreIcon } from "@/components/ui/icons";
+import FeaturedBadge from "@/components/business/FeaturedBadge";
 
 const CATEGORY_LABELS: Record<BusinessCategory, string> = {
   VETERINARIA: "Veterinaria",
@@ -78,6 +79,7 @@ function BusinessDirectoryPage() {
                   </span>
                   <div className="min-w-0">
                     <h2 className="break-words font-display text-display-sm text-ink">{business.name}</h2>
+                    {business.plan === "PREMIUM" && <FeaturedBadge className="mt-1" />}
                     <p className="mt-0.5 text-sm font-bold text-ink-muted">{CATEGORY_LABELS[business.category]}</p>
                     <p className="mt-1 flex items-start gap-1 text-sm text-ink-muted">
                       <PinIcon className="mt-0.5 h-4 w-4 shrink-0" />

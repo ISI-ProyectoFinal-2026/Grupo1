@@ -13,6 +13,17 @@ const CATEGORY_LABELS: Record<BusinessCategory, string> = {
   OTRO: "Otro",
 };
 
+// texto visible del enlace: dominio y ruta, sin protocolo ni "www."
+function linkLabel(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/$/, "");
+    return `${parsed.hostname.replace(/^www\./, "")}${path}`;
+  } catch {
+    return url;
+  }
+}
+
 function BusinessProfilePage() {
   const { id } = useParams<{ id: string }>();
   const businessId = id ? Number(id) : undefined;
@@ -49,6 +60,9 @@ function BusinessProfilePage() {
     );
   }
 
+  // sin repetidos: la web puede figurar también entre las redes
+  const links = [...new Set([...(business.website ? [business.website] : []), ...business.socialLinks])];
+
   return (
     <div className="mx-auto max-w-2xl px-4 pb-6 pt-2 sm:px-6 lg:py-6">
       {backLink}
@@ -76,6 +90,29 @@ function BusinessProfilePage() {
             </div>
           </div>
         </dl>
+
+        {business.description && <p className="mt-6 whitespace-pre-line break-words text-ink">{business.description}</p>}
+
+        {links.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-sm text-ink-muted">Enlaces</h2>
+            <ul className="mt-1 flex flex-col gap-1">
+              {links.map((link) => (
+                <li key={link}>
+                  {/* enlaces cargados por el comercio: pestaña nueva sin acceso a window.opener */}
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all font-bold text-ink underline underline-offset-4 hover:no-underline"
+                  >
+                    {linkLabel(link)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-6 border-t border-line pt-6" aria-live="polite">
           {contactMutation.isSuccess ? (

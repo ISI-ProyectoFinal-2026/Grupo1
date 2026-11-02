@@ -17,3 +17,24 @@ export function formatRelativeDate(value: string, now: Date = new Date()): strin
   }
   return shortDate.format(date);
 }
+
+const longDate = new Intl.DateTimeFormat("es-AR", { year: "numeric", month: "long", day: "numeric" });
+
+// fecha completa, ej. "1 de diciembre de 2026"
+export function formatLongDate(value: string): string {
+  return longDate.format(new Date(value));
+}
+
+const shortDay = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short", timeZone: "UTC" });
+
+// día "YYYY-MM-DD" sin hora (ej. "1 nov"); en UTC para que no se corra un día
+export function formatShortDay(isoDate: string): string {
+  return shortDay.format(new Date(isoDate));
+}
+
+const percent = new Intl.NumberFormat("es-AR", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+// proporción 0..1 como porcentaje, ej. 0.05 -> "5,0%"
+export function formatPercent(ratio: number): string {
+  return percent.format(ratio);
+}

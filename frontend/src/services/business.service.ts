@@ -4,7 +4,10 @@ import type {
   BusinessCategory,
   BusinessStats,
   CreateBusinessInput,
+  PlanOffer,
   PublicBusiness,
+  SubscribeResult,
+  SubscriptionPeriod,
   UpdateBusinessInput,
 } from "@/types/business.types";
 
@@ -42,4 +45,13 @@ export function getBusiness(id: number): Promise<PublicBusiness> {
 // cuerpo, así que no se devuelve nada.
 export function contactBusiness(id: number): Promise<void> {
   return api.post(`/businesses/${id}/contact`).then(() => undefined);
+}
+
+export function getPlans(): Promise<PlanOffer[]> {
+  return api.get<PlanOffer[]>("/plans").then((res) => res.data);
+}
+
+// Compra de Premium; hoy la confirma el proveedor de pago simulado (ADR-0024)
+export function subscribe(period: SubscriptionPeriod): Promise<SubscribeResult> {
+  return api.post<SubscribeResult>("/businesses/me/subscription", { period }).then((res) => res.data);
 }

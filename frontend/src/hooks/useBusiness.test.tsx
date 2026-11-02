@@ -7,6 +7,7 @@ import {
   useCreateBusinessMutation,
   useMyBusinessQuery,
   useMyBusinessStatsQuery,
+  useSubscribeMutation,
   useUpdateBusinessMutation,
 } from '@/hooks/useBusiness'
 import type { Business } from '@/types/business.types'
@@ -26,6 +27,9 @@ function comercio(overrides: Partial<Business> = {}): Business {
     longitude: null,
     plan: 'FREE',
     planExpiresAt: null,
+    description: null,
+    website: null,
+    socialLinks: [],
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }
@@ -126,6 +130,21 @@ describe('mutaciones', () => {
 
     await waitFor(() => expect(result.current.crear.isSuccess).toBe(true))
     expect(client.getQueryData(['business', 'me'])).toEqual(creado)
+  })
+
+  it('comprar Premium refresca el directorio (orden y marca de destacado)', async () => {
+    vi.mocked(businessService.subscribe).mockResolvedValue({
+      business: comercio({ plan: 'PREMIUM', planExpiresAt: '2026-12-01T12:00:00.000Z' }),
+      subscription: { id: 1, period: 'MONTHLY', amountUsd: 30, status: 'APPROVED', provider: 'fake' },
+    })
+    const { Wrapper, client } = createQueryWrapper()
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+
+    const { result } = renderHook(() => useSubscribeMutation(), { wrapper: Wrapper })
+    result.current.mutate('MONTHLY')
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['businesses'] })
   })
 
   it('actualizar comercio refresca el cache de useMyBusinessQuery', async () => {

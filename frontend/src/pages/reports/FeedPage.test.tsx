@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FeedPage from '@/pages/reports/FeedPage'
 import * as geoService from '@/services/geo.service'
 import * as reportsService from '@/services/reports.service'
+import * as adsService from '@/services/ads.service'
 import { moveMapTo, resetLeafletMock } from '@/test/react-leaflet-mock'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ReportDTO } from '@/types/report.types'
@@ -12,6 +13,14 @@ import type { ReportDTO } from '@/types/report.types'
 vi.mock('@/services/reports.service')
 vi.mock('@/services/geo.service')
 vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
+
+// publicidad (#30): sin anuncios ni comercios cercanos salvo que el test los pida
+vi.mock('@/services/ads.service', () => ({
+  getAdFor: vi.fn().mockResolvedValue(null),
+  getNearbyBusinesses: vi.fn().mockResolvedValue([]),
+  recordAdEvent: vi.fn().mockResolvedValue(undefined),
+  flagAd: vi.fn().mockResolvedValue(undefined),
+}))
 
 function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
   return {
@@ -50,6 +59,39 @@ beforeEach(() => {
   resetLeafletMock()
   vi.mocked(reportsService.listReports).mockResolvedValue([reporte()])
   vi.mocked(geoService.listMapReports).mockResolvedValue([])
+  vi.mocked(adsService.getAdFor).mockResolvedValue(null)
+})
+
+describe('FeedPage: publicidad', () => {
+  it('intercala el banner después de las primeras tarjetas', async () => {
+    vi.mocked(reportsService.listReports).mockResolvedValue(
+      [1, 2, 3, 4, 5].map((id) => reporte({ id, title: `Reporte ${id}`, createdAt: `2026-09-1${9 - id}T10:00:00.000Z` }))
+    )
+    vi.mocked(adsService.getAdFor).mockResolvedValue({
+      id: 7,
+      title: 'Baño y corte -20%',
+      body: 'Turnos',
+      imageUrl: 'https://pub.r2.dev/ad.jpg',
+      business: { id: 3, name: 'Veterinaria Demo', category: 'VETERINARIA' },
+      segmented: false,
+      isOwn: false,
+    })
+    renderPage()
+
+    const banner = await screen.findByRole('complementary', { name: 'Publicidad' })
+    const items = screen.getAllByRole('listitem')
+    expect(items[3]).toContainElement(banner)
+    expect(adsService.getAdFor).toHaveBeenCalledWith('feed', undefined)
+  })
+
+  it('sin anuncio no deja un hueco en la grilla', async () => {
+    vi.mocked(reportsService.listReports).mockResolvedValue([1, 2, 3, 4].map((id) => reporte({ id, title: `Reporte ${id}` })))
+    renderPage()
+
+    await screen.findByText('Reporte 1')
+    await waitFor(() => expect(adsService.getAdFor).toHaveBeenCalled())
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+  })
 })
 
 describe('FeedPage: listado', () => {

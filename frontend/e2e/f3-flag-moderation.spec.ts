@@ -11,7 +11,7 @@ test('F3: a user flags a report and a moderator resolves it, hiding the report',
 
   await loginAs(page, reporter)
   await page.goto(`/reports/${report.id}`)
-  await page.getByRole('button', { name: 'Denunciar' }).click()
+  await page.getByRole('button', { name: 'Denunciar', exact: true }).click()
   const form = page.getByRole('form', { name: 'Denunciar reporte' })
   await form.getByLabel('Motivo de la denuncia').fill(reason)
   await form.getByRole('button', { name: 'Enviar denuncia' }).click()

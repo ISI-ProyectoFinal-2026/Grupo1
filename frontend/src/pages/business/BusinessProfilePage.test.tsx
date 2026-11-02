@@ -17,6 +17,9 @@ function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusines
     phone: '1122334455',
     category: 'VETERINARIA',
     plan: 'FREE',
+    description: null,
+    website: null,
+    socialLinks: [],
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }
@@ -59,6 +62,41 @@ describe('BusinessProfilePage', () => {
 
     await waitFor(() => expect(businessService.contactBusiness).toHaveBeenCalledWith(9))
     expect(await screen.findByText(/registramos tu interés/i)).toBeInTheDocument()
+  })
+
+  it('muestra la descripción y los enlaces externos en una pestaña nueva', async () => {
+    vi.mocked(businessService.getBusiness).mockResolvedValue(
+      comercioPublico({
+        description: 'Guardia 24 hs y peluquería.',
+        website: 'https://vetsanroque.com.ar',
+        socialLinks: ['https://instagram.com/vetsanroque'],
+      })
+    )
+    renderPage()
+
+    expect(await screen.findByText('Guardia 24 hs y peluquería.')).toBeInTheDocument()
+    const web = screen.getByRole('link', { name: 'vetsanroque.com.ar' })
+    expect(web).toHaveAttribute('href', 'https://vetsanroque.com.ar')
+    expect(web).toHaveAttribute('target', '_blank')
+    expect(web).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(screen.getByRole('link', { name: 'instagram.com/vetsanroque' })).toBeInTheDocument()
+  })
+
+  it('no repite un enlace cargado como web y como red', async () => {
+    vi.mocked(businessService.getBusiness).mockResolvedValue(
+      comercioPublico({ website: 'https://vet.com', socialLinks: ['https://vet.com', 'https://instagram.com/vet'] })
+    )
+    renderPage()
+
+    expect(await screen.findAllByRole('link', { name: 'vet.com' })).toHaveLength(1)
+  })
+
+  it('sin descripción ni enlaces no muestra esas secciones', async () => {
+    vi.mocked(businessService.getBusiness).mockResolvedValue(comercioPublico())
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Veterinaria San Roque' })
+    expect(screen.queryByText('Enlaces')).not.toBeInTheDocument()
   })
 
   it('muestra un error si el comercio no se puede cargar', async () => {

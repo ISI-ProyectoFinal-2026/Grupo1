@@ -15,6 +15,14 @@ vi.mock('@/services/chats.service')
 vi.mock('@/services/moderation.service')
 vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
 
+// publicidad (#30): sin anuncios ni comercios cercanos salvo que el test los pida
+vi.mock('@/services/ads.service', () => ({
+  getAdFor: vi.fn().mockResolvedValue(null),
+  getNearbyBusinesses: vi.fn().mockResolvedValue([]),
+  recordAdEvent: vi.fn().mockResolvedValue(undefined),
+  flagAd: vi.fn().mockResolvedValue(undefined),
+}))
+
 const DUENO_ID = 7
 const OTRO_ID = 8
 

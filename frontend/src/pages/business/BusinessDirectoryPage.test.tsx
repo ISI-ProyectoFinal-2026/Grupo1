@@ -17,6 +17,9 @@ function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusines
     phone: '1122334455',
     category: 'VETERINARIA',
     plan: 'FREE',
+    description: null,
+    website: null,
+    socialLinks: [],
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }
@@ -50,6 +53,18 @@ describe('BusinessDirectoryPage', () => {
 
     expect(await screen.findByText('Veterinaria San Roque')).toBeInTheDocument()
     expect(screen.getByText('Refugio Esperanza')).toBeInTheDocument()
+  })
+
+  it('marca como destacados a los comercios Premium', async () => {
+    vi.mocked(businessService.listBusinesses).mockResolvedValue([
+      comercioPublico({ id: 1, name: 'Zoo Pet Shop', plan: 'PREMIUM' }),
+      comercioPublico({ id: 2, name: 'Refugio Esperanza', category: 'REFUGIO' }),
+    ])
+    renderPage()
+
+    const premium = await screen.findByRole('link', { name: /Zoo Pet Shop/ })
+    expect(premium).toHaveTextContent('Destacado')
+    expect(screen.getByRole('link', { name: /Refugio Esperanza/ })).not.toHaveTextContent('Destacado')
   })
 
   it('muestra el estado vacio cuando no hay comercios', async () => {
