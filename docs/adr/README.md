@@ -40,6 +40,7 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0022](0022-preferencias-notificacion-tabla-propia.md) | Preferencias de notificación y ubicación en una tabla propia | Aceptada | Franco Marín | — | — |
 | [ADR-0023](0023-aviso-calidad-imagen.md) | Aviso no bloqueante por foto borrosa o movida | Aceptada | Agustín Díaz | — | — |
 | [ADR-0024](0024-modelo-monetizacion.md) | Modelo de monetización con un plan pago y publicidad segmentada por cercanía | Aceptada | Agustín Díaz | — | — |
+| [ADR-0025](0025-geocodificacion-inversa-proxy-backend.md) | Geocodificación inversa mediante un proxy en el backend con caché | Aceptada | Franco Marín | — | — |
 
 ## Pendientes
 
