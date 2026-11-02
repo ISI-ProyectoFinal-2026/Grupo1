@@ -8,6 +8,7 @@ import BusinessProfilePage from '@/pages/business/BusinessProfilePage'
 import type { PublicBusiness } from '@/types/business.types'
 
 vi.mock('@/services/business.service')
+vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
 
 function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusiness {
   return {
@@ -16,6 +17,8 @@ function comercioPublico(overrides: Partial<PublicBusiness> = {}): PublicBusines
     address: 'Av. Siempre Viva 123',
     phone: '1122334455',
     category: 'VETERINARIA',
+    latitude: -34.6251,
+    longitude: -68.3221,
     plan: 'FREE',
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
@@ -47,6 +50,26 @@ describe('BusinessProfilePage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Veterinaria San Roque' })).toBeInTheDocument()
     expect(businessService.getBusiness).toHaveBeenCalledWith(9)
+  })
+
+  it('muestra el pin del comercio en el mapa', async () => {
+    vi.mocked(businessService.getBusiness).mockResolvedValue(comercioPublico())
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Veterinaria San Roque' })
+
+    expect(screen.getByTestId('marker')).toHaveAttribute('data-position', '-34.6251,-68.3221')
+  })
+
+  it('no muestra el mapa si el comercio no tiene ubicacion', async () => {
+    vi.mocked(businessService.getBusiness).mockResolvedValue(
+      comercioPublico({ latitude: null, longitude: null })
+    )
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Veterinaria San Roque' })
+
+    expect(screen.queryByTestId('map')).not.toBeInTheDocument()
   })
 
   it('registra el contacto al tocar el boton y muestra la confirmacion', async () => {

@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useBusinessQuery, useContactBusinessMutation } from "@/hooks/useBusiness";
 import type { BusinessCategory } from "@/types/business.types";
+import BusinessLocationMap from "@/components/maps/BusinessLocationMap";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Spinner from "@/components/ui/Spinner";
@@ -76,6 +77,15 @@ function BusinessProfilePage() {
             </div>
           </div>
         </dl>
+
+        {business.latitude !== null && business.longitude !== null && (
+          <div className="mt-6">
+            <BusinessLocationMap
+              location={{ lat: business.latitude, lng: business.longitude }}
+              label={business.name}
+            />
+          </div>
+        )}
 
         <div className="mt-6 border-t border-line pt-6" aria-live="polite">
           {contactMutation.isSuccess ? (

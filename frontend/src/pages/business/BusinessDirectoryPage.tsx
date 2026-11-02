@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useBusinessesQuery } from "@/hooks/useBusiness";
 import type { BusinessCategory } from "@/types/business.types";
+import BusinessesMap from "@/components/maps/BusinessesMap";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Spinner from "@/components/ui/Spinner";
 import { PinIcon, StoreIcon } from "@/components/ui/icons";
@@ -66,28 +67,31 @@ function BusinessDirectoryPage() {
             <p className="text-ink-muted">No hay comercios registrados todavía.</p>
           </EmptyState>
         ) : (
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {businesses.map((business) => (
-              <li key={business.id}>
-                <Link
-                  to={`/businesses/${business.id}`}
-                  className="card flex h-full items-start gap-3 p-4 transition-colors hover:border-ink-muted"
-                >
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-surface text-ink">
-                    <StoreIcon className="h-6 w-6" />
-                  </span>
-                  <div className="min-w-0">
-                    <h2 className="break-words font-display text-display-sm text-ink">{business.name}</h2>
-                    <p className="mt-0.5 text-sm font-bold text-ink-muted">{CATEGORY_LABELS[business.category]}</p>
-                    <p className="mt-1 flex items-start gap-1 text-sm text-ink-muted">
-                      <PinIcon className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span className="break-words">{business.address}</span>
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <>
+            <BusinessesMap businesses={businesses} />
+            <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {businesses.map((business) => (
+                <li key={business.id}>
+                  <Link
+                    to={`/businesses/${business.id}`}
+                    className="card flex h-full items-start gap-3 p-4 transition-colors hover:border-ink-muted"
+                  >
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-surface text-ink">
+                      <StoreIcon className="h-6 w-6" />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="break-words font-display text-display-sm text-ink">{business.name}</h2>
+                      <p className="mt-0.5 text-sm font-bold text-ink-muted">{CATEGORY_LABELS[business.category]}</p>
+                      <p className="mt-1 flex items-start gap-1 text-sm text-ink-muted">
+                        <PinIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span className="break-words">{business.address}</span>
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </div>

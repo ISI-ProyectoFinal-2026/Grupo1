@@ -8,10 +8,10 @@ export const PIN_COLORS: Record<ReportType, string> = {
   found: "#2457A6",
 };
 
-const PIN_WIDTH = 30;
-const PIN_HEIGHT = 40;
+export const PIN_WIDTH = 30;
+export const PIN_HEIGHT = 40;
 
-function pinSvg(color: string): string {
+export function pinSvg(color: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_WIDTH}" height="${PIN_HEIGHT}" viewBox="0 0 30 40" aria-hidden="true"><path d="M15 1C7.3 1 1 7.3 1 15c0 10.5 14 24 14 24s14-13.5 14-24C29 7.3 22.7 1 15 1z" fill="${color}" stroke="#FFFFFF" stroke-width="2"/><circle cx="15" cy="15" r="5" fill="#FFFFFF"/></svg>`;
 }
 
