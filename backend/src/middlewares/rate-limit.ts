@@ -60,6 +60,20 @@ export const reportCreateLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === "test",
 });
 
+// Geocodificación inversa (#216): por IP, porque el endpoint es público. El
+// tope de 1 req/s hacia Nominatim es global y lo aplica el servicio; esto evita
+// que una sola IP llene la cola de espera.
+export const REVERSE_GEOCODE_RATE_LIMIT = 30;
+
+export const reverseGeocodeLimiter = rateLimit({
+  windowMs: 60_000,
+  max: REVERSE_GEOCODE_RATE_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { message: "Demasiadas consultas de ubicación, esperá un minuto" } },
+  skip: () => process.env.NODE_ENV === "test",
+});
+
 // Impresiones y clics de anuncios: por IP, porque los anónimos también suman.
 // Frena el inflado de métricas sin cortar una sesión normal del feed.
 export const AD_EVENTS_RATE_LIMIT = 60;
