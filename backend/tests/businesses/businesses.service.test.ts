@@ -179,6 +179,17 @@ describe("businesses.service", () => {
     expect(found!.name).toBe(baseBusinessData.name);
   });
 
+  test("listPublic() expone las coordenadas del comercio", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    const list = await businessesService.listPublic({});
+    const found = list.find((item) => item.id === business.id);
+
+    expect(found!.latitude).toBeCloseTo(-34.6251, 5);
+    expect(found!.longitude).toBeCloseTo(-68.3221, 5);
+  });
+
   test("listPublic() filtra por categoría", async () => {
     const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
     createdBusinessIds.push(business.id);
@@ -199,6 +210,16 @@ describe("businesses.service", () => {
     expect(publicBusiness.id).toBe(business.id);
     expect(publicBusiness).not.toHaveProperty("cuit");
     expect(publicBusiness).not.toHaveProperty("userId");
+  });
+
+  test("getPublicById() expone las coordenadas del comercio", async () => {
+    const business = await businessesService.create({ userId, ...baseBusinessData, cuit: uniqueCuit() });
+    createdBusinessIds.push(business.id);
+
+    const publicBusiness = await businessesService.getPublicById(business.id);
+
+    expect(publicBusiness.latitude).toBeCloseTo(-34.6251, 5);
+    expect(publicBusiness.longitude).toBeCloseTo(-68.3221, 5);
   });
 
   test("getPublicById() lanza AppError 404 si el comercio no existe", async () => {

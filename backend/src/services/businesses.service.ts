@@ -15,6 +15,8 @@ const publicBusinessSelect = {
   address: true,
   phone: true,
   category: true,
+  latitude: true,
+  longitude: true,
   plan: true,
   createdAt: true,
 } satisfies Prisma.BusinessSelect;
