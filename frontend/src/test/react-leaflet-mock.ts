@@ -9,18 +9,26 @@ type LatLng = { lat: number; lng: number }
 type LatLngTuple = [number, number]
 type ClickHandler = (event: { latlng: LatLng }) => void
 type DragEndHandler = (event: { target: { getLatLng: () => LatLng } }) => void
+type MoveEndHandler = () => void
+type Bounds = { south: number; west: number; north: number; east: number }
+
+const DEFAULT_BOUNDS: Bounds = { south: -34.7, west: -68.4, north: -34.5, east: -68.2 }
 
 // estado compartido entre el doble y el test
 const state: {
   click?: ClickHandler
   dragEnd?: DragEndHandler
+  moveEnd?: MoveEndHandler
   zoom: number
   visible: LatLng | null
-} = { zoom: 13, visible: null }
+  bounds: Bounds
+} = { zoom: 13, visible: null, bounds: DEFAULT_BOUNDS }
 
 // el doble registra los handlers que recibe para que el test los dispare
-function register(handlers: { click?: ClickHandler; dragEnd?: DragEndHandler }) {
-  Object.assign(state, handlers)
+function register(handlers: { click?: ClickHandler; dragEnd?: DragEndHandler; moveEnd?: MoveEndHandler }) {
+  for (const [key, handler] of Object.entries(handlers)) {
+    if (handler) Object.assign(state, { [key]: handler })
+  }
 }
 
 export const mapSpy = { setView: vi.fn() }
@@ -28,9 +36,19 @@ export const mapSpy = { setView: vi.fn() }
 export function resetLeafletMock() {
   state.click = undefined
   state.dragEnd = undefined
+  state.moveEnd = undefined
   state.zoom = 13
   state.visible = null
+  state.bounds = DEFAULT_BOUNDS
   mapSpy.setView.mockReset()
+}
+
+// mueve el mapa: fija el area visible y dispara moveend como lo hace Leaflet
+export function moveMapTo(bounds: Bounds) {
+  state.bounds = bounds
+  act(() => {
+    state.moveEnd?.()
+  })
 }
 
 // fija el zoom y el unico punto que el mapa considera visible
@@ -96,11 +114,13 @@ export function useMap() {
     getBounds: () => ({
       contains: ([lat, lng]: LatLngTuple) =>
         state.visible !== null && state.visible.lat === lat && state.visible.lng === lng,
+      getSouthWest: () => ({ lat: state.bounds.south, lng: state.bounds.west }),
+      getNorthEast: () => ({ lat: state.bounds.north, lng: state.bounds.east }),
     }),
   }
 }
 
-export function useMapEvents(handlers: { click?: ClickHandler }) {
-  register({ click: handlers.click })
+export function useMapEvents(handlers: { click?: ClickHandler; moveend?: MoveEndHandler }) {
+  register({ click: handlers.click, moveEnd: handlers.moveend })
   return useMap()
 }

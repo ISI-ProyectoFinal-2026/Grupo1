@@ -104,6 +104,90 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
     expect(found.location).toEqual({ lat: expect.any(Number), lng: expect.any(Number) });
   });
 
+  describe("filtros del feed y tope de resultados", () => {
+    const BBOX = "-34.7,-58.5,-34.5,-58.3";
+
+    function ids(body: { id: number }[]) {
+      return body.map((r) => r.id);
+    }
+
+    async function createTracked(data: Record<string, unknown>) {
+      const created = await createPublishedReport(token, { userId, location: { lat: -34.6037, lng: -58.3816 }, ...data });
+      createdReportIds.push(created.id);
+      return created;
+    }
+
+    test("GET /api/geo/map filtra por type", async () => {
+      const lost = await createTracked({ reportType: "lost", title: "Perdido" });
+      const found = await createTracked({ reportType: "found", title: "Encontrado" });
+
+      const res = await request(app).get(`/api/geo/map?bounds=${BBOX}&type=lost`);
+
+      expect(res.status).toBe(200);
+      expect(ids(res.body)).toContain(lost.id);
+      expect(ids(res.body)).not.toContain(found.id);
+    });
+
+    test("GET /api/geo/map filtra por zone sobre la dirección", async () => {
+      const palermo = await createTracked({ reportType: "found", title: "En Palermo", locationAddress: "Palermo, CABA" });
+      const caballito = await createTracked({ reportType: "found", title: "En Caballito", locationAddress: "Caballito, CABA" });
+
+      const res = await request(app).get(`/api/geo/map?bounds=${BBOX}&zone=palermo`);
+
+      expect(ids(res.body)).toContain(palermo.id);
+      expect(ids(res.body)).not.toContain(caballito.id);
+    });
+
+    test("GET /api/geo/map filtra por rango de fechas", async () => {
+      const created = await createTracked({ reportType: "found", title: "Por fecha" });
+
+      const futuro = await request(app).get(`/api/geo/map?bounds=${BBOX}&dateFrom=2999-01-01`);
+      const pasado = await request(app).get(`/api/geo/map?bounds=${BBOX}&dateTo=2000-01-01`);
+      const dentro = await request(app).get(`/api/geo/map?bounds=${BBOX}&dateFrom=2000-01-01&dateTo=2999-01-01`);
+
+      expect(ids(futuro.body)).not.toContain(created.id);
+      expect(ids(pasado.body)).not.toContain(created.id);
+      expect(ids(dentro.body)).toContain(created.id);
+    });
+
+    test("GET /api/geo/map respeta limit y devuelve los más nuevos", async () => {
+      await createTracked({ reportType: "found", title: "Viejo" });
+      const nuevo = await createTracked({ reportType: "found", title: "Nuevo" });
+
+      const res = await request(app).get(`/api/geo/map?bounds=${BBOX}&limit=1`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].id).toBe(nuevo.id);
+    });
+
+    test("GET /api/geo/map aplica un tope por defecto cuando no se pasa limit", async () => {
+      const res = await request(app).get(`/api/geo/map?bounds=${BBOX}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.length).toBeLessThanOrEqual(200);
+    });
+
+    test("GET /api/geo/map responde 400 si type, fechas o limit son inválidos", async () => {
+      for (const query of ["type=otro", "dateFrom=nofecha", "limit=0", "limit=501", "limit=abc"]) {
+        const res = await request(app).get(`/api/geo/map?bounds=${BBOX}&${query}`);
+        expect(res.status).toBe(400);
+      }
+    });
+
+    test("GET /api/geo/nearby filtra por type y respeta limit", async () => {
+      const lost = await createTracked({ reportType: "lost", title: "Perdido cerca" });
+      const found = await createTracked({ reportType: "found", title: "Encontrado cerca" });
+
+      const porTipo = await request(app).get("/api/geo/nearby?lat=-34.6037&lng=-58.3816&radius=5&type=lost");
+      const conTope = await request(app).get("/api/geo/nearby?lat=-34.6037&lng=-58.3816&radius=5&limit=1");
+
+      expect(ids(porTipo.body)).toContain(lost.id);
+      expect(ids(porTipo.body)).not.toContain(found.id);
+      expect(conTope.body).toHaveLength(1);
+    });
+  });
+
   test("GET /api/geo/map responde 400 si falta bounds", async () => {
     const res = await request(app).get("/api/geo/map");
     expect(res.status).toBe(400);
