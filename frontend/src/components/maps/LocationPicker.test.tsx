@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LocationPicker from '@/components/maps/LocationPicker'
 import { PILOT_ZONE_CENTER } from '@/lib/map'
+import { reverseGeocode } from '@/services/geo.service'
 import {
   clickMap,
   dragPinTo,
@@ -12,9 +13,11 @@ import {
 } from '@/test/react-leaflet-mock'
 
 vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
+vi.mock('@/services/geo.service', () => ({ reverseGeocode: vi.fn() }))
 
-function nominatim(city: string) {
-  return { ok: true, json: async () => ({ address: { city } }) } as Response
+// la geocodificacion inversa pasa por el backend (ADR-0025): el mock devuelve la zona
+function zona(city: string): string {
+  return city
 }
 
 function deferred<T>() {
@@ -25,12 +28,11 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-const fetchMock = vi.fn()
+const reverseMock = vi.mocked(reverseGeocode)
 
 beforeEach(() => {
   resetLeafletMock()
-  fetchMock.mockReset()
-  vi.stubGlobal('fetch', fetchMock)
+  reverseMock.mockReset()
 })
 
 afterEach(() => {
@@ -47,7 +49,7 @@ describe('LocationPicker: mapa', () => {
   })
 
   it('tocar el mapa coloca un pin arrastrable y avisa las coordenadas al instante', () => {
-    fetchMock.mockReturnValue(new Promise(() => {}))
+    reverseMock.mockReturnValue(new Promise(() => {}))
     const onLocationSelect = vi.fn()
     render(<LocationPicker onLocationSelect={onLocationSelect} />)
 
@@ -60,8 +62,8 @@ describe('LocationPicker: mapa', () => {
     expect(screen.getByText('Ubicación seleccionada')).toBeInTheDocument()
   })
 
-  it('reemplaza la etiqueta con la zona que devuelve Nominatim', async () => {
-    fetchMock.mockResolvedValue(nominatim('San Rafael'))
+  it('reemplaza la etiqueta con la zona que devuelve el backend', async () => {
+    reverseMock.mockResolvedValue(zona('San Rafael'))
     const onLocationSelect = vi.fn()
     render(<LocationPicker onLocationSelect={onLocationSelect} />)
 
@@ -69,11 +71,11 @@ describe('LocationPicker: mapa', () => {
 
     expect(await screen.findByText('San Rafael')).toBeInTheDocument()
     expect(onLocationSelect).toHaveBeenLastCalledWith({ lat: -34.61, lng: -68.33 }, 'San Rafael')
-    expect(fetchMock.mock.calls[0][0]).toContain('lat=-34.61&lon=-68.33')
+    expect(reverseMock).toHaveBeenCalledWith(-34.61, -68.33, expect.any(AbortSignal))
   })
 
   it('arrastrar el pin actualiza la ubicacion elegida', () => {
-    fetchMock.mockReturnValue(new Promise(() => {}))
+    reverseMock.mockReturnValue(new Promise(() => {}))
     const onLocationSelect = vi.fn()
     render(<LocationPicker onLocationSelect={onLocationSelect} />)
 
@@ -84,11 +86,11 @@ describe('LocationPicker: mapa', () => {
     expect(onLocationSelect).toHaveBeenLastCalledWith({ lat: -34.62, lng: -68.34 }, '-34.6200, -68.3400')
   })
 
-  // Nominatim puede responder fuera de orden: la zona de un pin viejo no puede
-  // pisar la del pin actual.
-  it('descarta la respuesta de Nominatim de un pin que ya se movio', async () => {
-    const vieja = deferred<Response>()
-    fetchMock.mockReturnValueOnce(vieja.promise).mockResolvedValueOnce(nominatim('Zona nueva'))
+  // La geocodificacion puede responder fuera de orden: la zona de un pin viejo
+  // no puede pisar la del pin actual.
+  it('descarta la respuesta de un pin que ya se movio', async () => {
+    const vieja = deferred<string | null>()
+    reverseMock.mockReturnValueOnce(vieja.promise).mockResolvedValueOnce(zona('Zona nueva'))
     const onLocationSelect = vi.fn()
     render(<LocationPicker onLocationSelect={onLocationSelect} />)
 
@@ -96,40 +98,51 @@ describe('LocationPicker: mapa', () => {
     dragPinTo(-34.62, -68.34)
     expect(await screen.findByText('Zona nueva')).toBeInTheDocument()
 
-    vieja.resolve(nominatim('Zona vieja'))
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    vieja.resolve(zona('Zona vieja'))
+    await waitFor(() => expect(reverseMock).toHaveBeenCalledTimes(2))
     await new Promise((r) => setTimeout(r, 0))
 
     expect(screen.queryByText('Zona vieja')).not.toBeInTheDocument()
     expect(onLocationSelect).toHaveBeenLastCalledWith({ lat: -34.62, lng: -68.34 }, 'Zona nueva')
   })
 
-  it('si Nominatim falla conserva las coordenadas como etiqueta', async () => {
-    fetchMock.mockRejectedValue(new Error('timeout'))
+  it('si la geocodificacion falla conserva las coordenadas como etiqueta', async () => {
+    reverseMock.mockRejectedValue(new Error('timeout'))
     const onLocationSelect = vi.fn()
     render(<LocationPicker onLocationSelect={onLocationSelect} />)
 
     clickMap(-34.61, -68.33)
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await waitFor(() => expect(reverseMock).toHaveBeenCalled())
     expect(onLocationSelect).toHaveBeenCalledTimes(1)
     expect(screen.getByText('-34.6100, -68.3300')).toBeInTheDocument()
   })
 
-  it('sin resolveAddress no consulta Nominatim', () => {
+  it('si el backend no encuentra zona conserva las coordenadas como etiqueta', async () => {
+    reverseMock.mockResolvedValue(null)
+    const onLocationSelect = vi.fn()
+    render(<LocationPicker onLocationSelect={onLocationSelect} />)
+
+    clickMap(-34.61, -68.33)
+
+    await waitFor(() => expect(reverseMock).toHaveBeenCalled())
+    expect(await screen.findByText('-34.6100, -68.3300')).toBeInTheDocument()
+  })
+
+  it('sin resolveAddress no consulta la geocodificacion', () => {
     const onLocationSelect = vi.fn()
     render(<LocationPicker onLocationSelect={onLocationSelect} resolveAddress={false} />)
 
     clickMap(-34.61, -68.33)
 
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(reverseMock).not.toHaveBeenCalled()
     expect(onLocationSelect).toHaveBeenCalledWith({ lat: -34.61, lng: -68.33 }, '-34.6100, -68.3300')
     // sin zona resuelta las coordenadas no se repiten
     expect(screen.getAllByText('-34.6100, -68.3300')).toHaveLength(1)
   })
 
   it('acerca el mapa al pin si quedo lejos o con poco zoom', () => {
-    fetchMock.mockReturnValue(new Promise(() => {}))
+    reverseMock.mockReturnValue(new Promise(() => {}))
     render(<LocationPicker onLocationSelect={vi.fn()} />)
 
     clickMap(-34.61, -68.33)
@@ -138,7 +151,7 @@ describe('LocationPicker: mapa', () => {
   })
 
   it('no mueve el mapa si el pin ya esta a la vista con zoom suficiente', () => {
-    fetchMock.mockReturnValue(new Promise(() => {}))
+    reverseMock.mockReturnValue(new Promise(() => {}))
     setMapViewport(17, { lat: -34.61, lng: -68.33 })
     render(<LocationPicker onLocationSelect={vi.fn()} />)
 
@@ -167,11 +180,11 @@ describe('LocationPicker: ubicacion inicial (edicion)', () => {
     expect(screen.getByText('Ubicación seleccionada')).toBeInTheDocument()
     expect(screen.getByText('Nueva Córdoba')).toBeInTheDocument()
     expect(onLocationSelect).not.toHaveBeenCalled()
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(reverseMock).not.toHaveBeenCalled()
   })
 
   it('mover el pin reemplaza la ubicacion guardada', () => {
-    fetchMock.mockReturnValue(new Promise(() => {}))
+    reverseMock.mockReturnValue(new Promise(() => {}))
     const onLocationSelect = vi.fn()
     render(
       <LocationPicker
@@ -198,7 +211,7 @@ describe('LocationPicker: ubicacion actual', () => {
   }
 
   it('coloca el pin en la posicion del dispositivo', async () => {
-    fetchMock.mockReturnValue(new Promise(() => {}))
+    reverseMock.mockReturnValue(new Promise(() => {}))
     stubGeolocation((success) =>
       success({ coords: { latitude: -34.6, longitude: -68.32 } } as GeolocationPosition)
     )
