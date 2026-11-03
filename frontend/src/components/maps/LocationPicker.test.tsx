@@ -239,6 +239,65 @@ describe('LocationPicker: ubicacion actual', () => {
     expect(screen.queryByTestId('marker')).not.toBeInTheDocument()
   })
 
+  it('pide alta precision, con timeout y sin usar posiciones cacheadas', async () => {
+    reverseMock.mockReturnValue(new Promise(() => {}))
+    const getCurrentPosition = vi.fn()
+    stubGeolocation(getCurrentPosition)
+    const user = userEvent.setup()
+    render(<LocationPicker onLocationSelect={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /Usar mi ubicación actual/ }))
+
+    expect(getCurrentPosition).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.any(Function),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    )
+  })
+
+  it('avisa que la ubicacion es aproximada si la precision es baja y deja ajustar el pin', async () => {
+    reverseMock.mockReturnValue(new Promise(() => {}))
+    stubGeolocation((success) =>
+      success({ coords: { latitude: -34.6, longitude: -68.32, accuracy: 1800 } } as GeolocationPosition)
+    )
+    const user = userEvent.setup()
+    render(<LocationPicker onLocationSelect={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /Usar mi ubicación actual/ }))
+
+    expect(screen.getByText(/aproximada \(±1800 m\)/)).toBeInTheDocument()
+    expect(screen.getByTestId('marker')).toHaveAttribute('data-position', '-34.6,-68.32')
+    dragPinTo(-34.61, -68.33)
+    expect(screen.queryByText(/aproximada/)).not.toBeInTheDocument()
+  })
+
+  it('no avisa nada si la precision es buena', async () => {
+    reverseMock.mockReturnValue(new Promise(() => {}))
+    stubGeolocation((success) =>
+      success({ coords: { latitude: -34.6, longitude: -68.32, accuracy: 15 } } as GeolocationPosition)
+    )
+    const user = userEvent.setup()
+    render(<LocationPicker onLocationSelect={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /Usar mi ubicación actual/ }))
+
+    expect(screen.queryByText(/aproximada/)).not.toBeInTheDocument()
+  })
+
+  it('muestra un mensaje claro si la geolocalizacion supera el timeout', async () => {
+    stubGeolocation((_success, error) =>
+      error?.({ code: 3, TIMEOUT: 3, message: 'Timeout expired' } as GeolocationPositionError)
+    )
+    const user = userEvent.setup()
+    render(<LocationPicker onLocationSelect={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: /Usar mi ubicación actual/ }))
+
+    expect(
+      screen.getByText('No pudimos obtener tu ubicación a tiempo. Probá de nuevo o marcala en el mapa.')
+    ).toBeInTheDocument()
+  })
+
   it('avisa si el navegador no tiene geolocalizacion', async () => {
     stubGeolocation(undefined)
     const user = userEvent.setup()
