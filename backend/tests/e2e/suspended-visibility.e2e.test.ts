@@ -278,6 +278,18 @@ describe("E2E: contenido de cuentas suspendidas oculto", () => {
     expect(await visible()).toBe(false);
   });
 
+  test("POST /api/chats devuelve 404 al abrir un chat nuevo con un autor suspendido", async () => {
+    const freshReportId = await insertReport(author.id, "lost");
+    await expectHiddenWhileSuspended(async () => {
+      await prisma.chat.deleteMany({ where: { reportId: freshReportId } });
+      const res = await request(app)
+        .post("/api/chats")
+        .set(auth(viewer))
+        .send({ participantId: author.id, reportId: freshReportId });
+      return res.status === 201;
+    });
+  });
+
   test("los chats existentes no cambian mientras el autor está suspendido", async () => {
     setClock(T0);
     await suspend();

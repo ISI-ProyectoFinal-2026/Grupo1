@@ -1,6 +1,7 @@
 import { Chat, Message, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { isAuthorSuspended } from "./account-sanctions/visibility";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -59,6 +60,9 @@ export async function createChat(
   const existing = await prisma.chat.findUnique({ where: { userAId_userBId_reportId: key } });
   if (existing) {
     return { chat: existing, created: false };
+  }
+  if (await isAuthorSuspended(report.userId)) {
+    throw new AppError(404, "Reporte no encontrado");
   }
 
   try {
