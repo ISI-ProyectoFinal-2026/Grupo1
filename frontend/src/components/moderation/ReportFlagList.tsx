@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import Badge from '@/components/ui/Badge'
 import { buttonClasses } from '@/components/ui/buttonClasses'
 import type { ReportStatus } from '@/types/report.types'
-import type { ReportFlagDTO } from '@/types/moderation.types'
+import type { ReportFlagDTO, ResolveReportFlagAction } from '@/types/moderation.types'
 import { REPORT_STATUS_LABELS } from '@/lib/report-status'
 
 const REPORT_STATUS_COLORS: Record<ReportStatus, string> = {
@@ -15,8 +15,9 @@ const REPORT_STATUS_COLORS: Record<ReportStatus, string> = {
 
 interface ReportFlagListProps {
   flags: ReportFlagDTO[]
-  onResolve: (id: number) => void
-  resolvingId: number | null
+  onResolve: (id: number, action: ResolveReportFlagAction) => void
+  // aceptar cierra las demás denuncias del reporte: se bloquean todas mientras tanto
+  isResolving: boolean
 }
 
 const dateFormat = new Intl.DateTimeFormat('es-AR', {
@@ -30,7 +31,7 @@ function formatDate(value: string) {
   return dateFormat.format(new Date(value))
 }
 
-function ReportFlagList({ flags, onResolve, resolvingId }: ReportFlagListProps) {
+function ReportFlagList({ flags, onResolve, isResolving }: ReportFlagListProps) {
   if (flags.length === 0) {
     return (
       <EmptyState>
@@ -64,16 +65,28 @@ function ReportFlagList({ flags, onResolve, resolvingId }: ReportFlagListProps) 
               {formatDate(flag.createdAt)}
             </time>
             {flag.status === 'pending' ? (
-              <button
-                type='button'
-                onClick={() => onResolve(flag.id)}
-                disabled={resolvingId === flag.id}
-                className={buttonClasses('danger', 'sm')}
-              >
-                Resolver y ocultar
-              </button>
+              <div className='flex gap-2'>
+                <button
+                  type='button'
+                  onClick={() => onResolve(flag.id, 'dismiss')}
+                  disabled={isResolving}
+                  className={buttonClasses('secondary', 'sm')}
+                >
+                  Descartar
+                </button>
+                <button
+                  type='button'
+                  onClick={() => onResolve(flag.id, 'accept')}
+                  disabled={isResolving}
+                  className={buttonClasses('danger', 'sm')}
+                >
+                  Ocultar reporte
+                </button>
+              </div>
             ) : (
-              <span className='text-sm font-bold text-ink-muted'>Revisado</span>
+              <span className='text-sm font-bold text-ink-muted'>
+                {flag.status === 'reviewed' ? 'Aceptada' : 'Descartada'}
+              </span>
             )}
           </div>
         </li>

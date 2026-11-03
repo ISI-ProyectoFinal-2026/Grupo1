@@ -140,6 +140,14 @@ export function getReport(token: string, reportId: number): Promise<{ status: nu
   return call<ApiReport>('GET', `/reports/${reportId}`, { token })
 }
 
+export function flagReport(token: string, reportId: number, reason: string): Promise<{ status: number; body: unknown }> {
+  return call('POST', `/reports/${reportId}/flags`, { token, body: { reason } })
+}
+
+export function listNotifications(token: string): Promise<{ status: number; body: unknown }> {
+  return call('GET', '/notifications', { token })
+}
+
 export function listReportFlags(token: string): Promise<{ status: number; body: unknown }> {
   return call('GET', '/report-flags', { token })
 }

@@ -104,18 +104,19 @@ describe('ModerationPage', () => {
     expect(await screen.findByText('No se pudo cargar la cola de moderación')).toBeInTheDocument()
   })
 
-  it('resuelve un flag y confirma la accion', async () => {
+  it.each([
+    ['Ocultar reporte', 'accept', 'reviewed', 'Reporte ocultado y denuncia aceptada'],
+    ['Descartar', 'dismiss', 'dismissed', 'Denuncia descartada, el reporte sigue publicado'],
+  ] as const)('"%s" resuelve el flag y confirma la accion', async (boton, accion, status, mensaje) => {
     vi.mocked(moderationService.listReportFlags).mockResolvedValue([flag({ id: 42 })])
-    vi.mocked(moderationService.resolveReportFlag).mockResolvedValue(
-      flag({ id: 42, status: 'reviewed' })
-    )
+    vi.mocked(moderationService.resolveReportFlag).mockResolvedValue(flag({ id: 42, status }))
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByRole('button', { name: 'Resolver y ocultar' }))
+    await user.click(await screen.findByRole('button', { name: boton }))
 
-    await waitFor(() => expect(moderationService.resolveReportFlag).toHaveBeenCalledWith(42))
-    expect(await screen.findByText('Reporte ocultado y denuncia resuelta')).toBeInTheDocument()
+    await waitFor(() => expect(moderationService.resolveReportFlag).toHaveBeenCalledWith(42, accion))
+    expect(await screen.findByText(mensaje)).toBeInTheDocument()
   })
 
   it('muestra el error del backend cuando la resolucion falla', async () => {
@@ -126,7 +127,7 @@ describe('ModerationPage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByRole('button', { name: 'Resolver y ocultar' }))
+    await user.click(await screen.findByRole('button', { name: 'Ocultar reporte' }))
 
     expect(
       await screen.findByText('Este reporte de moderación ya fue revisado')

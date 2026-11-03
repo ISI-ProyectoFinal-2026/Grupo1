@@ -5,6 +5,7 @@ import {
   listReportFlagsQuerySchema,
   reportFlagIdParamSchema,
   reportFlagReportIdParamSchema,
+  resolveReportFlagSchema,
 } from "../validators/report-flags.validator";
 
 export async function create(req: Request, res: Response): Promise<void> {
@@ -22,6 +23,7 @@ export async function list(req: Request, res: Response): Promise<void> {
 
 export async function resolve(req: Request, res: Response): Promise<void> {
   const { id } = reportFlagIdParamSchema.parse(req.params);
-  const flag = await reportFlagsService.resolve(id);
+  const { action } = resolveReportFlagSchema.parse(req.body);
+  const flag = await reportFlagsService.resolve(id, action);
   res.status(200).json(flag);
 }

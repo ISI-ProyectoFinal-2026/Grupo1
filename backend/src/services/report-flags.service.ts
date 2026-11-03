@@ -1,7 +1,12 @@
 import { Prisma, ReportFlag, ReportFlagStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
-import { CreateReportFlagInput, ListReportFlagsQuery } from "../validators/report-flags.validator";
+import {
+  CreateReportFlagInput,
+  ListReportFlagsQuery,
+  ResolveReportFlagAction,
+} from "../validators/report-flags.validator";
+import * as notificationsService from "./notifications.service";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -58,17 +63,14 @@ export async function list(filters: ListReportFlagsQuery = {}): Promise<ReportFl
   });
 }
 
-/**
- * Resuelve un flag: lo marca "reviewed" y rechaza (oculta) el reporte
- * asociado, en una única operación atómica. Escritura condicional al estilo
- * de matching.service.ts `decideMatch`: si dos moderadores resuelven el
- * mismo flag a la vez, solo el primero gana.
- */
-export async function resolve(id: number): Promise<ReportFlagWithReport> {
-  await prisma.$transaction(async (tx) => {
+// escritura condicional: con dos moderadores a la vez gana el primero; aceptar cierra las demás y avisa al autor
+export async function resolve(id: number, action: ResolveReportFlagAction): Promise<ReportFlagWithReport> {
+  const status = action === "accept" ? ReportFlagStatus.reviewed : ReportFlagStatus.dismissed;
+
+  const hiddenReportId = await prisma.$transaction(async (tx) => {
     const { count } = await tx.reportFlag.updateMany({
       where: { id, status: ReportFlagStatus.pending },
-      data: { status: ReportFlagStatus.reviewed },
+      data: { status },
     });
 
     if (count === 0) {
@@ -79,9 +81,26 @@ export async function resolve(id: number): Promise<ReportFlagWithReport> {
       throw new AppError(409, "Este reporte de moderación ya fue revisado");
     }
 
+    if (action === "dismiss") {
+      return null;
+    }
+
     const flag = await tx.reportFlag.findUniqueOrThrow({ where: { id } });
     await tx.report.update({ where: { id: flag.reportId }, data: { status: "rejected" } });
+    await tx.reportFlag.updateMany({
+      where: { reportId: flag.reportId, status: ReportFlagStatus.pending },
+      data: { status: ReportFlagStatus.reviewed },
+    });
+    return flag.reportId;
   });
+
+  if (hiddenReportId !== null) {
+    try {
+      await notificationsService.createForStatusChange(hiddenReportId, "hidden_by_flag");
+    } catch (error) {
+      console.error(`[report-flags] no se pudo avisar al dueño el ocultamiento del report ${hiddenReportId}:`, error);
+    }
+  }
 
   return prisma.reportFlag.findUniqueOrThrow({ where: { id }, include: reportFlagWithReportInclude });
 }

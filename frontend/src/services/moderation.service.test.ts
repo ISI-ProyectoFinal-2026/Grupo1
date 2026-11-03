@@ -48,16 +48,16 @@ describe('moderation.service', () => {
     expect(api.get).toHaveBeenCalledWith('/report-flags', { params: { status: 'reviewed' } })
   })
 
-  it('resuelve un flag con PATCH y sin cuerpo', async () => {
+  it('resuelve un flag con PATCH y la accion elegida', async () => {
     const resuelto = flag({
       status: 'reviewed',
       report: { id: 10, title: 'X', status: 'rejected' },
     })
     vi.mocked(api.patch).mockResolvedValue(respuesta(resuelto))
 
-    const resultado = await resolveReportFlag(1)
+    const resultado = await resolveReportFlag(1, 'accept')
 
-    expect(api.patch).toHaveBeenCalledWith('/report-flags/1')
+    expect(api.patch).toHaveBeenCalledWith('/report-flags/1', { action: 'accept' })
     expect(resultado.status).toBe('reviewed')
     expect(resultado.report.status).toBe('rejected')
   })
