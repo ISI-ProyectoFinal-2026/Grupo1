@@ -6,6 +6,7 @@ import LocationConsentModal from "@/components/account/LocationConsentModal";
 import UnverifiedEmailBanner from "@/components/auth/UnverifiedEmailBanner";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useIsModerator } from "@/hooks/useIsModerator";
 import { useLocationSync } from "@/hooks/useLocationSync";
 import { cn } from "@/lib/cn";
@@ -106,6 +107,7 @@ function MainLayout() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const isModerator = useIsModerator();
+  const isAdmin = useIsAdmin();
   // Mantiene sincronizado `emailVerifiedAt` con el backend (ver el hook).
   useCurrentUser();
   // Actualiza la ubicación una vez por apertura si la persona la aceptó.
@@ -137,6 +139,7 @@ function MainLayout() {
     isOwnPetsPath(pathname) ||
     isOwnBusinessPath(pathname) ||
     pathname === "/moderation" ||
+    pathname === "/admin/users" ||
     pathname === "/account/security" ||
     pathname === "/account/notifications";
 
@@ -289,6 +292,17 @@ function MainLayout() {
               >
                 <ShieldIcon className="h-5 w-5" />
                 Moderación
+              </Link>
+            )}
+            {isAdmin && (
+              <Link
+                to="/admin/users"
+                onClick={closeMore}
+                aria-current={pathname === "/admin/users" ? "page" : undefined}
+                className={moreLinkClasses(pathname === "/admin/users")}
+              >
+                <UserIcon className="h-5 w-5" />
+                Administración
               </Link>
             )}
 

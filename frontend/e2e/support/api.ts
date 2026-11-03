@@ -148,6 +148,10 @@ export function listNotifications(token: string): Promise<{ status: number; body
   return call('GET', '/notifications', { token })
 }
 
+export function listAdminUsers(token: string): Promise<{ status: number; body: unknown }> {
+  return call('GET', '/admin/users', { token })
+}
+
 export function listReportFlags(token: string): Promise<{ status: number; body: unknown }> {
   return call('GET', '/report-flags', { token })
 }

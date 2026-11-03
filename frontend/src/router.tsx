@@ -28,6 +28,7 @@ import ModerationPage from "./pages/moderation/ModerationPage";
 import MyPetsPage from "./pages/pets/MyPetsPage";
 import CreatePetPage from "./pages/pets/CreatePetPage";
 import EditPetPage from "./pages/pets/EditPetPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -77,6 +78,10 @@ export const router = createBrowserRouter([
           {
             element: <RequireRole roles={["moderador", "admin"]} />,
             children: [{ path: "moderation", element: <ModerationPage /> }],
+          },
+          {
+            element: <RequireRole roles={["admin"]} />,
+            children: [{ path: "admin/users", element: <AdminUsersPage /> }],
           },
         ],
       },

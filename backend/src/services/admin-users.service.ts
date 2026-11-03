@@ -1,6 +1,7 @@
 import { Prisma, Role } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import type { ListRoleAuditQuery, ListUsersQuery } from "../validators/admin-users.validator";
 
 // usuario sin passwordHash ni secretos
 const adminUserSelect = {
@@ -11,7 +12,72 @@ const adminUserSelect = {
   createdAt: true,
 } satisfies Prisma.UserSelect;
 
-export type AdminUser = Prisma.UserGetPayload<{ select: typeof adminUserSelect }>;
+// etiquetas visibles de cada rol
+const ROLE_LABELS: Record<Role, string> = {
+  usuario_regular: "Usuario",
+  moderador: "Moderador",
+  admin: "Administrador",
+};
+
+export type AdminUser =Prisma.UserGetPayload<{ select: typeof adminUserSelect }>;
+
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function listUsers({ q, role, page, pageSize }: ListUsersQuery): Promise<Paginated<AdminUser>> {
+  const where: Prisma.UserWhereInput = {
+    ...(role ? { role } : {}),
+    ...(q
+      ? {
+          OR: [
+            { fullName: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+  const [items, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: adminUserSelect,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.user.count({ where }),
+  ]);
+  return { items, total, page, pageSize };
+}
+
+const auditUserSelect = { id: true, email: true, fullName: true } satisfies Prisma.UserSelect;
+
+const roleAuditSelect = {
+  id: true,
+  createdAt: true,
+  previousRole: true,
+  newRole: true,
+  actor: { select: auditUserSelect },
+  target: { select: auditUserSelect },
+} satisfies Prisma.RoleChangeAuditSelect;
+
+export type RoleAuditEntry = Prisma.RoleChangeAuditGetPayload<{ select: typeof roleAuditSelect }>;
+
+export async function listRoleAudit({ page, pageSize }: ListRoleAuditQuery): Promise<Paginated<RoleAuditEntry>> {
+  const [items, total] = await Promise.all([
+    prisma.roleChangeAudit.findMany({
+      select: roleAuditSelect,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.roleChangeAudit.count(),
+  ]);
+  return { items, total, page, pageSize };
+}
 
 export function assertAdminRemains(adminCount: number, previousRole: Role, newRole: Role): void {
   if (previousRole === "admin" && newRole !== "admin" && adminCount <= 1) {
@@ -53,7 +119,7 @@ export async function changeRole(actorId: number, targetId: number, newRole: Rol
         userId: targetId,
         type: "role_change",
         title: "Tu rol cambió",
-        message: `Un administrador cambió tu rol a ${newRole}.`,
+        message: `Un administrador cambió tu rol a ${ROLE_LABELS[newRole]}.`,
       },
     });
 

@@ -74,6 +74,42 @@ describe('MainLayout', () => {
     )
   })
 
+  it('ofrece la administracion de usuarios a un admin', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, role: 'admin' } })
+
+    renderLayout()
+
+    expect(await screen.findByRole('link', { name: 'Administración' })).toHaveAttribute(
+      'href',
+      '/admin/users'
+    )
+  })
+
+  it('marca Administración como activa en su ruta', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, role: 'admin' } })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout('/admin/users')
+
+    expect(await screen.findByRole('link', { name: 'Administración' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+  })
+
+  it.each(['moderador', 'usuario_regular'] as const)(
+    'oculta la administracion al rol %s',
+    async (role) => {
+      useAuthStore.setState({ token: 'token', user: { ...usuario, role } })
+
+      renderLayout()
+
+      await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+      expect(screen.getByRole('link', { name: 'Mis mascotas' })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Administración' })).not.toBeInTheDocument()
+    }
+  )
+
   it('ofrece el acceso a mis mascotas con sesion', async () => {
     useAuthStore.setState({ token: 'token', user: usuario })
 
