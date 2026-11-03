@@ -62,6 +62,8 @@ model User {
   adFlags       AdFlag[]
   business      Business?
   businessEvents BusinessEvent[]
+  roleChangesMade     RoleChangeAudit[] @relation("RoleChangeActor")
+  roleChangesReceived RoleChangeAudit[] @relation("RoleChangeTarget")
 
   @@map("users")
 }
@@ -285,7 +287,7 @@ model Message {
 model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int      @map("user_id")
-  type      String? // match_suggested | message | report_status_change | nearby_report
+  type      String? // match_suggested | message | report_status_change | nearby_report | role_change
   title     String?
   message   String?
   reportId  Int?     @map("report_id")
@@ -297,6 +299,22 @@ model Notification {
 
   @@index([userId])
   @@map("notifications")
+}
+
+// historial append-only de cambios de rol (#224)
+model RoleChangeAudit {
+  id           Int      @id @default(autoincrement())
+  actorId      Int      @map("actor_id")
+  targetId     Int      @map("target_id")
+  previousRole Role     @map("previous_role")
+  newRole      Role     @map("new_role")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actor  User @relation("RoleChangeActor", fields: [actorId], references: [id], onDelete: Restrict)
+  target User @relation("RoleChangeTarget", fields: [targetId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt])
+  @@map("role_change_audits")
 }
 
 enum LocationConsentStatus {
