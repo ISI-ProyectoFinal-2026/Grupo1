@@ -19,6 +19,11 @@ export async function list(req: Request, res: Response): Promise<void> {
   res.status(200).json(reports);
 }
 
+export async function listMine(req: Request, res: Response): Promise<void> {
+  const reports = await reportsService.listOwned(req.userId!);
+  res.status(200).json(reports);
+}
+
 export async function create(req: Request, res: Response): Promise<void> {
   const data = createReportSchema.parse(req.body);
   const report = await reportsService.create({ ...data, userId: req.userId! });

@@ -105,6 +105,14 @@ export async function list(filters: ListReportsQuery = {}, viewerId?: number): P
   return rows.map(toReportDTO);
 }
 
+// "Mis reportes" (#225): todos los estados, solo del dueño
+export async function listOwned(userId: number): Promise<ReportDTO[]> {
+  const rows = await prisma.$queryRaw<ReportRow[]>`
+    SELECT ${reportColumns} FROM reports r WHERE r.user_id = ${userId} ORDER BY r.created_at DESC, r.id DESC
+  `;
+  return rows.map(toReportDTO);
+}
+
 export async function getById(id: number): Promise<ReportDTO> {
   const rows = await prisma.$queryRaw<ReportRow[]>`
     SELECT ${reportColumns} FROM reports r WHERE r.id = ${id}

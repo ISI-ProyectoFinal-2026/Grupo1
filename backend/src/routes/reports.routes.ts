@@ -18,6 +18,8 @@ const flyerLimiter = rateLimit({
 });
 
 reportsRouter.get("/", optionalAuth, reportsController.list);
+// Va antes de /:id para que "mine" no se tome como id (#225).
+reportsRouter.get("/mine", requireAuth, reportsController.listMine);
 // El gate va antes del limiter: un usuario sin verificar no gasta su cupo de reportes.
 reportsRouter.post("/", requireAuth, requireVerifiedEmail, reportCreateLimiter, reportsController.create);
 // Posibles duplicados mientras se completa el formulario de alta (#211).
