@@ -15,7 +15,7 @@ cp .env.example .env
 | `DATABASE_URL` | sí | Puerto `5433` en el host, ver `../docker/ENV_VARS.md` |
 | `JWT_SECRET` / `JWT_EXPIRY` | sí | Firma de los tokens de sesión |
 | `INTERNAL_API_KEY` | **sí** | Clave compartida con el Backend IA. **Mismo valor que en `../backend-ia/.env`** (ver abajo) |
-| `AI_SERVICE_URL` | no | Backend IA. Si no está seteada, el trigger de generación de embedding no hace nada (no rompe la creación del reporte, ver `src/services/matching.service.ts`) |
+| `AI_SERVICE_URL` | no | Backend IA. Si no está seteada, el trigger de generación de embedding no hace nada (no rompe la creación del reporte, ver `src/services/matching.service.ts`), pero los reportes con foto quedan en `pending`: el arranque lo advierte en el log, `GET /health` informa `ai: "not_configured"` y `GET /health/ai` responde 503 (200 si el Backend IA contesta) |
 | `FRONTEND_URL` | no | Origen permitido por CORS y base de los enlaces `/verify-email` y `/reset-password` de los emails (default `http://localhost:5173`) |
 | `TRUST_PROXY` | no | Cantidad de proxies delante del backend (ej. `1` detrás del proxy de Vite, un túnel o el load balancer). Sin esto, los rate limiters ven la IP del proxy y el límite pasa a ser global. Vacío/`false` = no confiar en ningún proxy. `true` se rechaza a propósito: confiaría en un `X-Forwarded-For` que el cliente puede falsificar |
 | `PORT` | no | Default `3001` |
