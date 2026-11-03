@@ -15,6 +15,12 @@ export async function listReports(filters?: ListReportsQuery): Promise<ReportDTO
   return data;
 }
 
+// reportes propios en cualquier estado (#225)
+export async function listMyReports(): Promise<ReportDTO[]> {
+  const { data } = await api.get<ReportDTO[]>("/reports/mine");
+  return data;
+}
+
 export async function getReport(id: number): Promise<ReportDTO> {
   const { data } = await api.get<ReportDTO>(`/reports/${id}`);
   return data;

@@ -35,7 +35,8 @@ interface NavItemConfig {
 // pertenece a "Reportar" (no a "Reportes") y /businesses/dashboard o /plan a "Mi comercio"
 // (no a "Comercios"), cosa que el match por prefijo de NavLink no distingue.
 const isReportsPath = (path: string) =>
-  path === "/reports" || (path.startsWith("/reports/") && path !== "/reports/new");
+  path === "/reports" ||
+  (path.startsWith("/reports/") && path !== "/reports/new" && path !== "/reports/mine");
 const isOwnBusinessPath = (path: string) =>
   path === "/businesses/dashboard" || path === "/businesses/register" || path === "/businesses/plan";
 const isOwnPetsPath = (path: string) => path === "/pets" || path.startsWith("/pets/");
@@ -260,6 +261,15 @@ function MainLayout() {
             >
               <PawIcon className="h-5 w-5" />
               Mis mascotas
+            </Link>
+            <Link
+              to="/reports/mine"
+              onClick={closeMore}
+              aria-current={pathname === "/reports/mine" ? "page" : undefined}
+              className={moreLinkClasses(pathname === "/reports/mine")}
+            >
+              <ListIcon className="h-5 w-5" />
+              Mis reportes
             </Link>
             <Link
               to="/businesses/dashboard"

@@ -478,4 +478,44 @@ describe("GET/POST/PUT/DELETE /api/reports", () => {
       expect(res.body.some((r: { id: number }) => r.id === id)).toBe(false);
     });
   });
+
+  // "Mis reportes" (#225): el dueño ve los suyos en cualquier estado.
+  describe("GET /api/reports/mine", () => {
+    test("responde 401 sin sesión", async () => {
+      const res = await request(app).get("/api/reports/mine");
+      expect(res.status).toBe(401);
+    });
+
+    test("devuelve los reportes propios en todos los estados, del más nuevo al más viejo", async () => {
+      const ids: number[] = [];
+      for (const status of ["pending", "published", "rejected", "resolved"] as const) {
+        const created = await request(app)
+          .post("/api/reports")
+          .set("Authorization", `Bearer ${token}`)
+          .send({ userId, ...baseReportData, imageUrl: TEST_IMAGE_URL });
+        createdReportIds.push(created.body.id);
+        ids.push(created.body.id);
+        if (status !== "pending") {
+          await prisma.report.update({ where: { id: created.body.id }, data: { status } });
+        }
+      }
+
+      const res = await request(app).get("/api/reports/mine").set("Authorization", `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      const mine = res.body.filter((r: { id: number }) => ids.includes(r.id));
+      expect(mine.map((r: { status: string }) => r.status)).toEqual(["resolved", "rejected", "published", "pending"]);
+      expect(res.body.every((r: { userId: number }) => r.userId === userId)).toBe(true);
+    });
+
+    test("no incluye reportes de otro usuario", async () => {
+      const other = await createPublishedReport(otherToken, { userId: otherUserId, ...baseReportData });
+      createdReportIds.push(other.id);
+
+      const res = await request(app).get("/api/reports/mine").set("Authorization", `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.some((r: { id: number }) => r.id === other.id)).toBe(false);
+    });
+  });
 });

@@ -17,6 +17,7 @@ import FeedPage from "./pages/reports/FeedPage";
 import CreateReportPage from "./pages/reports/CreateReportPage";
 import ReportDetailPage from "./pages/reports/ReportDetailPage";
 import EditReportPage from "./pages/reports/EditReportPage";
+import MyReportsPage from "./pages/reports/MyReportsPage";
 import ChatPage from "./pages/chat/ChatPage";
 import BusinessRegisterPage from "./pages/business/BusinessRegisterPage";
 import BusinessDashboardPage from "./pages/business/BusinessDashboardPage";
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Home /> },
           { path: "reports", element: <FeedPage /> },
           { path: "reports/new", element: <CreateReportPage /> },
+          { path: "reports/mine", element: <MyReportsPage /> },
           { path: "reports/:id", element: <ReportDetailPage /> },
           { path: "reports/:id/edit", element: <EditReportPage /> },
           { path: "chats", element: <ChatPage /> },
