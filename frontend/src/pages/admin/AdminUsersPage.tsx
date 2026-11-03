@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ConfirmRoleChangeDialog from '@/components/admin/ConfirmRoleChangeDialog'
+import RoleAuditLog from '@/components/admin/RoleAuditLog'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
 import ErrorMessage from '@/components/ui/ErrorMessage'
@@ -184,6 +185,8 @@ function AdminUsersPage() {
             </Button>
           </nav>
         )}
+
+        <RoleAuditLog />
       </div>
 
       {pending && (

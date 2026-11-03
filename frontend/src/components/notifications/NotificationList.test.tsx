@@ -31,6 +31,25 @@ describe('NotificationList', () => {
     expect(screen.getByText('No tenés notificaciones')).toBeInTheDocument()
   })
 
+  it('muestra la notificacion de cambio de rol con su titulo y mensaje', () => {
+    render(
+      <NotificationList
+        notifications={[
+          notificacion({
+            type: 'role_change',
+            title: 'Tu rol cambió',
+            message: 'Un administrador cambió tu rol a Moderador.',
+          }),
+        ]}
+        onMarkRead={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Tu rol cambió')).toBeInTheDocument()
+    expect(screen.getByText('Un administrador cambió tu rol a Moderador.')).toBeInTheDocument()
+  })
+
   it('muestra solo la primera pagina', () => {
     render(<NotificationList notifications={muchas(7)} onMarkRead={vi.fn()} onDelete={vi.fn()} />)
 

@@ -54,6 +54,7 @@ vi.mock('@/pages/business/BusinessProfilePage', () => ({
 vi.mock('@/pages/pets/MyPetsPage', () => ({ default: () => <div>pagina mis mascotas</div> }))
 vi.mock('@/pages/pets/CreatePetPage', () => ({ default: () => <div>pagina alta mascota</div> }))
 vi.mock('@/pages/pets/EditPetPage', () => ({ default: () => <div>pagina editar mascota</div> }))
+vi.mock('@/pages/admin/AdminUsersPage', () => ({ default: () => <div>pagina admin usuarios</div> }))
 
 const usuario: AuthUser = {
   id: 7,
@@ -184,6 +185,36 @@ describe('router: rutas protegidas', () => {
 
     expect(screen.queryByText('pagina perfil comercio')).not.toBeInTheDocument()
   })
+})
+
+describe('router: administracion de usuarios', () => {
+  it('/admin/users manda al login sin token', () => {
+    const memoria = renderRuta('/admin/users')
+
+    expect(screen.getByText('pagina login')).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe('/login')
+  })
+
+  it('/admin/users se renderiza para un admin', () => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', { ...usuario, role: 'admin' })
+
+    renderRuta('/admin/users')
+
+    expect(screen.getByText('pagina admin usuarios')).toBeInTheDocument()
+  })
+
+  it.each(['moderador', 'usuario_regular'] as const)(
+    '/admin/users redirige a home para el rol %s',
+    (role) => {
+      useAuthStore.getState().setAuth('jwt-de-prueba', { ...usuario, role })
+
+      const memoria = renderRuta('/admin/users')
+
+      expect(screen.getByText('pagina home')).toBeInTheDocument()
+      expect(memoria.state.location.pathname).toBe('/')
+      expect(screen.queryByText('pagina admin usuarios')).not.toBeInTheDocument()
+    }
+  )
 })
 
 describe('router: rutas desconocidas', () => {
