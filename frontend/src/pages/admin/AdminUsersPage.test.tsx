@@ -55,10 +55,54 @@ beforeEach(() => {
   vi.clearAllMocks()
   useAuthStore.setState({ token: 'token', user: YO })
   vi.mocked(adminService.listAdminUsers).mockResolvedValue(pagina([propio, usuario()]))
+  vi.mocked(adminService.listRoleAudit).mockResolvedValue({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+  })
 })
 
 afterEach(() => {
   useAuthStore.setState({ token: null, user: null })
+})
+
+describe('AdminUsersPage: registro de cambios de rol', () => {
+  it('muestra el registro debajo del listado de usuarios', async () => {
+    vi.mocked(adminService.listRoleAudit).mockResolvedValue({
+      items: [
+        {
+          id: 3,
+          createdAt: '2026-09-02T10:00:00.000Z',
+          previousRole: 'usuario_regular',
+          newRole: 'admin',
+          actor: { id: 1, email: 'admin@example.com', fullName: 'Admin Root' },
+          target: { id: 9, email: 'lu@example.com', fullName: 'Lucía Gómez' },
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+    })
+    renderPage()
+
+    expect(
+      await screen.findByRole('heading', { name: 'Registro de cambios de rol' })
+    ).toBeInTheDocument()
+    expect(await screen.findByText('Lucía Gómez')).toBeInTheDocument()
+  })
+
+  it('el registro se vuelve a pedir tras cambiar un rol', async () => {
+    vi.mocked(adminService.changeUserRole).mockResolvedValue(usuario({ role: 'moderador' }))
+    renderPage()
+    await screen.findByText('Ana Pérez')
+    await waitFor(() => expect(adminService.listRoleAudit).toHaveBeenCalledTimes(1))
+
+    await userEvent.selectOptions(screen.getByLabelText('Rol de Ana Pérez'), 'moderador')
+    await userEvent.click(await screen.findByRole('button', { name: /Confirmar/ }))
+
+    await waitFor(() => expect(adminService.listRoleAudit).toHaveBeenCalledTimes(2))
+  })
 })
 
 describe('AdminUsersPage: listado y filtros', () => {

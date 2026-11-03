@@ -55,7 +55,7 @@ describe("admin-users.service changeRole", () => {
 
     const notifications = await prisma.notification.findMany({ where: { userId: targetId, type: "role_change" } });
     expect(notifications).toHaveLength(1);
-    expect(notifications[0].message).toContain("moderador");
+    expect(notifications[0].message).toBe("Un administrador cambió tu rol a Moderador.");
   });
 
   it("allows any pair of roles, including demoting another admin", async () => {

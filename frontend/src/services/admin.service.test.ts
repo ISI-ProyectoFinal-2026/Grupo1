@@ -1,8 +1,8 @@
 import type { AxiosResponse } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/services/api'
-import { changeUserRole, listAdminUsers } from '@/services/admin.service'
-import type { AdminUser, Paginated } from '@/types/admin.types'
+import { changeUserRole, listAdminUsers, listRoleAudit } from '@/services/admin.service'
+import type { AdminUser, Paginated, RoleAuditEntry } from '@/types/admin.types'
 
 vi.mock('@/services/api', () => ({
   api: { get: vi.fn(), patch: vi.fn() },
@@ -46,6 +46,30 @@ describe('admin.service', () => {
     await listAdminUsers({ q: '', role: '', page: 1, pageSize: 20 })
 
     expect(api.get).toHaveBeenCalledWith('/admin/users', { params: { page: 1, pageSize: 20 } })
+  })
+
+  it('lista el registro de cambios de rol con la paginación como params', async () => {
+    const pagina: Paginated<RoleAuditEntry> = {
+      items: [
+        {
+          id: 9,
+          createdAt: '2026-09-02T10:00:00.000Z',
+          previousRole: 'usuario_regular',
+          newRole: 'moderador',
+          actor: { id: 1, email: 'admin@example.com', fullName: 'Admin Root' },
+          target: { id: 4, email: 'ana@example.com', fullName: null },
+        },
+      ],
+      total: 1,
+      page: 3,
+      pageSize: 10,
+    }
+    vi.mocked(api.get).mockResolvedValue(respuesta(pagina))
+
+    const resultado = await listRoleAudit({ page: 3, pageSize: 10 })
+
+    expect(api.get).toHaveBeenCalledWith('/admin/role-audit', { params: { page: 3, pageSize: 10 } })
+    expect(resultado).toEqual(pagina)
   })
 
   it('cambia el rol con PATCH /admin/users/:id/role', async () => {

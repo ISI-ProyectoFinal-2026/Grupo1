@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CURRENT_USER_QUERY_KEY } from '@/hooks/useCurrentUser'
-import { useAdminUsers, useChangeUserRole } from '@/hooks/useAdminUsers'
+import { useAdminUsers, useChangeUserRole, useRoleAudit } from '@/hooks/useAdminUsers'
 import * as adminService from '@/services/admin.service'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import type { AdminUser } from '@/types/admin.types'
@@ -35,6 +35,24 @@ describe('useAdminUsers', () => {
 
     await waitFor(() => expect(result.current.data).toEqual(pagina))
     expect(adminService.listAdminUsers).toHaveBeenCalledWith(params)
+  })
+})
+
+describe('useRoleAudit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('consulta el registro con la paginación recibida', async () => {
+    const pagina = { items: [], total: 0, page: 2, pageSize: 10 }
+    vi.mocked(adminService.listRoleAudit).mockResolvedValue(pagina)
+    const { Wrapper } = createQueryWrapper()
+    const params = { page: 2, pageSize: 10 }
+
+    const { result } = renderHook(() => useRoleAudit(params), { wrapper: Wrapper })
+
+    await waitFor(() => expect(result.current.data).toEqual(pagina))
+    expect(adminService.listRoleAudit).toHaveBeenCalledWith(params)
   })
 })
 
