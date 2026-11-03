@@ -15,6 +15,7 @@ import { adFlagsRouter } from "./routes/ad-flags.routes";
 import { chatsRouter } from "./routes/chats.routes";
 import { notificationsRouter } from "./routes/notifications.routes";
 import { notificationPreferencesRouter } from "./routes/notification-preferences.routes";
+import { adminRouter } from "./routes/admin.routes";
 import { errorHandler } from "./middlewares/error-handler";
 import { applyTrustProxy } from "./config/trust-proxy";
 import { globalLimiter } from "./middlewares/rate-limit";
@@ -51,6 +52,7 @@ app.use("/api/ad-flags", adFlagsRouter);
 app.use("/api/chats", chatsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/notification-preferences", notificationPreferencesRouter);
+app.use("/api/admin", adminRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: { message: "Recurso no encontrado" } });
