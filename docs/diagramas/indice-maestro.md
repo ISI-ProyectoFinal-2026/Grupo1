@@ -62,3 +62,4 @@ Plantilla. Una fila se agrega cuando se decide producir el diagrama y su estado 
 | ID | Tema | Ruta | Estado | Última ejecución | Uso en el informe |
 | --- | --- | --- | --- | --- | --- |
 | U-01 | `casos-de-uso` | `uml/casos-de-uso/casos-de-uso.puml` (exportaciones `.svg` y `.png` generadas, general y por módulo) | `en-curso` | — | 1.2.2.1 Diagrama de casos de uso; 1.2.2.1.1 Lista de Requerimientos (trazabilidad casos de uso–RF en `matriz-trazabilidad.md`); Anexo N.º 5: Diagrama de casos de uso |
+| U-02 | `estados-de-reporte` | `uml/estados-de-reporte/estados-de-reporte.md` (Mermaid; complementa a D-39 con los estados planificados) | `en-curso` | — | — |
