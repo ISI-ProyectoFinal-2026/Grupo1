@@ -8,11 +8,13 @@ import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ReportDTO } from '@/types/report.types'
 import * as authService from '@/services/auth.service'
 import { listMyPets } from '@/services/pets.service'
+import { analyzeImage } from '@/services/uploads.service'
 import type { PetDTO } from '@/types/pet.types'
 
 vi.mock('@/services/reports.service', () => ({ createReport: vi.fn(), findSimilarReports: vi.fn() }))
 vi.mock('@/services/auth.service')
 vi.mock('@/services/pets.service')
+vi.mock('@/services/uploads.service')
 
 // LocationPicker y ImageUploader arrastran leaflet y el flujo de subida a R2:
 // nada de eso hace falta para probar la validacion y el envio del formulario.
@@ -166,6 +168,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listMyPets).mockResolvedValue([])
   vi.mocked(findSimilarReports).mockResolvedValue([])
+  vi.mocked(analyzeImage).mockResolvedValue({ hasAnimal: true, lowQuality: false })
 })
 
 describe('ReportForm: render', () => {
@@ -443,6 +446,147 @@ describe('ReportForm: mascota vinculada (#225)', () => {
     await waitFor(() => expect(createReport).toHaveBeenCalled())
     expect(screen.queryByLabelText('Mascota')).not.toBeInTheDocument()
     expect(vi.mocked(createReport).mock.calls[0][0].petId).toBeUndefined()
+  })
+})
+
+describe('ReportForm: precarga de la mascota propia (#255)', () => {
+  const firulais = () =>
+    mascota({
+      description: 'Collar azul con chapita',
+      photoUrls: ['https://pub.r2.dev/pets/a.jpg', 'https://pub.r2.dev/pets/b.jpg'],
+    })
+
+  async function elegirMascota(user: ReturnType<typeof userEvent.setup>, opcion: string) {
+    await user.selectOptions(await screen.findByLabelText('Mascota'), opcion)
+  }
+
+  it('precarga titulo, descripcion y la primera foto: solo falta la ubicacion', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    vi.mocked(createReport).mockResolvedValue(reporte({ petId: 3 }))
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Firulais (Labrador)')
+    expect(screen.getByLabelText('Descripción')).toHaveValue('Collar azul con chapita')
+    expect(await screen.findByAltText('Foto de tu mascota')).toHaveAttribute(
+      'src',
+      'https://pub.r2.dev/pets/a.jpg'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0]).toMatchObject({
+      petId: 3,
+      title: 'Firulais (Labrador)',
+      description: 'Collar azul con chapita',
+      imageUrl: 'https://pub.r2.dev/pets/a.jpg',
+    })
+  })
+
+  it('usa la especie cuando la mascota no tiene raza', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([mascota({ breed: null, species: 'cat', name: 'Michi' })])
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Michi')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Michi (Gato)')
+  })
+
+  it('los campos precargados se pueden editar antes de enviar', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    vi.mocked(createReport).mockResolvedValue(reporte({ petId: 3 }))
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+    const titulo = screen.getByLabelText('Título *')
+    await user.clear(titulo)
+    await user.type(titulo, 'Firulais perdido en Güemes')
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0]).toMatchObject({
+      title: 'Firulais perdido en Güemes',
+      imageUrl: 'https://cdn/foto.jpg',
+    })
+  })
+
+  it('al volver a "Ninguna" limpia solo lo precargado que no se edito', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+    await user.type(screen.getByLabelText('Título *'), ' perdido')
+    await elegirMascota(user, 'Ninguna')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Firulais (Labrador) perdido')
+    expect(screen.getByLabelText('Descripción')).toHaveValue('')
+    expect(screen.queryByAltText('Foto de tu mascota')).not.toBeInTheDocument()
+  })
+
+  it('no limpia la foto que el usuario subio en reemplazo', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    await elegirMascota(user, 'Ninguna')
+
+    expect(screen.getByAltText('Foto subida')).toHaveAttribute('src', 'https://cdn/foto.jpg')
+  })
+
+  it('no pisa lo que el usuario ya habia escrito', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Título *'), 'Perro perdido en Güemes')
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Perro perdido en Güemes')
+    expect(screen.getByLabelText('Descripción')).toHaveValue('Collar azul con chapita')
+  })
+
+  it('no precarga en un reporte de mascota encontrada', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.selectOptions(screen.getByLabelText('Tipo de reporte *'), 'found')
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('')
+    expect(screen.queryByAltText('Foto de tu mascota')).not.toBeInTheDocument()
+  })
+
+  it('la foto precargada pasa por la misma verificacion que una subida', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    vi.mocked(analyzeImage).mockResolvedValue({
+      hasAnimal: false,
+      lowQuality: false,
+      message: 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM',
+    })
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(
+      await screen.findByText(
+        'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM'
+      )
+    ).toBeInTheDocument()
+    expect(analyzeImage).toHaveBeenCalledWith('https://pub.r2.dev/pets/a.jpg')
+    expect(screen.getByRole('button', { name: 'Crear Reporte' })).toBeDisabled()
   })
 })
 

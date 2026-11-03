@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ZodError } from "zod";
 import { createReportSchema, type CreateReportFormData } from "@/types/validators/report.validator";
 import { createReport } from "@/services/reports.service";
 import PetSelect from "./PetSelect";
 import ReportTypeBadge from "./ReportTypeBadge";
+import { PREFILL_FIELDS, petPrefill, type Prefill } from "./petPrefill";
+import type { PetDTO } from "@/types/pet.types";
+import { screenImage } from "@/lib/screen-image";
 import type { ReportLocation } from "@/types/report.types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -46,7 +49,11 @@ export default function ReportForm(props: ReportFormProps) {
   // While the photo uploads and is analyzed there is no imageUrl nor verdict yet:
   // submitting then would create the report without image, skipping the screening.
   const [isImageUploading, setIsImageUploading] = useState(false);
-  const canSubmit = !imageRejection && !isImageUploading;
+  // valores precargados desde la mascota propia (#255)
+  const [prefilled, setPrefilled] = useState<Prefill>({});
+  const [isPrefillScreening, setIsPrefillScreening] = useState(false);
+  const prefillScreeningUrl = useRef<string | null>(null);
+  const canSubmit = !imageRejection && !isImageUploading && !isPrefillScreening;
 
   const [formData, setFormData] = useState<Partial<CreateReportFormData>>({
     reportType: "lost",
@@ -77,6 +84,8 @@ export default function ReportForm(props: ReportFormProps) {
     qualityWarning: string | null
   ) => {
     setFormData((prev) => ({ ...prev, imageUrl: publicUrl }));
+    prefillScreeningUrl.current = null;
+    setIsPrefillScreening(false);
     setImageRejection(rejection);
     setImageQualityWarning(qualityWarning);
     setFormError(null);
@@ -88,6 +97,46 @@ export default function ReportForm(props: ReportFormProps) {
     if (code === EMAIL_NOT_VERIFIED) return;
     setFormError(error);
     setFormErrorCode(null);
+  };
+
+  // foto precargada: misma verificación que una subida (#255)
+  const screenPrefilledImage = async (url: string) => {
+    prefillScreeningUrl.current = url;
+    setIsPrefillScreening(true);
+    const { rejection, qualityWarning } = await screenImage(url);
+    if (prefillScreeningUrl.current !== url) return;
+    prefillScreeningUrl.current = null;
+    setImageRejection(rejection);
+    setImageQualityWarning(qualityWarning);
+    setIsPrefillScreening(false);
+  };
+
+  // solo se pisan campos vacíos o que siguen con el valor precargado (#255)
+  const handlePetChange = (petId: number | undefined, pet?: PetDTO) => {
+    const next = pet && !isEdit && formData.reportType === "lost" ? petPrefill(pet) : {};
+    const updated: Partial<CreateReportFormData> = { ...formData, petId };
+    const applied: Prefill = {};
+    for (const field of PREFILL_FIELDS) {
+      const current = formData[field] ?? "";
+      if (current !== "" && current !== prefilled[field]) continue;
+      const value = next[field];
+      if (value) {
+        updated[field] = value;
+        applied[field] = value;
+      } else if (current !== "") {
+        updated[field] = field === "imageUrl" ? undefined : "";
+      }
+    }
+    setFormData(updated);
+    setPrefilled(applied);
+
+    if (updated.imageUrl !== formData.imageUrl) {
+      prefillScreeningUrl.current = null;
+      setIsPrefillScreening(false);
+      setImageRejection(null);
+      setImageQualityWarning(null);
+      if (applied.imageUrl) void screenPrefilledImage(applied.imageUrl);
+    }
   };
 
   const handleLocationSelect = (location: ReportLocation, address: string) => {
@@ -165,7 +214,7 @@ export default function ReportForm(props: ReportFormProps) {
 
       <PetSelect
         value={formData.petId}
-        onChange={(petId) => setFormData((prev) => ({ ...prev, petId }))}
+        onChange={handlePetChange}
       />
 
       <div className="flex flex-col gap-2">
@@ -221,7 +270,18 @@ export default function ReportForm(props: ReportFormProps) {
           <ErrorMessage message={fieldErrors.imageUrl} />
         ) : (
           formData.imageUrl &&
-          (isCurrentImage ? (
+          (formData.imageUrl === prefilled.imageUrl ? (
+            <div className="flex items-center gap-3">
+              <img
+                src={formData.imageUrl}
+                alt="Foto de tu mascota"
+                className="size-20 shrink-0 rounded-control border border-line object-cover"
+              />
+              <p className="text-sm text-ink-muted">
+                Usamos la primera foto de tu mascota. Podés cambiarla subiendo otra.
+              </p>
+            </div>
+          ) : isCurrentImage ? (
             <img
               src={formData.imageUrl}
               alt="Foto actual"

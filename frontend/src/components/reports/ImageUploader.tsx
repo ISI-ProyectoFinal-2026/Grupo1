@@ -2,7 +2,6 @@ import { useId, useState, useRef } from "react";
 import {
   ALLOWED_UPLOAD_TYPES,
   MAX_UPLOAD_BYTES,
-  analyzeImage,
   getPresignedUrl,
   uploadToR2,
   type UploadContentType,
@@ -11,6 +10,7 @@ import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
 import { CameraIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { getApiErrorCode } from "@/services/api";
+import { NO_SCREENING, screenImage } from "@/lib/screen-image";
 
 interface ImageUploaderProps {
   /**
@@ -29,28 +29,6 @@ interface ImageUploaderProps {
   onUploadingChange?: (uploading: boolean) => void;
   /** Run the animal screening after the upload (report photos, not custom flyers). */
   screenForAnimals?: boolean;
-}
-
-interface Screening {
-  rejection: string | null;
-  qualityWarning: string | null;
-}
-
-const NO_SCREENING: Screening = { rejection: null, qualityWarning: null };
-
-// Best-effort: the upload itself already succeeded, so a failed analysis is an
-// unknown verdict (no rejection) rather than an upload error. The backend
-// re-checks the image when the report is created anyway.
-async function screenImage(publicUrl: string): Promise<Screening> {
-  try {
-    const analysis = await analyzeImage(publicUrl);
-    return {
-      rejection: analysis.hasAnimal === false ? analysis.message : null,
-      qualityWarning: analysis.lowQuality === true ? analysis.qualityMessage : null,
-    };
-  } catch {
-    return NO_SCREENING;
-  }
 }
 
 export default function ImageUploader({
