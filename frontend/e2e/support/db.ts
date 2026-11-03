@@ -213,6 +213,7 @@ export async function deleteUsersByEmail(emails: string[]): Promise<void> {
         // ads, subscriptions, ad events and ad flags cascade with the business
         ['DELETE FROM ad_flags WHERE user_id = ANY($1)', [userIds]],
         ['DELETE FROM businesses WHERE user_id = ANY($1)', [userIds]],
+        ['DELETE FROM role_change_audits WHERE actor_id = ANY($1) OR target_id = ANY($1)', [userIds]],
         ['DELETE FROM users WHERE id = ANY($1)', [userIds]],
       ]
       for (const [sql, params] of steps) {

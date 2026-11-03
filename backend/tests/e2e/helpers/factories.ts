@@ -83,6 +83,9 @@ export async function cleanupE2EData(userIds: number[], extraReportIds: number[]
   await prisma.pet.deleteMany({ where: { userId: { in: userIds } } });
   // business_events cae en cascada con el business.
   await prisma.business.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.roleChangeAudit.deleteMany({
+    where: { OR: [{ actorId: { in: userIds } }, { targetId: { in: userIds } }] },
+  });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
 }
 
