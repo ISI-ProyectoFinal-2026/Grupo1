@@ -42,3 +42,11 @@ site/
 # Informe en docx (tools/informe-docx)
 .informe-docx-work/
 Patitas-Informe-Final-*.docx
+
+# archify: artefactos de build y QA
+docs/diagramas/**/*visual-check*
+docs/diagramas/**/candidate.json
+docs/diagramas/**/*.finalize*.json
+docs/diagramas/**/*.delivery.json
+docs/diagramas/**/*.browser-check.json
+docs/diagramas/**/.archify-delivery-*/
