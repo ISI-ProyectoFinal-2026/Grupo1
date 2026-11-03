@@ -17,6 +17,18 @@ interface LocationPickerProps {
 
 const REVERSE_GEOCODE_TIMEOUT_MS = 5000;
 
+// Sin alta precision el navegador puede devolver una posicion aproximada por
+// IP o Wi-Fi; maximumAge 0 evita reutilizar una lectura vieja.
+const GEOLOCATION_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  timeout: 15000,
+  maximumAge: 0,
+};
+// Por encima de este margen de error (metros) se avisa que el pin es aproximado
+const LOW_ACCURACY_THRESHOLD_M = 100;
+// GeolocationPositionError.TIMEOUT; la constante no existe en todos los entornos
+const GEOLOCATION_TIMEOUT_CODE = 3;
+
 const formatCoords = ({ lat, lng }: GeoPoint) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 
 async function resolveZone(lat: number, lng: number): Promise<string> {
@@ -36,6 +48,7 @@ export default function LocationPicker({
   const [address, setAddress] = useState<string>(initialAddress ?? "");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accuracyWarning, setAccuracyWarning] = useState<string | null>(null);
   // id de la ultima consulta a Nominatim: descarta respuestas de un pin viejo
   const lookupRef = useRef(0);
 
@@ -52,6 +65,7 @@ export default function LocationPicker({
       setLocation(loc);
       setAddress(coordsLabel);
       setError(null);
+      setAccuracyWarning(null);
       onLocationSelect(loc, coordsLabel);
 
       if (!resolveAddress) return;
@@ -85,11 +99,23 @@ export default function LocationPicker({
       (position) => {
         setIsLoading(false);
         void selectLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        // selectLocation limpia el aviso de forma sincrona: se setea despues
+        const { accuracy } = position.coords;
+        if (accuracy > LOW_ACCURACY_THRESHOLD_M) {
+          setAccuracyWarning(
+            `La ubicación es aproximada (±${Math.round(accuracy)} m). Ajustá el pin en el mapa para marcar el lugar exacto.`
+          );
+        }
       },
       (err) => {
-        setError(`Error de geolocalización: ${err.message}`);
+        setError(
+          err.code === GEOLOCATION_TIMEOUT_CODE
+            ? "No pudimos obtener tu ubicación a tiempo. Probá de nuevo o marcala en el mapa."
+            : `Error de geolocalización: ${err.message}`
+        );
         setIsLoading(false);
-      }
+      },
+      GEOLOCATION_OPTIONS
     );
   };
 
@@ -121,6 +147,12 @@ export default function LocationPicker({
             <p className="tabular text-sm text-ink-muted">{formatCoords(location)}</p>
           </div>
         </div>
+      )}
+
+      {accuracyWarning && (
+        <p role="status" className="text-sm text-ink-muted">
+          {accuracyWarning}
+        </p>
       )}
 
       {error && <ErrorMessage message={error} />}
