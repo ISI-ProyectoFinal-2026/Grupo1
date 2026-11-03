@@ -3,11 +3,12 @@ import type { GeoPoint } from "@/types/geo.types";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import Button from "@/components/ui/Button";
 import { PinIcon } from "@/components/ui/icons";
+import { reverseGeocode } from "@/services/geo.service";
 import PinPickerMap from "./PinPickerMap";
 
 interface LocationPickerProps {
   onLocationSelect: (location: GeoPoint, address: string) => void;
-  // false: no consulta Nominatim y la etiqueta son las coordenadas
+  // false: no consulta la geocodificacion inversa y la etiqueta son las coordenadas
   resolveAddress?: boolean;
   // ubicacion ya guardada (edicion): pin inicial hasta que se elija otra
   initialLocation?: GeoPoint | null;
@@ -18,18 +19,11 @@ const REVERSE_GEOCODE_TIMEOUT_MS = 5000;
 
 const formatCoords = ({ lat, lng }: GeoPoint) => `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 
-async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  // Nominatim es un servicio publico de terceros: sin timeout, una respuesta
-  // que nunca llega deja la promesa colgada para siempre.
-  const response = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-    { signal: AbortSignal.timeout(REVERSE_GEOCODE_TIMEOUT_MS) }
-  );
-  if (!response.ok) {
-    throw new Error(`Nominatim respondió ${response.status}`);
-  }
-  const data = await response.json();
-  return data.address?.city || data.address?.town || formatCoords({ lat, lng });
+async function resolveZone(lat: number, lng: number): Promise<string> {
+  // La consulta pasa por el backend (proxy con cache, ADR-0025). Sin timeout,
+  // una respuesta que nunca llega deja la promesa colgada para siempre.
+  const zone = await reverseGeocode(lat, lng, AbortSignal.timeout(REVERSE_GEOCODE_TIMEOUT_MS));
+  return zone ?? formatCoords({ lat, lng });
 }
 
 export default function LocationPicker({
@@ -66,7 +60,7 @@ export default function LocationPicker({
       // El nombre de la zona es una mejora sobre las coordenadas: si llega,
       // reemplaza la etiqueta; si falla, ya quedo algo utilizable.
       try {
-        const addr = await reverseGeocode(loc.lat, loc.lng);
+        const addr = await resolveZone(loc.lat, loc.lng);
         if (lookupId !== lookupRef.current) return;
         setAddress(addr);
         onLocationSelect(loc, addr);

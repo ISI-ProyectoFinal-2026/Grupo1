@@ -15,7 +15,7 @@ Los mapas usan Leaflet con OpenStreetMap, la geocodificación inversa (coordenad
 
 ## Consecuencias
 
-- La política del Nominatim público limita el uso a 1 solicitud por segundo por aplicación (sumando todos los usuarios) y exige identificarla. Hoy cada navegador lo consulta directo: alcanza para el piloto, pero no escala con muchos usuarios simultáneos (proxy con caché o servicio propio, a evaluar según [ADR-0018](0018-criterio-evolucion-tecnologica.md), [#216](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/216)).
+- La política del Nominatim público limita el uso a 1 solicitud por segundo por aplicación (sumando todos los usuarios) y exige identificarla. Hoy cada navegador lo consulta directo: alcanza para el piloto, pero no escala con muchos usuarios simultáneos (se resuelve con un proxy en el backend con caché, según [ADR-0025](0025-geocodificacion-inversa-proxy-backend.md), [#216](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/216)).
 
 ## Referencias
 
