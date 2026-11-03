@@ -20,7 +20,19 @@ Aplican siempre que se toca documentación: `docs/informe/`, `docs/adr/` (inclui
 - La evidencia de un ADR (texto, tablas e imágenes) forma parte del ADR. Cada imagen lleva epígrafe: "Figura X. Título. Fuente: ...".
 - La justificación la aporta el equipo; si no está documentada, se pregunta.
 
-## 3. Portada del documento final
+## 3. Resumen para Claude web (obligatorio al cerrar)
+
+El `.docx` lo genera el PM en Claude web: pega el documento actual y el resumen de cambios, y Claude web arma la sección nueva o completada respetando tablas y tipografía. Por eso, **cada vez que se toca documentación**, la última respuesta incluye un resumen listo para copiar:
+
+- Sección(es) afectada(s), con su número y título.
+- Qué cambió: contenido agregado, modificado o eliminado, en pocas líneas.
+- Tablas y figuras nuevas o modificadas (con epígrafe y fuente) y la ruta de cada imagen.
+- Archivos `.md`/imágenes tocados, para que el PM sepa qué adjuntar.
+- Si hay secciones pendientes de rellenar.
+
+No se regenera el `.docx` completo salvo pedido explícito.
+
+## 4. Portada del documento final
 
 | Campo | Valor |
 | --- | --- |

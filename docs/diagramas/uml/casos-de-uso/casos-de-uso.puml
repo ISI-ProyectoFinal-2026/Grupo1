@@ -1,0 +1,402 @@
+' Diagramas de casos de uso de PATITAS
+' Commit analizado: f518b9a (2026-11-02). Fuentes y supuestos: README.md de esta carpeta.
+' Bloque 1: vista general. Bloques 2 a 7: un diagrama por módulo.
+
+@startuml casos-de-uso
+title PATITAS: diagrama general de casos de uso
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam packageStyle rectangle
+skinparam actorStyle default
+skinparam nodesep 12
+skinparam ranksep 60
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #2F4F6F
+}
+skinparam usecase<<planificado>> {
+  BackgroundColor #EEEEEE
+  BorderColor #8A8A8A
+  BorderStyle dashed
+  FontColor #555555
+}
+
+' actores del lado izquierdo
+actor "Visitante" as VIS
+actor "Usuario registrado\n(rol usuario_regular)" as REG
+actor "Usuario verificado" as VER
+
+rectangle "PATITAS" {
+  package "Cuenta y seguridad" {
+    usecase "Registrarse" as UC01
+    usecase "Iniciar sesión" as UC03
+    usecase "Recuperar la contraseña" as UC06
+    usecase "Consultar reportes\nsin iniciar sesión" as UC08 <<planificado>>
+    usecase "Verificar el correo electrónico" as UC02
+    usecase "Gestionar la autenticación\nde dos factores" as UC07
+  }
+  package "Mascotas y reportes" {
+    usecase "Gestionar mascotas" as UC09
+    usecase "Consultar el feed de reportes" as UC15
+    usecase "Consultar el mapa de reportes" as UC16
+    usecase "Consultar el detalle de un reporte" as UC17
+    usecase "Publicar un reporte de mascota" as UC10
+    usecase "Editar o eliminar un reporte propio" as UC18
+    usecase "Cerrar un reporte propio" as UC19
+  }
+  package "IA y coincidencias" {
+    usecase "Consultar coincidencias sugeridas" as UC22
+    usecase "Confirmar o rechazar una coincidencia" as UC23
+    usecase "Reprocesar reportes pendientes" as UC21
+  }
+  package "Comunicación" {
+    usecase "Consultar notificaciones" as UC27
+    usecase "Configurar las preferencias\nde notificación" as UC28
+    usecase "Generar y compartir el flyer\nde un reporte" as UC29
+    usecase "Iniciar un chat con el autor\nde un reporte" as UC24
+    usecase "Intercambiar mensajes\nen tiempo real" as UC25
+  }
+  package "Comercios y publicidad" {
+    usecase "Registrar un comercio" as UC31
+    usecase "Consultar el directorio de comercios" as UC32
+    usecase "Consultar el perfil de un comercio" as UC33
+    usecase "Contactar a un comercio" as UC34
+    usecase "Consultar comercios cercanos\na un reporte" as UC35
+    usecase "Editar los datos del comercio" as UC36
+    usecase "Consultar las métricas del comercio" as UC37
+    usecase "Contratar o renovar el plan Premium" as UC38
+    usecase "Gestionar anuncios segmentados" as UC39
+    usecase "Consultar las métricas de anuncios" as UC40
+  }
+  package "Moderación" {
+    usecase "Denunciar un reporte" as UC41
+    usecase "Denunciar un anuncio" as UC42
+    usecase "Resolver denuncias de reportes" as UC43
+    usecase "Resolver denuncias de anuncios" as UC44
+    usecase "Suspender una cuenta" as UC45 <<planificado>>
+    usecase "Asignar el rol de moderador" as UC46 <<planificado>>
+  }
+}
+
+' actores del lado derecho
+actor "Temporizador" as TMP <<tiempo>>
+actor "Titular de comercio" as TIT
+actor "Moderador\n(rol moderador)" as MOD
+actor "Administrador\n(rol admin)" as ADM
+
+' generalizaciones
+VER -up-|> REG
+TIT -up-|> REG
+MOD -up-|> REG
+ADM -up-|> MOD
+
+' asociaciones lado izquierdo
+VIS -- UC01
+VIS -- UC03
+VIS -- UC06
+VIS -- UC08
+REG -- UC02
+REG -- UC09
+REG -- UC15
+REG -- UC16
+REG -- UC17
+REG -- UC22
+REG -- UC27
+REG -- UC28
+REG -- UC29
+REG -- UC31
+REG -- UC32
+REG -- UC33
+REG -- UC34
+REG -- UC35
+REG -- UC41
+REG -- UC42
+VER -- UC07
+VER -- UC10
+VER -- UC18
+VER -- UC19
+VER -- UC23
+VER -- UC24
+VER -- UC25
+
+' asociaciones lado derecho
+UC21 -- TMP
+UC36 -- TIT
+UC37 -- TIT
+UC38 -- TIT
+UC39 -- TIT
+UC40 -- TIT
+UC43 -- MOD
+UC44 -- MOD
+UC45 -- MOD
+UC46 -- ADM
+
+legend right
+  Vista general: actores, casos de uso y asociaciones.
+  Las relaciones <<include>> y <<extend>>, los casos de uso
+  incluidos o extendidos y los sistemas externos (Servidor SMTP,
+  Cloudflare R2, OpenStreetMap y Nominatim) figuran en los
+  diagramas por módulo.
+  Borde continuo: implementado (commit f518b9a).
+  Borde punteado <<planificado>>: previsto en un issue abierto.
+endlegend
+@enduml
+
+@startuml casos-de-uso-cuenta-y-seguridad
+title PATITAS: módulo Cuenta y seguridad
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+skinparam usecase<<planificado>> {
+  BackgroundColor #EEEEEE
+  BorderColor #8A8A8A
+  BorderStyle dashed
+  FontColor #555555
+}
+actor "Visitante" as VIS
+actor "Usuario registrado\n(rol usuario_regular)" as REG
+actor "Usuario verificado" as VER
+VER -up-|> REG
+
+rectangle "PATITAS: Cuenta y seguridad" {
+  usecase "Registrarse" as UC01
+  usecase "Verificar el correo electrónico" as UC02
+  usecase "Iniciar sesión" as UC03
+  usecase "Ingresar el segundo factor" as UC04
+  usecase "Reiniciar el segundo factor" as UC05
+  usecase "Recuperar la contraseña" as UC06
+  usecase "Gestionar la autenticación\nde dos factores" as UC07
+  usecase "Consultar reportes\nsin iniciar sesión" as UC08 <<planificado>>
+}
+rectangle "Servidor SMTP" as SMTP <<sistema externo>>
+
+VIS -- UC01
+VIS -- UC03
+VIS -- UC06
+VIS -- UC08
+REG -- UC02
+VER -- UC07
+UC04 .> UC03 : <<extend>>\n[la cuenta tiene el 2FA activo]
+UC05 .> UC04 : <<extend>>\n[sin acceso al segundo factor]
+UC01 -- SMTP
+UC02 -- SMTP
+UC05 -- SMTP
+UC06 -- SMTP
+
+note bottom of UC08
+  Issue #187 abierto: la API admite lecturas
+  sin sesión, la interfaz exige iniciar sesión.
+end note
+@enduml
+
+@startuml casos-de-uso-mascotas-y-reportes
+title PATITAS: módulo Mascotas y reportes
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+actor "Usuario registrado\n(rol usuario_regular)" as REG
+actor "Usuario verificado" as VER
+VER -up-|> REG
+
+rectangle "PATITAS: Mascotas y reportes" {
+  usecase "Gestionar mascotas" as UC09
+  usecase "Publicar un reporte de mascota" as UC10
+  usecase "Indicar la ubicación" as UC11
+  usecase "Adjuntar la foto de la mascota" as UC12
+  usecase "Analizar la foto con IA" as UC20
+  usecase "Vincular una mascota registrada" as UC13
+  usecase "Revisar reportes similares" as UC14
+  usecase "Consultar el feed de reportes" as UC15
+  usecase "Consultar el mapa de reportes" as UC16
+  usecase "Consultar el detalle de un reporte" as UC17
+  usecase "Editar o eliminar un reporte propio" as UC18
+  usecase "Cerrar un reporte propio" as UC19
+}
+rectangle "Cloudflare R2" as R2 <<sistema externo>>
+rectangle "OpenStreetMap y Nominatim" as OSM <<sistema externo>>
+
+REG -- UC09
+REG -- UC15
+REG -- UC16
+REG -- UC17
+VER -- UC10
+VER -- UC18
+VER -- UC19
+UC10 .> UC11 : <<include>>
+UC10 .> UC12 : <<include>>
+UC10 .> UC20 : <<include>>
+UC13 .> UC10 : <<extend>>\n[el usuario tiene mascotas registradas]
+UC14 .> UC10 : <<extend>>\n[existen reportes similares]
+UC11 -- OSM
+UC16 -- OSM
+UC12 -- R2
+
+note bottom of UC18
+  Solo el autor del reporte.
+  Cambiar la foto devuelve el reporte
+  a revisión de la IA.
+end note
+@enduml
+
+@startuml casos-de-uso-ia-y-coincidencias
+title PATITAS: módulo IA y coincidencias
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+actor "Usuario registrado\n(rol usuario_regular)" as REG
+actor "Usuario verificado" as VER
+actor "Temporizador" as TMP <<tiempo>>
+VER -up-|> REG
+
+rectangle "PATITAS: IA y coincidencias" {
+  usecase "Publicar un reporte de mascota" as UC10
+  usecase "Analizar la foto con IA" as UC20
+  usecase "Reprocesar reportes pendientes" as UC21
+  usecase "Consultar coincidencias sugeridas" as UC22
+  usecase "Confirmar o rechazar una coincidencia" as UC23
+}
+
+VER -- UC10
+TMP -- UC21
+REG -- UC22
+VER -- UC23
+UC10 .> UC20 : <<include>>
+UC21 .> UC20 : <<include>>
+
+note right of UC20
+  Detecta si la foto contiene un animal,
+  genera el embedding y busca coincidencias.
+  Lo ejecuta el Backend IA, componente de PATITAS.
+end note
+note bottom of UC21
+  Cada 5 minutos, reportes que siguen
+  pendientes de análisis.
+end note
+note bottom of UC23
+  Solo el autor de uno de los
+  dos reportes vinculados.
+end note
+@enduml
+
+@startuml casos-de-uso-comunicacion
+title PATITAS: módulo Comunicación
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+actor "Usuario registrado\n(rol usuario_regular)" as REG
+actor "Usuario verificado" as VER
+VER -up-|> REG
+
+rectangle "PATITAS: Comunicación" {
+  usecase "Iniciar un chat con el autor\nde un reporte" as UC24
+  usecase "Intercambiar mensajes\nen tiempo real" as UC25
+  usecase "Enviar una imagen en el chat" as UC26
+  usecase "Consultar notificaciones" as UC27
+  usecase "Configurar las preferencias\nde notificación" as UC28
+  usecase "Generar y compartir el flyer\nde un reporte" as UC29
+  usecase "Subir un flyer personalizado" as UC30
+}
+rectangle "Cloudflare R2" as R2 <<sistema externo>>
+
+VER -- UC24
+VER -- UC25
+REG -- UC27
+REG -- UC28
+REG -- UC29
+UC26 .> UC25 : <<extend>>\n[el usuario adjunta una imagen]
+UC30 .> UC29 : <<extend>>\n[el usuario es el autor del reporte]
+UC26 -- R2
+UC29 -- R2
+UC30 -- R2
+@enduml
+
+@startuml casos-de-uso-comercios-y-publicidad
+title PATITAS: módulo Comercios y publicidad
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+actor "Usuario registrado\n(rol usuario_regular)" as REG
+actor "Titular de comercio" as TIT
+TIT -up-|> REG
+
+rectangle "PATITAS: Comercios y publicidad" {
+  usecase "Registrar un comercio" as UC31
+  usecase "Consultar el directorio de comercios" as UC32
+  usecase "Consultar el perfil de un comercio" as UC33
+  usecase "Contactar a un comercio" as UC34
+  usecase "Consultar comercios cercanos\na un reporte" as UC35
+  usecase "Editar los datos del comercio" as UC36
+  usecase "Consultar las métricas del comercio" as UC37
+  usecase "Contratar o renovar el plan Premium" as UC38
+  usecase "Gestionar anuncios segmentados" as UC39
+  usecase "Consultar las métricas de anuncios" as UC40
+}
+
+REG -- UC31
+REG -- UC32
+REG -- UC33
+REG -- UC34
+REG -- UC35
+TIT -- UC36
+TIT -- UC37
+TIT -- UC38
+TIT -- UC39
+TIT -- UC40
+
+note bottom of UC38
+  Pago simulado: sin pasarela real (ADR-0024).
+end note
+note bottom of UC39
+  Requiere plan Premium vigente
+  y correo electrónico verificado.
+end note
+@enduml
+
+@startuml casos-de-uso-moderacion
+title PATITAS: módulo Moderación
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+skinparam usecase<<planificado>> {
+  BackgroundColor #EEEEEE
+  BorderColor #8A8A8A
+  BorderStyle dashed
+  FontColor #555555
+}
+actor "Usuario registrado\n(rol usuario_regular)" as REG
+actor "Moderador\n(rol moderador)" as MOD
+actor "Administrador\n(rol admin)" as ADM
+MOD -up-|> REG
+ADM -up-|> MOD
+
+rectangle "PATITAS: Moderación" {
+  usecase "Denunciar un reporte" as UC41
+  usecase "Denunciar un anuncio" as UC42
+  usecase "Resolver denuncias de reportes" as UC43
+  usecase "Resolver denuncias de anuncios" as UC44
+  usecase "Suspender una cuenta" as UC45 <<planificado>>
+  usecase "Asignar el rol de moderador" as UC46 <<planificado>>
+}
+
+REG -- UC41
+REG -- UC42
+MOD -- UC43
+MOD -- UC44
+MOD -- UC45
+ADM -- UC46
+
+note bottom of UC45
+  Issue #38 abierto.
+end note
+note bottom of UC46
+  Issue #224 abierto.
+end note
+@enduml
