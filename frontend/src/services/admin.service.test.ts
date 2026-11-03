@@ -1,0 +1,60 @@
+import type { AxiosResponse } from 'axios'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { api } from '@/services/api'
+import { changeUserRole, listAdminUsers } from '@/services/admin.service'
+import type { AdminUser, Paginated } from '@/types/admin.types'
+
+vi.mock('@/services/api', () => ({
+  api: { get: vi.fn(), patch: vi.fn() },
+}))
+
+function respuesta<T>(data: T): AxiosResponse<T> {
+  return { data } as AxiosResponse<T>
+}
+
+function usuario(overrides: Partial<AdminUser> = {}): AdminUser {
+  return {
+    id: 4,
+    email: 'ana@example.com',
+    fullName: 'Ana',
+    role: 'usuario_regular',
+    createdAt: '2026-09-01T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
+describe('admin.service', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('lista usuarios desde /admin/users con los filtros como params', async () => {
+    const pagina: Paginated<AdminUser> = { items: [usuario()], total: 1, page: 2, pageSize: 20 }
+    vi.mocked(api.get).mockResolvedValue(respuesta(pagina))
+
+    const resultado = await listAdminUsers({ q: 'ana', role: 'moderador', page: 2, pageSize: 20 })
+
+    expect(api.get).toHaveBeenCalledWith('/admin/users', {
+      params: { q: 'ana', role: 'moderador', page: 2, pageSize: 20 },
+    })
+    expect(resultado).toEqual(pagina)
+  })
+
+  it('omite q y role vacíos de los params', async () => {
+    vi.mocked(api.get).mockResolvedValue(respuesta({ items: [], total: 0, page: 1, pageSize: 20 }))
+
+    await listAdminUsers({ q: '', role: '', page: 1, pageSize: 20 })
+
+    expect(api.get).toHaveBeenCalledWith('/admin/users', { params: { page: 1, pageSize: 20 } })
+  })
+
+  it('cambia el rol con PATCH /admin/users/:id/role', async () => {
+    const actualizado = usuario({ role: 'moderador' })
+    vi.mocked(api.patch).mockResolvedValue(respuesta(actualizado))
+
+    const resultado = await changeUserRole(4, 'moderador')
+
+    expect(api.patch).toHaveBeenCalledWith('/admin/users/4/role', { role: 'moderador' })
+    expect(resultado.role).toBe('moderador')
+  })
+})
