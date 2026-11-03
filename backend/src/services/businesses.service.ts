@@ -7,6 +7,7 @@ import {
   ListBusinessesQuery,
   UpdateBusinessInput,
 } from "../validators/businesses.validator";
+import { isAuthorSuspended, visibleUserWhere } from "./account-sanctions/visibility";
 import { addMonths, getEffectivePlan, planPeriodStart } from "./business-plan";
 import { getPaymentProvider, PaymentProvider } from "./payments";
 
@@ -124,7 +125,7 @@ export async function updateByUserId(userId: number, data: UpdateBusinessInput):
 
 export async function listPublic(filters: ListBusinessesQuery): Promise<PublicBusiness[]> {
   const businesses = await prisma.business.findMany({
-    where: filters.category ? { category: filters.category } : undefined,
+    where: { ...(filters.category ? { category: filters.category } : {}), user: visibleUserWhere() },
     select: publicBusinessWithExpirySelect,
     orderBy: { name: "asc" },
   });
@@ -135,7 +136,10 @@ export async function listPublic(filters: ListBusinessesQuery): Promise<PublicBu
 }
 
 export async function getPublicById(id: number): Promise<PublicBusiness> {
-  const business = await prisma.business.findUnique({ where: { id }, select: publicBusinessWithExpirySelect });
+  const business = await prisma.business.findFirst({
+    where: { id, user: visibleUserWhere() },
+    select: publicBusinessWithExpirySelect,
+  });
   if (!business) {
     throw new AppError(404, "Comercio no encontrado");
   }
@@ -192,7 +196,7 @@ async function getOwnerIdOrThrow(businessId: number): Promise<number> {
     where: { id: businessId },
     select: { userId: true },
   });
-  if (!business) {
+  if (!business || (await isAuthorSuspended(business.userId))) {
     throw new AppError(404, "Comercio no encontrado");
   }
   return business.userId;
