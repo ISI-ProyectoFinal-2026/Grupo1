@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { assertImagesHaveAnimals } from "./image-screening.service";
 import { CreatePetInput, UpdatePetInput } from "../validators/pets.validator";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
@@ -12,6 +13,8 @@ export function list(userId: number) {
 }
 
 export async function create(data: CreatePetInput & { userId: number }) {
+  await assertImagesHaveAnimals(data.photoUrls);
+
   try {
     return await prisma.pet.create({ data });
   } catch (error) {
@@ -42,6 +45,10 @@ export async function update(id: number, userId: number, data: UpdatePetInput) {
   const pet = await getById(id);
   if (pet.userId !== userId) {
     throw new AppError(403, "No tenés permiso para modificar esta mascota");
+  }
+  // solo las fotos nuevas: las guardadas ya pasaron el screening
+  if (data.photoUrls) {
+    await assertImagesHaveAnimals(data.photoUrls.filter((url) => !pet.photoUrls.includes(url)));
   }
 
   try {

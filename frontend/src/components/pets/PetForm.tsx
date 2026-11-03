@@ -36,6 +36,10 @@ export default function PetForm({ initialValues, submitLabel, onSubmit }: PetFor
   })
   const [photoUrls, setPhotoUrls] = useState<string[]>(initialValues?.photoUrls ?? [])
   const [isPhotoUploading, setIsPhotoUploading] = useState(false)
+  // foto sin animales: no se agrega (#254)
+  const [photoRejection, setPhotoRejection] = useState<string | null>(null)
+  // foto borrosa: solo aviso (#212)
+  const [photoQualityWarning, setPhotoQualityWarning] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string | null>(null)
@@ -53,7 +57,14 @@ export default function PetForm({ initialValues, submitLabel, onSubmit }: PetFor
     clearFieldError(name)
   }
 
-  const handlePhotoUploaded = (publicUrl: string) => {
+  const handlePhotoUploaded = (
+    publicUrl: string,
+    rejection: string | null,
+    qualityWarning: string | null
+  ) => {
+    setPhotoRejection(rejection)
+    setPhotoQualityWarning(rejection ? null : qualityWarning)
+    if (rejection) return
     setPhotoUrls((prev) => [...prev, publicUrl])
     clearFieldError('photoUrls')
   }
@@ -186,7 +197,17 @@ export default function PetForm({ initialValues, submitLabel, onSubmit }: PetFor
           // el uploader ya muestra su propio error
           onError={() => undefined}
           onUploadingChange={setIsPhotoUploading}
+          screenForAnimals
         />
+        {photoRejection && <ErrorMessage message={photoRejection} />}
+        {photoQualityWarning && (
+          <p
+            role='status'
+            className='animate-drop rounded-control border border-signal bg-signal/15 px-3 py-2.5 text-sm text-ink'
+          >
+            {photoQualityWarning}
+          </p>
+        )}
         {fieldErrors.photoUrls && <ErrorMessage message={fieldErrors.photoUrls} />}
       </fieldset>
 
