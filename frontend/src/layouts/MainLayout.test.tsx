@@ -107,6 +107,39 @@ describe('MainLayout', () => {
     }
   )
 
+  it('ofrece el acceso a mis reportes con sesion', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout()
+
+    expect(await screen.findByRole('link', { name: 'Mis reportes' })).toHaveAttribute(
+      'href',
+      '/reports/mine'
+    )
+  })
+
+  it('en /reports/mine marca mis reportes y no la pestaña Reportes', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+    const { Wrapper } = createQueryWrapper()
+
+    render(
+      <Wrapper>
+        <MemoryRouter initialEntries={['/reports/mine']}>
+          <MainLayout />
+        </MemoryRouter>
+      </Wrapper>
+    )
+
+    expect(await screen.findByRole('link', { name: 'Mis reportes' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    for (const link of screen.getAllByRole('link', { name: 'Reportes' })) {
+      expect(link).not.toHaveAttribute('aria-current')
+    }
+  })
+
   it('no ofrece el panel de moderacion a un usuario regular', async () => {
     useAuthStore.setState({ token: 'token', user: usuario })
 
