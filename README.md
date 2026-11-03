@@ -1,197 +1,141 @@
-# 🐾 PATITAS - Plataforma de Búsqueda de Mascotas
+# 🐾 PATITAS — Plataforma de búsqueda de mascotas
 
-Aplicación web para reportar y buscar mascotas perdidas/encontradas con **matching automático visual** basado en IA.
+Aplicación web para reportar mascotas perdidas o encontradas, con **matching visual automático** por IA, moderación, chat entre usuarios y un directorio de comercios del rubro.
 
----
-
-## 🎯 Características Principales
-
-✅ **Reporte de mascotas** - Perdida o encontrada  
-✅ **Matching por IA** - Similitud visual + proximidad geográfica  
-✅ **Geolocalización** - Búsqueda por radio en mapas  
-✅ **Chat interno** - Comunicación directa entre usuarios  
-✅ **Notificaciones** - Alertas de posibles coincidencias  
+Documentación completa (informe y ADR): <https://isi-proyectofinal-2026.github.io/Grupo1/>
 
 ---
 
-## 🏗️ Arquitectura
+## Funcionalidades
 
-- **Frontend:** React 18 + TypeScript + Vite
-- **Backend Principal:** Node.js + Express + Prisma
-- **Backend IA:** Python + FastAPI + YOLO + DINOv2
-- **Base de datos:** PostgreSQL + PostGIS + pgvector
-- **Cache/Queue:** Redis
-- **Storage:** Cloudflare R2
+| Módulo | Qué incluye |
+|---|---|
+| Autenticación y cuenta | Registro con verificación de email, recuperación de contraseña, segundo factor (2FA) con códigos de recuperación |
+| Reportes | Alta de mascota perdida o encontrada, feed con filtros y vista de mapa, detalle, edición, cierre y "Mis reportes" |
+| Mascotas | Registro de las mascotas propias para precargar reportes |
+| IA y matching | Moderación automática de la foto (detección de animal y aviso de baja calidad), sugerencia de reportes similares y coincidencias por similitud visual y cercanía |
+| Notificaciones | Avisos de coincidencias, cambios de estado y reportes cercanos, con preferencias por usuario |
+| Chat | Conversación en tiempo real entre usuarios, por reporte |
+| Flyers | Generación de un flyer imprimible del reporte |
+| Moderación comunitaria | Denuncia de reportes y anuncios; panel de moderación para ocultar o descartar |
+| Mapa y geolocalización | Pin en el mapa, búsqueda por zona y geocodificación inversa |
+| Comercios | Directorio con mapa, perfil público, plan Premium, anuncios segmentados por ubicación y métricas |
+| Administración | Asignación de roles (moderador, admin) con registro de auditoría |
 
-Ver [ARQUITECTURA.md](./ARQUITECTURA.md) para detalles completos.
+El detalle de cada módulo, con sus flujos, reglas y limitaciones, está en [docs/informe/1-2-2-2-historias-y-flujos.md](docs/informe/1-2-2-2-historias-y-flujos.md).
 
 ---
 
-## 🚀 Quick Start
+## Arquitectura
+
+Monorepo con dos backends ([ADR-0001](docs/adr/0001-monorepo-y-dos-backends.md)):
+
+| Componente | Tecnología |
+|---|---|
+| Frontend (`frontend/`) | React 19, TypeScript, Vite, Tailwind CSS, TanStack Query, Zod, Leaflet |
+| Backend principal (`backend/`) | Node.js, Express 5, TypeScript, Zod, Prisma 5, Socket.IO |
+| Backend IA (`backend-ia/`) | Python, FastAPI, YOLOv8n (detección), DINOv2 ViT-B/14 (embeddings de 768 dimensiones) |
+| Base de datos | PostgreSQL con PostGIS y pgvector (Docker) |
+| Almacenamiento de imágenes | Cloudflare R2 con URLs prefirmadas |
+| Mapas | Leaflet + OpenStreetMap; geocodificación con Nominatim a través del backend |
+
+Cada decisión técnica está registrada como ADR en [docs/adr/](docs/adr/README.md). La arquitectura general está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
+
+---
+
+## Puesta en marcha local
 
 ### Requisitos
-- Docker & Docker Compose
-- Node.js 20.x (para desarrollo sin Docker)
-- Python 3.11+ (para Backend IA sin Docker)
 
-### Setup Local (Docker)
+- Docker (para PostgreSQL)
+- Node.js 24
+- Python 3.11
+
+### 1. Base de datos
 
 ```bash
-# 1. Clonar repositorio
-git clone https://github.com/ISI-ProyectoFinal-2026/Grupo1.git
-cd Grupo1
-
-# 2. Crear archivo .env
-cp docker/.env.example docker/.env
-# Editar docker/.env con tus credenciales de R2 (si quieres usar storage)
-
-# 3. Levantar servicios
-docker-compose up -d
-
-# 4. Migraciones de BD (en otra terminal)
-docker-compose exec backend npx prisma migrate dev --name init
-
-# 5. Acceder a los servicios
-# Frontend:    http://localhost:5173
-# Backend:     http://localhost:3001
-# Backend IA:  http://localhost:8000
-# pgAdmin:     http://localhost:5050
+docker compose up -d   # PostgreSQL + PostGIS + pgvector en el puerto 5433
 ```
 
-### Setup Local (Sin Docker)
+Variables opcionales de Compose: [docker/ENV_VARS.md](docker/ENV_VARS.md).
 
-**Backend Principal:**
+### 2. Backend principal
+
 ```bash
 cd backend
 npm install
-npm run dev  # http://localhost:3001
+npm run prisma:generate
+npm run prisma:deploy   # aplica las migraciones
+npm run dev             # http://localhost:3001
 ```
 
-**Backend IA:**
+Las variables de entorno (base, R2, email, 2FA, `AI_SERVICE_URL`, `INTERNAL_API_KEY`) están en [backend/README.md](backend/README.md).
+
+### 3. Backend IA
+
 ```bash
 cd backend-ia
 python -m venv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-python -m uvicorn app.main:app --reload  # http://localhost:8000
+uvicorn app.main:app --reload   # http://localhost:8000
 ```
 
-**Frontend:**
+Requiere las migraciones del backend principal aplicadas. Configuración en [backend-ia/README.md](backend-ia/README.md).
+
+### 4. Frontend
+
 ```bash
 cd frontend
 npm install
-npm run dev  # http://localhost:5173
+npm run dev   # http://localhost:5173
+```
+
+### Verificar que todo responde
+
+| Endpoint | Qué indica |
+|---|---|
+| `GET :3001/health` | El backend responde; `ai` informa si `AI_SERVICE_URL` está configurada |
+| `GET :3001/health/db` | La base de datos responde |
+| `GET :3001/health/ai` | El Backend IA responde |
+| `GET :8000/health/db` | El Backend IA llega a la base y pgvector está activo |
+
+---
+
+## Tests y calidad
+
+| Componente | Comandos |
+|---|---|
+| Backend | `npm run typecheck`, `npm test`, `npm run test:coverage` (Jest, contra la base real) |
+| Frontend | `npm run lint` (oxlint), `npm run typecheck`, `npm test` (Vitest), `npm run test:e2e` (Playwright) |
+| Backend IA | `python -m pytest tests/` |
+
+El CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) corre todo lo anterior en cada PR. La estrategia de pruebas está en [docs/informe/1-3-3-pruebas.md](docs/informe/1-3-3-pruebas.md).
+
+---
+
+## Estructura
+
+```
+Grupo1/
+├── frontend/          # SPA en React
+├── backend/           # API principal (Express + Prisma)
+├── backend-ia/        # Servicio de IA (FastAPI)
+├── docker/            # Configuración de PostgreSQL
+├── docs/              # Informe, ADR, arquitectura y flujo de trabajo
+├── openspec/          # Cambios especificados con SDD
+├── tools/             # Generación del sitio y del .docx del informe
+├── docker-compose.yml
+└── mkdocs.yml         # Sitio de documentación (GitHub Pages)
 ```
 
 ---
 
-## 📁 Estructura
+## Cómo contribuir
 
-```
-patitas/
-├── frontend/           # React SPA
-├── backend/            # Node.js API principal
-├── backend-ia/         # Python IA service
-├── docker/             # Configuración Docker
-├── docs/               # Documentación
-├── scripts/            # Utilidades
-├── docker-compose.yml  # Orquestación
-└── ARQUITECTURA.md     # Especificación técnica
-```
-
-Ver [ESTRUCTURA_PROYECTO.md](./ESTRUCTURA_PROYECTO.md) para detalles completos.
+Cada integrante trabaja en su rama personal (`{nombre}/features`) y abre un PR contra `main`; los commits siguen Conventional Commits. El detalle está en [docs/WORKFLOW.md](docs/WORKFLOW.md) y [ADR-0010](docs/adr/0010-flujo-git-ramas-personales.md).
 
 ---
 
-## 📚 Documentación
-
-| Documento | Propósito |
-|-----------|-----------|
-| [ARQUITECTURA.md](./ARQUITECTURA.md) | Diseño técnico completo |
-| [ESTRUCTURA_PROYECTO.md](./ESTRUCTURA_PROYECTO.md) | Árbol de carpetas |
-| [docs/API.md](./docs/API.md) | Especificación de endpoints |
-| [docs/DATABASE.md](./docs/DATABASE.md) | Esquema de BD |
-| [CONTRIBUTING.md](./CONTRIBUTING.md) | Guía de contribución |
-
----
-
-## 🔄 Flujo Principal
-
-1. **Usuario sube imagen** → Se guarda en Cloudflare R2
-2. **Backend crea reporte** → Backend IA se dispara (hoy: llamada directa fire-and-forget; a futuro: job en Redis Queue)
-3. **Backend IA procesa** → YOLO + DINOv2, guarda embedding
-4. **Se buscan similares** → pgvector matching (mismo paso, sin cola todavía)
-5. **Usuario confirma** → Match manual (pendiente: notificación al usuario, hoy solo hay un endpoint de lectura)
-
-Ver [ARQUITECTURA.md#4-flujo-funcional](./ARQUITECTURA.md#4-flujo-funcional---caso-de-uso-principal) para el detalle de qué está implementado vs. la arquitectura objetivo.
-
----
-
-## 🛠️ Desarrollo
-
-### Comandos Útiles
-
-```bash
-# Backend
-npm run dev              # Desarrollo
-npm run build            # Build
-npm run test             # Tests
-npm run lint             # Linter
-
-# Migraciones
-npx prisma migrate dev   # Nueva migración
-npx prisma studio       # Ver BD gráficamente
-
-# Frontend
-npm run dev              # Desarrollo
-npm run build            # Build
-npm run preview          # Preview
-npm run test             # Tests
-
-# Backend IA
-python -m uvicorn app.main:app --reload
-pytest                   # Tests
-```
-
----
-
-## 🚢 Despliegue
-
-Consultar [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) para:
-- Configuración de producción
-- Variables de entorno
-- Despliegue en AWS/Google Cloud/Hetzner
-- Monitoreo y logs
-
----
-
-## 📝 Contribuir
-
-1. Crea una rama: `git checkout -b feature/tu-feature`
-2. Haz commits descriptivos: `git commit -m "feat: descripción"`
-3. Push: `git push origin feature/tu-feature`
-4. Abre un PR
-
-Ver [CONTRIBUTING.md](./CONTRIBUTING.md) para detalles.
-
----
-
-## 📊 Stack Resumido
-
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | React 18, TypeScript, Vite, Tailwind |
-| Backend | Node.js, Express, Prisma, PostgreSQL |
-| IA | Python, FastAPI, YOLO v8, DINOv2 |
-| Infra | Docker, Redis, PostgreSQL+PostGIS+pgvector |
-| Storage | Cloudflare R2 |
-| Queue | Redis Queue (o RabbitMQ/SQS) |
-
----
-
-
-
----
-
-**Proyecto Final - Ingeniería de Software 2026**  
-Último update: 2026-08-06
+**Proyecto Final 2026 — Ingeniería en Sistemas de Información, UTN Facultad Regional San Rafael**
+Última actualización: 2026-11-03
