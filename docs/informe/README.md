@@ -21,7 +21,8 @@ Evidencia: **R** repositorio, **I** entrevista, **N** no disponible todavía.
 | 1.2.3 Pantallas y reportes (paleta, fuentes, pantallas) | `1-2-3-pantallas.md` | A | R (frontend) |
 | 1.2.4 Modelo de datos | `1-2-4-modelo-de-datos.md` | A | R |
 | 1.3.1 Programación y documentación | `1-3-1-programacion-y-documentacion.md` | A | R, ADR |
-| 1.3.2, 1.3.4, 1.3.5 Capacitación, manuales, implementación | — | B | I |
+| 1.3.2 Planificación de capacitación | `1-3-2-capacitacion.md` | B | I, R (frontend, PR #269-#272) |
+| 1.3.4, 1.3.5 Manuales, implementación | — | B | I |
 | 1.3.3 Pruebas (1.3.3.5 `No disponible`, #40) | `1-3-3-pruebas.md` | A | R |
 | 2.1 Actividades e hitos | — | B | R + I |
 | 2.2.1 Equipo de trabajo | `2-2-1-equipo-de-trabajo.md` | A | R |
@@ -141,3 +142,5 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 1.2.2-23 | Tabla | Requerimientos funcionales del PDD con su trazabilidad | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `docs/pdd/PDD v1.0.docx`, `gh issue list`, código y pruebas citados |
 | Tabla 1.2.2-24 | Tabla | Requerimientos funcionales agregados durante el desarrollo | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | issues, código y pruebas citados |
 | Tabla 1.2.2-25 | Tabla | Requerimientos no funcionales del PDD | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `gh run view 40526775901 --log`, archivos citados |
+| Tabla 1.3.2-1 | Tabla | Modalidad y material por rol | 1.3.2.3 ([`1-3-2-capacitacion.md`](1-3-2-capacitacion.md)) | Definición del equipo (2026-11-03) |
+| Figura 1.3.2-1 | Figura | Diagrama de Gantt del plan de capacitación | 1.3.2.6 ([`1-3-2-capacitacion.md`](1-3-2-capacitacion.md)) | Definición del equipo (2026-11-03) |
