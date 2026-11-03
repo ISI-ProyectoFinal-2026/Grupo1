@@ -30,10 +30,15 @@ interface InterServerEvents {
 
 interface SocketData {
   userId: number;
+  tokenVersion: number;
 }
 
 export type ChatServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 type ChatSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
+
+export function userRoom(userId: number): string {
+  return `user:${userId}`;
+}
 
 export function chatRoom(chatId: number): string {
   return `chat:${chatId}`;
@@ -90,7 +95,7 @@ async function handleSendMessage(
     const { chatId, content, imageUrl } = sendMessageSchema.parse(payload);
     // Lectura fresca por envío: el socket autentica una sola vez al conectar, así
     // que verificar el email a mitad de sesión tiene efecto sin reconectar.
-    assertEmailVerified(await loadAuthUser(socket.data.userId));
+    assertEmailVerified(await loadAuthUser(socket.data.userId, socket.data.tokenVersion));
     const chat = await chatsService.assertParticipant(chatId, socket.data.userId);
     const message = await chatsService.createMessage(chatId, socket.data.userId, { content, imageUrl });
 
@@ -128,6 +133,7 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
     try {
       const authUser = await authenticateAccessToken(token);
       socket.data.userId = authUser.id;
+      socket.data.tokenVersion = authUser.tokenVersion;
       next();
     } catch (error) {
       if (error instanceof AppError) {
@@ -140,16 +146,19 @@ export function initChatSocket(httpServer: HttpServer): ChatServer {
   });
 
   io.on("connection", (socket) => {
+    socket.join(userRoom(socket.data.userId));
+
     socket.on("join_chat", async (payload, ack) => {
       try {
         const { chatId } = joinChatSchema.parse(payload);
+        await loadAuthUser(socket.data.userId, socket.data.tokenVersion);
         await chatsService.assertParticipant(chatId, socket.data.userId);
         socket.join(chatRoom(chatId));
         ack?.({ ok: true, data: undefined });
       } catch (error) {
-        const { error: message } = toAckError(error);
-        ack?.({ ok: false, error: message });
-        socket.emit("error", { event: "join_chat", message });
+        const { error: message, code } = toAckError(error);
+        ack?.({ ok: false, error: message, ...(code ? { code } : {}) });
+        socket.emit("error", { event: "join_chat", message, ...(code ? { code } : {}) });
       }
     });
 

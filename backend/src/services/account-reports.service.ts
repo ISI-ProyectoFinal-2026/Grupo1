@@ -1,8 +1,9 @@
-import { AccountReport, AccountReportSeverity, Prisma, Role } from "@prisma/client";
+import { AccountReport, AccountSanction, AccountReportSeverity, Prisma, Role } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { CreateAccountReportInput } from "../validators/account-reports.validator";
 import * as accountSanctionsService from "./account-sanctions.service";
+import { applySanctionEffects } from "./account-sanctions/effects";
 import { sanctionClock } from "./account-sanctions/clock";
 import { countBySeverity, resolveSeverity } from "./account-sanctions/policy";
 
@@ -20,7 +21,7 @@ export async function create(reporterId: number, data: CreateAccountReportInput)
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const { created, sanction } = await prisma.$transaction(async (tx) => {
       // lock de la cuenta: serializa denuncias simultáneas para que el umbral se dispare una sola vez
       const locked = await tx.$queryRaw<{ id: number; role: Role }[]>`
         SELECT id, role FROM users WHERE id = ${data.reportedUserId} FOR UPDATE
@@ -44,16 +45,19 @@ export async function create(reporterId: number, data: CreateAccountReportInput)
         select: { id: true, severity: true },
         orderBy: { id: "asc" },
       });
+      let sanction: AccountSanction | null = null;
       if (open.length >= ACCOUNT_REPORT_THRESHOLD) {
-        await accountSanctionsService.createFromThreshold(tx, {
+        sanction = await accountSanctionsService.createFromThreshold(tx, {
           userId: data.reportedUserId,
           role: locked[0].role,
           reports: open.slice(0, ACCOUNT_REPORT_THRESHOLD),
           now,
         });
       }
-      return created;
+      return { created, sanction };
     });
+    if (sanction) await applySanctionEffects(sanction);
+    return created;
   } catch (error) {
     if (isPrismaKnownError(error, "P2002")) {
       throw new AppError(409, "Ya reportaste esta cuenta");

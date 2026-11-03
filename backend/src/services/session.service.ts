@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { verifyAccessToken } from "../utils/jwt";
+import { activeSanctionWhere, toSuspendedError } from "./account-sanctions/active";
+import { sanctionClock } from "./account-sanctions/clock";
 
 /** Lo que el resto del backend sabe del usuario autenticado en cada request. */
 export interface AuthUser {
@@ -12,7 +14,20 @@ export interface AuthUser {
   tokenVersion: number;
 }
 
-const AUTH_USER_SELECT = { id: true, role: true, emailVerifiedAt: true, tokenVersion: true } as const;
+// sanción vigente (a lo sumo una) para decidir el bloqueo en la misma consulta
+const authUserSelect = (now: Date) =>
+  ({
+    id: true,
+    role: true,
+    emailVerifiedAt: true,
+    tokenVersion: true,
+    accountSanctions: { where: activeSanctionWhere(now), take: 1 },
+  }) as const;
+
+function toAuthUser({ accountSanctions, ...user }: AuthUser & { accountSanctions: Parameters<typeof toSuspendedError>[0][] }): AuthUser {
+  if (accountSanctions[0]) throw toSuspendedError(accountSanctions[0]);
+  return user;
+}
 
 /**
  * Único punto donde se decide si un access token abre sesión. Lo usan
@@ -43,7 +58,7 @@ export async function authenticateAccessToken(token: string): Promise<AuthUser> 
     throw new AppError(401, "Token inválido");
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: AUTH_USER_SELECT });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: authUserSelect(sanctionClock.now()) });
   if (!user) {
     throw new AppError(401, "Token inválido");
   }
@@ -53,7 +68,7 @@ export async function authenticateAccessToken(token: string): Promise<AuthUser> 
     throw new AppError(401, "Tu sesión expiró, iniciá sesión de nuevo");
   }
 
-  return user;
+  return toAuthUser(user);
 }
 
 /**
@@ -62,12 +77,16 @@ export async function authenticateAccessToken(token: string): Promise<AuthUser> 
  * autentica una sola vez al conectar) para decidir con datos frescos: sin esto
  * un usuario que verifica su email a mitad de sesión tendría que reconectar.
  */
-export async function loadAuthUser(userId: number): Promise<AuthUser> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: AUTH_USER_SELECT });
+export async function loadAuthUser(userId: number, tokenVersion: number): Promise<AuthUser> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: authUserSelect(sanctionClock.now()) });
   if (!user) {
     throw new AppError(401, "Token inválido");
   }
-  return user;
+  const authUser = toAuthUser(user);
+  if (authUser.tokenVersion !== tokenVersion) {
+    throw new AppError(401, "Tu sesión expiró, iniciá sesión de nuevo");
+  }
+  return authUser;
 }
 
 /**
