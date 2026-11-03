@@ -7,4 +7,6 @@ export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireRole("admin"));
 
+adminRouter.get("/users", adminUsersController.listUsers);
+adminRouter.get("/role-audit", adminUsersController.listRoleAudit);
 adminRouter.patch("/users/:id/role", adminUsersController.changeRole);
