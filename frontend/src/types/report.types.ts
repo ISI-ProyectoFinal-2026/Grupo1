@@ -17,6 +17,10 @@ export interface ReportDTO {
   imageUrl: string | null
   customFlyerUrl: string | null
   locationAddress: string | null
+  // telefono del autor en el flyer (#259)
+  showPhoneOnFlyer: boolean
+  // fecha del suceso YYYY-MM-DD; null en reportes anteriores (#259)
+  eventDate: string | null
   location: ReportLocation | null
   tag: { label: string; color: string }
   createdAt: string
@@ -51,6 +55,8 @@ export interface CreateReportInput {
   imageUrl?: string
   location: ReportLocation
   locationAddress?: string
+  showPhoneOnFlyer?: boolean
+  eventDate?: string
 }
 
 // PUT /reports/:id is partial. `status` is left out on purpose: closing goes

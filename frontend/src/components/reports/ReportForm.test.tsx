@@ -1,18 +1,23 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportForm from '@/components/reports/ReportForm'
+import { newReportSchema } from '@/types/validators/report.validator'
 import { createReport, findSimilarReports } from '@/services/reports.service'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ReportDTO } from '@/types/report.types'
 import * as authService from '@/services/auth.service'
 import { listMyPets } from '@/services/pets.service'
+import { analyzeImage } from '@/services/uploads.service'
+import { useAuthStore } from '@/stores/auth.store'
+import type { AuthUser } from '@/types/auth'
 import type { PetDTO } from '@/types/pet.types'
 
 vi.mock('@/services/reports.service', () => ({ createReport: vi.fn(), findSimilarReports: vi.fn() }))
 vi.mock('@/services/auth.service')
 vi.mock('@/services/pets.service')
+vi.mock('@/services/uploads.service')
 
 // LocationPicker y ImageUploader arrastran leaflet y el flujo de subida a R2:
 // nada de eso hace falta para probar la validacion y el envio del formulario.
@@ -102,6 +107,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     description: null,
     imageUrl: 'https://cdn/foto.jpg',
     customFlyerUrl: null,
+    showPhoneOnFlyer: false,
+    eventDate: null,
     locationAddress: 'Nueva Córdoba',
     location: { lat: -31.42, lng: -64.18 },
     tag: { label: 'Perdido', color: '#ef4444' },
@@ -166,6 +173,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listMyPets).mockResolvedValue([])
   vi.mocked(findSimilarReports).mockResolvedValue([])
+  vi.mocked(analyzeImage).mockResolvedValue({ hasAnimal: true, lowQuality: false })
 })
 
 describe('ReportForm: render', () => {
@@ -173,6 +181,17 @@ describe('ReportForm: render', () => {
     renderForm()
 
     expect(screen.getByRole('combobox')).toHaveValue('lost')
+  })
+
+  it('el distintivo junto al tipo cambia de color segun la seleccion (#257)', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(screen.getByText('Mascota Perdida', { selector: 'span' })).toHaveClass('bg-lost')
+    await user.selectOptions(screen.getByLabelText('Tipo de reporte *'), 'found')
+
+    expect(screen.getByText('Mascota Encontrada', { selector: 'span' })).toHaveClass('bg-found')
+    expect(screen.queryByText('Mascota Perdida', { selector: 'span' })).not.toBeInTheDocument()
   })
 
   it('acepta datos iniciales para precargar el formulario', () => {
@@ -432,6 +451,292 @@ describe('ReportForm: mascota vinculada (#225)', () => {
     await waitFor(() => expect(createReport).toHaveBeenCalled())
     expect(screen.queryByLabelText('Mascota')).not.toBeInTheDocument()
     expect(vi.mocked(createReport).mock.calls[0][0].petId).toBeUndefined()
+  })
+})
+
+describe('ReportForm: precarga de la mascota propia (#255)', () => {
+  const firulais = () =>
+    mascota({
+      description: 'Collar azul con chapita',
+      photoUrls: ['https://pub.r2.dev/pets/a.jpg', 'https://pub.r2.dev/pets/b.jpg'],
+    })
+
+  async function elegirMascota(user: ReturnType<typeof userEvent.setup>, opcion: string) {
+    await user.selectOptions(await screen.findByLabelText('Mascota'), opcion)
+  }
+
+  it('precarga titulo, descripcion y la primera foto: solo falta la ubicacion', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    vi.mocked(createReport).mockResolvedValue(reporte({ petId: 3 }))
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Firulais (Labrador)')
+    expect(screen.getByLabelText('Descripción')).toHaveValue('Collar azul con chapita')
+    expect(await screen.findByAltText('Foto de tu mascota')).toHaveAttribute(
+      'src',
+      'https://pub.r2.dev/pets/a.jpg'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0]).toMatchObject({
+      petId: 3,
+      title: 'Firulais (Labrador)',
+      description: 'Collar azul con chapita',
+      imageUrl: 'https://pub.r2.dev/pets/a.jpg',
+    })
+  })
+
+  it('usa la especie cuando la mascota no tiene raza', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([mascota({ breed: null, species: 'cat', name: 'Michi' })])
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Michi')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Michi (Gato)')
+  })
+
+  it('los campos precargados se pueden editar antes de enviar', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    vi.mocked(createReport).mockResolvedValue(reporte({ petId: 3 }))
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+    const titulo = screen.getByLabelText('Título *')
+    await user.clear(titulo)
+    await user.type(titulo, 'Firulais perdido en Güemes')
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0]).toMatchObject({
+      title: 'Firulais perdido en Güemes',
+      imageUrl: 'https://cdn/foto.jpg',
+    })
+  })
+
+  it('al volver a "Ninguna" limpia solo lo precargado que no se edito', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+    await user.type(screen.getByLabelText('Título *'), ' perdido')
+    await elegirMascota(user, 'Ninguna')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Firulais (Labrador) perdido')
+    expect(screen.getByLabelText('Descripción')).toHaveValue('')
+    expect(screen.queryByAltText('Foto de tu mascota')).not.toBeInTheDocument()
+  })
+
+  it('no limpia la foto que el usuario subio en reemplazo', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    await elegirMascota(user, 'Ninguna')
+
+    expect(screen.getByAltText('Foto subida')).toHaveAttribute('src', 'https://cdn/foto.jpg')
+  })
+
+  it('no pisa lo que el usuario ya habia escrito', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText('Título *'), 'Perro perdido en Güemes')
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('Perro perdido en Güemes')
+    expect(screen.getByLabelText('Descripción')).toHaveValue('Collar azul con chapita')
+  })
+
+  it('no precarga en un reporte de mascota encontrada', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.selectOptions(screen.getByLabelText('Tipo de reporte *'), 'found')
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(screen.getByLabelText('Título *')).toHaveValue('')
+    expect(screen.queryByAltText('Foto de tu mascota')).not.toBeInTheDocument()
+  })
+
+  it('la foto precargada pasa por la misma verificacion que una subida', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    vi.mocked(analyzeImage).mockResolvedValue({
+      hasAnimal: false,
+      lowQuality: false,
+      message: 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM',
+    })
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(
+      await screen.findByText(
+        'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM'
+      )
+    ).toBeInTheDocument()
+    expect(analyzeImage).toHaveBeenCalledWith('https://pub.r2.dev/pets/a.jpg')
+    expect(screen.getByRole('button', { name: 'Crear Reporte' })).toBeDisabled()
+  })
+})
+
+describe('ReportForm: fecha del suceso (#259)', () => {
+  // 2 de noviembre 17:00 en Argentina; el navegador en Tokio ya está en el 3
+  const AHORA = new Date('2026-11-02T20:00:00Z')
+  const hoy = () => '2026-11-02'
+
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'Asia/Tokyo')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(AHORA)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllEnvs()
+  })
+
+  it('el dia local del navegador difiere del de Argentina en este escenario', () => {
+    expect(new Date().getDate()).toBe(3)
+  })
+
+  it('arranca en hoy de Argentina, no permite fechas futuras y la manda al crear', async () => {
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    const fecha = screen.getByLabelText('Fecha del suceso *')
+    expect(fecha).toHaveValue(hoy())
+    expect(fecha).toHaveAttribute('max', hoy())
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0].eventDate).toBe(hoy())
+  })
+
+  it('es obligatoria al crear', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.clear(screen.getByLabelText('Fecha del suceso *'))
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByText('Indicá la fecha del suceso')).toBeInTheDocument()
+    expect(createReport).not.toHaveBeenCalled()
+  })
+
+  it('no envia una fecha futura', async () => {
+    const user = userEvent.setup()
+    renderForm({ eventDate: '2999-01-01' })
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(screen.getByLabelText('Fecha del suceso *')).toBeInvalid()
+    expect(createReport).not.toHaveBeenCalled()
+  })
+
+  it('rechaza el dia siguiente de Argentina aunque ya sea hoy en el navegador', () => {
+    const result = newReportSchema.safeParse({
+      reportType: 'lost',
+      title: 'Perro perdido en Güemes',
+      imageUrl: 'https://cdn/foto.jpg',
+      location: { lat: -31.42, lng: -64.18 },
+      eventDate: '2026-11-03',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('el esquema rechaza una fecha futura con su mensaje', () => {
+    const result = newReportSchema.safeParse({
+      reportType: 'lost',
+      title: 'Perro perdido en Güemes',
+      imageUrl: 'https://cdn/foto.jpg',
+      location: { lat: -31.42, lng: -64.18 },
+      eventDate: '2999-01-01',
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('La fecha del suceso no puede ser futura')
+  })
+})
+
+describe('ReportForm: telefono en el flyer (#259)', () => {
+  function usuario(phone: string | null): AuthUser {
+    return {
+      id: 7,
+      email: 'usuario7@patitas.test',
+      fullName: null,
+      phone,
+      role: 'usuario_regular',
+      emailVerifiedAt: '2026-09-01T10:00:00.000Z',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    }
+  }
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
+  it('sin telefono en el perfil no ofrece mostrarlo', () => {
+    useAuthStore.setState({ token: 'token', user: usuario(null) })
+    renderForm()
+
+    expect(screen.queryByLabelText(/Mostrar mi teléfono en el flyer/)).not.toBeInTheDocument()
+  })
+
+  it('con telefono lo ofrece desmarcado y no lo manda si no se marca', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario('11 5555-5555') })
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(screen.getByLabelText(/Mostrar mi teléfono en el flyer/)).not.toBeChecked()
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0].showPhoneOnFlyer).toBeFalsy()
+  })
+
+  it('manda el consentimiento cuando se marca', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario('11 5555-5555') })
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByLabelText(/Mostrar mi teléfono en el flyer/))
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0].showPhoneOnFlyer).toBe(true)
+  })
+
+  it('precarga el consentimiento guardado', () => {
+    useAuthStore.setState({ token: 'token', user: usuario('11 5555-5555') })
+    renderForm({ showPhoneOnFlyer: true })
+
+    expect(screen.getByLabelText(/Mostrar mi teléfono en el flyer/)).toBeChecked()
   })
 })
 

@@ -15,6 +15,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     description: 'Collar rojo, responde a Pepe',
     imageUrl: 'https://cdn/pepe.jpg',
     customFlyerUrl: null,
+    showPhoneOnFlyer: false,
+    eventDate: null,
     locationAddress: 'Nueva Córdoba',
     location: { lat: -31.42, lng: -64.18 },
     tag: { label: 'Perdido', color: '#ef4444' },
@@ -48,6 +50,12 @@ describe('ReportCard', () => {
     // la zona va junto al icono de pin (SVG decorativo, ya no el emoji 📍)
     expect(screen.getByText('Nueva Córdoba')).toBeInTheDocument()
     expect(screen.getByText('Perdido')).toBeInTheDocument()
+  })
+
+  it('muestra el distintivo del tipo de reporte (#257)', () => {
+    renderCard(reporte({ reportType: 'found' }))
+
+    expect(screen.getByText('Mascota Encontrada')).toHaveClass('bg-found')
   })
 
   it('usa la foto del reporte con el titulo como alt', () => {

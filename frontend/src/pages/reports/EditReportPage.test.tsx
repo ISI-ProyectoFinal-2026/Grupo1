@@ -45,6 +45,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     imageUrl: 'https://cdn/actual.jpg',
     customFlyerUrl: null,
     locationAddress: 'Caballito, CABA',
+    showPhoneOnFlyer: false,
+    eventDate: null,
     location: { lat: -34.61, lng: -58.44 },
     tag: { label: 'PERDIDO', color: '#EF4444' },
     createdAt: '2026-09-19T10:00:00.000Z',
@@ -116,6 +118,25 @@ describe('EditReportPage', () => {
     expect(reportsService.getReport).toHaveBeenCalledWith(5)
   })
 
+  it('precarga la fecha del suceso (#259)', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ eventDate: '2026-09-18' }))
+    renderPage()
+
+    expect(await screen.findByLabelText('Fecha del suceso *')).toHaveValue('2026-09-18')
+  })
+
+  it('permite guardar un reporte anterior sin fecha del suceso (#259)', async () => {
+    const user = userEvent.setup()
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ eventDate: null }))
+    vi.mocked(reportsService.updateReport).mockResolvedValue(reporte())
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(reportsService.updateReport).toHaveBeenCalled())
+    expect(vi.mocked(reportsService.updateReport).mock.calls[0][1].eventDate).toBeUndefined()
+  })
+
   it('precarga la mascota vinculada al reporte en el selector', async () => {
     vi.mocked(listMyPets).mockResolvedValue([
       mascota(),
@@ -149,6 +170,7 @@ describe('EditReportPage', () => {
       imageUrl: 'https://cdn/actual.jpg',
       location: { lat: -34.61, lng: -58.44 },
       locationAddress: 'Caballito, CABA',
+      showPhoneOnFlyer: false,
     })
   })
 

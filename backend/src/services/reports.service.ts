@@ -1,9 +1,8 @@
 import { Prisma, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
-import { NO_ANIMAL_DETECTED_MESSAGE } from "../constants/moderation";
 import * as matchingService from "./matching.service";
-import { isR2PublicUrl } from "./storage.service";
+import { assertImageHasAnimal } from "./image-screening.service";
 import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
@@ -21,6 +20,8 @@ export interface ReportRow {
   imageUrl: string | null;
   customFlyerUrl: string | null;
   locationAddress: string | null;
+  showPhoneOnFlyer: boolean;
+  eventDate: Date | null;
   lat: number | null;
   lng: number | null;
   createdAt: Date;
@@ -46,15 +47,18 @@ function toReportTag(reportType: ReportType, status: ReportStatus): ReportTag {
   return { label, color: REPORT_TAG_COLORS[label] };
 }
 
-export interface ReportDTO extends Omit<ReportRow, "lat" | "lng"> {
+export interface ReportDTO extends Omit<ReportRow, "lat" | "lng" | "eventDate"> {
   location: { lat: number; lng: number } | null;
+  // YYYY-MM-DD: sin hora, así no se corre un día por la zona horaria
+  eventDate: string | null;
   tag: ReportTag;
 }
 
 export function toReportDTO(row: ReportRow): ReportDTO {
-  const { lat, lng, ...rest } = row;
+  const { lat, lng, eventDate, ...rest } = row;
   return {
     ...rest,
+    eventDate: eventDate ? eventDate.toISOString().slice(0, 10) : null,
     location: lat !== null && lng !== null ? { lat, lng } : null,
     tag: toReportTag(row.reportType, row.status),
   };
@@ -65,6 +69,8 @@ export const reportColumns = Prisma.sql`
   r.status, r.title, r.description, r.image_url AS "imageUrl",
   r.custom_flyer_url AS "customFlyerUrl",
   r.location_address AS "locationAddress",
+  r.show_phone_on_flyer AS "showPhoneOnFlyer",
+  r.event_date AS "eventDate",
   ST_Y(r.location::geometry) AS lat, ST_X(r.location::geometry) AS lng,
   r.created_at AS "createdAt", r.updated_at AS "updatedAt", r.published_at AS "publishedAt"
 `;
@@ -119,21 +125,6 @@ export async function getVisibleById(id: number, viewerId?: number): Promise<Rep
   throw new AppError(404, "Reporte no encontrado");
 }
 
-/**
- * Upfront screening: an image with no animal at all is rejected before anything
- * is persisted. The frontend runs the same check right after the upload, but it
- * is enforced here so the API cannot be used to bypass it. If the AI service
- * cannot answer, the report is still saved as "pending" and the async
- * moderation pipeline (triggerEmbeddingGeneration + reconciliation) decides.
- * Only images in our R2 bucket are screened synchronously: answering for an
- * arbitrary URL would turn this endpoint into an SSRF oracle.
- */
-async function assertImageHasAnimal(imageUrl: string): Promise<void> {
-  if (isR2PublicUrl(imageUrl) && (await matchingService.analyzeImage(imageUrl)) === "no_animal") {
-    throw new AppError(422, NO_ANIMAL_DETECTED_MESSAGE);
-  }
-}
-
 // Fire-and-forget: no se espera la inferencia de ML. Se envuelve en try/catch
 // además del .catch() interno del servicio para que ni siquiera un error
 // síncrono al disparar la llamada haga fallar la operación sobre el reporte.
@@ -164,6 +155,8 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
           description: data.description ?? null,
           imageUrl: data.imageUrl,
           locationAddress: data.locationAddress ?? null,
+          showPhoneOnFlyer: data.showPhoneOnFlyer ?? false,
+          eventDate: data.eventDate ?? null,
           // La fecha la sella matching.service al publicar tras el veredicto del Backend IA.
           publishedAt: null,
         },

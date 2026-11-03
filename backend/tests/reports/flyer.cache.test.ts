@@ -1,4 +1,5 @@
 import { ReportDTO } from "../../src/services/reports.service";
+import { prisma } from "../../src/db/client";
 
 const getObjectMetadataMock = jest.fn();
 const uploadBufferMock = jest.fn();
@@ -48,6 +49,8 @@ function buildReport(overrides: Partial<ReportDTO> = {}): ReportDTO {
     imageUrl: null,
     customFlyerUrl: null,
     locationAddress: "San Telmo, CABA",
+    showPhoneOnFlyer: false,
+    eventDate: null,
     createdAt: new Date("2026-09-01T10:00:00Z"),
     updatedAt: new Date("2026-09-01T10:00:00Z"),
     publishedAt: new Date("2026-09-01T10:00:00Z"),
@@ -82,6 +85,7 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env = { ...originalEnv };
+  jest.restoreAllMocks();
 });
 
 describe("getOrCreateFlyerUrl (cache del PNG en R2)", () => {
@@ -119,6 +123,9 @@ describe("getOrCreateFlyerUrl (cache del PNG en R2)", () => {
     ["locationAddress", { locationAddress: "Palermo, CABA" }],
     ["imageUrl", { imageUrl: "https://pub-test.r2.dev/pets/otra-foto.jpg" }],
     ["tag (reporte resuelto)", { status: "resolved", tag: { label: "RESUELTO", color: "#22C55E" } }],
+    ["createdAt (fecha del suceso)", { createdAt: new Date("2026-08-30T10:00:00Z") }],
+    ["reportType", { reportType: "found" }],
+    ["eventDate (fecha del suceso)", { eventDate: "2026-08-15" }],
   ])("cache miss tras cambiar %s: regenera el PNG y devuelve otra URL", async (_field, change) => {
     const original = buildReport();
     const firstUrl = await getOrCreateFlyerUrl(original);
@@ -276,5 +283,68 @@ describe("getOrCreateFlyerUrl (foto guardada fuera del bucket R2)", () => {
     await getOrCreateFlyerUrl(buildReport({ imageUrl: "HTTPS://PUB-TEST.r2.dev/pets/gato.jpg" }));
 
     expect(loadImageMock).toHaveBeenCalledWith("https://pub-test.r2.dev/pets/gato.jpg", { maxRedirects: 0 });
+  });
+});
+
+// datos de la mascota y teléfono del autor en la huella (#259)
+describe("getOrCreateFlyerUrl (datos de la mascota y teléfono)", () => {
+  const pet = { name: "Firulais", breed: "Labrador", color: "Marrón" };
+
+  function mockPet(data: typeof pet | null) {
+    return jest.spyOn(prisma.pet, "findUnique").mockResolvedValue(data as never);
+  }
+
+  function mockPhone(phone: string | null) {
+    return jest.spyOn(prisma.user, "findUnique").mockResolvedValue({ phone } as never);
+  }
+
+  test("no consulta el teléfono si el autor no lo autorizó", async () => {
+    const userSpy = mockPhone("11 5555-5555");
+
+    await getOrCreateFlyerUrl(buildReport({ showPhoneOnFlyer: false }));
+
+    expect(userSpy).not.toHaveBeenCalled();
+  });
+
+  test("con consentimiento, el teléfono entra en la huella", async () => {
+    mockPhone("11 5555-5555");
+    await getOrCreateFlyerUrl(buildReport({ showPhoneOnFlyer: false }));
+    const withoutPhone = lastUploadedMetadata()["flyer-version"];
+
+    await getOrCreateFlyerUrl(buildReport({ showPhoneOnFlyer: true }));
+
+    expect(lastUploadedMetadata()["flyer-version"]).not.toBe(withoutPhone);
+  });
+
+  test("con consentimiento pero sin teléfono cargado es el mismo flyer que sin consentimiento", async () => {
+    mockPhone(null);
+    await getOrCreateFlyerUrl(buildReport({ showPhoneOnFlyer: false }));
+    uploadBufferMock.mockClear();
+
+    await getOrCreateFlyerUrl(buildReport({ showPhoneOnFlyer: true }));
+
+    expect(uploadBufferMock).not.toHaveBeenCalled();
+  });
+
+  test("lee la mascota vinculada y regenera si cambia su color", async () => {
+    const petSpy = mockPet(pet);
+    await getOrCreateFlyerUrl(buildReport({ petId: 3 }));
+    expect(petSpy).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 3 } }));
+    const firstVersion = lastUploadedMetadata()["flyer-version"];
+    uploadBufferMock.mockClear();
+
+    mockPet({ ...pet, color: "Negro" });
+    await getOrCreateFlyerUrl(buildReport({ petId: 3 }));
+
+    expect(uploadBufferMock).toHaveBeenCalledTimes(1);
+    expect(lastUploadedMetadata()["flyer-version"]).not.toBe(firstVersion);
+  });
+
+  test("sin mascota vinculada no consulta la tabla de mascotas", async () => {
+    const petSpy = mockPet(pet);
+
+    await getOrCreateFlyerUrl(buildReport({ petId: null }));
+
+    expect(petSpy).not.toHaveBeenCalled();
   });
 });

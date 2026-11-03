@@ -151,10 +151,14 @@ describe("GET /api/geo/nearby y GET /api/geo/map", () => {
     });
 
     test("GET /api/geo/map respeta limit y devuelve los más nuevos", async () => {
-      await createTracked({ reportType: "found", title: "Viejo" });
-      const nuevo = await createTracked({ reportType: "found", title: "Nuevo" });
+      // zona propia: otras suites crean reportes en el mismo bbox en paralelo
+      const zone = `geo-limit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const viejo = await createTracked({ reportType: "found", title: "Viejo", locationAddress: zone });
+      const nuevo = await createTracked({ reportType: "found", title: "Nuevo", locationAddress: zone });
+      // orden explícito: dos inserts seguidos pueden empatar en created_at
+      await prisma.report.update({ where: { id: viejo.id }, data: { createdAt: new Date(Date.now() - 60_000) } });
 
-      const res = await request(app).get(`/api/geo/map?bounds=${BBOX}&limit=1`);
+      const res = await request(app).get(`/api/geo/map?bounds=${BBOX}&zone=${zone}&limit=1`);
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);

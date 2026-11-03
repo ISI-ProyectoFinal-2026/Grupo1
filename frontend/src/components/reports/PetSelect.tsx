@@ -3,7 +3,7 @@ import type { PetDTO } from '@/types/pet.types'
 
 interface PetSelectProps {
   value?: number
-  onChange: (petId: number | undefined) => void
+  onChange: (petId: number | undefined, pet?: PetDTO) => void
 }
 
 function petLabel(pet: PetDTO) {
@@ -25,7 +25,10 @@ export default function PetSelect({ value, onChange }: PetSelectProps) {
         id='petId'
         name='petId'
         value={value ?? ''}
-        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+        onChange={(e) => {
+          const petId = e.target.value ? Number(e.target.value) : undefined
+          onChange(petId, pets.find((pet) => pet.id === petId))
+        }}
         className='field'
       >
         <option value=''>Ninguna</option>

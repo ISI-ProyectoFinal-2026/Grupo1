@@ -2,6 +2,34 @@ import { z } from "zod";
 import { ReportType, ReportStatus } from "@prisma/client";
 import { locationSchema, r2ImageUrlSchema } from "./shared.validator";
 
+// el "hoy" del suceso se mide en hora de Argentina, no en la del server
+const EVENT_DATE_TIME_ZONE = "America/Argentina/Buenos_Aires";
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function todayInArgentina(): string {
+  // en-CA formatea como YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: EVENT_DATE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+// zod sigue con los refine aunque falle el regex: no asumir el formato
+function isCalendarDate(value: string): boolean {
+  const time = Date.parse(`${value}T00:00:00.000Z`);
+  return ISO_DATE.test(value) && !Number.isNaN(time) && new Date(time).toISOString().startsWith(value);
+}
+
+// fecha del suceso (#259): día sin hora, se guarda como medianoche UTC
+const eventDateSchema = z
+  .string()
+  .regex(ISO_DATE, "La fecha del suceso debe tener formato YYYY-MM-DD")
+  .refine(isCalendarDate, "Fecha del suceso inválida")
+  .refine((value) => value <= todayInArgentina(), "La fecha del suceso no puede ser futura")
+  .transform((value) => new Date(`${value}T00:00:00.000Z`));
+
 export const createReportSchema = z.object({
   petId: z.number().int().positive().optional(),
   reportType: z.enum([ReportType.lost, ReportType.found]),
@@ -10,6 +38,9 @@ export const createReportSchema = z.object({
   imageUrl: r2ImageUrlSchema,
   location: locationSchema,
   locationAddress: z.string().min(1).optional(),
+  // teléfono del autor en el flyer público (#259)
+  showPhoneOnFlyer: z.boolean().optional(),
+  eventDate: eventDateSchema.optional(),
 });
 
 /**

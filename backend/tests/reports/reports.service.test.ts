@@ -111,6 +111,60 @@ describe("reports.service", () => {
     });
   });
 
+  test("create() deja showPhoneOnFlyer en false por defecto (#259)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    expect(report.showPhoneOnFlyer).toBe(false);
+  });
+
+  test("create() guarda el consentimiento para mostrar el teléfono en el flyer (#259)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData, showPhoneOnFlyer: true });
+    createdReportIds.push(report.id);
+
+    expect(report.showPhoneOnFlyer).toBe(true);
+    expect((await reportsService.getById(report.id)).showPhoneOnFlyer).toBe(true);
+  });
+
+  test("update() cambia el consentimiento del teléfono en el flyer (#259)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData, showPhoneOnFlyer: true });
+    createdReportIds.push(report.id);
+
+    const updated = await reportsService.update(report.id, userId, { showPhoneOnFlyer: false });
+
+    expect(updated.showPhoneOnFlyer).toBe(false);
+  });
+
+  test("create() deja eventDate en null si no se indica (#259)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    expect(report.eventDate).toBeNull();
+  });
+
+  test("create() guarda la fecha del suceso y la expone como YYYY-MM-DD (#259)", async () => {
+    const report = await reportsService.create({
+      userId,
+      ...baseReportData,
+      eventDate: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    createdReportIds.push(report.id);
+
+    expect(report.eventDate).toBe("2026-09-01");
+    expect((await reportsService.getById(report.id)).eventDate).toBe("2026-09-01");
+  });
+
+  test("update() cambia la fecha del suceso (#259)", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    const updated = await reportsService.update(report.id, userId, {
+      eventDate: new Date("2026-08-15T00:00:00.000Z"),
+    });
+
+    expect(updated.eventDate).toBe("2026-08-15");
+  });
+
   test("list() incluye los reportes creados y expone location", async () => {
     const report = await createPublished({ userId, ...baseReportData });
     createdReportIds.push(report.id);
