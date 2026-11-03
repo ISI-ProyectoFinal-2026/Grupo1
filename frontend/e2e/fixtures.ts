@@ -33,10 +33,9 @@ export async function loginAs(page: Page, session: api.Session): Promise<void> {
 
 /** Fakes the third-party calls the app makes from the browser. */
 export async function stubExternalServices(page: Page): Promise<void> {
-  // LocationPicker reverse-geocodes the coordinates with Nominatim.
-  await page.route('https://nominatim.openstreetmap.org/**', (route) =>
-    route.fulfill({ json: { address: { city: 'Ciudad E2E' } } }),
-  )
+  // LocationPicker reverse-geocodes through the backend proxy (/api/geo/reverse),
+  // which would otherwise hit the public Nominatim.
+  await page.route('**/api/geo/reverse**', (route) => route.fulfill({ json: { address: 'Ciudad E2E' } }))
   // Map tiles (FeedPage/MapView): never hit the public OSM servers from tests.
   await page.route(/tile\.openstreetmap\.org/, (route) => route.fulfill({ status: 204 }))
   // Report photo upload (mandatory): presign and the PUT to R2 are faked, so no

@@ -1,7 +1,7 @@
 import type { AxiosResponse } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/services/api'
-import { listMapReports } from '@/services/geo.service'
+import { listMapReports, reverseGeocode } from '@/services/geo.service'
 import type { ReportDTO } from '@/types/report.types'
 
 vi.mock('@/services/api', () => ({
@@ -15,6 +15,26 @@ function respuesta<T>(data: T): AxiosResponse<T> {
 }
 
 beforeEach(() => vi.clearAllMocks())
+
+describe('reverseGeocode', () => {
+  it('pide /geo/reverse con lat y lng y devuelve la direccion', async () => {
+    vi.mocked(api.get).mockResolvedValue(respuesta({ address: 'San Rafael' }))
+    const { signal } = new AbortController()
+
+    await expect(reverseGeocode(-34.61, -68.33, signal)).resolves.toBe('San Rafael')
+
+    expect(api.get).toHaveBeenCalledWith('/geo/reverse', {
+      params: { lat: -34.61, lng: -68.33 },
+      signal,
+    })
+  })
+
+  it('devuelve null si el backend no encontro ciudad ni localidad', async () => {
+    vi.mocked(api.get).mockResolvedValue(respuesta({ address: null }))
+
+    await expect(reverseGeocode(-34.61, -68.33)).resolves.toBeNull()
+  })
+})
 
 describe('listMapReports', () => {
   it('pide /geo/map con bounds como "swLat,swLng,neLat,neLng"', async () => {

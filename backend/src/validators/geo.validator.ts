@@ -36,6 +36,11 @@ export const geoMapQuerySchema = geoFiltersSchema.extend({
   bounds: boundsSchema,
 });
 
-export type GeoFilters = z.infer<typeof geoFiltersSchema>;
+export const geoReverseQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+});
+
+export type GeoFilters =z.infer<typeof geoFiltersSchema>;
 export type GeoNearbyQuery = z.infer<typeof geoNearbyQuerySchema>;
 export type BoundingBox = z.infer<typeof boundsSchema>;
