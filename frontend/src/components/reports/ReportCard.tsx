@@ -5,6 +5,7 @@ import { DogFace } from "@/components/ui/canine";
 import { formatRelativeDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { tagTone } from "@/lib/tag-tone";
+import ReportTypeBadge from "@/components/reports/ReportTypeBadge";
 
 interface ReportCardProps {
   report: ReportDTO;
@@ -56,6 +57,7 @@ export default function ReportCard({ report }: ReportCardProps) {
         </div>
 
         <div className="flex flex-1 flex-col gap-1.5 p-4">
+          <ReportTypeBadge reportType={report.reportType} />
           {/* Fixed text rows (1-line title, 2-line description) keep every card the same height. */}
           <h3 title={report.title} className="truncate font-display text-display-sm text-ink">
             {report.title}

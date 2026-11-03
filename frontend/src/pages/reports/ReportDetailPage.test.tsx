@@ -99,6 +99,14 @@ describe('ReportDetailPage estado', () => {
     expect(await screen.findByText('Publicado')).toBeInTheDocument()
     expect(screen.queryByText('published')).not.toBeInTheDocument()
   })
+
+  it('muestra el distintivo del tipo de reporte (#257)', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ reportType: 'lost' }))
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+    renderPage()
+
+    expect(await screen.findByText('Mascota Perdida', { selector: 'span' })).toHaveClass('bg-lost')
+  })
 })
 
 describe('ReportDetailPage coincidencias', () => {

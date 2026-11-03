@@ -31,6 +31,7 @@ import NearbyBusinesses from "@/components/business/NearbyBusinesses";
 import { cn } from "@/lib/cn";
 import { DogFace } from "@/components/ui/canine";
 import { tagTone } from "@/lib/tag-tone";
+import ReportTypeBadge from "@/components/reports/ReportTypeBadge";
 import { REPORT_STATUS_LABELS } from "@/lib/report-status";
 
 const sectionTitle = "font-display text-display-sm text-ink";
@@ -190,7 +191,8 @@ export default function ReportDetailPage() {
             )}
           </div>
 
-          <h1 className="mt-5 break-words font-display text-display-lg sm:text-display-xl">{report.title}</h1>
+          <ReportTypeBadge reportType={report.reportType} className="mt-5" />
+          <h1 className="mt-3 break-words font-display text-display-lg sm:text-display-xl">{report.title}</h1>
 
           <dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex gap-3">

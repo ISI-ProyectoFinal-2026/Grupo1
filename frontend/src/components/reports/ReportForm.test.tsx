@@ -175,6 +175,17 @@ describe('ReportForm: render', () => {
     expect(screen.getByRole('combobox')).toHaveValue('lost')
   })
 
+  it('el distintivo junto al tipo cambia de color segun la seleccion (#257)', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(screen.getByText('Mascota Perdida', { selector: 'span' })).toHaveClass('bg-lost')
+    await user.selectOptions(screen.getByLabelText('Tipo de reporte *'), 'found')
+
+    expect(screen.getByText('Mascota Encontrada', { selector: 'span' })).toHaveClass('bg-found')
+    expect(screen.queryByText('Mascota Perdida', { selector: 'span' })).not.toBeInTheDocument()
+  })
+
   it('acepta datos iniciales para precargar el formulario', () => {
     renderForm({ reportType: 'found', title: 'Gato encontrado en Güemes' })
 

@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import { createReportSchema, type CreateReportFormData } from "@/types/validators/report.validator";
 import { createReport } from "@/services/reports.service";
 import PetSelect from "./PetSelect";
+import ReportTypeBadge from "./ReportTypeBadge";
 import type { ReportLocation } from "@/types/report.types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -147,16 +148,19 @@ export default function ReportForm(props: ReportFormProps) {
         <label htmlFor="reportType" className="field-label">
           Tipo de reporte *
         </label>
-        <select
-          id="reportType"
-          name="reportType"
-          value={formData.reportType}
-          onChange={handleInputChange}
-          className="field"
-        >
-          <option value="lost">Mascota Perdida</option>
-          <option value="found">Mascota Encontrada</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <select
+            id="reportType"
+            name="reportType"
+            value={formData.reportType}
+            onChange={handleInputChange}
+            className="field"
+          >
+            <option value="lost">Mascota Perdida</option>
+            <option value="found">Mascota Encontrada</option>
+          </select>
+          <ReportTypeBadge reportType={formData.reportType ?? "lost"} className="shrink-0" />
+        </div>
       </div>
 
       <PetSelect

@@ -50,6 +50,12 @@ describe('ReportCard', () => {
     expect(screen.getByText('Perdido')).toBeInTheDocument()
   })
 
+  it('muestra el distintivo del tipo de reporte (#257)', () => {
+    renderCard(reporte({ reportType: 'found' }))
+
+    expect(screen.getByText('Mascota Encontrada')).toHaveClass('bg-found')
+  })
+
   it('usa la foto del reporte con el titulo como alt', () => {
     renderCard(reporte())
 
