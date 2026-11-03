@@ -79,6 +79,10 @@ describe("selección de anuncios y comercios cercanos", () => {
   };
 
   beforeAll(async () => {
+    // restos de corridas interrumpidas de esta suite: sus anuncios Premium en Ushuaia pisan la selección
+    await prisma.business.deleteMany({
+      where: { name: { startsWith: "Serving " }, user: { email: { startsWith: "serving-" } } },
+    });
     const viewer = await createTestUser({ prefix: "serving-viewer" });
     viewerId = viewer.user.id;
     viewerToken = viewer.token;
@@ -236,21 +240,24 @@ describe("selección de anuncios y comercios cercanos", () => {
       const freeFar = await createBusiness("list-free-far", NEAR, "FREE", null);
       const premiumFar = await createBusiness("list-premium-far", { lat: -54.70, lng: -68.303 });
       const expired = await createBusiness("list-expired", { lat: -54.795, lng: -68.303 }, "PREMIUM", new Date(Date.now() - 1000));
-      await createBusiness("list-out-of-range", FAR, "PREMIUM");
-      await createBusiness("list-no-location", null, "PREMIUM");
+      const outOfRange = await createBusiness("list-out-of-range", FAR, "PREMIUM");
+      const noLocation = await createBusiness("list-no-location", null, "PREMIUM");
       const report = await createReport(ORIGIN);
 
       const res = await request(app).get(`/api/reports/${report.id}/nearby-businesses`);
 
       expect(res.status).toBe(200);
-      const ids = res.body.map((item: { id: number }) => item.id);
+      // solo los comercios de este test: la base local puede tener otros cerca
+      const own = new Set([freeNear.id, freeFar.id, premiumFar.id, expired.id, outOfRange.id, noLocation.id]);
+      const items = res.body.filter((item: { id: number }) => own.has(item.id));
+      const ids = items.map((item: { id: number }) => item.id);
       // premiumFar ~11 km, expired ~0,8 km, freeNear ~1,3 km, freeFar ~5,5 km
       expect(ids).toEqual([premiumFar.id, expired.id, freeNear.id, freeFar.id]);
-      expect(res.body[0]).toMatchObject({ featured: true, name: premiumFar.name });
-      expect(res.body[1]).toMatchObject({ featured: false });
-      expect(res.body[2]).toMatchObject({ featured: false });
-      expect(res.body[2].distanceKm).toBeCloseTo(1.3, 1);
-      expect(res.body[0]).not.toHaveProperty("cuit");
+      expect(items[0]).toMatchObject({ featured: true, name: premiumFar.name });
+      expect(items[1]).toMatchObject({ featured: false });
+      expect(items[2]).toMatchObject({ featured: false });
+      expect(items[2].distanceKm).toBeCloseTo(1.3, 1);
+      expect(items[0]).not.toHaveProperty("cuit");
     });
 
     test("un reporte sin ubicación devuelve una lista vacía", async () => {
