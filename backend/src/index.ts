@@ -4,8 +4,10 @@ import { app } from "./app";
 import { initChatSocket } from "./sockets/chat.socket";
 import { startPendingReportsReconciliation } from "./services/matching.service";
 import { assertMonetizationConfig } from "./config/plans";
+import { warnIfAiServiceMissing } from "./config/ai-service";
 
 assertMonetizationConfig();
+warnIfAiServiceMissing();
 
 const PORT = process.env.PORT ?? 3001;
 

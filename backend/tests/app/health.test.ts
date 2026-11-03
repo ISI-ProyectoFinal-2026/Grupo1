@@ -3,18 +3,62 @@ import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 
 describe("GET /health", () => {
+  const originalEnv = { ...process.env };
+
   afterEach(() => {
+    process.env = { ...originalEnv };
     jest.restoreAllMocks();
   });
 
-  test("responde 200 sin tocar la base (liveness)", async () => {
+  test("responde 200 sin tocar la base ni el Backend IA (liveness)", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
     const querySpy = jest.spyOn(prisma, "$queryRaw");
+    const fetchSpy = jest.spyOn(global, "fetch");
 
     const res = await request(app).get("/health");
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: "ok" });
+    expect(res.body).toEqual({ status: "ok", ai: "configured" });
     expect(querySpy).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  test("informa el Backend IA como no configurado sin AI_SERVICE_URL (#220)", async () => {
+    delete process.env.AI_SERVICE_URL;
+
+    const res = await request(app).get("/health");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "ok", ai: "not_configured" });
+  });
+
+  test("GET /health/ai responde 503 not_configured sin AI_SERVICE_URL", async () => {
+    delete process.env.AI_SERVICE_URL;
+
+    const res = await request(app).get("/health/ai");
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ status: "not_configured" });
+  });
+
+  test("GET /health/ai responde 200 cuando el Backend IA contesta", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    jest.spyOn(global, "fetch").mockResolvedValue({ ok: true, status: 200 } as Response);
+
+    const res = await request(app).get("/health/ai");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "ok" });
+  });
+
+  test("GET /health/ai responde 503 cuando el Backend IA no contesta", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    jest.spyOn(global, "fetch").mockRejectedValue(new TypeError("fetch failed"));
+
+    const res = await request(app).get("/health/ai");
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ status: "unavailable" });
   });
 
   test("GET /health/db responde 200 cuando la base contesta (readiness)", async () => {
