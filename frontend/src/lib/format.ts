@@ -32,6 +32,26 @@ export function formatShortDay(isoDate: string): string {
   return shortDay.format(new Date(isoDate));
 }
 
+const longDay = new Intl.DateTimeFormat("es-AR", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+
+// día "YYYY-MM-DD" sin hora, ej. "1 de septiembre de 2026"
+export function formatLongDay(isoDate: string): string {
+  return longDay.format(new Date(isoDate));
+}
+
+// la app usa solo la hora de Argentina (piloto en AR), igual que el backend
+const argentinaDay = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Argentina/Buenos_Aires",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+// hoy como "YYYY-MM-DD" en Argentina (en-CA ya formatea así)
+export function todayInArgentina(now: Date = new Date()): string {
+  return argentinaDay.format(now);
+}
+
 const percent = new Intl.NumberFormat("es-AR", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 // proporción 0..1 como porcentaje, ej. 0.05 -> "5,0%"

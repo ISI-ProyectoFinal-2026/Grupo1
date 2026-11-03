@@ -1,14 +1,17 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportForm from '@/components/reports/ReportForm'
+import { newReportSchema } from '@/types/validators/report.validator'
 import { createReport, findSimilarReports } from '@/services/reports.service'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import type { ReportDTO } from '@/types/report.types'
 import * as authService from '@/services/auth.service'
 import { listMyPets } from '@/services/pets.service'
 import { analyzeImage } from '@/services/uploads.service'
+import { useAuthStore } from '@/stores/auth.store'
+import type { AuthUser } from '@/types/auth'
 import type { PetDTO } from '@/types/pet.types'
 
 vi.mock('@/services/reports.service', () => ({ createReport: vi.fn(), findSimilarReports: vi.fn() }))
@@ -104,6 +107,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     description: null,
     imageUrl: 'https://cdn/foto.jpg',
     customFlyerUrl: null,
+    showPhoneOnFlyer: false,
+    eventDate: null,
     locationAddress: 'Nueva Córdoba',
     location: { lat: -31.42, lng: -64.18 },
     tag: { label: 'Perdido', color: '#ef4444' },
@@ -587,6 +592,151 @@ describe('ReportForm: precarga de la mascota propia (#255)', () => {
     ).toBeInTheDocument()
     expect(analyzeImage).toHaveBeenCalledWith('https://pub.r2.dev/pets/a.jpg')
     expect(screen.getByRole('button', { name: 'Crear Reporte' })).toBeDisabled()
+  })
+})
+
+describe('ReportForm: fecha del suceso (#259)', () => {
+  // 2 de noviembre 17:00 en Argentina; el navegador en Tokio ya está en el 3
+  const AHORA = new Date('2026-11-02T20:00:00Z')
+  const hoy = () => '2026-11-02'
+
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'Asia/Tokyo')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(AHORA)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllEnvs()
+  })
+
+  it('el dia local del navegador difiere del de Argentina en este escenario', () => {
+    expect(new Date().getDate()).toBe(3)
+  })
+
+  it('arranca en hoy de Argentina, no permite fechas futuras y la manda al crear', async () => {
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    const fecha = screen.getByLabelText('Fecha del suceso *')
+    expect(fecha).toHaveValue(hoy())
+    expect(fecha).toHaveAttribute('max', hoy())
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0].eventDate).toBe(hoy())
+  })
+
+  it('es obligatoria al crear', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.clear(screen.getByLabelText('Fecha del suceso *'))
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(await screen.findByText('Indicá la fecha del suceso')).toBeInTheDocument()
+    expect(createReport).not.toHaveBeenCalled()
+  })
+
+  it('no envia una fecha futura', async () => {
+    const user = userEvent.setup()
+    renderForm({ eventDate: '2999-01-01' })
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    expect(screen.getByLabelText('Fecha del suceso *')).toBeInvalid()
+    expect(createReport).not.toHaveBeenCalled()
+  })
+
+  it('rechaza el dia siguiente de Argentina aunque ya sea hoy en el navegador', () => {
+    const result = newReportSchema.safeParse({
+      reportType: 'lost',
+      title: 'Perro perdido en Güemes',
+      imageUrl: 'https://cdn/foto.jpg',
+      location: { lat: -31.42, lng: -64.18 },
+      eventDate: '2026-11-03',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('el esquema rechaza una fecha futura con su mensaje', () => {
+    const result = newReportSchema.safeParse({
+      reportType: 'lost',
+      title: 'Perro perdido en Güemes',
+      imageUrl: 'https://cdn/foto.jpg',
+      location: { lat: -31.42, lng: -64.18 },
+      eventDate: '2999-01-01',
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe('La fecha del suceso no puede ser futura')
+  })
+})
+
+describe('ReportForm: telefono en el flyer (#259)', () => {
+  function usuario(phone: string | null): AuthUser {
+    return {
+      id: 7,
+      email: 'usuario7@patitas.test',
+      fullName: null,
+      phone,
+      role: 'usuario_regular',
+      emailVerifiedAt: '2026-09-01T10:00:00.000Z',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    }
+  }
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
+  it('sin telefono en el perfil no ofrece mostrarlo', () => {
+    useAuthStore.setState({ token: 'token', user: usuario(null) })
+    renderForm()
+
+    expect(screen.queryByLabelText(/Mostrar mi teléfono en el flyer/)).not.toBeInTheDocument()
+  })
+
+  it('con telefono lo ofrece desmarcado y no lo manda si no se marca', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario('11 5555-5555') })
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(screen.getByLabelText(/Mostrar mi teléfono en el flyer/)).not.toBeChecked()
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0].showPhoneOnFlyer).toBeFalsy()
+  })
+
+  it('manda el consentimiento cuando se marca', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario('11 5555-5555') })
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByLabelText(/Mostrar mi teléfono en el flyer/))
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0].showPhoneOnFlyer).toBe(true)
+  })
+
+  it('precarga el consentimiento guardado', () => {
+    useAuthStore.setState({ token: 'token', user: usuario('11 5555-5555') })
+    renderForm({ showPhoneOnFlyer: true })
+
+    expect(screen.getByLabelText(/Mostrar mi teléfono en el flyer/)).toBeChecked()
   })
 })
 

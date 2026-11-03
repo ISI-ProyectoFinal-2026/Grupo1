@@ -76,6 +76,8 @@ export default function EditReportPage() {
             location: report.location ?? undefined,
             locationAddress: report.locationAddress ?? '',
             petId: report.petId ?? undefined,
+            showPhoneOnFlyer: report.showPhoneOnFlyer,
+            eventDate: report.eventDate ?? '',
           }}
           onSubmit={handleSubmit}
           canChangeImage={report.status !== 'resolved'}

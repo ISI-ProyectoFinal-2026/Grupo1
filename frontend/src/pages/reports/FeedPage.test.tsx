@@ -33,6 +33,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     description: null,
     imageUrl: null,
     customFlyerUrl: null,
+    showPhoneOnFlyer: false,
+    eventDate: null,
     locationAddress: 'Caballito, CABA',
     location: null,
     tag: { label: 'PERDIDO', color: '#EF4444' },

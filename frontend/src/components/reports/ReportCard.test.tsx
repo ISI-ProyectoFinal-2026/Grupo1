@@ -15,6 +15,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     description: 'Collar rojo, responde a Pepe',
     imageUrl: 'https://cdn/pepe.jpg',
     customFlyerUrl: null,
+    showPhoneOnFlyer: false,
+    eventDate: null,
     locationAddress: 'Nueva Córdoba',
     location: { lat: -31.42, lng: -64.18 },
     tag: { label: 'Perdido', color: '#ef4444' },

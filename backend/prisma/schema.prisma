@@ -159,6 +159,10 @@ model Report {
   // falta (ST_DWithin, etc. — ver docs/ARQUITECTURA.md sección 4.3).
   location        Unsupported("geometry(Point, 4326)")?
   locationAddress String?      @map("location_address")
+  // teléfono del autor en el flyer público, solo con consentimiento (#259)
+  showPhoneOnFlyer Boolean     @default(false) @map("show_phone_on_flyer")
+  // fecha del suceso (#259); null en reportes anteriores
+  eventDate       DateTime?    @db.Date @map("event_date")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
   publishedAt     DateTime?    @map("published_at")

@@ -48,6 +48,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     description: null,
     imageUrl: null,
     customFlyerUrl: null,
+    showPhoneOnFlyer: false,
+    eventDate: null,
     locationAddress: 'Caballito, CABA',
     location: null,
     tag: { label: 'PERDIDO', color: '#EF4444' },
@@ -98,6 +100,14 @@ describe('ReportDetailPage estado', () => {
 
     expect(await screen.findByText('Publicado')).toBeInTheDocument()
     expect(screen.queryByText('published')).not.toBeInTheDocument()
+  })
+
+  it('muestra la fecha del suceso sin correrla por la zona horaria (#259)', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ eventDate: '2026-09-01' }))
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+    renderPage()
+
+    expect(await screen.findByText('Suceso: 1 de septiembre de 2026')).toBeInTheDocument()
   })
 
   it('muestra el distintivo del tipo de reporte (#257)', async () => {

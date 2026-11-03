@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { todayInArgentina } from "@/lib/format";
 
 export const reportLocationSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -19,6 +20,14 @@ const optionalText = z
     return trimmed ? trimmed : undefined;
   });
 
+// fecha del suceso (#259)
+const eventDateField = z
+  .string({ error: "Indicá la fecha del suceso" })
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha del suceso inválida")
+  .refine((value) => value <= todayInArgentina(), "La fecha del suceso no puede ser futura");
+
+const blankToUndefined = (value: unknown) => (value === "" ? undefined : value);
+
 export const createReportSchema = z.object({
   reportType: z.enum(["lost", "found"]),
   title: z.string().min(5, "Mínimo 5 caracteres").max(255),
@@ -31,6 +40,14 @@ export const createReportSchema = z.object({
   }),
   locationAddress: optionalText,
   petId: z.number().optional(),
+  showPhoneOnFlyer: z.boolean().optional(),
+  // opcional para editar reportes anteriores sin fecha
+  eventDate: z.preprocess(blankToUndefined, eventDateField.optional()),
+});
+
+// al crear, la fecha del suceso es obligatoria
+export const newReportSchema = createReportSchema.extend({
+  eventDate: z.preprocess(blankToUndefined, eventDateField),
 });
 
 export type CreateReportFormData = z.infer<typeof createReportSchema>;

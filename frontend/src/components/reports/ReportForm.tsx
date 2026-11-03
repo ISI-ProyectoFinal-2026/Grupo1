@@ -1,13 +1,19 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ZodError } from "zod";
-import { createReportSchema, type CreateReportFormData } from "@/types/validators/report.validator";
+import {
+  createReportSchema,
+  newReportSchema,
+  type CreateReportFormData,
+} from "@/types/validators/report.validator";
 import { createReport } from "@/services/reports.service";
 import PetSelect from "./PetSelect";
 import ReportTypeBadge from "./ReportTypeBadge";
 import { PREFILL_FIELDS, petPrefill, type Prefill } from "./petPrefill";
 import type { PetDTO } from "@/types/pet.types";
 import { screenImage } from "@/lib/screen-image";
+import { useAuthStore } from "@/stores/auth.store";
+import { todayInArgentina } from "@/lib/format";
 import type { ReportLocation } from "@/types/report.types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -37,6 +43,7 @@ export default function ReportForm(props: ReportFormProps) {
   const isEdit = props.mode === "edit";
   const canChangeImage = props.mode !== "edit" || props.canChangeImage !== false;
   const navigate = useNavigate();
+  const hasPhone = Boolean(useAuthStore((state) => state.user?.phone));
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formErrorCode, setFormErrorCode] = useState<string | null>(null);
@@ -62,6 +69,8 @@ export default function ReportForm(props: ReportFormProps) {
     imageUrl: undefined,
     location: undefined,
     locationAddress: "",
+    // editar no inventa la fecha de un reporte anterior
+    eventDate: isEdit ? undefined : todayInArgentina(),
     ...initialData,
   });
 
@@ -156,12 +165,11 @@ export default function ReportForm(props: ReportFormProps) {
     setIsLoading(true);
 
     try {
-      const validated = createReportSchema.parse(formData);
       if (props.mode === "edit") {
-        await props.onSubmit(validated);
+        await props.onSubmit(createReportSchema.parse(formData));
         return;
       }
-      const result = await createReport(validated);
+      const result = await createReport(newReportSchema.parse(formData));
 
       navigate(`/reports/${result.id}`, {
         state: { message: "Reporte creado exitosamente" },
@@ -230,6 +238,20 @@ export default function ReportForm(props: ReportFormProps) {
           aria-invalid={Boolean(fieldErrors.title)}
         />
         {fieldErrors.title && <ErrorMessage message={fieldErrors.title} />}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Input
+          label="Fecha del suceso *"
+          id="eventDate"
+          name="eventDate"
+          type="date"
+          max={todayInArgentina()}
+          value={formData.eventDate || ""}
+          onChange={handleInputChange}
+          aria-invalid={Boolean(fieldErrors.eventDate)}
+        />
+        {fieldErrors.eventDate && <ErrorMessage message={fieldErrors.eventDate} />}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -328,6 +350,25 @@ export default function ReportForm(props: ReportFormProps) {
           />
         )}
       </fieldset>
+
+      {/* el flyer es público: el teléfono va solo con consentimiento (#259) */}
+      {hasPhone && (
+        <label className="flex items-start gap-3 text-sm text-ink">
+          <input
+            type="checkbox"
+            name="showPhoneOnFlyer"
+            checked={formData.showPhoneOnFlyer ?? false}
+            onChange={(e) => setFormData((prev) => ({ ...prev, showPhoneOnFlyer: e.target.checked }))}
+            className="mt-0.5 size-4 shrink-0 accent-ink"
+          />
+          <span>
+            Mostrar mi teléfono en el flyer
+            <span className="block text-ink-muted">
+              El flyer es público: cualquiera que lo vea va a poder llamarte.
+            </span>
+          </span>
+        </label>
+      )}
 
       <Button
         type="submit"

@@ -36,6 +36,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     description: null,
     imageUrl: null,
     customFlyerUrl: null,
+    showPhoneOnFlyer: false,
+    eventDate: null,
     locationAddress: null,
     location: { lat: -31.42, lng: -64.18 },
     tag: { label: 'Perdido', color: 'red' },

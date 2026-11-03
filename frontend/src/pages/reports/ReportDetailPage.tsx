@@ -32,6 +32,7 @@ import { cn } from "@/lib/cn";
 import { DogFace } from "@/components/ui/canine";
 import { tagTone } from "@/lib/tag-tone";
 import ReportTypeBadge from "@/components/reports/ReportTypeBadge";
+import { formatLongDay } from "@/lib/format";
 import { REPORT_STATUS_LABELS } from "@/lib/report-status";
 
 const sectionTitle = "font-display text-display-sm text-ink";
@@ -215,6 +216,9 @@ export default function ReportDetailPage() {
               <div>
                 <dt className="text-sm text-ink-muted">Fecha</dt>
                 <dd className="font-bold text-ink">{formatDate(report.createdAt)}</dd>
+                {report.eventDate && (
+                  <dd className="text-sm text-ink-muted">Suceso: {formatLongDay(report.eventDate)}</dd>
+                )}
                 {report.publishedAt && (
                   <dd className="text-sm text-ink-muted">Publicado: {formatDate(report.publishedAt)}</dd>
                 )}

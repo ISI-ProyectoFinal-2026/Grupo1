@@ -20,6 +20,8 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     description: null,
     imageUrl: null,
     customFlyerUrl: null,
+    showPhoneOnFlyer: false,
+    eventDate: null,
     locationAddress: 'San Rafael',
     location: { lat: -34.62, lng: -68.33 },
     tag: { label: 'PERDIDO', color: '#EF4444' },

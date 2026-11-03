@@ -20,6 +20,8 @@ export interface ReportRow {
   imageUrl: string | null;
   customFlyerUrl: string | null;
   locationAddress: string | null;
+  showPhoneOnFlyer: boolean;
+  eventDate: Date | null;
   lat: number | null;
   lng: number | null;
   createdAt: Date;
@@ -45,15 +47,18 @@ function toReportTag(reportType: ReportType, status: ReportStatus): ReportTag {
   return { label, color: REPORT_TAG_COLORS[label] };
 }
 
-export interface ReportDTO extends Omit<ReportRow, "lat" | "lng"> {
+export interface ReportDTO extends Omit<ReportRow, "lat" | "lng" | "eventDate"> {
   location: { lat: number; lng: number } | null;
+  // YYYY-MM-DD: sin hora, así no se corre un día por la zona horaria
+  eventDate: string | null;
   tag: ReportTag;
 }
 
 export function toReportDTO(row: ReportRow): ReportDTO {
-  const { lat, lng, ...rest } = row;
+  const { lat, lng, eventDate, ...rest } = row;
   return {
     ...rest,
+    eventDate: eventDate ? eventDate.toISOString().slice(0, 10) : null,
     location: lat !== null && lng !== null ? { lat, lng } : null,
     tag: toReportTag(row.reportType, row.status),
   };
@@ -64,6 +69,8 @@ export const reportColumns = Prisma.sql`
   r.status, r.title, r.description, r.image_url AS "imageUrl",
   r.custom_flyer_url AS "customFlyerUrl",
   r.location_address AS "locationAddress",
+  r.show_phone_on_flyer AS "showPhoneOnFlyer",
+  r.event_date AS "eventDate",
   ST_Y(r.location::geometry) AS lat, ST_X(r.location::geometry) AS lng,
   r.created_at AS "createdAt", r.updated_at AS "updatedAt", r.published_at AS "publishedAt"
 `;
@@ -148,6 +155,8 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
           description: data.description ?? null,
           imageUrl: data.imageUrl,
           locationAddress: data.locationAddress ?? null,
+          showPhoneOnFlyer: data.showPhoneOnFlyer ?? false,
+          eventDate: data.eventDate ?? null,
           // La fecha la sella matching.service al publicar tras el veredicto del Backend IA.
           publishedAt: null,
         },
