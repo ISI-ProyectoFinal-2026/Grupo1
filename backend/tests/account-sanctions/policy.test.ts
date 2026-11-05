@@ -1,4 +1,4 @@
-import { addCalendarMonthUtc, addDays, decideSanction, resolveSeverity } from "../../src/services/account-sanctions/policy";
+import { addCalendarMonthUtc, addDays, decideSanction, planConfirmation, resolveSeverity } from "../../src/services/account-sanctions/policy";
 
 const NOW = new Date("2026-03-10T12:00:00.000Z");
 
@@ -78,6 +78,55 @@ describe("decideSanction", () => {
     expect(decideSanction({ ...regular, role, severity: "mild", priorModerate: true })).toMatchObject({
       kind: "permanent",
       status: "pending_review",
+    });
+  });
+});
+
+describe("planConfirmation", () => {
+  const pending = { status: "pending_review", severity: "moderate", kind: "temporary" } as const;
+
+  test("moderada de staff en revisión: pasa a activa con +1 mes y advertencia", () => {
+    expect(planConfirmation(pending, NOW)).toEqual({
+      kind: "temporary",
+      status: "active",
+      warning: true,
+      endsAt: new Date("2026-04-10T12:00:00.000Z"),
+    });
+  });
+
+  test("leve de staff en revisión: +14 días sin advertencia", () => {
+    expect(planConfirmation({ ...pending, severity: "mild" }, NOW)).toEqual({
+      kind: "temporary",
+      status: "active",
+      warning: false,
+      endsAt: new Date("2026-03-24T12:00:00.000Z"),
+    });
+  });
+
+  test("grave de staff en revisión: pasa a provisional activa", () => {
+    expect(planConfirmation({ ...pending, severity: "severe", kind: "provisional" }, NOW)).toEqual({
+      kind: "provisional",
+      status: "active",
+      warning: false,
+      endsAt: null,
+    });
+  });
+
+  test("reincidencia de staff en revisión: permanente", () => {
+    expect(planConfirmation({ ...pending, kind: "permanent" }, NOW)).toEqual({
+      kind: "permanent",
+      status: "active",
+      warning: false,
+      endsAt: null,
+    });
+  });
+
+  test("provisional activa: pasa a permanente", () => {
+    expect(planConfirmation({ status: "active", severity: "severe", kind: "provisional" }, NOW)).toEqual({
+      kind: "permanent",
+      status: "active",
+      warning: false,
+      endsAt: null,
     });
   });
 });

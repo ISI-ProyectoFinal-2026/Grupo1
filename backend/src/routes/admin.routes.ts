@@ -1,4 +1,5 @@
 import { Router } from "express";
+import * as adminSanctionsController from "../controllers/admin-sanctions.controller";
 import * as adminUsersController from "../controllers/admin-users.controller";
 import { requireAuth, requireRole } from "../middlewares/auth.middleware";
 
@@ -10,3 +11,6 @@ adminRouter.use(requireAuth, requireRole("admin"));
 adminRouter.get("/users", adminUsersController.listUsers);
 adminRouter.get("/role-audit", adminUsersController.listRoleAudit);
 adminRouter.patch("/users/:id/role", adminUsersController.changeRole);
+adminRouter.get("/account-sanctions/pending", adminSanctionsController.listPending);
+adminRouter.post("/account-sanctions/:id/confirm", adminSanctionsController.confirm);
+adminRouter.post("/account-sanctions/:id/revert", adminSanctionsController.revert);
