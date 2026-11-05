@@ -153,3 +153,27 @@ export async function sendTwoFactorResetCompleted(to: string): Promise<void> {
     html: `<p>${intro} ${detail}</p><p>${warning}</p>`,
   });
 }
+
+interface SuspensionNotice {
+  kind: "temporary" | "provisional" | "permanent";
+  endsAt: Date | null;
+  warning: boolean;
+}
+
+// aviso de suspensión: texto fijo por tipo, sin datos de denunciantes
+export async function sendAccountSuspended(to: string, { kind, endsAt, warning }: SuspensionNotice): Promise<void> {
+  const intro = "Tu cuenta de PATITAS fue suspendida por recibir denuncias de otros usuarios.";
+  const detail =
+    kind === "temporary" && endsAt
+      ? `No vas a poder iniciar sesión hasta el ${formatArgentinaDate(endsAt)}.`
+      : kind === "provisional"
+        ? "La suspensión es preventiva hasta que un administrador revise el caso."
+        : "La suspensión es permanente.";
+  const advice = warning ? "Si recibís nuevas denuncias de gravedad media, la suspensión pasará a ser permanente." : "";
+  await mail.getMailSender().send({
+    to,
+    subject: "Tu cuenta de PATITAS fue suspendida",
+    text: [intro, detail, advice].filter(Boolean).join(" "),
+    html: `<p>${[intro, detail, advice].filter(Boolean).join(" ")}</p>`,
+  });
+}
