@@ -1,5 +1,6 @@
 import { BusinessCategory, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
+import { visibleAuthorSql } from "./account-sanctions/visibility";
 import * as notificationPreferencesService from "./notification-preferences.service";
 import * as reportsService from "./reports.service";
 
@@ -67,6 +68,7 @@ async function pickAd(point: Point | null): Promise<AdRow | null> {
     WHERE a.status = 'ACTIVE'::ad_status
       AND ${isPremiumActive}
       AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL
+      AND ${visibleAuthorSql(Prisma.sql`b.user_id`)}
       ${inRadius}
     ORDER BY random()
     LIMIT 1
@@ -120,6 +122,7 @@ export async function getNearbyBusinesses(reportId: number, viewerId?: number): 
            ${isPremiumActive} AS featured
     FROM businesses b
     WHERE b.latitude IS NOT NULL AND b.longitude IS NOT NULL
+      AND ${visibleAuthorSql(Prisma.sql`b.user_id`)}
       AND ST_DWithin(${businessPoint}, ${point}, ${NEARBY_BUSINESSES_RADIUS_KM * 1000})
     ORDER BY featured DESC, "distanceMeters" ASC
     LIMIT ${NEARBY_BUSINESSES_LIMIT}

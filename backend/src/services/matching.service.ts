@@ -1,6 +1,7 @@
-import { MatchStatus } from "@prisma/client";
+import { MatchStatus, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { visibleAuthorSql } from "./account-sanctions/visibility";
 import * as notificationsService from "./notifications.service";
 import { normalizeR2PublicUrl } from "./storage.service";
 
@@ -350,6 +351,8 @@ export async function listMatches(reportId: number): Promise<MatchDTO[]> {
       ON other.id = CASE WHEN rm.report_lost_id = ${reportId} THEN rm.report_found_id ELSE rm.report_lost_id END
     WHERE (rm.report_lost_id = ${reportId} OR rm.report_found_id = ${reportId})
       AND rm.status <> 'rejected'::match_status
+      AND ${visibleAuthorSql(Prisma.sql`other.user_id`)}
+      AND EXISTS (SELECT 1 FROM reports src WHERE src.id = ${reportId} AND ${visibleAuthorSql(Prisma.sql`src.user_id`)})
     ORDER BY rm.similarity_score DESC
   `;
 }

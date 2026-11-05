@@ -1,5 +1,6 @@
 import { Prisma, ReportStatus, ReportType } from "@prisma/client";
 import { prisma } from "../db/client";
+import { visibleAuthorSql } from "./account-sanctions/visibility";
 import * as matchingService from "./matching.service";
 import { SimilarReportsInput } from "../validators/reports.validator";
 
@@ -48,6 +49,7 @@ export async function findSimilarReports(input: SimilarReportsInput, viewerId: n
     WHERE r.report_type = ${input.reportType}::report_type
       AND r.status IN ('published'::report_status, 'resolved'::report_status)
       AND r.created_at >= ${since}
+      AND ${visibleAuthorSql(Prisma.sql`r.user_id`)}
       AND ST_DWithin(r.location::geography, ${point}, ${SIMILAR_RADIUS_METERS})
     ORDER BY ${order}
     LIMIT ${SIMILAR_MAX_RESULTS}

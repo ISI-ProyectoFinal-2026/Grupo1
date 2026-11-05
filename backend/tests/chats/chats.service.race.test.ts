@@ -12,6 +12,7 @@ const chatCreate = jest.fn();
 jest.mock("../../src/db/client", () => ({
   prisma: {
     report: { findUnique: (...args: unknown[]) => reportFindUnique(...args) },
+    accountSanction: { count: () => Promise.resolve(0) },
     chat: {
       findUnique: (...args: unknown[]) => chatFindUnique(...args),
       create: (...args: unknown[]) => chatCreate(...args),
