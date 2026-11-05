@@ -98,6 +98,20 @@ export interface RecoveryCodesResponse extends AuthResponse {
   recoveryCodes: string[];
 }
 
+export const ACCOUNT_SUSPENDED = "ACCOUNT_SUSPENDED";
+
+export type SuspensionType = "temporary" | "provisional" | "permanent";
+
+// details del 403 ACCOUNT_SUSPENDED (login, 2FA y API)
+export interface SuspensionDetails {
+  type: SuspensionType;
+  severity: "mild" | "moderate" | "severe";
+  // ISO si es temporal, null si no tiene fin
+  endsAt: string | null;
+  // aviso de posible suspensión permanente (gravedad media)
+  warning: boolean;
+}
+
 export interface ApiErrorDetail {
   path: string;
   message: string;

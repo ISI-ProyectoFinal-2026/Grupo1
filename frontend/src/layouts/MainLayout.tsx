@@ -140,6 +140,7 @@ function MainLayout() {
     isOwnBusinessPath(pathname) ||
     pathname === "/moderation" ||
     pathname === "/admin/users" ||
+    pathname === "/admin/sanctions" ||
     pathname === "/account/security" ||
     pathname === "/account/notifications";
 
@@ -303,6 +304,17 @@ function MainLayout() {
               >
                 <UserIcon className="h-5 w-5" />
                 Administración
+              </Link>
+            )}
+            {isAdmin && (
+              <Link
+                to="/admin/sanctions"
+                onClick={closeMore}
+                aria-current={pathname === "/admin/sanctions" ? "page" : undefined}
+                className={moreLinkClasses(pathname === "/admin/sanctions")}
+              >
+                <ShieldIcon className="h-5 w-5" />
+                Sanciones
               </Link>
             )}
 
