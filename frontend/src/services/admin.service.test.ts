@@ -9,12 +9,7 @@ import {
   listRoleAudit,
   revertSanction,
 } from '@/services/admin.service'
-import type {
-  AdminUser,
-  Paginated,
-  RoleAuditEntry,
-  SanctionQueueItem,
-} from '@/types/admin.types'
+import type { AdminUser, Paginated, RoleAuditEntry, SanctionQueueItem } from '@/types/admin.types'
 
 vi.mock('@/services/api', () => ({
   api: { get: vi.fn(), patch: vi.fn(), post: vi.fn() },

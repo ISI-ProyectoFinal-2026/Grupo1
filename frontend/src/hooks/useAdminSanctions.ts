@@ -4,8 +4,8 @@ import { getApiErrorStatus } from '@/services/api'
 
 const SANCTIONS_KEY = ['admin', 'sanctions'] as const
 
-export function usePendingSanctions() {
-  return useQuery({ queryKey: SANCTIONS_KEY, queryFn: listPendingSanctions })
+export function usePendingSanctions(enabled = true) {
+  return useQuery({ queryKey: SANCTIONS_KEY, queryFn: listPendingSanctions, enabled })
 }
 
 export function useDecideSanction() {
