@@ -25,6 +25,7 @@ import ImageUploader from "@/components/reports/ImageUploader";
 import CloseReportButton from "@/components/reports/CloseReportButton";
 import DeleteReportButton from "@/components/reports/DeleteReportButton";
 import FlagReportForm from "@/components/reports/FlagReportForm";
+import ReportAccountForm from "@/components/reports/ReportAccountForm";
 import LocationMap from "@/components/maps/LocationMap";
 import AdBanner from "@/components/ads/AdBanner";
 import NearbyBusinesses from "@/components/business/NearbyBusinesses";
@@ -147,7 +148,9 @@ export default function ReportDetailPage() {
   const canFlag = isPublished && currentUserId !== undefined && !isOwner;
   const canContact = currentUserId !== undefined && currentUserId !== report.userId;
   const canClose = isOwner && isPublished;
-  const hasActions = canContact || isOwner || canFlag;
+  // denuncia la cuenta del autor, no la publicación (#267)
+  const canReportAccount = currentUserId !== undefined && !isOwner;
+  const hasActions = canContact || isOwner || canFlag || canReportAccount;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-4 pt-2 sm:px-6 lg:py-6">
@@ -429,6 +432,8 @@ export default function ReportDetailPage() {
                 error={flagReport.error}
               />
             )}
+
+            {canReportAccount && <ReportAccountForm reportedUserId={report.userId} />}
           </aside>
         )}
       </div>
