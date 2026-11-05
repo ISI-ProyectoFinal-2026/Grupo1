@@ -274,3 +274,111 @@ async def test_no_pisa_un_match_ya_confirmado(scenario, notified):
     confirmed = rows[scenario["lost_match_id"]]
     assert confirmed["status"] == "confirmed"
     assert confirmed["similarity_score"] == pytest.approx(0.42, abs=1e-6)
+
+
+# sanción de cuenta (fechas en UTC, como las guarda Prisma)
+async def _insert_sanction(session, user_id: int, status: str, ends_at_expr: str) -> None:
+    await session.execute(
+        text(
+            f"""
+            INSERT INTO account_sanctions (user_id, severity, kind, status, reason, starts_at, ends_at)
+            VALUES (
+                :user_id, 'mild'::account_report_severity, 'temporary'::account_sanction_kind,
+                CAST(:status AS account_sanction_status), 'test',
+                (now() AT TIME ZONE 'utc') - interval '1 day', {ends_at_expr}
+            )
+            """
+        ),
+        {"user_id": user_id, "status": status},
+    )
+
+
+@pytest_asyncio.fixture
+async def pair():
+    """found (autor A, recién procesado) y lost (autor B), coseno 0.70: matchean sin sanciones."""
+    async with async_session_factory() as session:
+        source_user_id = await _insert_user(session, f"matching-source-{uuid.uuid4()}@example.com")
+        candidate_user_id = await _insert_user(session, f"matching-candidate-{uuid.uuid4()}@example.com")
+
+        found_id = await _insert_report(session, source_user_id, "found", NEAR_LAT, NEAR_LNG)
+        await _insert_embedding(session, found_id, EMBEDDING_BASE)
+        lost_id = await _insert_report(session, candidate_user_id, "lost", NEAR_LAT, NEAR_LNG)
+        await _insert_embedding(session, lost_id, EMBEDDING_MISMA_MASCOTA)
+        await session.commit()
+
+    ids = {
+        "source_user_id": source_user_id,
+        "candidate_user_id": candidate_user_id,
+        "found_id": found_id,
+        "lost_id": lost_id,
+    }
+
+    yield ids
+
+    report_ids = [found_id, lost_id]
+    user_ids = [source_user_id, candidate_user_id]
+    async with async_session_factory() as session:
+        await session.execute(
+            text("DELETE FROM report_matches WHERE report_lost_id = ANY(:ids) OR report_found_id = ANY(:ids)"),
+            {"ids": report_ids},
+        )
+        await session.execute(text("DELETE FROM report_embeddings WHERE report_id = ANY(:ids)"), {"ids": report_ids})
+        await session.execute(text("DELETE FROM reports WHERE id = ANY(:ids)"), {"ids": report_ids})
+        await session.execute(text("DELETE FROM account_sanctions WHERE user_id = ANY(:ids)"), {"ids": user_ids})
+        await session.execute(text("DELETE FROM users WHERE id = ANY(:ids)"), {"ids": user_ids})
+        await session.commit()
+
+
+async def _pair_matches(pair):
+    return await _scenario_matches({"found_id": pair["found_id"], "lost_id": pair["lost_id"]})
+
+
+async def _sanction_and_match(pair, user_key: str, status: str, ends_at_expr: str) -> int:
+    async with async_session_factory() as session:
+        await _insert_sanction(session, pair[user_key], status, ends_at_expr)
+        await session.commit()
+    async with async_session_factory() as session:
+        return await matching_service.find_and_store_matches(pair["found_id"], session)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "ends_at_expr",
+    ["NULL", "(now() AT TIME ZONE 'utc') + interval '7 days'"],
+    ids=["permanente", "temporal-vigente"],
+)
+async def test_excluye_candidatos_de_autores_suspendidos(pair, notified, ends_at_expr):
+    created = await _sanction_and_match(pair, "candidate_user_id", "active", ends_at_expr)
+
+    assert created == 0
+    assert await _pair_matches(pair) == []
+    assert notified == []
+
+
+@pytest.mark.asyncio
+async def test_no_busca_matches_si_el_autor_del_origen_esta_suspendido(pair, notified):
+    created = await _sanction_and_match(pair, "source_user_id", "active", "NULL")
+
+    assert created == 0
+    assert await _pair_matches(pair) == []
+    assert notified == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("user_key", "status", "ends_at_expr"),
+    [
+        ("candidate_user_id", "active", "(now() AT TIME ZONE 'utc') - interval '1 hour'"),
+        ("source_user_id", "active", "(now() AT TIME ZONE 'utc') - interval '1 hour'"),
+        ("candidate_user_id", "pending_review", "NULL"),
+        ("candidate_user_id", "reverted", "NULL"),
+    ],
+    ids=["candidato-vencida", "origen-vencida", "candidato-pending-review", "candidato-revertida"],
+)
+async def test_sanciones_no_vigentes_no_excluyen(pair, notified, user_key, status, ends_at_expr):
+    created = await _sanction_and_match(pair, user_key, status, ends_at_expr)
+
+    assert created == 1
+    assert [(row["report_lost_id"], row["report_found_id"]) for row in await _pair_matches(pair)] == [
+        (pair["lost_id"], pair["found_id"])
+    ]
