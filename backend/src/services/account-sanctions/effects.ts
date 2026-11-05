@@ -14,3 +14,13 @@ export async function applySanctionEffects(sanction: AccountSanction): Promise<v
     console.error(`[sanciones] no se pudo completar el aviso de la sanción ${sanction.id}:`, error);
   }
 }
+
+// aviso posterior al commit de una suspensión revertida; nunca lanza
+export async function applyReinstatementEffects(sanction: AccountSanction): Promise<void> {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: sanction.userId }, select: { email: true } });
+    if (user) await mailService.sendAccountReinstated(user.email);
+  } catch (error) {
+    console.error(`[sanciones] no se pudo avisar la reactivación de la sanción ${sanction.id}:`, error);
+  }
+}

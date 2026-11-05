@@ -63,3 +63,18 @@ export function decideSanction({ role, severity, priorModerate, now }: DecisionI
   const endsAt = enforced ? (moderate ? addCalendarMonthUtc(now) : addDays(now, MILD_SUSPENSION_DAYS)) : null;
   return { kind: "temporary", status, warning: moderate, endsAt };
 }
+
+interface ConfirmableSanction {
+  status: AccountSanctionStatus;
+  severity: AccountReportSeverity;
+  kind: AccountSanctionKind;
+}
+
+// Efecto de confirmar un caso de la cola: provisional -> permanente; staff en revisión -> la
+// sanción normal por gravedad (la reincidencia ya quedó fijada en el kind al crear el caso).
+export function planConfirmation(sanction: ConfirmableSanction, now: Date): SanctionDecision {
+  if (sanction.status === "active" || sanction.kind === "permanent") {
+    return { kind: "permanent", status: "active", warning: false, endsAt: null };
+  }
+  return decideSanction({ role: "usuario_regular", severity: sanction.severity, priorModerate: false, now });
+}

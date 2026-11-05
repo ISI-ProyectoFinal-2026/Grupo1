@@ -177,3 +177,15 @@ export async function sendAccountSuspended(to: string, { kind, endsAt, warning }
     html: `<p>${[intro, detail, advice].filter(Boolean).join(" ")}</p>`,
   });
 }
+
+// aviso de reactivación tras revertir una suspensión
+export async function sendAccountReinstated(to: string): Promise<void> {
+  const intro = "Un administrador revisó el caso y tu cuenta de PATITAS fue reactivada.";
+  const detail = "Tus sesiones anteriores siguen cerradas: iniciá sesión de nuevo para volver a usarla.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Tu cuenta de PATITAS fue reactivada",
+    text: `${intro} ${detail}`,
+    html: `<p>${intro} ${detail}</p>`,
+  });
+}

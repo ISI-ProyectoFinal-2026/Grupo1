@@ -12,3 +12,5 @@ adminRouter.get("/users", adminUsersController.listUsers);
 adminRouter.get("/role-audit", adminUsersController.listRoleAudit);
 adminRouter.patch("/users/:id/role", adminUsersController.changeRole);
 adminRouter.get("/account-sanctions/pending", adminSanctionsController.listPending);
+adminRouter.post("/account-sanctions/:id/confirm", adminSanctionsController.confirm);
+adminRouter.post("/account-sanctions/:id/revert", adminSanctionsController.revert);
