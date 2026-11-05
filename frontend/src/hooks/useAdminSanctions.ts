@@ -1,0 +1,31 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { confirmSanction, listPendingSanctions, revertSanction } from '@/services/admin.service'
+import { getApiErrorStatus } from '@/services/api'
+
+const SANCTIONS_KEY = ['admin', 'sanctions'] as const
+
+export function usePendingSanctions() {
+  return useQuery({ queryKey: SANCTIONS_KEY, queryFn: listPendingSanctions })
+}
+
+export function useDecideSanction() {
+  const queryClient = useQueryClient()
+  const refresh = () => queryClient.invalidateQueries({ queryKey: SANCTIONS_KEY })
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      action,
+      reason,
+    }: {
+      id: number
+      action: 'confirm' | 'revert'
+      reason: string
+    }) => (action === 'confirm' ? confirmSanction(id, reason) : revertSanction(id, reason)),
+    onSuccess: refresh,
+    // 409: otro admin decidió antes; la cola se refresca y el caso desaparece
+    onError: (error) => {
+      if (getApiErrorStatus(error) === 409) refresh()
+    },
+  })
+}
