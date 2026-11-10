@@ -60,6 +60,22 @@ export const reportCreateLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === "test",
 });
 
+// Denuncias de cuentas (#38): cada denuncia puede disparar una suspensión, así
+// que se frena el abuso masivo por usuario. Igual solo se cuenta una denuncia
+// por denunciante y ciclo; 10 por hora sobra para un uso real.
+export const ACCOUNT_REPORT_CREATE_RATE_LIMIT = 10;
+
+// Va después de requireAuth y requireVerifiedEmail: el cupo es por usuario.
+export const accountReportCreateLimiter = rateLimit({
+  windowMs: 60 * 60_000,
+  max: ACCOUNT_REPORT_CREATE_RATE_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => `user:${req.userId}`,
+  message: { error: { message: "Límite de denuncias de cuentas alcanzado, esperá unos minutos" } },
+  skip: () => process.env.NODE_ENV === "test",
+});
+
 // Geocodificación inversa (#216): por IP, porque el endpoint es público. El
 // tope de 1 req/s hacia Nominatim es global y lo aplica el servicio; esto evita
 // que una sola IP llene la cola de espera.
