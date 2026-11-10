@@ -47,6 +47,7 @@ function buildReport(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: "Gato gris perdido en San Telmo",
     description: "Collar rojo, muy asustadizo",
     imageUrl: null,
+    extraImageUrls: [],
     customFlyerUrl: null,
     locationAddress: "San Telmo, CABA",
     showPhoneOnFlyer: false,
@@ -346,5 +347,94 @@ describe("getOrCreateFlyerUrl (datos de la mascota y teléfono)", () => {
     await getOrCreateFlyerUrl(buildReport({ petId: null }));
 
     expect(petSpy).not.toHaveBeenCalled();
+  });
+});
+
+// fotos extra del reporte: miniaturas bajo la foto principal
+describe("getOrCreateFlyerUrl (fotos extra)", () => {
+  const MAIN = "https://pub-test.r2.dev/pets/principal.jpg";
+  const extra = (n: number) => `https://pub-test.r2.dev/pets/extra-${n}.jpg`;
+
+  test("baja cada foto extra del bucket, sin seguir redirecciones", async () => {
+    await getOrCreateFlyerUrl(buildReport({ imageUrl: MAIN, extraImageUrls: [extra(1), extra(2)] }));
+
+    expect(loadImageMock).toHaveBeenCalledWith(MAIN, { maxRedirects: 0 });
+    expect(loadImageMock).toHaveBeenCalledWith(extra(1), { maxRedirects: 0 });
+    expect(loadImageMock).toHaveBeenCalledWith(extra(2), { maxRedirects: 0 });
+  });
+
+  test("baja como máximo 3 fotos extra", async () => {
+    await getOrCreateFlyerUrl(
+      buildReport({ imageUrl: MAIN, extraImageUrls: [extra(1), extra(2), extra(3), extra(4)] })
+    );
+
+    expect(loadImageMock).toHaveBeenCalledTimes(4);
+    expect(loadImageMock).not.toHaveBeenCalledWith(extra(4), expect.anything());
+  });
+
+  test("nunca baja una foto extra fuera del bucket R2", async () => {
+    await getOrCreateFlyerUrl(
+      buildReport({ imageUrl: MAIN, extraImageUrls: ["https://evil.com/x.jpg", "http://169.254.169.254/", extra(1)] })
+    );
+
+    const urls = loadImageMock.mock.calls.map((call) => call[0]);
+    expect(urls).toEqual([MAIN, extra(1)]);
+  });
+
+  test("una foto extra que falla se omite y no marca el flyer como degradado", async () => {
+    loadImageMock.mockImplementation((url: string) =>
+      url === extra(1) ? Promise.reject(new Error("timeout")) : canvas.loadImage(canvas.createCanvas(4, 4).toBuffer("image/png"))
+    );
+
+    await getOrCreateFlyerUrl(buildReport({ imageUrl: MAIN, extraImageUrls: [extra(1), extra(2)] }));
+
+    expect(uploadBufferMock).toHaveBeenCalledTimes(1);
+    expect(lastUploadedMetadata()["flyer-degraded-at"]).toBeUndefined();
+  });
+
+  test("cambiar las fotos extra regenera el flyer", async () => {
+    await getOrCreateFlyerUrl(buildReport({ imageUrl: MAIN, extraImageUrls: [extra(1)] }));
+    const firstVersion = lastUploadedMetadata()["flyer-version"];
+    uploadBufferMock.mockClear();
+
+    await getOrCreateFlyerUrl(buildReport({ imageUrl: MAIN, extraImageUrls: [extra(1), extra(2)] }));
+
+    expect(uploadBufferMock).toHaveBeenCalledTimes(1);
+    expect(lastUploadedMetadata()["flyer-version"]).not.toBe(firstVersion);
+  });
+});
+
+// cambio de diseño: los PNG del layout anterior no se reusan
+describe("getOrCreateFlyerUrl (versión de diseño)", () => {
+  // huella con la que se guardaban los flyers del diseño anterior (v2)
+  function legacyV2Version(report: ReportDTO): string {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { createHash } = require("crypto");
+    const fields = [
+      2,
+      report.title,
+      report.description,
+      report.locationAddress,
+      report.imageUrl,
+      report.tag.label,
+      report.tag.color,
+      report.reportType,
+      new Date(report.createdAt).toISOString(),
+      report.eventDate,
+      null,
+      null,
+      null,
+      null,
+    ];
+    return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
+  }
+
+  test("un flyer cacheado con el diseño anterior se regenera", async () => {
+    const report = buildReport();
+    bucket.set(FLYER_KEY, { "flyer-version": legacyV2Version(report) });
+
+    await getOrCreateFlyerUrl(report);
+
+    expect(uploadBufferMock).toHaveBeenCalledTimes(1);
   });
 });
