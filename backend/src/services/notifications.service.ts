@@ -145,8 +145,16 @@ export async function notifyMatch(data: NotifyMatchInput): Promise<Notification[
 
 export type ModerationVerdict = "published" | "rejected";
 
-// hidden_by_flag: un moderador aceptó una denuncia (#223)
-export type StatusChange = ModerationVerdict | "hidden_by_flag";
+// avisos por denuncias (#218): auto_hidden (umbral), hidden_by_flag (moderador oculta), restored, hide_confirmed
+export type StatusChange = ModerationVerdict | "auto_hidden" | "hidden_by_flag" | "restored" | "hide_confirmed";
+
+// avisos que se envían aunque el dueño haya desactivado notifyStatusChange
+const MANDATORY_STATUS_CHANGES: ReadonlySet<StatusChange> = new Set([
+  "auto_hidden",
+  "hidden_by_flag",
+  "restored",
+  "hide_confirmed",
+]);
 
 const STATUS_CHANGE_TEXTS: Record<StatusChange, { title: string; message: (reportTitle: string) => string }> = {
   published: {
@@ -158,10 +166,22 @@ const STATUS_CHANGE_TEXTS: Record<StatusChange, { title: string; message: (repor
     message: (reportTitle) =>
       `"${reportTitle}" no pasó la moderación de contenido y no es visible para la comunidad.`,
   },
-  hidden_by_flag: {
+  auto_hidden: {
     title: "Tu reporte fue ocultado",
     message: (reportTitle) =>
-      `"${reportTitle}" fue denunciado, la moderación aceptó la denuncia y ya no es visible para la comunidad.`,
+      `"${reportTitle}" recibió varias denuncias y quedó oculto mientras la moderación lo revisa.`,
+  },
+  hidden_by_flag: {
+    title: "Tu reporte fue ocultado",
+    message: (reportTitle) => `"${reportTitle}" fue ocultado por la moderación mientras revisa el caso.`,
+  },
+  restored: {
+    title: "Tu reporte volvió a estar visible",
+    message: (reportTitle) => `La moderación revisó "${reportTitle}" y volvió a ser visible para la comunidad.`,
+  },
+  hide_confirmed: {
+    title: "La moderación confirmó el ocultamiento",
+    message: (reportTitle) => `La moderación confirmó que "${reportTitle}" permanece oculto.`,
   },
 };
 
@@ -173,7 +193,7 @@ export async function createForStatusChange(
   if (!report) {
     return null;
   }
-  if (!(await isNotificationEnabled(report.userId, "notifyStatusChange"))) {
+  if (!MANDATORY_STATUS_CHANGES.has(status) && !(await isNotificationEnabled(report.userId, "notifyStatusChange"))) {
     return null;
   }
 
