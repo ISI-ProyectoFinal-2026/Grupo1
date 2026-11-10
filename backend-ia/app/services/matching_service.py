@@ -8,6 +8,7 @@ PostGIS/pgvector — ver docs/ARQUITECTURA.md sección 4.3.
 """
 
 import logging
+from datetime import datetime, timezone
 
 import httpx
 from sqlalchemy import text
@@ -38,6 +39,19 @@ logger = logging.getLogger(__name__)
 # recalibrar con matches confirmados/rechazados reales.
 MATCH_THRESHOLD = 0.45
 NOTIFY_THRESHOLD = 0.63
+
+# autor sin suspensión vigente (mismo criterio que activeAuthorSql en Node)
+_AUTHOR_NOT_SUSPENDED_SQL = """
+    NOT EXISTS (
+        SELECT 1 FROM account_sanctions s
+        WHERE s.user_id = r.user_id AND s.status = 'active' AND (s.ends_at IS NULL OR s.ends_at > :now)
+    )
+"""
+
+
+# ahora en UTC sin tz: account_sanctions usa timestamp(3) en UTC (Prisma)
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 async def _notify_match(lost_id: int, found_id: int, similarity: float) -> None:
@@ -77,16 +91,18 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
 
     Devuelve la cantidad de matches creados/actualizados.
     """
+    now = _utc_now()
     source_result = await session.execute(
         text(
-            """
+            f"""
             SELECT r.report_type, r.location, re.embedding
             FROM reports r
             JOIN report_embeddings re ON re.report_id = r.id
             WHERE r.id = :report_id
+              AND {_AUTHOR_NOT_SUSPENDED_SQL}
             """
         ),
-        {"report_id": report_id},
+        {"report_id": report_id, "now": now},
     )
     source = source_result.mappings().first()
     if source is None:
@@ -94,7 +110,7 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
 
     candidates_result = await session.execute(
         text(
-            """
+            f"""
             -- `<=>` es distancia COSENO en pgvector, así que `1 - (a <=> b)` es
             -- la similitud coseno con la que se calibraron MATCH_THRESHOLD y
             -- NOTIFY_THRESHOLD. NO usar `<->`: ese es distancia L2 y, aun con
@@ -117,6 +133,7 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
               AND r.id != :report_id
               AND ST_DWithin(r.location::geography, CAST(:location AS geography), 5000)
               AND r.created_at > NOW() - INTERVAL '30 days'
+              AND {_AUTHOR_NOT_SUSPENDED_SQL}
             ORDER BY re.embedding <=> :embedding ASC
             LIMIT 5
             """
@@ -126,6 +143,7 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
             "report_type": source["report_type"],
             "report_id": report_id,
             "location": source["location"],
+            "now": now,
         },
     )
 
