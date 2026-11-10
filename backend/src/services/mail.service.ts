@@ -1,3 +1,4 @@
+import { AccountSanctionKind } from "@prisma/client";
 import * as mail from "./mail";
 
 /**
@@ -155,7 +156,7 @@ export async function sendTwoFactorResetCompleted(to: string): Promise<void> {
 }
 
 interface SuspensionNotice {
-  kind: "temporary" | "provisional" | "permanent";
+  kind: AccountSanctionKind;
   endsAt: Date | null;
   warning: boolean;
 }
@@ -166,10 +167,8 @@ export async function sendAccountSuspended(to: string, { kind, endsAt, warning }
   const detail =
     kind === "temporary" && endsAt
       ? `No vas a poder iniciar sesión hasta el ${formatArgentinaDate(endsAt)}.`
-      : kind === "provisional"
-        ? "La suspensión es preventiva hasta que un administrador revise el caso."
-        : "La suspensión es permanente.";
-  const advice = warning ? "Si recibís nuevas denuncias de gravedad media, la suspensión pasará a ser permanente." : "";
+      : "La suspensión es preventiva hasta que el equipo de moderación revise el caso; si se confirma, la cuenta se elimina de forma definitiva.";
+  const advice = warning ? "Si volvés a acumular denuncias, tu cuenta puede ser eliminada de forma definitiva." : "";
   await mail.getMailSender().send({
     to,
     subject: "Tu cuenta de PATITAS fue suspendida",

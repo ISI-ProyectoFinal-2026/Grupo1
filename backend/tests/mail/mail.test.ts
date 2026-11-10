@@ -233,6 +233,37 @@ describe("mail.service", () => {
     expect(disabled.text).not.toMatch(/https?:\/\//);
   });
 
+  test("sendAccountSuspended con advertencia avisa que nuevas denuncias pueden eliminar la cuenta", async () => {
+    await mailService.sendAccountSuspended("ana@example.com", {
+      kind: "temporary",
+      endsAt: new Date("2026-04-10T12:00:00.000Z"),
+      warning: true,
+    });
+
+    const message = send.mock.calls[0][0];
+    expect(message.text).toMatch(/eliminada de forma definitiva/);
+    expect(message.text).not.toMatch(/permanente/);
+  });
+
+  test("sendAccountSuspended provisional: preventiva hasta la revisión y eliminación si se confirma", async () => {
+    await mailService.sendAccountSuspended("ana@example.com", { kind: "provisional", endsAt: null, warning: false });
+
+    const message = send.mock.calls[0][0];
+    expect(message.text).toMatch(/preventiva/);
+    expect(message.text).toMatch(/equipo de moderación/);
+    expect(message.text).toMatch(/se elimina de forma definitiva/);
+    expect(message.text).not.toMatch(/permanente|administrador/);
+  });
+
+  test("sendAccountDeleted avisa la baja definitiva al destinatario", async () => {
+    await mailService.sendAccountDeleted("ana@example.com");
+
+    const message = send.mock.calls[0][0];
+    expect(message.to).toBe("ana@example.com");
+    expect(message.subject).toBe("Tu cuenta de PATITAS fue eliminada");
+    expect(message.text).toMatch(/eliminarla de forma definitiva/);
+  });
+
   test("propaga el error del adaptador para que el llamador decida", async () => {
     send.mockRejectedValue(new Error("smtp caído"));
 
