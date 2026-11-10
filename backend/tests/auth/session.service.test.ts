@@ -127,15 +127,15 @@ describe("session.service — loadAuthUser()", () => {
     });
     createdUserIds.push(user.id);
 
-    await expect(loadAuthUser(user.id)).resolves.toMatchObject({ id: user.id, emailVerifiedAt: null });
+    await expect(loadAuthUser(user.id, 0)).resolves.toMatchObject({ id: user.id, emailVerifiedAt: null });
 
     const verifiedAt = new Date("2026-09-01T10:00:00.000Z");
     await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: verifiedAt } });
 
-    await expect(loadAuthUser(user.id)).resolves.toMatchObject({ id: user.id, emailVerifiedAt: verifiedAt });
+    await expect(loadAuthUser(user.id, 0)).resolves.toMatchObject({ id: user.id, emailVerifiedAt: verifiedAt });
   });
 
   test("tira 401 si el usuario ya no existe", async () => {
-    await expect(loadAuthUser(2_000_000_000)).rejects.toMatchObject({ statusCode: 401, message: "Token inválido" });
+    await expect(loadAuthUser(2_000_000_000, 0)).rejects.toMatchObject({ statusCode: 401, message: "Token inválido" });
   });
 });

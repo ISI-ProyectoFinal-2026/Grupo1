@@ -9,6 +9,7 @@ import {
   TwoFactorDisableInput,
   TwoFactorLoginInput,
 } from "../../validators/two-factor.validator";
+import { assertNotSuspended } from "../account-sanctions.service";
 import { consumeAuthToken, findValidAuthToken, invalidateAuthTokens, issueAuthToken, TokenError } from "../auth-tokens.service";
 import * as mailService from "../mail.service";
 import { encryptSecret } from "./crypto";
@@ -90,6 +91,7 @@ export async function findValidChallenge(rawToken: string): Promise<number> {
  */
 export async function loginWithSecondFactor(input: TwoFactorLoginInput) {
   const userId = await findValidChallenge(input.twoFactorToken);
+  await assertNotSuspended(userId);
 
   const { user, recoveryRemaining, resetCancelled } = await verifySecondFactor(
     userId,
