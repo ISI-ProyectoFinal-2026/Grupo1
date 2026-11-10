@@ -623,10 +623,10 @@ describe('Login: cuenta suspendida', () => {
     expect(await screen.findByText(MOTIVO)).toBeInTheDocument()
     expect(screen.getByText(/Suspensión temporal/)).toBeInTheDocument()
     expect(screen.getByText(/1 de diciembre de 2026/)).toBeInTheDocument()
-    expect(screen.queryByText(/suspensión permanente/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/eliminada de forma definitiva/i)).not.toBeInTheDocument()
   })
 
-  it('moderada: agrega el aviso de posible suspensión permanente', async () => {
+  it('moderada: agrega el aviso de posible eliminación de la cuenta', async () => {
     vi.mocked(authService.login).mockRejectedValue(
       errorSuspendido({ type: 'temporary', severity: 'moderate', endsAt: '2026-12-01T12:00:00.000Z', warning: true })
     )
@@ -634,18 +634,20 @@ describe('Login: cuenta suspendida', () => {
     renderLogin()
     await completarYEnviar(user)
 
-    expect(await screen.findByText(/pasar a ser permanente/i)).toBeInTheDocument()
+    expect(await screen.findByText(/tu cuenta puede ser eliminada de forma definitiva/i)).toBeInTheDocument()
+    expect(screen.queryByText(/permanente/i)).not.toBeInTheDocument()
   })
 
-  it('permanente: sin fecha de fin', async () => {
+  it('provisional: sin fecha de fin y avisa que puede terminar en la eliminación de la cuenta', async () => {
     vi.mocked(authService.login).mockRejectedValue(
-      errorSuspendido({ type: 'permanent', severity: 'severe', endsAt: null, warning: false })
+      errorSuspendido({ type: 'provisional', severity: 'severe', endsAt: null, warning: false })
     )
     const user = userEvent.setup()
     renderLogin()
     await completarYEnviar(user)
 
-    expect(await screen.findByText(/Suspensión permanente/)).toBeInTheDocument()
+    expect(await screen.findByText(/Suspensión provisional/)).toBeInTheDocument()
+    expect(screen.getByText(/si se confirma, la cuenta se elimina de forma definitiva/i)).toBeInTheDocument()
     expect(screen.queryByText(/Hasta el/)).not.toBeInTheDocument()
   })
 

@@ -97,6 +97,7 @@ describe('admin.service', () => {
       kind: 'provisional',
       status: 'active',
       severity: 'severe',
+      recidivism: false,
       severityCounts: { mild: 1, moderate: 1, severe: 3 },
       reportDates: ['2026-11-01T10:00:00.000Z'],
     }
@@ -109,7 +110,7 @@ describe('admin.service', () => {
   })
 
   it('confirma una sanción con POST y el motivo', async () => {
-    const decision = { id: 12, status: 'active', kind: 'permanent', endsAt: null }
+    const decision = { id: 12, accountDeleted: true }
     vi.mocked(api.post).mockResolvedValue(respuesta(decision))
 
     const resultado = await confirmSanction(12, 'Evidencia suficiente')
@@ -121,7 +122,7 @@ describe('admin.service', () => {
   })
 
   it('revierte una sanción con POST y el motivo', async () => {
-    const decision = { id: 12, status: 'reverted', kind: 'provisional', endsAt: null }
+    const decision = { id: 12, status: 'reverted', kind: 'provisional', endsAt: null, accountDeleted: false }
     vi.mocked(api.post).mockResolvedValue(respuesta(decision))
 
     const resultado = await revertSanction(12, 'Denuncias infundadas')
@@ -129,6 +130,6 @@ describe('admin.service', () => {
     expect(api.post).toHaveBeenCalledWith('/admin/account-sanctions/12/revert', {
       reason: 'Denuncias infundadas',
     })
-    expect(resultado.status).toBe('reverted')
+    expect(resultado).toEqual(decision)
   })
 })

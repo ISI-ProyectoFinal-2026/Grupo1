@@ -6,7 +6,7 @@ import { createQueryWrapper } from '@/test/query-wrapper'
 
 vi.mock('@/services/admin.service')
 
-const decision = { id: 12, status: 'active', kind: 'permanent', endsAt: null } as const
+const decision = { id: 12, accountDeleted: true } as const
 
 describe('usePendingSanctions', () => {
   beforeEach(() => {
@@ -42,7 +42,13 @@ describe('useDecideSanction', () => {
   })
 
   it('revierte con el motivo', async () => {
-    vi.mocked(adminService.revertSanction).mockResolvedValue({ ...decision, status: 'reverted' })
+    vi.mocked(adminService.revertSanction).mockResolvedValue({
+      id: 12,
+      status: 'reverted',
+      kind: 'provisional',
+      endsAt: null,
+      accountDeleted: false,
+    })
     const { Wrapper } = createQueryWrapper()
     const { result } = renderHook(() => useDecideSanction(), { wrapper: Wrapper })
 
@@ -52,10 +58,10 @@ describe('useDecideSanction', () => {
     expect(adminService.revertSanction).toHaveBeenCalledWith(12, 'Motivo')
   })
 
-  // otro admin decidió antes: refrescar la cola para sacar el caso
-  it('ante un 409 también refresca la cola', async () => {
+  // otra persona decidió antes (409) o la cuenta ya fue eliminada (404): refrescar la cola
+  it.each([409, 404])('ante un %i también refresca la cola', async (status) => {
     vi.mocked(adminService.confirmSanction).mockRejectedValue(
-      Object.assign(new Error('El caso ya fue decidido'), { status: 409 })
+      Object.assign(new Error('El caso ya fue decidido'), { status })
     )
     const { Wrapper, client } = createQueryWrapper()
     const invalidate = vi.spyOn(client, 'invalidateQueries')

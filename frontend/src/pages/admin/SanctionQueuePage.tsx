@@ -1,25 +1,29 @@
 import { useState } from 'react'
-import SanctionDecisionDialog from '@/components/admin/SanctionDecisionDialog'
+import SanctionDecisionDialog, { DELETE_ACCOUNT_LABEL } from '@/components/admin/SanctionDecisionDialog'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { useDecideSanction, usePendingSanctions } from '@/hooks/useAdminSanctions'
-import { useIsAdmin } from '@/hooks/useIsAdmin'
+import { useIsModerator } from '@/hooks/useIsModerator'
 import { formatLongDate } from '@/lib/format'
 import { getApiErrorCode } from '@/services/api'
-import { ROLE_LABELS, type SanctionKind, type SanctionQueueItem } from '@/types/admin.types'
+import { ROLE_LABELS, type SanctionQueueItem } from '@/types/admin.types'
 
 const ERROR_BY_CODE: Record<string, string> = {
-  SANCTION_ALREADY_DECIDED: 'Otro administrador ya decidió este caso.',
+  SANCTION_ALREADY_DECIDED: 'Otra persona del equipo ya decidió este caso.',
   LAST_ADMIN: 'No se puede sancionar al último administrador activo.',
   SELF_SANCTION_DECISION: 'No podés decidir sobre tu propia sanción.',
 }
 
-const KIND_LABELS: Record<SanctionKind, string> = {
-  temporary: 'Suspensión temporal',
-  provisional: 'Suspensión provisional (pendiente de confirmar)',
-  permanent: 'Suspensión permanente',
+// provisional vigente: confirmar elimina la cuenta
+const deletesAccount = (item: SanctionQueueItem) => item.status === 'active' && item.kind === 'provisional'
+
+function caseLabel(item: SanctionQueueItem): string {
+  if (item.kind === 'temporary') return 'Suspensión temporal'
+  if (!deletesAccount(item)) return 'Suspensión provisional (pendiente de confirmar)'
+  const cause = item.recidivism ? 'Reincidencia' : 'Denuncias graves'
+  return `${cause}: suspensión provisional, eliminación de la cuenta pendiente`
 }
 
 const SEVERITY_COUNT_LABELS = { mild: 'Leves', moderate: 'Medias', severe: 'Fuertes' } as const
@@ -27,15 +31,15 @@ const SEVERITY_COUNT_LABELS = { mild: 'Leves', moderate: 'Medias', severe: 'Fuer
 const accountName = (item: SanctionQueueItem) => item.account.fullName ?? item.account.email
 
 function SanctionQueuePage() {
-  const isAdmin = useIsAdmin()
-  const queue = usePendingSanctions(isAdmin)
+  const isModerator = useIsModerator()
+  const queue = usePendingSanctions(isModerator)
   const decide = useDecideSanction()
   const [pending, setPending] = useState<{
     item: SanctionQueueItem
     action: 'confirm' | 'revert'
   } | null>(null)
 
-  if (!isAdmin) return null
+  if (!isModerator) return null
 
   async function submit(reason: string) {
     if (!pending) return
@@ -81,7 +85,7 @@ function SanctionQueuePage() {
             <p className='font-bold'>{item.account.fullName ?? 'Sin nombre'}</p>
             <p className='text-ink-muted'>{item.account.email}</p>
             <p className='mt-1 text-sm text-ink-muted'>
-              {ROLE_LABELS[item.role]} · {KIND_LABELS[item.kind]}
+              {ROLE_LABELS[item.role]} · {caseLabel(item)}
             </p>
             <ul className='mt-2 flex flex-wrap gap-x-4 text-sm'>
               {(
@@ -97,7 +101,7 @@ function SanctionQueuePage() {
             </p>
             <div className='mt-3 flex gap-2'>
               <Button variant='danger' onClick={() => openDialog(item, 'confirm')}>
-                Confirmar
+                {deletesAccount(item) ? DELETE_ACCOUNT_LABEL : 'Confirmar sanción'}
               </Button>
               <Button variant='secondary' onClick={() => openDialog(item, 'revert')}>
                 Revertir
@@ -127,6 +131,7 @@ function SanctionQueuePage() {
       {pending && (
         <SanctionDecisionDialog
           action={pending.action}
+          deletesAccount={deletesAccount(pending.item)}
           accountName={accountName(pending.item)}
           isLoading={decide.isPending}
           onSubmit={submit}

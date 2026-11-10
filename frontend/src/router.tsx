@@ -78,14 +78,15 @@ export const router = createBrowserRouter([
           // responderia 403.
           {
             element: <RequireRole roles={["moderador", "admin"]} />,
-            children: [{ path: "moderation", element: <ModerationPage /> }],
+            children: [
+              { path: "moderation", element: <ModerationPage /> },
+              // el moderador ve solo las reincidencias (filtra el backend)
+              { path: "admin/sanctions", element: <SanctionQueuePage /> },
+            ],
           },
           {
             element: <RequireRole roles={["admin"]} />,
-            children: [
-              { path: "admin/users", element: <AdminUsersPage /> },
-              { path: "admin/sanctions", element: <SanctionQueuePage /> },
-            ],
+            children: [{ path: "admin/users", element: <AdminUsersPage /> }],
           },
         ],
       },

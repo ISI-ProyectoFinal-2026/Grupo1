@@ -50,7 +50,7 @@ export interface AdminUsersQuery {
   pageSize: number
 }
 
-export type SanctionKind = 'temporary' | 'provisional' | 'permanent'
+export type SanctionKind = 'temporary' | 'provisional'
 export type SanctionStatus = 'active' | 'pending_review' | 'expired' | 'reverted' | 'dismissed'
 
 // caso de la cola (#38): sin denunciantes ni ids de denuncias; id = id de la sanción
@@ -61,13 +61,13 @@ export interface SanctionQueueItem {
   kind: SanctionKind
   status: SanctionStatus
   severity: AccountReportSeverity
+  // provisional por reincidencia (no por denuncias graves)
+  recidivism: boolean
   severityCounts: Record<AccountReportSeverity, number>
   reportDates: string[]
 }
 
-export interface SanctionDecision {
-  id: number
-  status: SanctionStatus
-  kind: SanctionKind
-  endsAt: string | null
-}
+// confirmar una provisional vigente elimina la cuenta
+export type SanctionDecision =
+  | { id: number; status: SanctionStatus; kind: SanctionKind; endsAt: string | null; accountDeleted: false }
+  | { id: number; accountDeleted: true }

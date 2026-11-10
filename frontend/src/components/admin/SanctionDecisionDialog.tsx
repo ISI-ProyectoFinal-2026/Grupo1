@@ -6,19 +6,19 @@ const MAX_REASON_LENGTH = 500
 
 interface SanctionDecisionDialogProps {
   action: 'confirm' | 'revert'
+  // confirmar una provisional vigente elimina la cuenta
+  deletesAccount: boolean
   accountName: string
   isLoading: boolean
   onSubmit: (reason: string) => void
   onCancel: () => void
 }
 
-const COPY = {
-  confirm: { title: 'Confirmar', label: 'Confirmar' },
-  revert: { title: 'Revertir', label: 'Revertir' },
-}
+export const DELETE_ACCOUNT_LABEL = 'Confirmar y eliminar cuenta'
 
 function SanctionDecisionDialog({
   action,
+  deletesAccount,
   accountName,
   isLoading,
   onSubmit,
@@ -28,6 +28,11 @@ function SanctionDecisionDialog({
   const dialogRef = useRef<HTMLDivElement>(null)
   const [reason, setReason] = useState('')
   const trimmed = reason.trim()
+  const deleting = action === 'confirm' && deletesAccount
+  const title = deleting
+    ? `Eliminar la cuenta de ${accountName}`
+    : `${action === 'confirm' ? 'Confirmar' : 'Revertir'} el caso de ${accountName}`
+  const submitLabel = deleting ? DELETE_ACCOUNT_LABEL : action === 'confirm' ? 'Confirmar sanción' : 'Revertir'
 
   useEffect(() => {
     dialogRef.current?.focus()
@@ -49,9 +54,16 @@ function SanctionDecisionDialog({
         className='w-full max-w-md rounded-card bg-paper p-5 shadow-pop focus:outline-none sm:p-6'
       >
         <h2 id={titleId} className='font-display text-display-md'>
-          {action === 'confirm' ? 'Confirmar' : 'Revertir'} el caso de {accountName}
+          {title}
         </h2>
-        <p className='mt-2 text-ink-muted'>La decisión y el motivo quedan registrados.</p>
+        {deleting ? (
+          <p className='mt-2 font-bold text-danger'>
+            La cuenta y todos sus datos (reportes, mascotas y conversaciones) se eliminan de forma
+            definitiva y no se puede deshacer.
+          </p>
+        ) : (
+          <p className='mt-2 text-ink-muted'>La decisión y el motivo quedan registrados.</p>
+        )}
         <div className='mt-4 flex flex-col gap-1.5'>
           <label htmlFor='sanction-reason' className='field-label'>
             Motivo
@@ -74,7 +86,7 @@ function SanctionDecisionDialog({
             onClick={() => onSubmit(trimmed)}
             className='w-full sm:w-auto'
           >
-            {COPY[action].label}
+            {submitLabel}
           </Button>
           <Button
             variant='secondary'

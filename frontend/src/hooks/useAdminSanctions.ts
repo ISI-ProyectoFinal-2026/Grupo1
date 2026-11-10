@@ -23,9 +23,10 @@ export function useDecideSanction() {
       reason: string
     }) => (action === 'confirm' ? confirmSanction(id, reason) : revertSanction(id, reason)),
     onSuccess: refresh,
-    // 409: otro admin decidió antes; la cola se refresca y el caso desaparece
+    // 409: otra persona decidió antes; 404: la cuenta ya fue eliminada. La cola se refresca
     onError: (error) => {
-      if (getApiErrorStatus(error) === 409) refresh()
+      const status = getApiErrorStatus(error)
+      if (status === 409 || status === 404) refresh()
     },
   })
 }

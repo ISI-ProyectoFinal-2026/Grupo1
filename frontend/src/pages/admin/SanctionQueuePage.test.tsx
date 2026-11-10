@@ -29,6 +29,7 @@ function caso(overrides: Partial<SanctionQueueItem> = {}): SanctionQueueItem {
     kind: 'temporary',
     status: 'pending_review',
     severity: 'moderate',
+    recidivism: false,
     severityCounts: { mild: 1, moderate: 3, severe: 1 },
     reportDates: ['2026-11-03T12:00:00.000Z', '2026-11-04T12:00:00.000Z'],
     ...overrides,
@@ -50,7 +51,7 @@ function renderPage() {
 
 async function decidir(
   user: ReturnType<typeof userEvent.setup>,
-  accion: 'Confirmar' | 'Revertir',
+  accion: 'Confirmar sanción' | 'Confirmar y eliminar cuenta' | 'Revertir',
   motivo: string
 ) {
   await user.click(await screen.findByRole('button', { name: accion }))
@@ -89,12 +90,42 @@ describe('SanctionQueuePage', () => {
     expect(await screen.findByText('No hay casos pendientes.')).toBeInTheDocument()
   })
 
-  it('no renderiza nada para quien no es admin', () => {
-    useAuthStore.setState({ token: 'token', user: { ...YO, role: 'moderador' } })
+  it('no renderiza nada para un usuario regular', () => {
+    useAuthStore.setState({ token: 'token', user: { ...YO, role: 'usuario_regular' } })
     renderPage()
 
     expect(screen.queryByRole('heading')).not.toBeInTheDocument()
     expect(adminService.listPendingSanctions).not.toHaveBeenCalled()
+  })
+
+  it('un moderador ve la cola (el backend le manda solo reincidencias)', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...YO, role: 'moderador' } })
+    vi.mocked(adminService.listPendingSanctions).mockResolvedValue({
+      items: [caso({ role: 'usuario_regular', kind: 'provisional', status: 'active', severity: 'mild', recidivism: true })],
+    })
+    renderPage()
+
+    expect(await screen.findByText(/Reincidencia/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirmar y eliminar cuenta' })).toBeInTheDocument()
+  })
+
+  it('un caso provisional vigente avisa que confirmar elimina la cuenta de forma definitiva', async () => {
+    vi.mocked(adminService.listPendingSanctions).mockResolvedValue({
+      items: [caso({ role: 'usuario_regular', kind: 'provisional', status: 'active', severity: 'severe' })],
+    })
+    vi.mocked(adminService.confirmSanction).mockResolvedValue({ id: 12, accountDeleted: true })
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(await screen.findByText(/Denuncias graves/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Confirmar y eliminar cuenta' }))
+    const dialogo = screen.getByRole('alertdialog')
+    expect(within(dialogo).getByText(/Eliminar la cuenta de Ana Pérez/)).toBeInTheDocument()
+    expect(within(dialogo).getByText(/se eliminan de forma definitiva y no se puede deshacer/)).toBeInTheDocument()
+    await user.type(within(dialogo).getByLabelText('Motivo'), 'Confirmado')
+    await user.click(within(dialogo).getByRole('button', { name: 'Confirmar y eliminar cuenta' }))
+
+    await waitFor(() => expect(adminService.confirmSanction).toHaveBeenCalledWith(12, 'Confirmado'))
   })
 
   it('confirma con el motivo escrito en el diálogo', async () => {
@@ -103,13 +134,15 @@ describe('SanctionQueuePage', () => {
       status: 'active',
       kind: 'temporary',
       endsAt: null,
+      accountDeleted: false,
     })
     const user = userEvent.setup()
     renderPage()
-    await user.click(await screen.findByRole('button', { name: 'Confirmar' }))
+    await user.click(await screen.findByRole('button', { name: 'Confirmar sanción' }))
 
     const dialogo = screen.getByRole('alertdialog')
-    const aceptar = within(dialogo).getByRole('button', { name: 'Confirmar' })
+    expect(within(dialogo).queryByText(/eliminan de forma definitiva/)).not.toBeInTheDocument()
+    const aceptar = within(dialogo).getByRole('button', { name: 'Confirmar sanción' })
     expect(aceptar).toBeDisabled()
     await user.type(within(dialogo).getByLabelText('Motivo'), 'Evidencia suficiente')
     await user.click(aceptar)
@@ -126,6 +159,7 @@ describe('SanctionQueuePage', () => {
       status: 'dismissed',
       kind: 'temporary',
       endsAt: null,
+      accountDeleted: false,
     })
     const user = userEvent.setup()
     renderPage()
@@ -143,7 +177,7 @@ describe('SanctionQueuePage', () => {
   })
 
   it.each([
-    ['SANCTION_ALREADY_DECIDED', 409, 'Otro administrador ya decidió este caso.'],
+    ['SANCTION_ALREADY_DECIDED', 409, 'Otra persona del equipo ya decidió este caso.'],
     ['LAST_ADMIN', 409, 'No se puede sancionar al último administrador activo.'],
     ['SELF_SANCTION_DECISION', 403, 'No podés decidir sobre tu propia sanción.'],
   ])('mapea el código %s a un mensaje', async (code, status, mensaje) => {
@@ -152,7 +186,7 @@ describe('SanctionQueuePage', () => {
     )
     const user = userEvent.setup()
     renderPage()
-    await decidir(user, 'Confirmar', 'Motivo')
+    await decidir(user, 'Confirmar sanción', 'Motivo')
 
     expect(await screen.findByText(mensaje)).toBeInTheDocument()
     expect(screen.queryByText('mensaje crudo del servidor')).not.toBeInTheDocument()
@@ -164,7 +198,7 @@ describe('SanctionQueuePage', () => {
     )
     const user = userEvent.setup()
     renderPage()
-    await decidir(user, 'Confirmar', 'Motivo')
+    await decidir(user, 'Confirmar sanción', 'Motivo')
 
     expect(await screen.findByText('Caso de sanción no encontrado')).toBeInTheDocument()
   })

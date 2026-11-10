@@ -97,27 +97,27 @@ describe('MainLayout', () => {
     )
   })
 
-  it('ofrece la cola de sanciones a un admin y la marca activa en su ruta', async () => {
-    useAuthStore.setState({ token: 'token', user: { ...usuario, role: 'admin' } })
-
-    renderLayout('/admin/sanctions')
-
-    const enlace = await screen.findByRole('link', { name: 'Sanciones' })
-    expect(enlace).toHaveAttribute('href', '/admin/sanctions')
-    expect(enlace).toHaveAttribute('aria-current', 'page')
-  })
-
-  it.each(['moderador', 'usuario_regular'] as const)(
-    'oculta la cola de sanciones al rol %s',
+  it.each(['admin', 'moderador'] as const)(
+    'ofrece la cola de sanciones al rol %s y la marca activa en su ruta',
     async (role) => {
       useAuthStore.setState({ token: 'token', user: { ...usuario, role } })
 
-      renderLayout()
+      renderLayout('/admin/sanctions')
 
-      await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
-      expect(screen.queryByRole('link', { name: 'Sanciones' })).not.toBeInTheDocument()
+      const enlace = await screen.findByRole('link', { name: 'Sanciones' })
+      expect(enlace).toHaveAttribute('href', '/admin/sanctions')
+      expect(enlace).toHaveAttribute('aria-current', 'page')
     }
   )
+
+  it('oculta la cola de sanciones a un usuario regular', async () => {
+    useAuthStore.setState({ token: 'token', user: { ...usuario, role: 'usuario_regular' } })
+
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: 'Sanciones' })).not.toBeInTheDocument()
+  })
 
   it.each(['moderador', 'usuario_regular'] as const)(
     'oculta la administracion al rol %s',

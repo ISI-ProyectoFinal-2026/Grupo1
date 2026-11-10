@@ -4,7 +4,6 @@ import type { SuspensionDetails, SuspensionType } from '@/types/auth'
 const TYPE_LABELS: Record<SuspensionType, string> = {
   temporary: 'Suspensión temporal',
   provisional: 'Suspensión provisional',
-  permanent: 'Suspensión permanente',
 }
 
 interface SuspensionNoticeProps {
@@ -22,9 +21,15 @@ function SuspensionNotice({ message, suspension }: SuspensionNoticeProps) {
       <p className='font-bold'>{message}</p>
       <p>{TYPE_LABELS[suspension.type]}</p>
       {suspension.endsAt && <p>Hasta el {formatLongDate(suspension.endsAt)}.</p>}
+      {suspension.type === 'provisional' && (
+        <p>
+          La suspensión es preventiva hasta que el equipo de moderación revise el caso; si se
+          confirma, la cuenta se elimina de forma definitiva.
+        </p>
+      )}
       {suspension.warning && (
         <p className='font-bold'>
-          Si volvés a recibir denuncias, la suspensión puede pasar a ser permanente.
+          Si volvés a recibir denuncias, tu cuenta puede ser eliminada de forma definitiva.
         </p>
       )}
     </div>

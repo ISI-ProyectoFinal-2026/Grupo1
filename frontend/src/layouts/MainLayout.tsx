@@ -306,7 +306,7 @@ function MainLayout() {
                 Administración
               </Link>
             )}
-            {isAdmin && (
+            {isModerator && (
               <Link
                 to="/admin/sanctions"
                 onClick={closeMore}
