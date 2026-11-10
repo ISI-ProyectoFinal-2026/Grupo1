@@ -1,7 +1,6 @@
 import request from "supertest";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
-import * as accountSanctionsService from "../../src/services/account-sanctions.service";
 import { createTestUser } from "../helpers/users";
 
 type Severity = "mild" | "moderate" | "severe";
@@ -11,7 +10,6 @@ describe("POST/GET /api/account-reports (#267)", () => {
   let reported: { id: number; token: string };
   let reporters: { id: number; token: string }[];
   let moderatorToken: string;
-  let thresholdSpy: jest.SpyInstance;
 
   async function newUser(prefix: string, role?: "moderador" | "admin") {
     const { user, token } = await createTestUser({ prefix, role });
@@ -24,7 +22,6 @@ describe("POST/GET /api/account-reports (#267)", () => {
   }
 
   beforeEach(async () => {
-    thresholdSpy = jest.spyOn(accountSanctionsService, "onAccountReportThreshold").mockResolvedValue(undefined);
     reported = await newUser("account-reports-reported");
     reporters = [];
     for (let i = 0; i < 6; i++) reporters.push(await newUser(`account-reports-reporter-${i}`));
@@ -32,7 +29,9 @@ describe("POST/GET /api/account-reports (#267)", () => {
   });
 
   afterEach(async () => {
-    jest.restoreAllMocks();
+    await prisma.accountSanctionEvent.deleteMany({ where: { sanction: { userId: { in: userIds } } } });
+    await prisma.accountReport.deleteMany({ where: { reportedUserId: { in: userIds } } });
+    await prisma.accountSanction.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds.splice(0) } } });
   });
 
@@ -98,48 +97,29 @@ describe("POST/GET /api/account-reports (#267)", () => {
       }
     }
 
-    test("con 4 denuncias no se dispara la sanción", async () => {
+    const sanctionOf = () => prisma.accountSanction.findMany({ where: { userId: reported.id } });
+
+    test("con 4 denuncias no se crea la sanción", async () => {
       await reportWith(["severe", "severe", "severe", "severe"]);
-      expect(thresholdSpy).not.toHaveBeenCalled();
+      expect(await sanctionOf()).toHaveLength(0);
     });
 
-    test("la 5.ª denuncia dispara la sanción con la gravedad más frecuente", async () => {
+    test("la 5.ª denuncia crea la sanción con la gravedad más frecuente", async () => {
       await reportWith(["mild", "severe", "mild", "moderate", "mild"]);
-
-      expect(thresholdSpy).toHaveBeenCalledTimes(1);
-      expect(thresholdSpy).toHaveBeenCalledWith(reported.id, "mild");
+      expect(await sanctionOf()).toEqual([expect.objectContaining({ severity: "mild", kind: "temporary" })]);
     });
 
-    test("en empate dispara la sanción con la gravedad más alta", async () => {
+    test("en empate crea la sanción con la gravedad más alta", async () => {
       await reportWith(["mild", "moderate", "mild", "moderate", "severe"]);
-
-      expect(thresholdSpy).toHaveBeenCalledWith(reported.id, "moderate");
+      expect(await sanctionOf()).toEqual([expect.objectContaining({ severity: "moderate" })]);
     });
 
-    test("una 6.ª denuncia no vuelve a disparar la sanción", async () => {
-      await reportWith(["severe", "severe", "severe", "severe", "severe", "mild"]);
-      expect(thresholdSpy).toHaveBeenCalledTimes(1);
-    });
+    test("una 6.ª denuncia contra la cuenta suspendida se rechaza", async () => {
+      await reportWith(["severe", "severe", "severe", "severe", "severe"]);
+      const res = await report(reporters[5], { reportedUserId: reported.id, severity: "mild" });
 
-    test("denuncias simultáneas disparan la sanción una sola vez", async () => {
-      await reportWith(["moderate", "moderate", "moderate"]);
-      const results = await Promise.all(
-        [3, 4, 5].map((i) => report(reporters[i], { reportedUserId: reported.id, severity: "moderate" }))
-      );
-
-      expect(results.map((r) => r.status)).toEqual([201, 201, 201]);
-      expect(thresholdSpy).toHaveBeenCalledTimes(1);
-    });
-
-    test("si el aviso a la sanción falla, la denuncia queda registrada igual", async () => {
-      thresholdSpy.mockRejectedValue(new Error("boom"));
-      jest.spyOn(console, "error").mockImplementation(() => {});
-      await reportWith(["mild", "mild", "mild", "mild"]);
-
-      const res = await report(reporters[4], { reportedUserId: reported.id, severity: "mild" });
-
-      expect(res.status).toBe(201);
-      expect(await prisma.accountReport.count({ where: { reportedUserId: reported.id } })).toBe(5);
+      expect(res.status).toBe(409);
+      expect(await sanctionOf()).toHaveLength(1);
     });
   });
 
@@ -164,17 +144,6 @@ describe("POST/GET /api/account-reports (#267)", () => {
         resultingSeverity: null,
       });
       expect(entry.reportedUser).not.toHaveProperty("passwordHash");
-    });
-
-    test("al llegar al umbral informa la gravedad resultante", async () => {
-      for (const [i, severity] of (["severe", "mild", "severe", "mild", "moderate"] as Severity[]).entries()) {
-        await report(reporters[i], { reportedUserId: reported.id, severity });
-      }
-
-      const res = await request(app).get("/api/account-reports").set("Authorization", `Bearer ${moderatorToken}`);
-
-      const entry = res.body.find((e: { reportedUser: { id: number } }) => e.reportedUser.id === reported.id);
-      expect(entry).toMatchObject({ reportCount: 5, thresholdReached: true, resultingSeverity: "severe" });
     });
   });
 });

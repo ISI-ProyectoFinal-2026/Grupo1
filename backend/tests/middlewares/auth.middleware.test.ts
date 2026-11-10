@@ -31,8 +31,13 @@ function signToken(payload: Record<string, unknown>, expiresIn: jwt.SignOptions[
   return jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn });
 }
 
+function withoutSanctions(row: Record<string, unknown>) {
+  const { accountSanctions: _unused, ...rest } = row;
+  return rest;
+}
+
 function authUserRow(overrides: Record<string, unknown> = {}) {
-  return { id: 42, role: "usuario_regular", emailVerifiedAt: null, tokenVersion: 0, ...overrides };
+  return { id: 42, role: "usuario_regular", emailVerifiedAt: null, tokenVersion: 0, accountSanctions: [], ...overrides };
 }
 
 describe("requireAuth", () => {
@@ -120,7 +125,7 @@ describe("requireAuth", () => {
     await requireAuth(req, {} as Response, next);
 
     expect(req.userId).toBe(42);
-    expect(req.authUser).toEqual(row);
+    expect(req.authUser).toEqual(withoutSanctions(row));
     expect(next).toHaveBeenCalledTimes(1);
     expect(userFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 42 } }));
   });
@@ -149,7 +154,7 @@ describe("optionalAuth", () => {
     await optionalAuth(req, {} as Response, next);
 
     expect(req.userId).toBe(42);
-    expect(req.authUser).toEqual(authUserRow());
+    expect(req.authUser).toEqual(withoutSanctions(authUserRow()));
     expect(next).toHaveBeenCalledTimes(1);
   });
 

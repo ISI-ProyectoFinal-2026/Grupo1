@@ -128,7 +128,7 @@ model Pet {
   microchipId String?  @map("microchip_id")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  user    User     @relation(fields: [userId], references: [id])
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reports Report[]
 
   @@map("pets")
@@ -173,7 +173,7 @@ model Report {
   updatedAt       DateTime     @updatedAt @map("updated_at")
   publishedAt     DateTime?    @map("published_at")
 
-  user   User             @relation(fields: [userId], references: [id])
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   pet    Pet?             @relation(fields: [petId], references: [id])
   embedding      ReportEmbedding?
   matchesAsLost  ReportMatch[]   @relation("MatchLost")
@@ -204,7 +204,7 @@ model ReportFlag {
   createdAt DateTime          @default(now()) @map("created_at")
 
   report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([reportId, userId])
   @@index([status])
@@ -245,7 +245,7 @@ model AccountReport {
 
   reportedUser User             @relation("AccountReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
   reporter     User             @relation("AccountReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  sanction     AccountSanction? @relation(fields: [sanctionId], references: [id], onDelete: Restrict)
+  sanction     AccountSanction? @relation(fields: [sanctionId], references: [id], onDelete: Cascade)
 
   // una denuncia por persona y ciclo: índice único parcial (sanction_id IS NULL) en SQL crudo
   @@index([reportedUserId, sanctionId])
@@ -294,7 +294,7 @@ model AccountSanction {
   endsAt              DateTime?             @map("ends_at")
   createdAt           DateTime              @default(now()) @map("created_at")
 
-  user    User                   @relation("SanctionTarget", fields: [userId], references: [id], onDelete: Restrict)
+  user    User                   @relation("SanctionTarget", fields: [userId], references: [id], onDelete: Cascade)
   reports AccountReport[]
   events  AccountSanctionEvent[]
 
@@ -313,8 +313,9 @@ model AccountSanctionEvent {
   reason     String?
   createdAt  DateTime                 @default(now()) @map("created_at")
 
-  sanction AccountSanction @relation(fields: [sanctionId], references: [id], onDelete: Restrict)
-  actor    User?           @relation("SanctionActor", fields: [actorId], references: [id], onDelete: Restrict)
+  sanction AccountSanction @relation(fields: [sanctionId], references: [id], onDelete: Cascade)
+  // SetNull: si se elimina la cuenta del staff, el historial queda sin actor
+  actor    User?           @relation("SanctionActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([sanctionId])
   @@map("account_sanction_events")
@@ -353,8 +354,8 @@ model Chat {
   reportId  Int?     @map("report_id")
   createdAt DateTime @default(now()) @map("created_at")
 
-  userA    User      @relation("ChatUserA", fields: [userAId], references: [id])
-  userB    User      @relation("ChatUserB", fields: [userBId], references: [id])
+  userA    User      @relation("ChatUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User      @relation("ChatUserB", fields: [userBId], references: [id], onDelete: Cascade)
   report   Report?   @relation(fields: [reportId], references: [id])
   messages Message[]
 
@@ -376,8 +377,8 @@ model Message {
   imageUrl  String?  @map("image_url")
   createdAt DateTime @default(now()) @map("created_at")
 
-  chat   Chat @relation(fields: [chatId], references: [id])
-  sender User @relation(fields: [senderId], references: [id])
+  chat   Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@map("messages")
 }
@@ -392,7 +393,7 @@ model Notification {
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
 
-  user   User    @relation(fields: [userId], references: [id])
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   report Report? @relation(fields: [reportId], references: [id])
 
   @@index([userId])
@@ -402,14 +403,15 @@ model Notification {
 // historial append-only de cambios de rol (#224)
 model RoleChangeAudit {
   id           Int      @id @default(autoincrement())
-  actorId      Int      @map("actor_id")
+  // null: la cuenta del admin que hizo el cambio fue eliminada (#38)
+  actorId      Int?     @map("actor_id")
   targetId     Int      @map("target_id")
   previousRole Role     @map("previous_role")
   newRole      Role     @map("new_role")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  actor  User @relation("RoleChangeActor", fields: [actorId], references: [id], onDelete: Restrict)
-  target User @relation("RoleChangeTarget", fields: [targetId], references: [id], onDelete: Restrict)
+  actor  User? @relation("RoleChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
+  target User  @relation("RoleChangeTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@map("role_change_audits")
@@ -525,7 +527,7 @@ model Business {
   planExpiresAt DateTime?        @map("plan_expires_at")
   createdAt     DateTime         @default(now()) @map("created_at")
 
-  user          User            @relation(fields: [userId], references: [id])
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   events        BusinessEvent[]
   subscriptions Subscription[]
   ads           Ad[]
@@ -581,7 +583,7 @@ model AdFlag {
   createdAt DateTime     @default(now()) @map("created_at")
 
   ad   Ad   @relation(fields: [adId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([adId, userId])
   @@index([status])

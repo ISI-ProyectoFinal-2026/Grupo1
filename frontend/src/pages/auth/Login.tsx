@@ -3,16 +3,17 @@ import type { FormEvent, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import TwoFactorChallengeForm from "@/components/auth/TwoFactorChallengeForm";
 import TwoFactorResetRequestForm from "@/components/auth/TwoFactorResetRequestForm";
+import SuspensionNotice from "@/components/auth/SuspensionNotice";
 import AuthCard, { AuthFrame } from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import { CheckIcon } from "@/components/ui/icons";
-import { getApiErrorCode } from "@/services/api";
+import { getApiErrorCode, getApiErrorSuspension } from "@/services/api";
 import { login } from "@/services/auth.service";
 import { loginWithTwoFactor, requestTwoFactorReset } from "@/services/two-factor.service";
 import { useAuthStore } from "@/stores/auth.store";
 import { isTwoFactorChallenge, TWO_FACTOR_CHALLENGE_INVALID, TWO_FACTOR_LOCKED } from "@/types/auth";
-import type { AuthUser } from "@/types/auth";
+import type { AuthUser, SuspensionDetails } from "@/types/auth";
 import {
   formatWaitMessage,
   getRetryAfterSeconds,
@@ -66,6 +67,7 @@ function Login() {
   const [sentMessage, setSentMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suspended, setSuspended] = useState<{ message: string; details: SuspensionDetails } | null>(null);
 
   function startSession(token: string, user: AuthUser) {
     useAuthStore.getState().setAuth(token, user);
@@ -79,11 +81,25 @@ function Login() {
     setResetPassword("");
     setSentMessage(null);
     setError(message);
+    setSuspended(null);
+  }
+
+  // Cuenta suspendida: muestra el aviso en el paso de contraseña (el desafío ya no sirve).
+  function showSuspension(err: unknown): boolean {
+    const details = getApiErrorSuspension(err);
+    if (!details) return false;
+    setStep({ kind: "password" });
+    setCode("");
+    setMode("totp");
+    setError(null);
+    setSuspended({ message: messageOf(err), details });
+    return true;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setSuspended(null);
     setIsLoading(true);
 
     try {
@@ -99,7 +115,7 @@ function Login() {
       }
       startSession(response.token, response.user);
     } catch (err) {
-      setError(messageOf(err));
+      if (!showSuspension(err)) setError(messageOf(err));
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +134,9 @@ function Login() {
       startSession(token, user);
     } catch (err) {
       const errorCode = getApiErrorCode(err);
-      if (errorCode === TWO_FACTOR_CHALLENGE_INVALID) {
+      if (showSuspension(err)) {
+        // el aviso se muestra en el paso de contraseña
+      } else if (errorCode === TWO_FACTOR_CHALLENGE_INVALID) {
         backToPassword(messageOf(err));
       } else if (errorCode === TWO_FACTOR_LOCKED) {
         // El desafío se conserva: el bloqueo es de la cuenta, no de este intento.
@@ -275,6 +293,7 @@ function Login() {
         </div>
 
         {error && <ErrorMessage message={error} />}
+        {suspended && <SuspensionNotice message={suspended.message} suspension={suspended.details} />}
 
         <button type="submit" disabled={isLoading} className={buttonClasses("primary", "lg", "mt-2 w-full")}>
           {isLoading ? "Ingresando..." : "Ingresar"}

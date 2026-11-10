@@ -1,11 +1,18 @@
 import type { AxiosResponse } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/services/api'
-import { changeUserRole, listAdminUsers, listRoleAudit } from '@/services/admin.service'
-import type { AdminUser, Paginated, RoleAuditEntry } from '@/types/admin.types'
+import {
+  changeUserRole,
+  confirmSanction,
+  listAdminUsers,
+  listPendingSanctions,
+  listRoleAudit,
+  revertSanction,
+} from '@/services/admin.service'
+import type { AdminUser, Paginated, RoleAuditEntry, SanctionQueueItem } from '@/types/admin.types'
 
 vi.mock('@/services/api', () => ({
-  api: { get: vi.fn(), patch: vi.fn() },
+  api: { get: vi.fn(), patch: vi.fn(), post: vi.fn() },
 }))
 
 function respuesta<T>(data: T): AxiosResponse<T> {
@@ -80,5 +87,49 @@ describe('admin.service', () => {
 
     expect(api.patch).toHaveBeenCalledWith('/admin/users/4/role', { role: 'moderador' })
     expect(resultado.role).toBe('moderador')
+  })
+
+  it('lista la cola de sanciones desde GET /admin/account-sanctions/pending', async () => {
+    const item: SanctionQueueItem = {
+      id: 12,
+      account: { id: 4, fullName: 'Ana', email: 'ana@example.com' },
+      role: 'moderador',
+      kind: 'provisional',
+      status: 'active',
+      severity: 'severe',
+      recidivism: false,
+      severityCounts: { mild: 1, moderate: 1, severe: 3 },
+      reportDates: ['2026-11-01T10:00:00.000Z'],
+    }
+    vi.mocked(api.get).mockResolvedValue(respuesta({ items: [item] }))
+
+    const resultado = await listPendingSanctions()
+
+    expect(api.get).toHaveBeenCalledWith('/admin/account-sanctions/pending')
+    expect(resultado).toEqual({ items: [item] })
+  })
+
+  it('confirma una sanción con POST y el motivo', async () => {
+    const decision = { id: 12, accountDeleted: true }
+    vi.mocked(api.post).mockResolvedValue(respuesta(decision))
+
+    const resultado = await confirmSanction(12, 'Evidencia suficiente')
+
+    expect(api.post).toHaveBeenCalledWith('/admin/account-sanctions/12/confirm', {
+      reason: 'Evidencia suficiente',
+    })
+    expect(resultado).toEqual(decision)
+  })
+
+  it('revierte una sanción con POST y el motivo', async () => {
+    const decision = { id: 12, status: 'reverted', kind: 'provisional', endsAt: null, accountDeleted: false }
+    vi.mocked(api.post).mockResolvedValue(respuesta(decision))
+
+    const resultado = await revertSanction(12, 'Denuncias infundadas')
+
+    expect(api.post).toHaveBeenCalledWith('/admin/account-sanctions/12/revert', {
+      reason: 'Denuncias infundadas',
+    })
+    expect(resultado).toEqual(decision)
   })
 })

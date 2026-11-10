@@ -6,7 +6,7 @@ import { createQueryWrapper } from '@/test/query-wrapper'
 import * as moderationService from '@/services/moderation.service'
 import * as adsService from '@/services/ads.service'
 import ModerationPage from '@/pages/moderation/ModerationPage'
-import type { ReportFlagDTO } from '@/types/moderation.types'
+import type { ReportedAccountDTO, ReportFlagDTO } from '@/types/moderation.types'
 
 vi.mock('@/services/moderation.service')
 vi.mock('@/services/ads.service')
@@ -20,6 +20,18 @@ function flag(overrides: Partial<ReportFlagDTO> = {}): ReportFlagDTO {
     status: 'pending',
     createdAt: '2026-09-01T10:00:00.000Z',
     report: { id: 10, title: 'Perrito en Plaza de Mayo', status: 'published' },
+    ...overrides,
+  }
+}
+
+function cuenta(overrides: Partial<ReportedAccountDTO> = {}): ReportedAccountDTO {
+  return {
+    reportedUser: { id: 42, fullName: 'Juan Pérez' },
+    reportCount: 2,
+    severityCounts: { mild: 1, moderate: 0, severe: 1 },
+    thresholdReached: false,
+    resultingSeverity: null,
+    lastReportedAt: '2026-11-01T10:00:00.000Z',
     ...overrides,
   }
 }
@@ -39,6 +51,7 @@ describe('ModerationPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(adsService.listAdFlags).mockResolvedValue([])
+    vi.mocked(moderationService.listReportedAccounts).mockResolvedValue([])
   })
 
   it('lista los flags pendientes de la cola', async () => {
@@ -132,5 +145,46 @@ describe('ModerationPage', () => {
     expect(
       await screen.findByText('Este reporte de moderación ya fue revisado')
     ).toBeInTheDocument()
+  })
+
+  describe('cuentas denunciadas', () => {
+    beforeEach(() => {
+      vi.mocked(moderationService.listReportFlags).mockResolvedValue([])
+    })
+
+    it('muestra cada cuenta con sus denuncias por gravedad', async () => {
+      vi.mocked(moderationService.listReportedAccounts).mockResolvedValue([cuenta()])
+
+      renderPage()
+
+      const item = (await screen.findByText('Juan Pérez')).closest('li')!
+      expect(item).toHaveTextContent('2 de 5 denuncias')
+      expect(item).toHaveTextContent('Leve: 1')
+      expect(item).toHaveTextContent('Media: 0')
+      expect(item).toHaveTextContent('Fuerte: 1')
+    })
+
+    it('al llegar al umbral muestra la gravedad resultante', async () => {
+      vi.mocked(moderationService.listReportedAccounts).mockResolvedValue([
+        cuenta({
+          reportedUser: { id: 43, fullName: null },
+          reportCount: 5,
+          severityCounts: { mild: 1, moderate: 2, severe: 2 },
+          thresholdReached: true,
+          resultingSeverity: 'severe',
+        }),
+      ])
+
+      renderPage()
+
+      const item = (await screen.findByText('Usuario #43')).closest('li')!
+      expect(item).toHaveTextContent('Gravedad resultante: Fuerte')
+    })
+
+    it('avisa cuando no hay cuentas denunciadas', async () => {
+      renderPage()
+
+      expect(await screen.findByText('No hay cuentas denunciadas')).toBeInTheDocument()
+    })
   })
 })

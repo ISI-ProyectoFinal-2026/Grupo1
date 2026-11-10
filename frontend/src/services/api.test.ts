@@ -25,7 +25,8 @@ vi.mock('axios', () => ({
   },
 }))
 
-const { getApiErrorCode, getApiErrorDetails, getApiErrorStatus } = await import('@/services/api')
+const { getApiErrorCode, getApiErrorDetails, getApiErrorStatus, getApiErrorSuspension } =
+  await import('@/services/api')
 const { useAuthStore } = await import('@/stores/auth.store')
 
 const aplicarRequest = capturado.request[0]
@@ -214,6 +215,50 @@ describe('errores del segundo factor', () => {
     expect(locationFalsa.href).toBe('/account/security')
     expect(getApiErrorCode(rechazado)).toBe(code)
     expect(getApiErrorStatus(rechazado)).toBe(status)
+  })
+})
+
+describe('cuenta suspendida', () => {
+  let locationFalsa: { pathname: string; href: string }
+  const details = { type: 'temporary', severity: 'moderate', endsAt: '2026-12-01T00:00:00.000Z', warning: true }
+  const cuerpo = { error: { message: 'Tu cuenta fue suspendida', code: 'ACCOUNT_SUSPENDED', details } }
+
+  beforeEach(() => {
+    locationFalsa = { pathname: '/reports/5', href: '/reports/5' }
+    Object.defineProperty(window, 'location', {
+      value: locationFalsa,
+      writable: true,
+      configurable: true,
+    })
+  })
+
+  afterEach(() => {
+    useAuthStore.getState().logout()
+  })
+
+  it('cierra la sesion y manda al login ante un 403 ACCOUNT_SUSPENDED', async () => {
+    useAuthStore.getState().setAuth('jwt-vigente', usuario)
+
+    const rechazado = await alFallar(errorAxios(403, cuerpo)).catch((e: unknown) => e)
+
+    expect(useAuthStore.getState().token).toBeNull()
+    expect(locationFalsa.href).toBe('/login')
+    expect(getApiErrorSuspension(rechazado)).toEqual(details)
+  })
+
+  // En el login el usuario debe ver el aviso: no hay navegacion que lo pierda.
+  it('no redirige si vino del propio login, pero expone la suspension', async () => {
+    locationFalsa.pathname = '/login'
+
+    const rechazado = await alFallar(errorAxios(403, cuerpo)).catch((e: unknown) => e)
+
+    expect(locationFalsa.href).toBe('/reports/5')
+    expect(getApiErrorSuspension(rechazado)).toEqual(details)
+  })
+
+  it('otros errores no traen suspension', () => {
+    expect(getApiErrorSuspension(new Error('x'))).toBeUndefined()
+    expect(getApiErrorSuspension(null)).toBeUndefined()
   })
 })
 
