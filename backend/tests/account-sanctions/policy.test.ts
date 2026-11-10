@@ -1,4 +1,12 @@
-import { addCalendarMonthUtc, addDays, decideSanction, resolveSeverity } from "../../src/services/account-sanctions/policy";
+import {
+  addCalendarMonthUtc,
+  addDays,
+  canDecide,
+  decideSanction,
+  isRecidivism,
+  planConfirmation,
+  resolveSeverity,
+} from "../../src/services/account-sanctions/policy";
 
 const NOW = new Date("2026-03-10T12:00:00.000Z");
 
@@ -40,7 +48,7 @@ describe("decideSanction", () => {
     });
   });
 
-  test("moderada: un mes calendario con aviso de baja permanente", () => {
+  test("moderada: un mes calendario con aviso de eliminación de la cuenta", () => {
     expect(decideSanction({ ...regular, severity: "moderate" })).toEqual({
       kind: "temporary",
       status: "active",
@@ -58,14 +66,17 @@ describe("decideSanction", () => {
     });
   });
 
-  test.each(["mild", "moderate", "severe"] as const)("reincidencia (%s) con moderada previa: permanente", (severity) => {
-    expect(decideSanction({ ...regular, severity, priorModerate: true })).toEqual({
-      kind: "permanent",
-      status: "active",
-      warning: false,
-      endsAt: null,
-    });
-  });
+  test.each(["mild", "moderate", "severe"] as const)(
+    "reincidencia (%s) con moderada previa: suspensión provisional a revisión, nunca permanente",
+    (severity) => {
+      expect(decideSanction({ ...regular, severity, priorModerate: true })).toEqual({
+        kind: "provisional",
+        status: "active",
+        warning: false,
+        endsAt: null,
+      });
+    }
+  );
 
   test.each(["moderador", "admin"] as const)("%s no se suspende: queda pendiente de revisión", (role) => {
     expect(decideSanction({ ...regular, role, severity: "moderate" })).toEqual({
@@ -76,8 +87,73 @@ describe("decideSanction", () => {
     });
     expect(decideSanction({ ...regular, role, severity: "severe" }).status).toBe("pending_review");
     expect(decideSanction({ ...regular, role, severity: "mild", priorModerate: true })).toMatchObject({
-      kind: "permanent",
+      kind: "provisional",
       status: "pending_review",
     });
+  });
+});
+
+describe("planConfirmation", () => {
+  const pending = { status: "pending_review", severity: "moderate", kind: "temporary" } as const;
+  const sanctionWith = (decision: object) => ({ action: "sanction", decision });
+
+  test("moderada de staff en revisión: pasa a activa con +1 mes y advertencia", () => {
+    expect(planConfirmation(pending, NOW)).toEqual(
+      sanctionWith({ kind: "temporary", status: "active", warning: true, endsAt: new Date("2026-04-10T12:00:00.000Z") })
+    );
+  });
+
+  test("leve de staff en revisión: +14 días sin advertencia", () => {
+    expect(planConfirmation({ ...pending, severity: "mild" }, NOW)).toEqual(
+      sanctionWith({ kind: "temporary", status: "active", warning: false, endsAt: new Date("2026-03-24T12:00:00.000Z") })
+    );
+  });
+
+  test.each(["severe", "mild"] as const)("provisional (%s) de staff en revisión: pasa a provisional activa", (severity) => {
+    expect(planConfirmation({ ...pending, severity, kind: "provisional" }, NOW)).toEqual(
+      sanctionWith({ kind: "provisional", status: "active", warning: false, endsAt: null })
+    );
+  });
+
+  test.each(["severe", "moderate", "mild"] as const)("provisional activa (%s): elimina la cuenta", (severity) => {
+    expect(planConfirmation({ status: "active", severity, kind: "provisional" }, NOW)).toEqual({ action: "delete_account" });
+  });
+});
+
+describe("isRecidivism", () => {
+  test.each([
+    ["provisional", "mild", true],
+    ["provisional", "moderate", true],
+    ["provisional", "severe", false],
+    ["temporary", "moderate", false],
+  ] as const)("%s %s -> %s", (kind, severity, expected) => {
+    expect(isRecidivism({ kind, severity })).toBe(expected);
+  });
+});
+
+describe("canDecide", () => {
+  const recidivism = { status: "active", kind: "provisional", severity: "moderate" } as const;
+  const severe = { status: "active", kind: "provisional", severity: "severe" } as const;
+  const staffPending = { status: "pending_review", kind: "provisional", severity: "mild" } as const;
+
+  test("el admin decide cualquier caso", () => {
+    for (const sanction of [recidivism, severe, staffPending]) {
+      expect(canDecide("admin", sanction, "usuario_regular")).toBe(true);
+    }
+  });
+
+  test("el moderador decide la reincidencia de un usuario regular", () => {
+    expect(canDecide("moderador", recidivism, "usuario_regular")).toBe(true);
+  });
+
+  test("el moderador no decide casos graves, de staff ni sobre cuentas de staff", () => {
+    expect(canDecide("moderador", severe, "usuario_regular")).toBe(false);
+    expect(canDecide("moderador", staffPending, "moderador")).toBe(false);
+    expect(canDecide("moderador", recidivism, "moderador")).toBe(false);
+    expect(canDecide("moderador", recidivism, "admin")).toBe(false);
+  });
+
+  test("un usuario regular no decide nada", () => {
+    expect(canDecide("usuario_regular", recidivism, "usuario_regular")).toBe(false);
   });
 });
