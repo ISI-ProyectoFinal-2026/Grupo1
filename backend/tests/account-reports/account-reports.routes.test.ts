@@ -45,6 +45,17 @@ describe("POST/GET /api/account-reports (#267)", () => {
     expect(res.status).toBe(401);
   });
 
+  test("responde 403 EMAIL_NOT_VERIFIED si el denunciante no verificó su email", async () => {
+    const { user, token } = await createTestUser({ prefix: "account-reports-unverified", verified: false });
+    userIds.push(user.id);
+
+    const res = await report({ token }, { reportedUserId: reported.id, severity: "mild" });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe("EMAIL_NOT_VERIFIED");
+    expect(await prisma.accountReport.count({ where: { reportedUserId: reported.id } })).toBe(0);
+  });
+
   test("crea la denuncia con su gravedad y responde 201", async () => {
     const res = await report(reporters[0], { reportedUserId: reported.id, severity: "moderate" });
 
