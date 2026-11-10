@@ -152,11 +152,11 @@ describe("E2E: enforcement y aviso de suspensión", () => {
     expect(JSON.stringify(message)).not.toMatch(/reporter|denunciante/i);
   });
 
-  test("el mail de gravedad media advierte que la próxima suspensión será permanente", async () => {
+  test("el mail de gravedad media advierte que nuevas denuncias pueden eliminar la cuenta", async () => {
     const target = await ctx.registerAndLogin("mail-moderate");
     await suspendViaReports(target, ["moderate", "moderate", "moderate", "moderate", "moderate"]);
 
-    expect(suspensionMails()[0].text).toContain("permanente");
+    expect(suspensionMails()[0].text).toContain("eliminada de forma definitiva");
   });
 
   test("si el mail falla, la sanción igual queda y la denuncia responde 201", async () => {

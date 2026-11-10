@@ -25,8 +25,8 @@ describe("E2E: cola admin de sanciones", () => {
       expect(res.status).toBe(201);
     }
   };
-  const queueItemOf = async (userId: number) => {
-    const res = await request(app).get(QUEUE).set(auth(admin));
+  const queueItemOf = async (userId: number, viewer: E2EUser = admin) => {
+    const res = await request(app).get(QUEUE).set(auth(viewer));
     expect(res.status).toBe(200);
     return (res.body.items as { account: { id: number } }[]).find((i) => i.account.id === userId);
   };
@@ -60,7 +60,7 @@ describe("E2E: cola admin de sanciones", () => {
 
     expect(item).toBeDefined();
     expect(Object.keys(item!).sort()).toEqual(
-      ["account", "id", "kind", "reportDates", "role", "severity", "severityCounts", "status"]
+      ["account", "id", "kind", "recidivism", "reportDates", "role", "severity", "severityCounts", "status"]
     );
     expect(item).toMatchObject({
       account: { id: target.id },
@@ -68,6 +68,7 @@ describe("E2E: cola admin de sanciones", () => {
       kind: "provisional",
       status: "active",
       severity: "severe",
+      recidivism: false,
       severityCounts: { mild: 2, moderate: 0, severe: 3 },
     });
     expect(item).toHaveProperty("reportDates");
@@ -100,11 +101,34 @@ describe("E2E: cola admin de sanciones", () => {
     expect(await queueItemOf(target.id)).toBeUndefined();
   });
 
-  test("un moderador recibe 403 y sin token 401", async () => {
+  test("un moderador ve solo los casos de reincidencia de usuarios regulares", async () => {
     const moderator = await ctx.registerAndLogin("moderator");
     await promoteTo(moderator.id, "moderador");
+    const recidivist = await ctx.registerAndLogin("recidivist");
+    await fileReports(recidivist, ["moderate", "moderate", "moderate", "moderate", "moderate"]);
+    jest.spyOn(sanctionClock, "now").mockReturnValue(new Date("2026-04-11T00:00:00.000Z"));
+    await fileReports(recidivist, ["mild", "mild", "mild", "mild", "mild"]);
+    const severe = await ctx.registerAndLogin("severe-hidden");
+    await fileReports(severe, ["severe", "severe", "severe", "severe", "severe"]);
+    const staff = await ctx.registerAndLogin("staff-hidden");
+    await promoteTo(staff.id, "moderador");
+    await fileReports(staff, ["mild", "mild", "mild", "mild", "mild"]);
 
-    expect((await request(app).get(QUEUE).set(auth(moderator))).status).toBe(403);
+    expect(await queueItemOf(recidivist.id, moderator)).toMatchObject({
+      kind: "provisional",
+      status: "active",
+      severity: "mild",
+      recidivism: true,
+    });
+    expect(await queueItemOf(severe.id, moderator)).toBeUndefined();
+    expect(await queueItemOf(staff.id, moderator)).toBeUndefined();
+    expect(await queueItemOf(severe.id)).toBeDefined();
+  });
+
+  test("un usuario regular recibe 403 y sin token 401", async () => {
+    const regular = await ctx.registerAndLogin("regular");
+
+    expect((await request(app).get(QUEUE).set(auth(regular))).status).toBe(403);
     expect((await request(app).get(QUEUE)).status).toBe(401);
   });
 });

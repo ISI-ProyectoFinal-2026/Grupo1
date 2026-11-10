@@ -32,7 +32,8 @@ export interface RoleAuditEntry {
   createdAt: string
   previousRole: Role
   newRole: Role
-  actor: AuditPerson
+  // null: la cuenta del admin que hizo el cambio fue eliminada
+  actor: AuditPerson | null
   target: AuditPerson
 }
 

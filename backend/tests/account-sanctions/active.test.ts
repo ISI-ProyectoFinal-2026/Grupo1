@@ -86,17 +86,15 @@ describe("toSuspendedError", () => {
     });
   });
 
-  test("moderada: incluye la advertencia de posible baja permanente", () => {
+  test("moderada: incluye la advertencia de posible eliminación de la cuenta", () => {
     const error = toSuspendedError(sanction({ severity: "moderate", warning: true, reason: SANCTION_REASONS.moderate }));
     expect(error.details).toMatchObject({ type: "temporary", severity: "moderate", warning: true });
     expect(error.message).toBe(SANCTION_REASONS.moderate);
   });
 
-  test("permanente y provisoria: endsAt null", () => {
-    const permanent = toSuspendedError(sanction({ kind: "permanent", endsAt: null }));
+  test("provisoria: endsAt null", () => {
     const provisional = toSuspendedError(sanction({ kind: "provisional", severity: "severe", endsAt: null }));
 
-    expect(permanent.details).toMatchObject({ type: "permanent", endsAt: null });
     expect(provisional.details).toMatchObject({ type: "provisional", severity: "severe", endsAt: null });
   });
 

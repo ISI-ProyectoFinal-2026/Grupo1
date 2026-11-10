@@ -21,4 +21,6 @@ httpServer.listen(PORT, () => {
   // caído cuando se creó el reporte (o porque este proceso se reinició con la
   // llamada en vuelo). Ver matching.service.reconcilePendingReports.
   startPendingReportsReconciliation();
+  // Registra el vencimiento de las suspensiones temporales cumplidas (#38).
+  startSanctionExpirySweep();
 });
