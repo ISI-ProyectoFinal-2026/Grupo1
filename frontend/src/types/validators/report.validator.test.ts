@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createReportSchema, reportLocationSchema } from '@/types/validators/report.validator'
+import {
+  MAX_REPORT_EXTRA_PHOTOS,
+  createReportSchema,
+  reportLocationSchema,
+} from '@/types/validators/report.validator'
 
 function formularioValido(overrides: Record<string, unknown> = {}) {
   return {
@@ -89,5 +93,28 @@ describe('reportLocationSchema', () => {
     ['longitud fuera de rango', { lat: 0, lng: 181 }],
   ])('rechaza %s', (_caso, coordenadas) => {
     expect(reportLocationSchema.safeParse(coordenadas).success).toBe(false)
+  })
+})
+
+// fotos extra: hasta 3 además de la principal
+describe('createReportSchema: fotos extra', () => {
+  const extra = (n: number) => `https://cdn/extra-${n}.jpg`
+
+  it('permite hasta 3 fotos extra', () => {
+    expect(MAX_REPORT_EXTRA_PHOTOS).toBe(3)
+    const urls = [extra(1), extra(2), extra(3)]
+    expect(createReportSchema.parse(formularioValido({ extraImageUrls: urls })).extraImageUrls).toEqual(urls)
+  })
+
+  it('son opcionales', () => {
+    expect(createReportSchema.safeParse(formularioValido()).success).toBe(true)
+  })
+
+  it('rechaza mas de 3 fotos extra con un mensaje claro', () => {
+    const resultado = createReportSchema.safeParse(
+      formularioValido({ extraImageUrls: [extra(1), extra(2), extra(3), extra(4)] })
+    )
+    expect(resultado.success).toBe(false)
+    expect(resultado.error?.issues[0].message).toBe('Podés subir hasta 4 fotos')
   })
 })
