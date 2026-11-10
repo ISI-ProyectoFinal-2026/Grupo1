@@ -59,6 +59,10 @@ model User {
   chatsAsUserA  Chat[]          @relation("ChatUserA")
   chatsAsUserB  Chat[]          @relation("ChatUserB")
   reportFlags   ReportFlag[]
+  accountReportsMade     AccountReport[] @relation("AccountReportReporter")
+  accountReportsReceived AccountReport[] @relation("AccountReportReported")
+  accountSanctions       AccountSanction[]      @relation("SanctionTarget")
+  accountSanctionEvents  AccountSanctionEvent[] @relation("SanctionActor")
   adFlags       AdFlag[]
   business      Business?
   businessEvents BusinessEvent[]
@@ -220,6 +224,100 @@ model ReportEmbedding {
   report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@map("report_embeddings")
+}
+
+// denuncia de una cuenta con gravedad (#267); a las 5 se calcula la sanción (#38)
+enum AccountReportSeverity {
+  mild
+  moderate
+  severe
+
+  @@map("account_report_severity")
+}
+
+model AccountReport {
+  id             Int                   @id @default(autoincrement())
+  reportedUserId Int                   @map("reported_user_id")
+  reporterId     Int                   @map("reporter_id")
+  severity       AccountReportSeverity
+  sanctionId     Int?                  @map("sanction_id")
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  reportedUser User             @relation("AccountReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  reporter     User             @relation("AccountReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  sanction     AccountSanction? @relation(fields: [sanctionId], references: [id], onDelete: Restrict)
+
+  // una denuncia por persona y ciclo: índice único parcial (sanction_id IS NULL) en SQL crudo
+  @@index([reportedUserId, sanctionId])
+  @@map("account_reports")
+}
+
+enum AccountSanctionKind {
+  temporary
+  provisional
+  permanent
+
+  @@map("account_sanction_kind")
+}
+
+enum AccountSanctionStatus {
+  active
+  pending_review
+  expired
+  reverted
+  dismissed
+
+  @@map("account_sanction_status")
+}
+
+enum AccountSanctionEventType {
+  created
+  confirmed
+  reverted
+  dismissed
+  expired
+
+  @@map("account_sanction_event_type")
+}
+
+// sanción de cuenta (#38); única fuente de verdad del estado de suspensión
+model AccountSanction {
+  id                  Int                   @id @default(autoincrement())
+  userId              Int                   @map("user_id")
+  severity            AccountReportSeverity
+  kind                AccountSanctionKind
+  status              AccountSanctionStatus
+  warning             Boolean               @default(false)
+  reason              String
+  triggeringReportIds Int[]                 @map("triggering_report_ids")
+  startsAt            DateTime              @map("starts_at")
+  endsAt              DateTime?             @map("ends_at")
+  createdAt           DateTime              @default(now()) @map("created_at")
+
+  user    User                   @relation("SanctionTarget", fields: [userId], references: [id], onDelete: Restrict)
+  reports AccountReport[]
+  events  AccountSanctionEvent[]
+
+  // índice único parcial "una sanción abierta por usuario" en SQL crudo
+  @@index([userId, status])
+  @@index([status, endsAt])
+  @@map("account_sanctions")
+}
+
+// historial append-only; actorId null = sistema
+model AccountSanctionEvent {
+  id         Int                      @id @default(autoincrement())
+  sanctionId Int                      @map("sanction_id")
+  actorId    Int?                     @map("actor_id")
+  type       AccountSanctionEventType
+  reason     String?
+  createdAt  DateTime                 @default(now()) @map("created_at")
+
+  sanction AccountSanction @relation(fields: [sanctionId], references: [id], onDelete: Restrict)
+  actor    User?           @relation("SanctionActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([sanctionId])
+  @@map("account_sanction_events")
 }
 
 enum MatchStatus {
