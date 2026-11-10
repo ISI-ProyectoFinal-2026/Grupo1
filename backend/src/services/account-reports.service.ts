@@ -1,31 +1,17 @@
-import { AccountReport, AccountReportSeverity, Prisma } from "@prisma/client";
+import { AccountReport, AccountReportSeverity, Prisma, Role } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { CreateAccountReportInput } from "../validators/account-reports.validator";
 import * as accountSanctionsService from "./account-sanctions.service";
+import { sanctionClock } from "./account-sanctions/clock";
+import { countBySeverity, resolveSeverity } from "./account-sanctions/policy";
 
 export const ACCOUNT_REPORT_THRESHOLD = 5;
 
-const SEVERITY_RANK: Record<AccountReportSeverity, number> = { mild: 1, moderate: 2, severe: 3 };
+export { resolveSeverity };
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
-}
-
-// la más frecuente; en empate, la más alta
-export function resolveSeverity(severities: AccountReportSeverity[]): AccountReportSeverity {
-  const counts = countBySeverity(severities);
-  return (Object.keys(SEVERITY_RANK) as AccountReportSeverity[]).reduce((best, current) =>
-    counts[current] > counts[best] || (counts[current] === counts[best] && SEVERITY_RANK[current] > SEVERITY_RANK[best])
-      ? current
-      : best
-  );
-}
-
-function countBySeverity(severities: AccountReportSeverity[]): Record<AccountReportSeverity, number> {
-  const counts: Record<AccountReportSeverity, number> = { mild: 0, moderate: 0, severe: 0 };
-  for (const severity of severities) counts[severity]++;
-  return counts;
 }
 
 export async function create(reporterId: number, data: CreateAccountReportInput): Promise<AccountReport> {
@@ -33,45 +19,47 @@ export async function create(reporterId: number, data: CreateAccountReportInput)
     throw new AppError(403, "No podés reportar tu propia cuenta");
   }
 
-  let report: AccountReport;
-  let thresholdSeverity: AccountReportSeverity | null = null;
   try {
-    ({ report, thresholdSeverity } = await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx) => {
       // lock de la cuenta: serializa denuncias simultáneas para que el umbral se dispare una sola vez
-      const locked = await tx.$queryRaw<{ id: number }[]>`
-        SELECT id FROM users WHERE id = ${data.reportedUserId} FOR UPDATE
+      const locked = await tx.$queryRaw<{ id: number; role: Role }[]>`
+        SELECT id, role FROM users WHERE id = ${data.reportedUserId} FOR UPDATE
       `;
       if (locked.length === 0) {
         throw new AppError(404, "Cuenta no encontrada");
+      }
+
+      const now = sanctionClock.now();
+      await accountSanctionsService.expireDue(tx, data.reportedUserId, now);
+      if (await accountSanctionsService.findOpenSanction(tx, data.reportedUserId)) {
+        throw new AppError(409, "La cuenta ya tiene una sanción en curso");
       }
 
       const created = await tx.accountReport.create({
         data: { reportedUserId: data.reportedUserId, reporterId, severity: data.severity },
       });
 
-      const all = await tx.accountReport.findMany({
-        where: { reportedUserId: data.reportedUserId },
-        select: { severity: true },
+      const open = await tx.accountReport.findMany({
+        where: { reportedUserId: data.reportedUserId, sanctionId: null },
+        select: { id: true, severity: true },
+        orderBy: { id: "asc" },
       });
-      const severity = all.length === ACCOUNT_REPORT_THRESHOLD ? resolveSeverity(all.map((r) => r.severity)) : null;
-      return { report: created, thresholdSeverity: severity };
-    }));
+      if (open.length >= ACCOUNT_REPORT_THRESHOLD) {
+        await accountSanctionsService.createFromThreshold(tx, {
+          userId: data.reportedUserId,
+          role: locked[0].role,
+          reports: open.slice(0, ACCOUNT_REPORT_THRESHOLD),
+          now,
+        });
+      }
+      return created;
+    });
   } catch (error) {
     if (isPrismaKnownError(error, "P2002")) {
       throw new AppError(409, "Ya reportaste esta cuenta");
     }
     throw error;
   }
-
-  if (thresholdSeverity !== null) {
-    try {
-      await accountSanctionsService.onAccountReportThreshold(data.reportedUserId, thresholdSeverity);
-    } catch (error) {
-      console.error(`[account-reports] no se pudo disparar la sanción de la cuenta ${data.reportedUserId}:`, error);
-    }
-  }
-
-  return report;
 }
 
 export interface ReportedAccountSummary {
@@ -83,9 +71,10 @@ export interface ReportedAccountSummary {
   lastReportedAt: Date;
 }
 
-// vista de moderación: una fila por cuenta, las más denunciadas primero
+// vista de moderación: denuncias del ciclo abierto, una fila por cuenta, las más denunciadas primero
 export async function list(): Promise<ReportedAccountSummary[]> {
   const reports = await prisma.accountReport.findMany({
+    where: { sanctionId: null },
     include: { reportedUser: { select: { id: true, fullName: true } } },
     orderBy: { createdAt: "asc" },
   });
