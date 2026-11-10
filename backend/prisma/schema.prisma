@@ -155,6 +155,8 @@ model Report {
   title           String
   description     String?
   imageUrl        String?      @map("image_url")
+  // fotos extra; imageUrl sigue siendo la principal (IA, flyer, mapa)
+  extraImageUrls  String[]     @default([]) @map("extra_image_urls")
   customFlyerUrl  String?      @map("custom_flyer_url")
   // PostGIS point (lat/long). Prisma no modela tipos geométricos de forma
   // nativa: se declara como Unsupported y se maneja con SQL crudo cuando haga

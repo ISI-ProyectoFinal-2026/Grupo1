@@ -129,6 +129,37 @@ describe("reports.service create() image screening", () => {
     });
   });
 
+  describe("create() extra photos", () => {
+    const extras = ["https://pub-test.r2.dev/pets/extra-1.jpg", "https://pub-test.r2.dev/pets/extra-2.jpg"];
+
+    test("screens every extra photo and persists them", async () => {
+      analyzeSpy.mockResolvedValue("animal");
+
+      await reportsService.create({ ...reportData, extraImageUrls: extras });
+
+      expect(analyzeSpy).toHaveBeenCalledWith(extras[0]);
+      expect(analyzeSpy).toHaveBeenCalledWith(extras[1]);
+      expect(reportCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ extraImageUrls: extras }) });
+    });
+
+    test("rejects with 422 when an extra photo has no animal, creating nothing", async () => {
+      analyzeSpy.mockImplementation(async (url: string) => (url === extras[1] ? "no_animal" : "animal"));
+
+      await expect(reportsService.create({ ...reportData, extraImageUrls: extras })).rejects.toMatchObject({
+        statusCode: 422,
+      });
+      expect(reportCreate).not.toHaveBeenCalled();
+    });
+
+    test("defaults to no extra photos", async () => {
+      analyzeSpy.mockResolvedValue("animal");
+
+      await reportsService.create(reportData);
+
+      expect(reportCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ extraImageUrls: [] }) });
+    });
+  });
+
   // Editing must not become a way around the screening: a report published with
   // a dog photo could otherwise swap it for an unrelated image (PR #195 review).
   describe("update() image screening", () => {
@@ -217,6 +248,101 @@ describe("reports.service create() image screening", () => {
       expect(analyzeSpy).not.toHaveBeenCalled();
       expect(reportUpdate).toHaveBeenCalledWith({ where: { id: 99 }, data: expect.not.objectContaining({ status: "pending" }) });
       expect(triggerSpy).not.toHaveBeenCalled();
+    });
+
+    // D4: cambiar las fotos extra re-modera igual que cambiar la principal
+    describe("extra photos", () => {
+      const currentExtra = "https://pub-test.r2.dev/pets/extra-1.jpg";
+      const newExtra = "https://pub-test.r2.dev/pets/extra-new.jpg";
+
+      beforeEach(() => {
+        jest.spyOn(prisma, "$queryRaw").mockResolvedValue([
+          {
+            id: 99,
+            userId: 7,
+            petId: null,
+            reportType: "lost",
+            status: "published",
+            title: "Perro perdido",
+            description: null,
+            imageUrl: reportData.imageUrl,
+            extraImageUrls: [currentExtra],
+            customFlyerUrl: null,
+            locationAddress: null,
+            lat: -34.6,
+            lng: -58.38,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            publishedAt: new Date(),
+          },
+        ] as never);
+      });
+
+      test("screens only the new extra photos and sends the report back to pending", async () => {
+        analyzeSpy.mockResolvedValue("animal");
+
+        await reportsService.update(99, 7, { extraImageUrls: [currentExtra, newExtra] });
+
+        expect(analyzeSpy).toHaveBeenCalledTimes(1);
+        expect(analyzeSpy).toHaveBeenCalledWith(newExtra);
+        expect(reportUpdate).toHaveBeenCalledWith({
+          where: { id: 99 },
+          data: expect.objectContaining({
+            extraImageUrls: [currentExtra, newExtra],
+            status: "pending",
+            publishedAt: null,
+          }),
+        });
+        expect(triggerSpy).toHaveBeenCalledWith(99, reportData.imageUrl);
+      });
+
+      test("removing an extra photo also sends the report back to pending", async () => {
+        await reportsService.update(99, 7, { extraImageUrls: [] });
+
+        expect(analyzeSpy).not.toHaveBeenCalled();
+        expect(reportUpdate).toHaveBeenCalledWith({
+          where: { id: 99 },
+          data: expect.objectContaining({ extraImageUrls: [], status: "pending", publishedAt: null }),
+        });
+        expect(triggerSpy).toHaveBeenCalledWith(99, reportData.imageUrl);
+      });
+
+      test("rejects with 422 when a new extra photo has no animal, updating nothing", async () => {
+        analyzeSpy.mockResolvedValue("no_animal");
+
+        await expect(reportsService.update(99, 7, { extraImageUrls: [newExtra] })).rejects.toMatchObject({
+          statusCode: 422,
+        });
+        expect(reportUpdate).not.toHaveBeenCalled();
+        expect(triggerSpy).not.toHaveBeenCalled();
+      });
+
+      test("keeps the status when the extra photos are unchanged", async () => {
+        await reportsService.update(99, 7, { title: "Nuevo", extraImageUrls: [currentExtra] });
+
+        expect(analyzeSpy).not.toHaveBeenCalled();
+        expect(reportUpdate).toHaveBeenCalledWith({ where: { id: 99 }, data: expect.not.objectContaining({ status: "pending" }) });
+        expect(triggerSpy).not.toHaveBeenCalled();
+      });
+
+      test("only reordering the extra photos keeps the status", async () => {
+        jest.spyOn(prisma, "$queryRaw").mockResolvedValue([
+          { ...(await reportsService.getById(99)), extraImageUrls: [currentExtra, newExtra], lat: -34.6, lng: -58.38 },
+        ] as never);
+
+        await reportsService.update(99, 7, { extraImageUrls: [newExtra, currentExtra] });
+
+        expect(analyzeSpy).not.toHaveBeenCalled();
+        expect(reportUpdate).toHaveBeenCalledWith({ where: { id: 99 }, data: expect.not.objectContaining({ status: "pending" }) });
+        expect(triggerSpy).not.toHaveBeenCalled();
+      });
+
+      test("rejects with 409 changing extra photos of a resolved report", async () => {
+        await expect(
+          reportsService.update(99, 7, { extraImageUrls: [newExtra], status: "resolved" })
+        ).rejects.toMatchObject({ statusCode: 409 });
+        expect(reportUpdate).not.toHaveBeenCalled();
+      });
     });
   });
 });

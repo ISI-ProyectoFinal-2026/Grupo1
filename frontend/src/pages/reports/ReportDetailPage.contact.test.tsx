@@ -35,6 +35,7 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: 'Perro perdido en el parque',
     description: null,
     imageUrl: null,
+    extraImageUrls: [],
     customFlyerUrl: null,
     showPhoneOnFlyer: false,
     eventDate: null,

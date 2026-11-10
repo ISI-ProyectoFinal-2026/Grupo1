@@ -47,6 +47,7 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: 'Perra perdida en Caballito',
     description: null,
     imageUrl: null,
+    extraImageUrls: [],
     customFlyerUrl: null,
     showPhoneOnFlyer: false,
     eventDate: null,
@@ -108,6 +109,20 @@ describe('ReportDetailPage estado', () => {
     renderPage()
 
     expect(await screen.findByText('Suceso: 1 de septiembre de 2026')).toBeInTheDocument()
+  })
+
+  it('muestra la galeria cuando el reporte tiene fotos extra', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(
+      reporte({ imageUrl: 'https://cdn/principal.jpg', extraImageUrls: ['https://cdn/extra-1.jpg'] })
+    )
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Ver foto 2 de 2' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('img', { name: 'Perra perdida en Caballito' })).toHaveAttribute(
+      'src',
+      'https://cdn/principal.jpg'
+    )
   })
 
   it('muestra el distintivo del tipo de reporte (#257)', async () => {

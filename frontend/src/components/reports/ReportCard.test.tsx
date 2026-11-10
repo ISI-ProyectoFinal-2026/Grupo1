@@ -14,6 +14,7 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: 'Perro perdido en Nueva Córdoba',
     description: 'Collar rojo, responde a Pepe',
     imageUrl: 'https://cdn/pepe.jpg',
+    extraImageUrls: [],
     customFlyerUrl: null,
     showPhoneOnFlyer: false,
     eventDate: null,

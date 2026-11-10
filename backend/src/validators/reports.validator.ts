@@ -30,7 +30,10 @@ const eventDateSchema = z
   .refine((value) => value <= todayInArgentina(), "La fecha del suceso no puede ser futura")
   .transform((value) => new Date(`${value}T00:00:00.000Z`));
 
-export const createReportSchema = z.object({
+// fotos extra además de la principal (4 en total)
+export const MAX_REPORT_EXTRA_PHOTOS = 3;
+
+const reportBaseSchema = z.object({
   petId: z.number().int().positive().optional(),
   reportType: z.enum([ReportType.lost, ReportType.found]),
   title: z.string().min(1),
@@ -41,7 +44,23 @@ export const createReportSchema = z.object({
   // teléfono del autor en el flyer público (#259)
   showPhoneOnFlyer: z.boolean().optional(),
   eventDate: eventDateSchema.optional(),
+  extraImageUrls: z
+    .array(r2ImageUrlSchema)
+    .max(MAX_REPORT_EXTRA_PHOTOS, `Podés subir hasta ${MAX_REPORT_EXTRA_PHOTOS} fotos extra`)
+    .optional(),
 });
+
+// la principal no se repite entre las extra
+function rejectDuplicatedMainPhoto(
+  data: { imageUrl?: string; extraImageUrls?: string[] },
+  ctx: z.RefinementCtx
+): void {
+  if (data.imageUrl && data.extraImageUrls?.includes(data.imageUrl)) {
+    ctx.addIssue({ code: "custom", path: ["extraImageUrls"], message: "La foto principal no puede repetirse" });
+  }
+}
+
+export const createReportSchema = reportBaseSchema.superRefine(rejectDuplicatedMainPhoto);
 
 /**
  * `status` acepta únicamente `resolved`.
@@ -53,9 +72,10 @@ export const createReportSchema = z.object({
  * Cerrar el reporte sí es una acción legítima del autor, así que `resolved`
  * queda habilitado.
  */
-export const updateReportSchema = createReportSchema
+export const updateReportSchema = reportBaseSchema
   .extend({ status: z.literal(ReportStatus.resolved).optional() })
-  .partial();
+  .partial()
+  .superRefine(rejectDuplicatedMainPhoto);
 
 export const reportIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
