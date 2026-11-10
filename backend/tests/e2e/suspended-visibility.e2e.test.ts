@@ -36,7 +36,7 @@ describe("E2E: contenido de cuentas suspendidas oculto", () => {
       data: {
         userId: author.id,
         severity: "mild",
-        kind: endsAt ? "temporary" : "permanent",
+        kind: endsAt ? "temporary" : "provisional",
         status,
         reason: "motivo",
         triggeringReportIds: [],
@@ -259,7 +259,7 @@ describe("E2E: contenido de cuentas suspendidas oculto", () => {
     });
   });
 
-  test("revertida, descartada o en revisión de staff no oculta; la permanente sí", async () => {
+  test("revertida, descartada o en revisión de staff no oculta; la provisional sí", async () => {
     const visible = async () => {
       const res = await request(app).get(`/api/reports/${authorReportId}`).set(auth(viewer));
       return res.status === 200;

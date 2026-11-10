@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import * as adminSanctionsService from "../services/admin-sanctions.service";
 import { sanctionDecisionSchema, sanctionIdParamSchema } from "../validators/admin-sanctions.validator";
 
-export async function listPending(_req: Request, res: Response): Promise<void> {
-  res.status(200).json(await adminSanctionsService.listPending());
+export async function listPending(req: Request, res: Response): Promise<void> {
+  res.status(200).json(await adminSanctionsService.listPending(req.authUser!.role));
 }
 
 export async function confirm(req: Request, res: Response): Promise<void> {

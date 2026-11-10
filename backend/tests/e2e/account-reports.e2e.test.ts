@@ -121,7 +121,7 @@ describe("E2E: denuncias por ciclo y sanción", () => {
     expect(await sanctionsOf(target)).toHaveLength(1);
   });
 
-  test("reincidencia: con una moderada previa el nuevo umbral es permanente", async () => {
+  test("reincidencia: con una moderada previa el nuevo umbral es una suspensión provisional a revisión", async () => {
     const target = await newTarget("recidivist");
     await reportWith(target, ["moderate", "moderate", "moderate", "moderate", "moderate"]);
     jest.spyOn(sanctionClock, "now").mockReturnValue(new Date("2026-04-11T00:00:00.000Z"));
@@ -131,7 +131,7 @@ describe("E2E: denuncias por ciclo y sanción", () => {
     const sanctions = await sanctionsOf(target);
     expect(sanctions.map((s) => [s.status, s.kind])).toEqual([
       ["expired", "temporary"],
-      ["active", "permanent"],
+      ["active", "provisional"],
     ]);
     expect(sanctions[1].endsAt).toBeNull();
   });

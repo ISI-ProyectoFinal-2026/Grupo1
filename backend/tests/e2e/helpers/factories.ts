@@ -86,7 +86,7 @@ export async function cleanupE2EData(userIds: number[], extraReportIds: number[]
   await prisma.roleChangeAudit.deleteMany({
     where: { OR: [{ actorId: { in: userIds } }, { targetId: { in: userIds } }] },
   });
-  // eventos -> denuncias -> sanciones antes que los usuarios (FKs RESTRICT)
+  // eventos -> denuncias -> sanciones antes que los usuarios
   await prisma.accountSanctionEvent.deleteMany({
     where: { OR: [{ actorId: { in: userIds } }, { sanction: { userId: { in: userIds } } }] },
   });
