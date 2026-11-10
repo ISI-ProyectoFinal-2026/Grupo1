@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPetSchema } from '@/types/validators/pet.validator'
+import { MAX_PET_PHOTOS, createPetSchema } from '@/types/validators/pet.validator'
 
 function mascotaValida(overrides: Record<string, unknown> = {}) {
   return {
@@ -50,6 +50,16 @@ describe('createPetSchema', () => {
 
   it('exige al menos una foto', () => {
     expect(mensajeDe(mascotaValida({ photoUrls: [] }), 'photoUrls')).toBe('Subí al menos una foto')
+  })
+
+  it('acepta hasta 4 fotos y rechaza la quinta', () => {
+    const fotos = (n: number) => Array.from({ length: n }, (_, i) => `https://pub.r2.dev/pets/${i}.jpg`)
+
+    expect(MAX_PET_PHOTOS).toBe(4)
+    expect(createPetSchema.safeParse(mascotaValida({ photoUrls: fotos(4) })).success).toBe(true)
+    expect(mensajeDe(mascotaValida({ photoUrls: fotos(5) }), 'photoUrls')).toBe(
+      'Podés subir hasta 4 fotos'
+    )
   })
 
   it('recorta los textos', () => {

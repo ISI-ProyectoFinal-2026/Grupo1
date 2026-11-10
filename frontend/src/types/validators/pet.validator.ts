@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+// espejo de MAX_PET_PHOTOS del backend
+export const MAX_PET_PHOTOS = 4
+
 const requiredText = (message: string) => z.string({ error: message }).trim().min(1, message)
 
 // "" se omite: el backend declara estos campos min(1).optional()
@@ -21,7 +24,10 @@ export const createPetSchema = z.object({
     .min(0, 'La edad no puede ser negativa'),
   color: requiredText('Ingresá el color'),
   description: requiredText('Ingresá una descripción'),
-  photoUrls: z.array(z.string().url()).min(1, 'Subí al menos una foto'),
+  photoUrls: z
+    .array(z.string().url())
+    .min(1, 'Subí al menos una foto')
+    .max(MAX_PET_PHOTOS, `Podés subir hasta ${MAX_PET_PHOTOS} fotos`),
   microchipId: optionalText,
 })
 

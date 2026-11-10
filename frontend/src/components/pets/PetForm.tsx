@@ -1,13 +1,13 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { ZodError } from 'zod'
 import ActionErrorMessage from '@/components/auth/ActionErrorMessage'
-import ImageUploader from '@/components/reports/ImageUploader'
+import MultiImageUploader from '@/components/common/MultiImageUploader'
 import Button from '@/components/ui/Button'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import Input from '@/components/ui/Input'
 import { getApiErrorCode } from '@/services/api'
 import type { CreatePetInput } from '@/types/pet.types'
-import { createPetSchema } from '@/types/validators/pet.validator'
+import { MAX_PET_PHOTOS, createPetSchema } from '@/types/validators/pet.validator'
 
 interface PetFormProps {
   initialValues?: Partial<CreatePetInput>
@@ -36,10 +36,6 @@ export default function PetForm({ initialValues, submitLabel, onSubmit }: PetFor
   })
   const [photoUrls, setPhotoUrls] = useState<string[]>(initialValues?.photoUrls ?? [])
   const [isPhotoUploading, setIsPhotoUploading] = useState(false)
-  // foto sin animales: no se agrega (#254)
-  const [photoRejection, setPhotoRejection] = useState<string | null>(null)
-  // foto borrosa: solo aviso (#212)
-  const [photoQualityWarning, setPhotoQualityWarning] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string | null>(null)
@@ -57,20 +53,9 @@ export default function PetForm({ initialValues, submitLabel, onSubmit }: PetFor
     clearFieldError(name)
   }
 
-  const handlePhotoUploaded = (
-    publicUrl: string,
-    rejection: string | null,
-    qualityWarning: string | null
-  ) => {
-    setPhotoRejection(rejection)
-    setPhotoQualityWarning(rejection ? null : qualityWarning)
-    if (rejection) return
-    setPhotoUrls((prev) => [...prev, publicUrl])
-    clearFieldError('photoUrls')
-  }
-
-  const removePhoto = (index: number) => {
-    setPhotoUrls((prev) => prev.filter((_, i) => i !== index))
+  const handlePhotosChange = (urls: string[]) => {
+    setPhotoUrls(urls)
+    if (urls.length > 0) clearFieldError('photoUrls')
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -171,43 +156,13 @@ export default function PetForm({ initialValues, submitLabel, onSubmit }: PetFor
 
       <fieldset className='flex flex-col gap-3'>
         <legend className='field-label mb-1.5'>Fotos *</legend>
-        {photoUrls.length > 0 && (
-          <ul className='flex flex-wrap gap-3'>
-            {photoUrls.map((url, index) => (
-              <li key={`${url}-${index}`} className='flex flex-col items-center gap-1'>
-                <img
-                  src={url}
-                  alt={`Foto ${index + 1}`}
-                  className='size-20 rounded-control border border-line object-cover'
-                />
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  aria-label={`Quitar foto ${index + 1}`}
-                  onClick={() => removePhoto(index)}
-                >
-                  Quitar
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <ImageUploader
-          onSuccess={handlePhotoUploaded}
-          // el uploader ya muestra su propio error
-          onError={() => undefined}
+        <MultiImageUploader
+          value={photoUrls}
+          onChange={handlePhotosChange}
+          max={MAX_PET_PHOTOS}
           onUploadingChange={setIsPhotoUploading}
           screenForAnimals
         />
-        {photoRejection && <ErrorMessage message={photoRejection} />}
-        {photoQualityWarning && (
-          <p
-            role='status'
-            className='animate-drop rounded-control border border-signal bg-signal/15 px-3 py-2.5 text-sm text-ink'
-          >
-            {photoQualityWarning}
-          </p>
-        )}
         {fieldErrors.photoUrls && <ErrorMessage message={fieldErrors.photoUrls} />}
       </fieldset>
 
