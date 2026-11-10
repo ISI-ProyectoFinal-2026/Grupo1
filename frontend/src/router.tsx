@@ -29,6 +29,7 @@ import MyPetsPage from "./pages/pets/MyPetsPage";
 import CreatePetPage from "./pages/pets/CreatePetPage";
 import EditPetPage from "./pages/pets/EditPetPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import SanctionQueuePage from "./pages/admin/SanctionQueuePage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -77,7 +78,11 @@ export const router = createBrowserRouter([
           // responderia 403.
           {
             element: <RequireRole roles={["moderador", "admin"]} />,
-            children: [{ path: "moderation", element: <ModerationPage /> }],
+            children: [
+              { path: "moderation", element: <ModerationPage /> },
+              // el moderador ve solo las reincidencias (filtra el backend)
+              { path: "admin/sanctions", element: <SanctionQueuePage /> },
+            ],
           },
           {
             element: <RequireRole roles={["admin"]} />,

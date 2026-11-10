@@ -1,6 +1,8 @@
 import { api } from './api'
 import type {
   AdminUser,
+  SanctionDecision,
+  SanctionQueueItem,
   AdminUsersQuery,
   Paginated,
   RoleAuditEntry,
@@ -26,5 +28,24 @@ export async function listRoleAudit(params: RoleAuditQuery): Promise<Paginated<R
 
 export async function changeUserRole(id: number, role: Role): Promise<AdminUser> {
   const { data } = await api.patch<AdminUser>(`/admin/users/${id}/role`, { role })
+  return data
+}
+
+export async function listPendingSanctions(): Promise<{ items: SanctionQueueItem[] }> {
+  const { data } = await api.get<{ items: SanctionQueueItem[] }>('/admin/account-sanctions/pending')
+  return data
+}
+
+export async function confirmSanction(id: number, reason: string): Promise<SanctionDecision> {
+  const { data } = await api.post<SanctionDecision>(`/admin/account-sanctions/${id}/confirm`, {
+    reason,
+  })
+  return data
+}
+
+export async function revertSanction(id: number, reason: string): Promise<SanctionDecision> {
+  const { data } = await api.post<SanctionDecision>(`/admin/account-sanctions/${id}/revert`, {
+    reason,
+  })
   return data
 }
