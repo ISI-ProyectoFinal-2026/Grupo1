@@ -15,6 +15,16 @@ export async function applySanctionEffects(sanction: AccountSanction): Promise<v
   }
 }
 
+// efectos posteriores a eliminar la cuenta: usa datos leídos antes del borrado; nunca lanza
+export async function applyAccountDeletionEffects(deleted: { userId: number; email: string }): Promise<void> {
+  try {
+    getChatIO()?.in(userRoom(deleted.userId)).disconnectSockets(true);
+    await mailService.sendAccountDeleted(deleted.email);
+  } catch (error) {
+    console.error(`[sanciones] no se pudo avisar la eliminación de la cuenta ${deleted.userId}:`, error);
+  }
+}
+
 // aviso posterior al commit de una suspensión revertida; nunca lanza
 export async function applyReinstatementEffects(sanction: AccountSanction): Promise<void> {
   try {

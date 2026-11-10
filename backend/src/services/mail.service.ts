@@ -178,6 +178,18 @@ export async function sendAccountSuspended(to: string, { kind, endsAt, warning }
   });
 }
 
+// aviso de baja definitiva; se envía con el email leído antes de eliminar la cuenta
+export async function sendAccountDeleted(to: string): Promise<void> {
+  const intro = "Revisamos las denuncias que recibió tu cuenta de PATITAS y decidimos eliminarla de forma definitiva.";
+  const detail = "Se borraron tu perfil, tus reportes, tus mascotas y tus conversaciones.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Tu cuenta de PATITAS fue eliminada",
+    text: `${intro} ${detail}`,
+    html: `<p>${intro} ${detail}</p>`,
+  });
+}
+
 // aviso de reactivación tras revertir una suspensión
 export async function sendAccountReinstated(to: string): Promise<void> {
   const intro = "Un administrador revisó el caso y tu cuenta de PATITAS fue reactivada.";

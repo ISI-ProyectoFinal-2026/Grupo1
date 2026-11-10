@@ -4,6 +4,7 @@ import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 import { sanctionClock } from "../../src/services/account-sanctions/clock";
 import { isAuthorSuspended } from "../../src/services/account-sanctions/visibility";
+import * as chatSocket from "../../src/sockets/chat.socket";
 import * as adminsModule from "../../src/services/account-sanctions/admins";
 import * as mailModule from "../../src/services/mail";
 import { createE2EContext, E2E_PASSWORD, E2EUser, promoteTo } from "./helpers/factories";
@@ -16,6 +17,7 @@ describe("E2E: decisiones del admin sobre sanciones", () => {
   const T0 = new Date("2026-03-10T12:00:00.000Z");
   const SUSPENDED_SUBJECT = "Tu cuenta de PATITAS fue suspendida";
   const REINSTATED_SUBJECT = "Tu cuenta de PATITAS fue reactivada";
+  const DELETED_SUBJECT = "Tu cuenta de PATITAS fue eliminada";
   const send = jest.fn();
 
   let reporters: E2EUser[];
@@ -42,6 +44,28 @@ describe("E2E: decisiones del admin sobre sanciones", () => {
     await promoteTo(staff.id, role);
     await fileReports(staff, severities);
     return { staff, sanction: await sanctionOf(staff.id) };
+  };
+  const recidivismCase = async (label: string) => {
+    const target = await ctx.registerAndLogin(label);
+    await fileReports(target, ["moderate", "moderate", "moderate", "moderate", "moderate"]);
+    jest.spyOn(sanctionClock, "now").mockReturnValue(new Date("2026-04-11T00:00:00.000Z"));
+    await fileReports(target, ["mild", "mild", "mild", "mild", "mild"]);
+    const sanction = await prisma.accountSanction.findFirstOrThrow({ where: { userId: target.id, status: "active" } });
+    return { target, sanction };
+  };
+  const newModerator = async (label: string) => {
+    const moderator = await ctx.registerAndLogin(label);
+    await promoteTo(moderator.id, "moderador");
+    return moderator;
+  };
+  const expectAccountDeleted = async (target: E2EUser, sanctionId: number) => {
+    expect(await prisma.user.count({ where: { id: target.id } })).toBe(0);
+    expect(await prisma.accountSanction.count({ where: { id: sanctionId } })).toBe(0);
+    expect(await prisma.accountReport.count({ where: { reportedUserId: target.id } })).toBe(0);
+    expect((await login(target.email)).status).toBe(401);
+    const mails = mailsWithSubject(DELETED_SUBJECT);
+    expect(mails).toHaveLength(1);
+    expect(mails[0].to).toBe(target.email);
   };
   const severeCase = async (label: string) => {
     const target = await ctx.registerAndLogin(label);
@@ -112,19 +136,57 @@ describe("E2E: decisiones del admin sobre sanciones", () => {
       });
     });
 
-    test("provisional confirmada: permanente, datos intactos y login rechazado como permanente", async () => {
-      const { target, sanction } = await severeCase("confirm-permanent");
+    test("reincidencia de un moderador en revisión: pasa a provisional activa, sin eliminar la cuenta", async () => {
+      const staff = await ctx.registerAndLogin("confirm-staff-recidivism");
+      await promoteTo(staff.id, "moderador");
+      const sanction = await prisma.accountSanction.create({
+        data: {
+          userId: staff.id,
+          severity: "mild",
+          kind: "provisional",
+          status: "pending_review",
+          reason: "x",
+          triggeringReportIds: [],
+          startsAt: T0,
+        },
+      });
+
+      expect((await decide(admin, sanction.id, "confirm")).status).toBe(200);
+
+      expect(await sanctionOf(staff.id)).toMatchObject({ status: "active", kind: "provisional", endsAt: null });
+      expect(await prisma.user.count({ where: { id: staff.id } })).toBe(1);
+    });
+
+    test("provisional grave confirmada: elimina la cuenta en cascada, desconecta y avisa con los datos previos", async () => {
+      const { target, sanction } = await severeCase("confirm-delete");
+      const disconnectSockets = jest.fn();
+      const io = { in: jest.fn().mockReturnValue({ disconnectSockets }) };
+      jest.spyOn(chatSocket, "getChatIO").mockReturnValue(io as never);
+      send.mockClear();
 
       const res = await decide(admin, sanction.id, "confirm", { reason: "baja definitiva" });
 
       expect(res.status).toBe(200);
-      expect(await sanctionOf(target.id)).toMatchObject({ status: "active", kind: "permanent", endsAt: null });
-      expect(await prisma.user.count({ where: { id: target.id } })).toBe(1);
-      const next = await login(target.email);
-      expect(next.status).toBe(403);
-      expect(next.body.error.details).toMatchObject({ type: "permanent" });
-      expect((await eventsOf(sanction.id)).map((e) => e.type)).toEqual(["created", "confirmed"]);
-      expect(mailsWithSubject(SUSPENDED_SUBJECT)).toHaveLength(2);
+      expect(res.body).toEqual({ id: sanction.id, accountDeleted: true });
+      await expectAccountDeleted(target, sanction.id);
+      expect(io.in).toHaveBeenCalledWith(chatSocket.userRoom(target.id));
+      expect(disconnectSockets).toHaveBeenCalledWith(true);
+      // sin lista negra: puede volver a registrarse con el mismo email
+      const again = await request(app).post("/api/auth/register").send({ email: target.email, password: E2E_PASSWORD });
+      expect(again.status).toBe(201);
+      await prisma.user.deleteMany({ where: { email: target.email } });
+    });
+
+    test("reincidencia confirmada por un moderador: elimina la cuenta", async () => {
+      const { target, sanction } = await recidivismCase("confirm-recidivism");
+      const moderator = await newModerator("confirm-recidivism-mod");
+      send.mockClear();
+
+      const res = await decide(moderator, sanction.id, "confirm", { reason: "reincide" });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ id: sanction.id, accountDeleted: true });
+      await expectAccountDeleted(target, sanction.id);
     });
 
     test("un admin como objetivo, habiendo otro admin activo, se puede sancionar", async () => {
@@ -190,6 +252,17 @@ describe("E2E: decisiones del admin sobre sanciones", () => {
       expect((await request(app).get("/api/auth/me").set(auth(target))).status).toBe(401);
       expect((await login(target.email)).status).toBe(200);
     });
+
+    test("reincidencia revertida por un moderador: reverted y la cuenta sigue entrando", async () => {
+      const { target, sanction } = await recidivismCase("revert-recidivism");
+      const moderator = await newModerator("revert-recidivism-mod");
+
+      const res = await decide(moderator, sanction.id, "revert", { reason: "error" });
+
+      expect(res.status).toBe(200);
+      expect((await prisma.accountSanction.findUniqueOrThrow({ where: { id: sanction.id } })).status).toBe("reverted");
+      expect((await login(target.email)).status).toBe(200);
+    });
   });
 
   describe("errores y concurrencia", () => {
@@ -230,26 +303,38 @@ describe("E2E: decisiones del admin sobre sanciones", () => {
       expect((await sanctionOf(staff.id)).status).toBe("pending_review");
     });
 
-    test("un moderador recibe 403 y un cuerpo sin motivo, 400", async () => {
+    test("un moderador recibe 403 en un caso grave o de staff y un cuerpo sin motivo, 400", async () => {
       const { target, sanction } = await severeCase("authz");
-      const moderator = await ctx.registerAndLogin("authz-mod");
-      await promoteTo(moderator.id, "moderador");
+      const moderator = await newModerator("authz-mod");
+      const { sanction: staffSanction } = await staffCase("authz-staff", "moderador", ["mild", "mild", "mild", "mild", "mild"]);
+      const regular = await ctx.registerAndLogin("authz-regular");
 
-      expect((await decide(moderator, sanction.id, "confirm")).status).toBe(403);
+      for (const action of ["confirm", "revert"] as const) {
+        expect((await decide(moderator, sanction.id, action)).status).toBe(403);
+        expect((await decide(moderator, staffSanction.id, action)).status).toBe(403);
+        expect((await decide(regular, sanction.id, action)).status).toBe(403);
+      }
       expect((await decide(admin, sanction.id, "confirm", {})).status).toBe(400);
       expect((await sanctionOf(target.id)).kind).toBe("provisional");
     });
 
-    test("decisiones simultáneas: una prospera y la otra recibe SANCTION_ALREADY_DECIDED", async () => {
+    test("decisiones simultáneas: una prospera y la otra no encuentra el caso abierto", async () => {
       const { target, sanction } = await severeCase("concurrent");
 
       const results = await Promise.all([decide(admin, sanction.id, "confirm"), decide(admin, sanction.id, "revert")]);
 
-      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-      expect(results.find((r) => r.status === 409)!.body.error.code).toBe("SANCTION_ALREADY_DECIDED");
-      const decided = (await eventsOf(sanction.id)).filter((e) => e.type !== "created");
-      expect(decided).toHaveLength(1);
-      expect((await sanctionOf(target.id)).status).toBe(decided[0].type === "confirmed" ? "active" : "reverted");
+      const remaining = await prisma.accountSanction.findUnique({ where: { id: sanction.id } });
+      if (remaining) {
+        // ganó revertir: confirmar recibe SANCTION_ALREADY_DECIDED
+        expect(results.map((r) => r.status)).toEqual([409, 200]);
+        expect(results[0].body.error.code).toBe("SANCTION_ALREADY_DECIDED");
+        expect(remaining.status).toBe("reverted");
+        expect((await eventsOf(sanction.id)).filter((e) => e.type !== "created")).toHaveLength(1);
+      } else {
+        // ganó confirmar: la cuenta y el caso ya no existen
+        expect(results.map((r) => r.status)).toEqual([200, 404]);
+        expect(await prisma.user.count({ where: { id: target.id } })).toBe(0);
+      }
     });
   });
 
