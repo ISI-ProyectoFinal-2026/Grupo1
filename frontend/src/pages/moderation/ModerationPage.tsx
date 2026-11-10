@@ -1,7 +1,8 @@
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import ReportFlagList from '@/components/moderation/ReportFlagList'
 import Spinner from '@/components/ui/Spinner'
-import { CheckIcon } from '@/components/ui/icons'
+import { Link } from 'react-router-dom'
+import { CheckIcon, ShieldIcon } from '@/components/ui/icons'
 import { useReportFlagsQuery, useResolveReportFlagMutation } from '@/hooks/useReportFlagsQuery'
 import { useAdFlagsQuery, useResolveAdFlagMutation } from '@/hooks/useServedAds'
 import AdFlagList from '@/components/moderation/AdFlagList'
@@ -76,6 +77,20 @@ function ReportedAccountsSection() {
       </h2>
       <p className='mt-2 max-w-prose text-ink-muted'>
         Al llegar a 5 denuncias de personas distintas se aplica la gravedad más frecuente; en empate, la más alta.
+      </p>
+      {/* aviso: al llegar al umbral la cuenta pasa a la cola de sanciones */}
+      <p
+        role='note'
+        className='mt-3 flex items-start gap-2 rounded-card border border-signal-track bg-signal-soft p-4 text-sm text-ink'
+      >
+        <ShieldIcon className='mt-0.5 h-4 w-4 shrink-0' />
+        <span>
+          Cuando una cuenta llega a 5 denuncias sale de esta lista y pasa a{' '}
+          <Link to='/admin/sanctions' className='font-bold underline'>
+            Sanciones pendientes
+          </Link>
+          , donde se confirma o revierte la sanción.
+        </span>
       </p>
 
       <div className='mt-4' aria-live='polite'>
