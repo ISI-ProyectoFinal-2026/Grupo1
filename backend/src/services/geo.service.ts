@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
+import { visibleAuthorSql } from "./account-sanctions/visibility";
 import { reportColumns, toReportDTO, ReportDTO, ReportRow } from "./reports.service";
 import { BoundingBox, GEO_DEFAULT_LIMIT, GeoFilters } from "../validators/geo.validator";
 
@@ -7,7 +8,10 @@ type GeoFilterInput = Partial<GeoFilters>;
 
 // mismos filtros que el feed (reports.service list) + tope de resultados
 function filterConditions(filters: GeoFilterInput): Prisma.Sql[] {
-  const conditions: Prisma.Sql[] = [Prisma.sql`r.status = 'published'::report_status`];
+  const conditions: Prisma.Sql[] = [
+    Prisma.sql`r.status = 'published'::report_status`,
+    visibleAuthorSql(Prisma.sql`r.user_id`),
+  ];
   if (filters.type) conditions.push(Prisma.sql`r.report_type = ${filters.type}::report_type`);
   if (filters.zone) conditions.push(Prisma.sql`r.location_address ILIKE ${`%${filters.zone}%`}`);
   if (filters.dateFrom) conditions.push(Prisma.sql`r.created_at >= ${filters.dateFrom}`);

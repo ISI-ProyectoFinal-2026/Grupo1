@@ -1,6 +1,7 @@
 import { Chat, Message, Notification, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { isAuthorSuspended } from "./account-sanctions/visibility";
 import { isNotificationEnabled } from "./notification-preferences.service";
 
 export async function listByUser(userId: number): Promise<Notification[]> {
@@ -129,6 +130,10 @@ export async function notifyMatch(data: NotifyMatchInput): Promise<Notification[
     throw new AppError(404, "El reporte de mascota encontrada no existe");
   }
 
+  if ((await isAuthorSuspended(lostReport.userId)) || (await isAuthorSuspended(foundReport.userId))) {
+    return [];
+  }
+
   return createForMatch({
     lostReportId: data.lostReportId,
     foundReportId: data.foundReportId,
@@ -232,9 +237,9 @@ interface NearbyRecipientRow {
 export async function createForNearbyReport(reportId: number): Promise<Notification[]> {
   const report = await prisma.report.findUnique({
     where: { id: reportId },
-    select: { title: true, reportType: true, status: true },
+    select: { title: true, reportType: true, status: true, userId: true },
   });
-  if (!report || report.status !== "published") {
+  if (!report || report.status !== "published" || (await isAuthorSuspended(report.userId))) {
     return [];
   }
 

@@ -2,6 +2,7 @@ import { Ad, AdStatus, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { CreateAdInput, UpdateAdInput } from "../validators/ads.validator";
+import { isAuthorSuspended } from "./account-sanctions/visibility";
 import { getEffectivePlan } from "./business-plan";
 import * as businessesService from "./businesses.service";
 
@@ -28,7 +29,7 @@ export async function getServableAd(adId: number): Promise<{ ownerId: number }> 
   });
   const servable =
     ad?.status === AdStatus.ACTIVE && getEffectivePlan(ad.business.plan, ad.business.planExpiresAt) === "PREMIUM";
-  if (!ad || !servable) {
+  if (!ad || !servable || (await isAuthorSuspended(ad.business.userId))) {
     throw new AppError(404, "Anuncio no encontrado");
   }
   return { ownerId: ad.business.userId };
