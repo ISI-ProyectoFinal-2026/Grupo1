@@ -16,7 +16,8 @@ const dateFormat = new Intl.DateTimeFormat('es-AR', {
   minute: '2-digit',
 })
 
-const personLabel = (person: AuditPerson) => person.fullName ?? person.email
+const personLabel = (person: AuditPerson | null) =>
+  person ? (person.fullName ?? person.email) : 'Cuenta eliminada'
 
 function RoleAuditLog() {
   const [page, setPage] = useState(1)
