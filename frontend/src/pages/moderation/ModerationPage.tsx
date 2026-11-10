@@ -5,6 +5,8 @@ import { CheckIcon } from '@/components/ui/icons'
 import { useReportFlagsQuery, useResolveReportFlagMutation } from '@/hooks/useReportFlagsQuery'
 import { useAdFlagsQuery, useResolveAdFlagMutation } from '@/hooks/useServedAds'
 import AdFlagList from '@/components/moderation/AdFlagList'
+import ReportedAccountList from '@/components/moderation/ReportedAccountList'
+import { useReportedAccountsQuery } from '@/hooks/useAccountReports'
 
 function ModerationPage() {
   const flagsQuery = useReportFlagsQuery()
@@ -56,8 +58,36 @@ function ModerationPage() {
         )}
       </div>
 
+      <ReportedAccountsSection />
+
       <AdModerationSection />
     </div>
+  )
+}
+
+// denuncias de cuentas con gravedad (#267); la sanción al llegar al umbral es #38
+function ReportedAccountsSection() {
+  const accountsQuery = useReportedAccountsQuery()
+
+  return (
+    <section className='mt-10' aria-labelledby='account-moderation'>
+      <h2 id='account-moderation' className='font-display text-display-md'>
+        Cuentas denunciadas
+      </h2>
+      <p className='mt-2 max-w-prose text-ink-muted'>
+        Al llegar a 5 denuncias de personas distintas se aplica la gravedad más frecuente; en empate, la más alta.
+      </p>
+
+      <div className='mt-4' aria-live='polite'>
+        {accountsQuery.isPending && (
+          <div className='flex justify-center py-10 text-ink-muted'>
+            <Spinner />
+          </div>
+        )}
+        {accountsQuery.isError && <ErrorMessage message='No se pudieron cargar las cuentas denunciadas' />}
+        {accountsQuery.isSuccess && <ReportedAccountList accounts={accountsQuery.data} />}
+      </div>
+    </section>
   )
 }
 
