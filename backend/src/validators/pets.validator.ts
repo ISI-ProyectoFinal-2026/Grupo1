@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { r2ImageUrlSchema } from "./shared.validator";
 
+export const MAX_PET_PHOTOS = 4;
+
 export const createPetSchema = z.object({
   name: z.string().min(1),
   species: z.string().min(1).optional(),
@@ -8,7 +10,10 @@ export const createPetSchema = z.object({
   age: z.number().int().min(0),
   color: z.string().min(1),
   description: z.string().min(1),
-  photoUrls: z.array(r2ImageUrlSchema).min(1, "Se requiere al menos una foto"),
+  photoUrls: z
+    .array(r2ImageUrlSchema)
+    .min(1, "Se requiere al menos una foto")
+    .max(MAX_PET_PHOTOS, `Podés subir hasta ${MAX_PET_PHOTOS} fotos`),
   microchipId: z.string().min(1).optional(),
 });
 

@@ -11,56 +11,41 @@ vi.mock('@/services/auth.service')
 const FOTO_A = 'https://pub.r2.dev/pets/a.jpg'
 const FOTO_B = 'https://pub.r2.dev/pets/b.jpg'
 
-// el uploader real sube a R2: el doble expone un boton por callback
-vi.mock('@/components/reports/ImageUploader', () => ({
+// el uploader real sube a R2: el doble expone botones que llaman a onChange
+vi.mock('@/components/common/MultiImageUploader', () => ({
   default: ({
-    onSuccess,
-    onError,
-    onUploadingChange,
+    value,
+    onChange,
+    max,
     screenForAnimals,
+    onUploadingChange,
   }: {
-    onSuccess: (url: string, rejection: string | null, qualityWarning: string | null) => void
-    onError: (error: string, code?: string) => void
-    onUploadingChange?: (uploading: boolean) => void
+    value: string[]
+    onChange: (urls: string[]) => void
+    max: number
     screenForAnimals?: boolean
+    onUploadingChange?: (uploading: boolean) => void
   }) => (
     <>
+      <p>{`Máximo ${max}`}</p>
       {screenForAnimals && <p>Analiza animales</p>}
-      <button type='button' onClick={() => onSuccess('https://pub.r2.dev/pets/a.jpg', null, null)}>
+      {value.map((url, index) => (
+        <img key={url} src={url} alt={`Foto ${index + 1}`} />
+      ))}
+      <button type='button' onClick={() => onChange([...value, 'https://pub.r2.dev/pets/a.jpg'])}>
         Simular foto A
       </button>
-      <button type='button' onClick={() => onSuccess('https://pub.r2.dev/pets/b.jpg', null, null)}>
+      <button type='button' onClick={() => onChange([...value, 'https://pub.r2.dev/pets/b.jpg'])}>
         Simular foto B
       </button>
-      <button
-        type='button'
-        onClick={() =>
-          onSuccess(
-            'https://pub.r2.dev/pets/paisaje.jpg',
-            'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM',
-            null
-          )
-        }
-      >
-        Simular foto sin animales
+      <button type='button' onClick={() => onChange([...value].reverse())}>
+        Simular cambio de principal
       </button>
-      <button
-        type='button'
-        onClick={() =>
-          onSuccess(
-            'https://pub.r2.dev/pets/borrosa.jpg',
-            null,
-            'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.'
-          )
-        }
-      >
-        Simular foto borrosa
+      <button type='button' onClick={() => onChange(value.slice(1))}>
+        Quitar foto 1
       </button>
       <button type='button' onClick={() => onUploadingChange?.(true)}>
         Simular subida en curso
-      </button>
-      <button type='button' onClick={() => onError('No se pudo subir la imagen')}>
-        Simular falla de subida
       </button>
     </>
   ),
@@ -154,6 +139,13 @@ describe('PetForm: validacion', () => {
 })
 
 describe('PetForm: fotos', () => {
+  it('usa el uploader multiple con maximo 4 y screening de animales (#254)', () => {
+    renderForm()
+
+    expect(screen.getByText('Máximo 4')).toBeInTheDocument()
+    expect(screen.getByText('Analiza animales')).toBeInTheDocument()
+  })
+
   it('agrega varias fotos y quita la elegida', async () => {
     const user = userEvent.setup()
     renderForm()
@@ -168,6 +160,21 @@ describe('PetForm: fotos', () => {
 
     expect(screen.getAllByRole('img')).toHaveLength(1)
     expect(screen.getByRole('img', { name: 'Foto 1' })).toHaveAttribute('src', FOTO_B)
+  })
+
+  it('envia las fotos en el orden del uploader (la principal primero)', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarObligatorios(user)
+    await user.click(screen.getByRole('button', { name: 'Simular foto A' }))
+    await user.click(screen.getByRole('button', { name: 'Simular foto B' }))
+    await user.click(screen.getByRole('button', { name: 'Simular cambio de principal' }))
+    await user.click(guardar())
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ photoUrls: [FOTO_B, FOTO_A] }))
+    )
   })
 
   it('quitar la unica foto vuelve a exigir una', async () => {
@@ -190,95 +197,6 @@ describe('PetForm: fotos', () => {
     await user.click(screen.getByRole('button', { name: 'Simular subida en curso' }))
 
     expect(guardar()).toBeDisabled()
-  })
-
-  it('no repite el error de subida que ya muestra el uploader', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular falla de subida' }))
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-})
-
-// #254: las fotos de mascotas pasan por la misma verificacion que las de reportes
-describe('PetForm: verificacion de animales en la foto', () => {
-  const NO_ANIMAL_MESSAGE =
-    'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM'
-  const QUALITY_MESSAGE =
-    'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.'
-
-  it('pide al uploader que analice la foto', () => {
-    renderForm()
-
-    expect(screen.getByText('Analiza animales')).toBeInTheDocument()
-  })
-
-  it('no agrega una foto sin animales y muestra el rechazo', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
-
-    expect(screen.getByRole('alert')).toHaveTextContent(NO_ANIMAL_MESSAGE)
-    expect(screen.queryByRole('img')).not.toBeInTheDocument()
-  })
-
-  it('no guarda si la unica foto subida fue rechazada', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await completarObligatorios(user)
-    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
-    await user.click(guardar())
-
-    expect(await screen.findByText('Subí al menos una foto')).toBeInTheDocument()
-    expect(onSubmit).not.toHaveBeenCalled()
-  })
-
-  it('conserva las fotos validas y limpia el rechazo al subir otra con animal', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto A' }))
-    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
-
-    expect(screen.getAllByRole('img')).toHaveLength(1)
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto B' }))
-
-    expect(screen.queryByText(NO_ANIMAL_MESSAGE)).not.toBeInTheDocument()
-    expect(screen.getAllByRole('img')).toHaveLength(2)
-  })
-
-  it('agrega una foto borrosa con un aviso que no bloquea el guardado', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await completarObligatorios(user)
-    await user.click(screen.getByRole('button', { name: 'Simular foto borrosa' }))
-
-    expect(screen.getByText(QUALITY_MESSAGE).closest('[role="status"]')).not.toBeNull()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-
-    await user.click(guardar())
-
-    await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({ photoUrls: ['https://pub.r2.dev/pets/borrosa.jpg'] })
-      )
-    )
-  })
-
-  it('limpia el aviso de calidad al subir una foto nitida', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto borrosa' }))
-    await user.click(screen.getByRole('button', { name: 'Simular foto A' }))
-
-    expect(screen.queryByText(QUALITY_MESSAGE)).not.toBeInTheDocument()
   })
 })
 

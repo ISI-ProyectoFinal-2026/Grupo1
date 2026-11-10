@@ -64,6 +64,17 @@ describe("pets.service image screening", () => {
       }
     );
 
+    test("analiza cada una de las 4 fotos (máximo permitido)", async () => {
+      analyzeSpy.mockResolvedValue("animal");
+      const cuatroFotos = ["a", "b", "c", "d"].map((n) => `https://pub-test.r2.dev/pets/${n}.jpg`);
+
+      await petsService.create({ ...petData, photoUrls: cuatroFotos });
+
+      expect(analyzeSpy).toHaveBeenCalledTimes(4);
+      cuatroFotos.forEach((url) => expect(analyzeSpy).toHaveBeenCalledWith(url));
+      expect(petCreate).toHaveBeenCalled();
+    });
+
     // mismo criterio que reportes: fuera del bucket R2 no hay veredicto síncrono (SSRF)
     test("no analiza fotos fuera del bucket R2", async () => {
       await petsService.create({ ...petData, photoUrls: ["https://cdn.example.com/foto.jpg"] });
@@ -90,6 +101,17 @@ describe("pets.service image screening", () => {
 
       expect(analyzeSpy).toHaveBeenCalledTimes(1);
       expect(analyzeSpy).toHaveBeenCalledWith(fotoB);
+      expect(petUpdate).toHaveBeenCalled();
+    });
+
+    test("con 4 fotos solo analiza las 3 nuevas", async () => {
+      analyzeSpy.mockResolvedValue("animal");
+      const nuevas = ["b", "c", "d"].map((n) => `https://pub-test.r2.dev/pets/${n}.jpg`);
+
+      await petsService.update(5, 7, { photoUrls: [fotoA, ...nuevas] });
+
+      expect(analyzeSpy).toHaveBeenCalledTimes(3);
+      expect(analyzeSpy).not.toHaveBeenCalledWith(fotoA);
       expect(petUpdate).toHaveBeenCalled();
     });
 
