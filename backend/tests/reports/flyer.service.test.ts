@@ -1,4 +1,5 @@
-import { FlyerDetails, composeFlyer, flyerInfoRows, wrapLines } from "../../src/services/flyer.service";
+import { FlyerDetails, composeFlyer, flyerInfoRows, flyerLayout, flyerTone, wrapLines } from "../../src/services/flyer.service";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { ReportDTO } from "../../src/services/reports.service";
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
@@ -13,6 +14,7 @@ function buildReport(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: "Gato gris perdido en San Telmo",
     description: "Collar rojo, muy asustadizo",
     imageUrl: null,
+    extraImageUrls: [],
     customFlyerUrl: null,
     locationAddress: "San Telmo, CABA",
     showPhoneOnFlyer: false,
@@ -193,5 +195,97 @@ describe("wrapLines", () => {
 
   test("un texto vacío no genera líneas", () => {
     expect(wrapLines("   ", 100, 2, measure)).toEqual([]);
+  });
+});
+
+// fotos extra como miniaturas
+describe("composeFlyer con fotos extra", () => {
+  async function solidImage(color: string) {
+    const c = createCanvas(40, 40);
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 40, 40);
+    return loadImage(c.toBuffer("image/png"));
+  }
+
+  test("las miniaturas cambian el flyer", async () => {
+    const main = await solidImage("#888888");
+    const extra = await solidImage("#00FF00");
+
+    const without = composeFlyer(buildReport(), main, NO_DETAILS, []);
+    const withExtras = composeFlyer(buildReport(), main, NO_DETAILS, [extra, extra]);
+
+    expect(withExtras.subarray(0, 4)).toEqual(PNG_SIGNATURE);
+    expect(withExtras.equals(without)).toBe(false);
+  });
+
+  test("dibuja como máximo 3 miniaturas", async () => {
+    const main = await solidImage("#888888");
+    const a = await solidImage("#00FF00");
+    const b = await solidImage("#FF00FF");
+
+    const three = composeFlyer(buildReport(), main, NO_DETAILS, [a, a, a]);
+    const four = composeFlyer(buildReport(), main, NO_DETAILS, [a, a, a, b]);
+
+    expect(four.equals(three)).toBe(true);
+  });
+});
+
+// color de estado: tonos del sistema para las etiquetas conocidas
+describe("flyerTone", () => {
+  test.each([
+    ["PERDIDO", "#C4342B"],
+    ["ENCONTRADO", "#2457A6"],
+    ["RESUELTO", "#1F7A4D"],
+    [" perdido ", "#C4342B"],
+  ])("%s usa el tono del sistema", (label, tone) => {
+    expect(flyerTone({ label, color: "#EF4444" })).toBe(tone);
+  });
+
+  test("una etiqueta desconocida conserva el color de la API", () => {
+    expect(flyerTone({ label: "EN TRÁNSITO", color: "#123456" })).toBe("#123456");
+  });
+});
+
+// reparto vertical: sin bandas vacías
+describe("flyerLayout", () => {
+  const HEIGHT = 1920;
+
+  function sections(layout: ReturnType<typeof flyerLayout>) {
+    return [layout.header, layout.photo, ...(layout.thumbs ? [layout.thumbs] : []), layout.info, layout.footer];
+  }
+
+  test.each([true, false])("las secciones cubren todo el alto sin huecos (extras: %s)", (hasExtras) => {
+    const parts = sections(flyerLayout({ hasExtras, infoHeight: 420 }));
+
+    expect(parts[0].y).toBe(0);
+    for (let i = 1; i < parts.length; i++) {
+      expect(parts[i].y).toBe(parts[i - 1].y + parts[i - 1].height);
+    }
+    const last = parts[parts.length - 1];
+    expect(last.y + last.height).toBe(HEIGHT);
+  });
+
+  test("sin fotos extra no hay tira de miniaturas y la foto gana ese espacio", () => {
+    const withExtras = flyerLayout({ hasExtras: true, infoHeight: 420 });
+    const without = flyerLayout({ hasExtras: false, infoHeight: 420 });
+
+    expect(without.thumbs).toBeNull();
+    expect(withExtras.thumbs).not.toBeNull();
+    expect(without.photo.height).toBeGreaterThan(withExtras.photo.height);
+  });
+
+  test("la foto absorbe el espacio que no usa la información", () => {
+    const short = flyerLayout({ hasExtras: false, infoHeight: 300 });
+    const long = flyerLayout({ hasExtras: false, infoHeight: 500 });
+
+    expect(short.photo.height - long.photo.height).toBe(200);
+  });
+
+  test("la foto es protagonista aun con información larga y fotos extra", () => {
+    const layout = flyerLayout({ hasExtras: true, infoHeight: 560 });
+
+    expect(layout.photo.height).toBeGreaterThanOrEqual(HEIGHT * 0.27);
+    expect(layout.photo.height + (layout.thumbs?.height ?? 0)).toBeGreaterThanOrEqual(HEIGHT * 0.44);
   });
 });
