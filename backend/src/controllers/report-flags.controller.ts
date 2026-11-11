@@ -21,6 +21,10 @@ export async function list(req: Request, res: Response): Promise<void> {
   res.status(200).json(flags);
 }
 
+export async function listGroups(_req: Request, res: Response): Promise<void> {
+  res.status(200).json(await reportFlagsService.listGroups());
+}
+
 export async function moderate(req: Request, res: Response): Promise<void> {
   const { reportId } = moderationReportIdParamSchema.parse(req.params);
   const { action } = moderationActionSchema.parse(req.body);

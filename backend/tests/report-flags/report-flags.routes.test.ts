@@ -196,6 +196,27 @@ describe("report-flags routes", () => {
     });
   });
 
+  describe("GET /api/report-flags/reports", () => {
+    test("responde 401 sin token y 403 a un usuario común", async () => {
+      expect((await request(app).get("/api/report-flags/reports")).status).toBe(401);
+      const res = await request(app).get("/api/report-flags/reports").set("Authorization", `Bearer ${regularToken}`);
+      expect(res.status).toBe(403);
+    });
+
+    test("un moderador ve la cola agrupada por reporte", async () => {
+      const created = await request(app)
+        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
+        .send({ reason: "other", detail: "Es publicidad" });
+      createdFlagIds.push(created.body.id);
+
+      const res = await request(app).get("/api/report-flags/reports").set("Authorization", `Bearer ${moderatorToken}`);
+
+      expect(res.status).toBe(200);
+      const group = res.body.find((g: { report: { id: number } }) => g.report.id === reportId);
+      expect(group).toMatchObject({ flagCount: 1, reasonCounts: { other: 1 }, otherDetails: ["Es publicidad"] });
+    });
+  });
+
   describe("PATCH /api/report-flags/reports/:reportId", () => {
     const patch = (tk: string, body: object = { action: "hide" }, id: number | string = reportId) =>
       request(app).patch(`/api/report-flags/reports/${id}`).set("Authorization", `Bearer ${tk}`).send(body);

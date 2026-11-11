@@ -1,4 +1,4 @@
-import { Prisma, ReportFlag, ReportFlagStatus, ReportStatus } from "@prisma/client";
+import { Prisma, ReportFlag, ReportFlagReason, ReportFlagStatus, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import {
@@ -116,6 +116,57 @@ export async function list(filters: ListReportFlagsQuery = {}): Promise<ReportFl
     include: reportFlagWithReportInclude,
     orderBy: { createdAt: "desc" },
   });
+}
+
+export type ReportFlagGroupDTO = {
+  report: {
+    id: number;
+    title: string;
+    status: ReportStatus;
+    reportType: ReportType;
+    imageUrl: string | null;
+    description: string | null;
+  };
+  flagCount: number;
+  reasonCounts: Partial<Record<ReportFlagReason, number>>;
+  otherDetails: string[];
+  lastFlaggedAt: string;
+};
+
+// cola agrupada: ocultos primero, luego más denunciados y más recientes; los confirmados no tienen pendientes y salen
+export async function listGroups(): Promise<ReportFlagGroupDTO[]> {
+  const flags = await prisma.reportFlag.findMany({
+    where: { status: ReportFlagStatus.pending, report: { status: { in: ["published", "hidden"] } } },
+    include: {
+      report: { select: { id: true, title: true, status: true, reportType: true, imageUrl: true, description: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const groups = new Map<number, ReportFlagGroupDTO>();
+  for (const flag of flags) {
+    const group = groups.get(flag.reportId) ?? {
+      report: flag.report,
+      flagCount: 0,
+      reasonCounts: {},
+      otherDetails: [],
+      lastFlaggedAt: flag.createdAt.toISOString(),
+    };
+    group.flagCount += 1;
+    group.reasonCounts[flag.reason] = (group.reasonCounts[flag.reason] ?? 0) + 1;
+    if (flag.reason === ReportFlagReason.other && flag.detail) {
+      group.otherDetails.push(flag.detail);
+    }
+    group.lastFlaggedAt = flag.createdAt.toISOString();
+    groups.set(flag.reportId, group);
+  }
+
+  return [...groups.values()].sort(
+    (a, b) =>
+      Number(b.report.status === "hidden") - Number(a.report.status === "hidden") ||
+      b.flagCount - a.flagCount ||
+      b.lastFlaggedAt.localeCompare(a.lastFlaggedAt)
+  );
 }
 
 const ALREADY_REVIEWED_MESSAGE = "Este reporte ya fue revisado";

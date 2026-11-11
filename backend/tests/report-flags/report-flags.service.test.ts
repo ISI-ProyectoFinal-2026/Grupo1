@@ -463,4 +463,66 @@ describe("report-flags.service", () => {
       await expect(reportFlagsService.moderate(999999999, "hide")).rejects.toMatchObject({ statusCode: 404 });
     });
   });
+
+  describe("listGroups() (#218)", () => {
+    const extraReportIds: number[] = [];
+    afterEach(async () => {
+      await prisma.reportFlag.deleteMany({ where: { reportId: { in: extraReportIds } } });
+      await prisma.report.deleteMany({ where: { id: { in: extraReportIds } } });
+      extraReportIds.length = 0;
+    });
+
+    async function extraReport(status: "published" | "hidden" | "resolved", title: string) {
+      const report = await prisma.report.create({ data: { userId, reportType: "lost", status, title } });
+      extraReportIds.push(report.id);
+      return report.id;
+    }
+    const flagIt = (rid: number, flaggerId: number, reason: "spam" | "other", detail?: string) =>
+      prisma.reportFlag.create({ data: { reportId: rid, userId: flaggerId, reason, detail } });
+
+    test("agrupa por reporte con conteo, motivos, detalles de 'otro' y snapshot", async () => {
+      const [third] = await makeUsers(1);
+      await flagIt(reportId, reporterId, "spam");
+      await flagIt(reportId, secondReporterId, "other", "es publicidad");
+      await flagIt(reportId, third, "spam");
+
+      const group = (await reportFlagsService.listGroups()).find((g) => g.report.id === reportId)!;
+
+      expect(group.flagCount).toBe(3);
+      expect(group.reasonCounts).toEqual({ spam: 2, other: 1 });
+      expect(group.otherDetails).toEqual(["es publicidad"]);
+      expect(group.report).toMatchObject({ title: "Perrito encontrado en Plaza de Mayo", status: "published" });
+      expect(typeof group.lastFlaggedAt).toBe("string");
+    });
+
+    test("ordena ocultos primero, luego más denunciados", async () => {
+      const [u3] = await makeUsers(1);
+      const hiddenId = await extraReport("hidden", "oculto");
+      const busyId = await extraReport("published", "muy denunciado");
+      await flagIt(hiddenId, reporterId, "spam");
+      await flagIt(busyId, reporterId, "spam");
+      await flagIt(busyId, secondReporterId, "spam");
+      await flagIt(busyId, u3, "spam");
+      await flagIt(reportId, reporterId, "spam");
+
+      const ids = (await reportFlagsService.listGroups())
+        .map((g) => g.report.id)
+        .filter((id) => [hiddenId, busyId, reportId].includes(id));
+
+      expect(ids).toEqual([hiddenId, busyId, reportId]);
+    });
+
+    test("excluye reportes confirmados y reportes resueltos", async () => {
+      const resolvedId = await extraReport("resolved", "resuelto");
+      await flagIt(resolvedId, reporterId, "spam");
+      await flagIt(reportId, reporterId, "spam");
+      await reportFlagsService.moderate(reportId, "hide");
+      await reportFlagsService.moderate(reportId, "confirm");
+
+      const ids = (await reportFlagsService.listGroups()).map((g) => g.report.id);
+
+      expect(ids).not.toContain(resolvedId);
+      expect(ids).not.toContain(reportId);
+    });
+  });
 });
