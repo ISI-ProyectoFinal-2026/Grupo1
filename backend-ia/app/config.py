@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     # issue #106.
     allow_insecure_internal: bool = False
 
+    # parámetros del matching (ver ADR-0014 y matching_service.py)
+    match_threshold: float = 0.45
+    notify_threshold: float = 0.63
+    match_radius_meters: int = 5000
+    match_window_days: int = 90
+    match_top_k: int = 5
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

@@ -37,8 +37,10 @@ logger = logging.getLogger(__name__)
 #
 # Valores provisionales: el benchmark usa fotos prolijas de animales famosos;
 # recalibrar con matches confirmados/rechazados reales.
-MATCH_THRESHOLD = 0.45
-NOTIFY_THRESHOLD = 0.63
+#
+# Los valores viven en app.config.Settings (MATCH_THRESHOLD, NOTIFY_THRESHOLD,
+# MATCH_RADIUS_METERS, MATCH_WINDOW_DAYS, MATCH_TOP_K) y se leen en cada
+# llamada.
 
 # autor sin suspensión vigente (mismo criterio que activeAuthorSql en Node)
 _AUTHOR_NOT_SUSPENDED_SQL = """
@@ -86,8 +88,9 @@ async def _notify_match(lost_id: int, found_id: int, similarity: float) -> None:
 
 async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
     """Busca candidatos a match para `report_id` (recién procesado) y
-    persiste los que superen MATCH_THRESHOLD en `report_matches`. Solo los
-    que además superen NOTIFY_THRESHOLD disparan la notificación.
+    persiste los que superen `settings.match_threshold` en `report_matches`.
+    Solo los que además superen `settings.notify_threshold` disparan la
+    notificación.
 
     Devuelve la cantidad de matches creados/actualizados.
     """
@@ -131,11 +134,11 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
             WHERE r.status = 'published'
               AND r.report_type != :report_type
               AND r.id != :report_id
-              AND ST_DWithin(r.location::geography, CAST(:location AS geography), 5000)
-              AND r.created_at > NOW() - INTERVAL '30 days'
+              AND ST_DWithin(r.location::geography, CAST(:location AS geography), :radius_meters)
+              AND r.created_at > NOW() - make_interval(days => :window_days)
               AND {_AUTHOR_NOT_SUSPENDED_SQL}
             ORDER BY re.embedding <=> :embedding ASC
-            LIMIT 5
+            LIMIT :top_k
             """
         ),
         {
@@ -144,12 +147,15 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
             "report_id": report_id,
             "location": source["location"],
             "now": now,
+            "radius_meters": settings.match_radius_meters,
+            "window_days": settings.match_window_days,
+            "top_k": settings.match_top_k,
         },
     )
 
     matches_created = 0
     for candidate in candidates_result.mappings():
-        if candidate["similarity"] < MATCH_THRESHOLD:
+        if candidate["similarity"] < settings.match_threshold:
             continue
 
         if source["report_type"] == "lost":
@@ -172,7 +178,7 @@ async def find_and_store_matches(report_id: int, session: AsyncSession) -> int:
         )
         if upsert_result.first() is not None:
             matches_created += 1
-            if candidate["similarity"] >= NOTIFY_THRESHOLD:
+            if candidate["similarity"] >= settings.notify_threshold:
                 await _notify_match(lost_id, found_id, candidate["similarity"])
 
     await session.commit()
