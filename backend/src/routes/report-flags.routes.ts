@@ -8,4 +8,4 @@ import { requireAuth, requireRole } from "../middlewares/auth.middleware";
 export const reportFlagsRouter = Router();
 
 reportFlagsRouter.get("/", requireAuth, requireRole("moderador", "admin"), reportFlagsController.list);
-reportFlagsRouter.patch("/:id", requireAuth, requireRole("moderador", "admin"), reportFlagsController.resolve);
+reportFlagsRouter.patch("/reports/:reportId", requireAuth, requireRole("moderador", "admin"), reportFlagsController.moderate);

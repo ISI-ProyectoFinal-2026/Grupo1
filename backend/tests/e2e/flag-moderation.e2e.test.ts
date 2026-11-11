@@ -11,8 +11,8 @@ import { createE2EContext, E2EUser, promoteTo } from "./helpers/factories";
  */
 describe("E2E: moderación de reportes denunciados (B5)", () => {
   const ctx = createE2EContext("flag-moderation");
-  // Ningún id de flag llega a este valor en la base de pruebas.
-  const UNKNOWN_FLAG_ID = 2_147_483_647;
+  // Ningún id de reporte llega a este valor en la base de pruebas.
+  const UNKNOWN_REPORT_ID = 2_147_483_647;
 
   let owner: E2EUser;
   let reporter: E2EUser;
@@ -83,9 +83,9 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(list.status).toBe(403);
 
     const resolve = await request(app)
-      .patch(`/api/report-flags/${flagId}`)
+      .patch(`/api/report-flags/reports/${reportId}`)
       .set(auth(reporter))
-      .send({ action: "accept" });
+      .send({ action: "hide" });
     expect(resolve.status).toBe(403);
   });
 
@@ -100,14 +100,14 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(flag).toMatchObject({ status: "pending", report: { id: reportId, status: "published" } });
   });
 
-  test("el moderador acepta el flag, el reporte queda hidden y el dueño recibe el aviso", async () => {
+  test("el moderador oculta el reporte, el dueño recibe el aviso y la denuncia sigue pendiente", async () => {
     const res = await request(app)
-      .patch(`/api/report-flags/${flagId}`)
+      .patch(`/api/report-flags/reports/${reportId}`)
       .set(auth(moderator))
-      .send({ action: "accept" });
+      .send({ action: "hide" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ id: flagId, status: "reviewed", report: { id: reportId, status: "hidden" } });
+    expect(res.body).toEqual({ id: reportId, status: "hidden" });
 
     // Ya no es visible para la comunidad, pero el dueño lo sigue viendo.
     const anonymous = await request(app).get(`/api/reports/${reportId}`);
@@ -122,10 +122,6 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
         expect.objectContaining({ type: "report_status_change", title: "Tu reporte fue ocultado", reportId }),
       ])
     );
-
-    // Y sale de la cola de pendientes.
-    const queue = await request(app).get("/api/report-flags").set(auth(moderator));
-    expect(queue.body.some((f: { id: number }) => f.id === flagId)).toBe(false);
   });
 
   test("un reporte oculto no se puede denunciar (404)", async () => {
@@ -137,20 +133,20 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(res.status).toBe(404);
   });
 
-  test("resolver dos veces el mismo flag responde 409", async () => {
+  test("ocultar dos veces el mismo reporte responde 409", async () => {
     const res = await request(app)
-      .patch(`/api/report-flags/${flagId}`)
+      .patch(`/api/report-flags/reports/${reportId}`)
       .set(auth(moderator))
-      .send({ action: "accept" });
+      .send({ action: "hide" });
 
     expect(res.status).toBe(409);
   });
 
-  test("resolver un flag inexistente responde 404", async () => {
+  test("moderar un reporte inexistente responde 404", async () => {
     const res = await request(app)
-      .patch(`/api/report-flags/${UNKNOWN_FLAG_ID}`)
+      .patch(`/api/report-flags/reports/${UNKNOWN_REPORT_ID}`)
       .set(auth(moderator))
-      .send({ action: "accept" });
+      .send({ action: "hide" });
 
     expect(res.status).toBe(404);
   });

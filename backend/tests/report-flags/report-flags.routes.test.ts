@@ -185,9 +185,7 @@ describe("report-flags routes", () => {
         .send({ userId: reporterId, reason: "false_info" });
       createdFlagIds.push(created.body.id);
 
-      await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
-        .send({ action: "accept" });
+      await prisma.reportFlag.update({ where: { id: created.body.id }, data: { status: "reviewed" } });
 
       const res = await request(app)
         .get("/api/report-flags?status=reviewed").set("Authorization", `Bearer ${moderatorToken}`);
@@ -198,89 +196,70 @@ describe("report-flags routes", () => {
     });
   });
 
-  describe("PATCH /api/report-flags/:id", () => {
+  describe("PATCH /api/report-flags/reports/:reportId", () => {
+    const patch = (tk: string, body: object = { action: "hide" }, id: number | string = reportId) =>
+      request(app).patch(`/api/report-flags/reports/${id}`).set("Authorization", `Bearer ${tk}`).send(body);
+
+    async function flag() {
+      const created = await request(app)
+        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
+        .send({ reason: "false_info" });
+      createdFlagIds.push(created.body.id);
+    }
+
     test("responde 401 sin token", async () => {
-      const res = await request(app).patch("/api/report-flags/1");
+      const res = await request(app).patch(`/api/report-flags/reports/${reportId}`).send({ action: "hide" });
       expect(res.status).toBe(401);
     });
 
     test("responde 403 si el usuario no es moderador ni admin", async () => {
-      const created = await request(app)
-        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(created.body.id);
-
-      const res = await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${regularToken}`);
+      await flag();
+      const res = await patch(regularToken);
       expect(res.status).toBe(403);
+      expect((await prisma.report.findUniqueOrThrow({ where: { id: reportId } })).status).toBe("published");
     });
 
-    test("responde 400 sin una acción válida", async () => {
-      const created = await request(app)
-        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ reason: "false_info" });
-      createdFlagIds.push(created.body.id);
-
-      for (const body of [{}, { action: "hide" }]) {
-        const res = await request(app)
-          .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
-          .send(body);
-        expect(res.status).toBe(400);
+    test("responde 400 sin una acción válida o con id inválido", async () => {
+      await flag();
+      for (const body of [{}, { action: "accept" }]) {
+        expect((await patch(moderatorToken, body)).status).toBe(400);
       }
+      expect((await patch(moderatorToken, { action: "hide" }, "abc")).status).toBe(400);
     });
 
-    test("un moderador descarta el flag: queda dismissed y el reporte sigue publicado", async () => {
-      const created = await request(app)
-        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ reason: "false_info" });
-      createdFlagIds.push(created.body.id);
-
-      const res = await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
-        .send({ action: "dismiss" });
-
+    test("un moderador descarta: el reporte sigue publicado y las denuncias quedan dismissed", async () => {
+      await flag();
+      const res = await patch(moderatorToken, { action: "dismiss" });
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ status: "dismissed", report: { id: reportId, status: "published" } });
+      expect(res.body).toEqual({ id: reportId, status: "published" });
+      expect(await prisma.reportFlag.count({ where: { reportId, status: "dismissed" } })).toBe(1);
     });
 
-    test("un moderador acepta el flag: queda reviewed y el reporte queda hidden", async () => {
-      const created = await request(app)
-        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(created.body.id);
+    test("un moderador oculta, confirma y ya no puede restaurar (409)", async () => {
+      await flag();
+      expect((await patch(moderatorToken, { action: "hide" })).body.status).toBe("hidden");
+      expect((await patch(moderatorToken, { action: "confirm" })).status).toBe(200);
 
-      const res = await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
-        .send({ action: "accept" });
-
-      expect(res.status).toBe(200);
-      expect(res.body.status).toBe("reviewed");
-
-      const report = await prisma.report.findUnique({ where: { id: reportId } });
-      expect(report?.status).toBe("hidden");
-    });
-
-    test("responde 409 si el flag ya fue revisado", async () => {
-      const created = await request(app)
-        .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(created.body.id);
-
-      await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
-        .send({ action: "accept" });
-      const res = await request(app)
-        .patch(`/api/report-flags/${created.body.id}`).set("Authorization", `Bearer ${moderatorToken}`)
-        .send({ action: "accept" });
-
+      const res = await patch(moderatorToken, { action: "restore" });
       expect(res.status).toBe(409);
+      expect((await prisma.report.findUniqueOrThrow({ where: { id: reportId } })).status).toBe("hidden");
     });
 
-    test("responde 404 si el flag no existe", async () => {
-      const res = await request(app)
-        .patch("/api/report-flags/999999999").set("Authorization", `Bearer ${moderatorToken}`)
-        .send({ action: "accept" });
-      expect(res.status).toBe(404);
+    test("un admin también puede restaurar un reporte oculto", async () => {
+      await flag();
+      await patch(moderatorToken, { action: "hide" });
+      await prisma.user.update({ where: { id: moderatorId }, data: { role: "admin" } });
+      const res = await patch(moderatorToken, { action: "restore" });
+      await prisma.user.update({ where: { id: moderatorId }, data: { role: "moderador" } });
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe("published");
+    });
+
+    test("responde 409 si ya fue revisado y 404 si el reporte no existe", async () => {
+      await flag();
+      await patch(moderatorToken, { action: "dismiss" });
+      expect((await patch(moderatorToken, { action: "dismiss" })).status).toBe(409);
+      expect((await patch(moderatorToken, { action: "hide" }, 999999999)).status).toBe(404);
     });
   });
 });
