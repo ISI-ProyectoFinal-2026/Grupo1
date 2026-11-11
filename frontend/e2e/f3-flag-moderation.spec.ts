@@ -2,7 +2,7 @@ import { dismissLocationConsent, expect, loginAs, stubExternalServices, test } f
 import * as api from './support/api.ts'
 import { setRole } from './support/db.ts'
 
-test('F3: a user flags a report and a moderator accepts it, hiding the report and notifying the owner', async ({ page, browser, users }) => {
+test('F3: a user flags a report and a moderator hides it and then confirms, notifying the owner', async ({ page, browser, users }) => {
   const owner = await users.create('f3-owner')
   const reporter = await users.create('f3-reporter')
   const moderator = await users.create('f3-mod')
@@ -33,20 +33,23 @@ test('F3: a user flags a report and a moderator accepts it, hiding the report an
 
     await moderatorPage.goto('/moderation')
     await expect(moderatorPage.getByRole('heading', { name: 'Panel de moderación' })).toBeVisible()
-    // The queue is shared with any other pending flag in the DB: scope to ours.
-    const flagItem = moderatorPage.getByRole('listitem').filter({ hasText: reason })
-    await expect(flagItem.getByRole('link', { name: report.title })).toBeVisible()
-    await flagItem.getByRole('button', { name: 'Ocultar reporte' }).click()
+    // The queue is shared with any other flagged report in the DB: scope to ours.
+    const reportItem = moderatorPage.getByRole('listitem').filter({ has: moderatorPage.getByRole('link', { name: report.title }) })
+    await expect(reportItem).toContainText(reason)
+    await reportItem.getByRole('button', { name: 'Ocultar', exact: true }).click()
+    await expect(moderatorPage.getByText('Reporte ocultado', { exact: true })).toBeVisible()
 
-    await expect(moderatorPage.getByText('Reporte ocultado y denuncia aceptada')).toBeVisible()
-    await expect(moderatorPage.getByRole('listitem').filter({ hasText: reason })).toHaveCount(0)
+    // Hidden reports stay in the queue until restored or confirmed.
+    await reportItem.getByRole('button', { name: 'Confirmar ocultamiento' }).click()
+    await expect(moderatorPage.getByText('Ocultamiento confirmado')).toBeVisible()
+    await expect(reportItem).toHaveCount(0)
   } finally {
     await moderatorContext.close()
   }
 
-  // Hidden: only the owner can still see it, as rejected.
+  // Hidden: only the owner can still see it.
   const asOwner = await api.getReport(owner.token, report.id)
-  expect(asOwner.body.status).toBe('rejected')
+  expect(asOwner.body.status).toBe('hidden')
   const asReporter = await api.getReport(reporter.token, report.id)
   expect(asReporter.status).toBe(404)
 
@@ -64,21 +67,40 @@ test('F3: a moderator dismisses an unfounded flag and the report stays published
   const reporter = await users.create('f3d-reporter')
   const moderator = await users.create('f3d-mod')
   const report = await api.createPublishedReport(owner.token, { reportType: 'lost', title: `Perro perdido F3 ${Date.now()}` })
-  const reason = `Denuncia infundada ${Date.now()}`
-  expect((await api.flagReport(reporter.token, report.id, reason)).status).toBe(201)
+  expect((await api.flagReport(reporter.token, report.id, 'spam')).status).toBe(201)
 
   await setRole(moderator.user.id, 'moderador')
   await loginAs(page, await users.relogin(moderator.email))
   await page.goto('/moderation')
-  const flagItem = page.getByRole('listitem').filter({ hasText: reason })
-  await flagItem.getByRole('button', { name: 'Descartar' }).click()
+  const reportItem = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: report.title }) })
+  await reportItem.getByRole('button', { name: 'Descartar' }).click()
 
-  await expect(page.getByText('Denuncia descartada, el reporte sigue publicado')).toBeVisible()
-  await expect(page.getByRole('listitem').filter({ hasText: reason })).toHaveCount(0)
+  await expect(page.getByText('Denuncias descartadas, el reporte sigue publicado')).toBeVisible()
+  await expect(reportItem).toHaveCount(0)
 
   // Still visible to the community.
   const asReporter = await api.getReport(reporter.token, report.id)
   expect(asReporter.body.status).toBe('published')
+})
+
+test('F3: a moderator restores a hidden report and it is published again', async ({ page, users }) => {
+  const owner = await users.create('f3r-owner')
+  const reporter = await users.create('f3r-reporter')
+  const moderator = await users.create('f3r-mod')
+  const report = await api.createPublishedReport(owner.token, { reportType: 'found', title: `Gato encontrado F3 ${Date.now()}` })
+  expect((await api.flagReport(reporter.token, report.id, 'offensive')).status).toBe(201)
+
+  await setRole(moderator.user.id, 'moderador')
+  await loginAs(page, await users.relogin(moderator.email))
+  await page.goto('/moderation')
+  const reportItem = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: report.title }) })
+  await reportItem.getByRole('button', { name: 'Ocultar', exact: true }).click()
+  await expect(page.getByText('Reporte ocultado', { exact: true })).toBeVisible()
+  await reportItem.getByRole('button', { name: 'Restaurar' }).click()
+
+  await expect(page.getByText('Reporte restaurado, vuelve a estar publicado')).toBeVisible()
+  await expect(reportItem).toHaveCount(0)
+  expect((await api.getReport(reporter.token, report.id)).body.status).toBe('published')
 })
 
 test('F3: a regular user cannot open the moderation panel', async ({ page, users }) => {

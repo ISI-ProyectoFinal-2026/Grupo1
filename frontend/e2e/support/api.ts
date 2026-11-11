@@ -140,8 +140,14 @@ export function getReport(token: string, reportId: number): Promise<{ status: nu
   return call<ApiReport>('GET', `/reports/${reportId}`, { token })
 }
 
-export function flagReport(token: string, reportId: number, reason: string): Promise<{ status: number; body: unknown }> {
-  return call('POST', `/reports/${reportId}/flags`, { token, body: { reason } })
+/** Typed reason; `detail` is mandatory (and only kept) for `other`. */
+export function flagReport(
+  token: string,
+  reportId: number,
+  reason: 'not_an_animal' | 'offensive' | 'spam' | 'duplicate' | 'false_info' | 'other',
+  detail?: string,
+): Promise<{ status: number; body: unknown }> {
+  return call('POST', `/reports/${reportId}/flags`, { token, body: detail ? { reason, detail } : { reason } })
 }
 
 export function listNotifications(token: string): Promise<{ status: number; body: unknown }> {
@@ -153,7 +159,7 @@ export function listAdminUsers(token: string): Promise<{ status: number; body: u
 }
 
 export function listReportFlags(token: string): Promise<{ status: number; body: unknown }> {
-  return call('GET', '/report-flags', { token })
+  return call('GET', '/report-flags/reports', { token })
 }
 
 /** What backend-ia calls after persisting a match (matching_service.py). */
