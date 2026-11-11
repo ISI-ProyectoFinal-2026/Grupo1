@@ -173,7 +173,7 @@ const TAG_TONES: Record<string, string> = {
   RESUELTO: "#1F7A4D",
 };
 
-export function flyerTone(tag: ReportTag): string {
+export function flyerTone(tag: Pick<ReportTag, "color"> & { label: string }): string {
   return TAG_TONES[tag.label.trim().toUpperCase()] ?? tag.color;
 }
 
