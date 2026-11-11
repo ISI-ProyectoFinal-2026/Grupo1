@@ -151,3 +151,68 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// umbral 1: una denuncia oculta, así el flujo completo usa pocos usuarios (#218)
+describe("E2E: ocultamiento por umbral, restauración y confirmación (#218)", () => {
+  const ctx = createE2EContext("flag-threshold");
+  let owner: E2EUser;
+  let flagger1: E2EUser;
+  let flagger2: E2EUser;
+  let moderator: E2EUser;
+  let reportId: number;
+
+  const auth = (user: E2EUser) => ({ Authorization: `Bearer ${user.token}` });
+  const flag = (user: E2EUser) =>
+    request(app).post(`/api/reports/${reportId}/flags`).set(auth(user)).send({ reason: "spam" });
+  const act = (action: string) =>
+    request(app).patch(`/api/report-flags/reports/${reportId}`).set(auth(moderator)).send({ action });
+
+  beforeAll(async () => {
+    process.env.REPORT_FLAG_THRESHOLD = "1";
+    owner = await ctx.registerAndLogin("owner");
+    flagger1 = await ctx.registerAndLogin("flagger1");
+    flagger2 = await ctx.registerAndLogin("flagger2");
+    moderator = await ctx.registerAndLogin("moderator");
+    await promoteTo(moderator.id, "moderador");
+
+    mockImageModeration();
+    const report = await createPublishedReport(owner.token, {
+      reportType: "lost",
+      title: "Gato perdido en Caballito",
+      location: { lat: -34.62, lng: -58.44 },
+    });
+    jest.restoreAllMocks();
+    reportId = report.id;
+    ctx.trackReport(reportId);
+  }, 30_000);
+
+  afterAll(async () => {
+    delete process.env.REPORT_FLAG_THRESHOLD;
+    await ctx.cleanup();
+    await prisma.$disconnect();
+  });
+
+  test("la denuncia que alcanza el umbral oculta el reporte y aparece primero en la cola", async () => {
+    expect((await flag(flagger1)).status).toBe(201);
+    expect((await request(app).get(`/api/reports/${reportId}`)).status).toBe(404);
+
+    const queue = await request(app).get("/api/report-flags/reports").set(auth(moderator));
+    expect(queue.body[0]).toMatchObject({ report: { id: reportId, status: "hidden" }, flagCount: 1 });
+  });
+
+  test("restaurar lo vuelve visible y quien denunció no puede repetir sin edición del dueño", async () => {
+    expect((await act("restore")).body.status).toBe("published");
+    expect((await request(app).get(`/api/reports/${reportId}`)).status).toBe(200);
+    expect((await flag(flagger1)).status).toBe(409);
+  });
+
+  test("confirmar es definitivo: sale de la cola y restaurar responde 409", async () => {
+    expect((await flag(flagger2)).status).toBe(201);
+    expect((await act("confirm")).body.status).toBe("hidden");
+
+    const queue = await request(app).get("/api/report-flags/reports").set(auth(moderator));
+    expect(queue.body.some((g: { report: { id: number } }) => g.report.id === reportId)).toBe(false);
+    expect((await act("restore")).status).toBe(409);
+    expect((await request(app).get(`/api/reports/${reportId}`)).status).toBe(404);
+  });
+});
