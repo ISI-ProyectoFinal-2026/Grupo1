@@ -1,10 +1,10 @@
-import { Prisma, ReportFlag, ReportFlagStatus } from "@prisma/client";
+import { Prisma, ReportFlag, ReportFlagReason, ReportFlagStatus, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import {
   CreateReportFlagInput,
   ListReportFlagsQuery,
-  ResolveReportFlagAction,
+  ModerationAction,
 } from "../validators/report-flags.validator";
 import * as notificationsService from "./notifications.service";
 import { getReportFlagThreshold } from "../config/report-flags";
@@ -118,39 +118,110 @@ export async function list(filters: ListReportFlagsQuery = {}): Promise<ReportFl
   });
 }
 
-// escritura condicional: con dos moderadores a la vez gana el primero; aceptar oculta el reporte (las demás denuncias siguen pendientes) y avisa al autor
-export async function resolve(id: number, action: ResolveReportFlagAction): Promise<ReportFlagWithReport> {
-  const status = action === "accept" ? ReportFlagStatus.reviewed : ReportFlagStatus.dismissed;
+export type ReportFlagGroupDTO = {
+  report: {
+    id: number;
+    title: string;
+    status: ReportStatus;
+    reportType: ReportType;
+    imageUrl: string | null;
+    description: string | null;
+  };
+  flagCount: number;
+  reasonCounts: Partial<Record<ReportFlagReason, number>>;
+  otherDetails: string[];
+  lastFlaggedAt: string;
+};
 
-  const hiddenReportId = await prisma.$transaction(async (tx) => {
-    const { count } = await tx.reportFlag.updateMany({
-      where: { id, status: ReportFlagStatus.pending },
-      data: { status, resolvedAt: new Date() },
-    });
-
-    if (count === 0) {
-      const current = await tx.reportFlag.findUnique({ where: { id } });
-      if (!current) {
-        throw new AppError(404, "Reporte de moderación no encontrado");
-      }
-      throw new AppError(409, "Este reporte de moderación ya fue revisado");
-    }
-
-    if (action === "dismiss") {
-      return null;
-    }
-
-    const flag = await tx.reportFlag.findUniqueOrThrow({ where: { id } });
-    const { count: hidden } = await tx.report.updateMany({
-      where: { id: flag.reportId, status: "published" },
-      data: { status: "hidden" },
-    });
-    return hidden === 1 ? flag.reportId : null;
+// cola agrupada: ocultos primero, luego más denunciados y más recientes; los confirmados no tienen pendientes y salen
+export async function listGroups(): Promise<ReportFlagGroupDTO[]> {
+  const flags = await prisma.reportFlag.findMany({
+    where: { status: ReportFlagStatus.pending, report: { status: { in: ["published", "hidden"] } } },
+    include: {
+      report: { select: { id: true, title: true, status: true, reportType: true, imageUrl: true, description: true } },
+    },
+    orderBy: { createdAt: "asc" },
   });
 
-  if (hiddenReportId !== null) {
-    await notifyOwner(hiddenReportId, "hidden_by_flag");
+  const groups = new Map<number, ReportFlagGroupDTO>();
+  for (const flag of flags) {
+    const group = groups.get(flag.reportId) ?? {
+      report: flag.report,
+      flagCount: 0,
+      reasonCounts: {},
+      otherDetails: [],
+      lastFlaggedAt: flag.createdAt.toISOString(),
+    };
+    group.flagCount += 1;
+    group.reasonCounts[flag.reason] = (group.reasonCounts[flag.reason] ?? 0) + 1;
+    if (flag.reason === ReportFlagReason.other && flag.detail) {
+      group.otherDetails.push(flag.detail);
+    }
+    group.lastFlaggedAt = flag.createdAt.toISOString();
+    groups.set(flag.reportId, group);
   }
 
-  return prisma.reportFlag.findUniqueOrThrow({ where: { id }, include: reportFlagWithReportInclude });
+  return [...groups.values()].sort(
+    (a, b) =>
+      Number(b.report.status === "hidden") - Number(a.report.status === "hidden") ||
+      b.flagCount - a.flagCount ||
+      b.lastFlaggedAt.localeCompare(a.lastFlaggedAt)
+  );
+}
+
+const ALREADY_REVIEWED_MESSAGE = "Este reporte ya fue revisado";
+
+const ACTION_NOTICE = {
+  hide: "hidden_by_flag",
+  restore: "restored",
+  confirm: "hide_confirmed",
+} as const;
+
+// acciones por reporte: el bloqueo de fila + la precondición hacen que gane un solo moderador
+export async function moderate(reportId: number, action: ModerationAction): Promise<{ id: number; status: ReportStatus }> {
+  const status = await prisma.$transaction(async (tx) => {
+    await lockReport(tx, reportId);
+    const report = await tx.report.findUniqueOrThrow({ where: { id: reportId } });
+    const pending = await tx.reportFlag.count({ where: { reportId, status: ReportFlagStatus.pending } });
+    const closeFlags = (to: ReportFlagStatus) =>
+      tx.reportFlag.updateMany({
+        where: { reportId, status: ReportFlagStatus.pending },
+        data: { status: to, resolvedAt: new Date() },
+      });
+
+    const needsPending = action !== "restore";
+    const requiredStatus = action === "hide" || action === "dismiss" ? "published" : "hidden";
+    if (report.status !== requiredStatus || (needsPending && pending === 0)) {
+      throw new AppError(409, ALREADY_REVIEWED_MESSAGE);
+    }
+
+    if (action === "hide") {
+      await tx.report.update({ where: { id: reportId }, data: { status: "hidden" } });
+      return "hidden" as const;
+    }
+    if (action === "confirm") {
+      await closeFlags(ReportFlagStatus.reviewed);
+      return "hidden" as const;
+    }
+    // restaurar solo si el ocultamiento no fue confirmado: confirmar deja una denuncia reviewed en el ciclo
+    if (action === "restore") {
+      const confirmed = await tx.reportFlag.count({
+        where: { reportId, cycle: report.flagCycle, status: ReportFlagStatus.reviewed },
+      });
+      if (confirmed > 0) {
+        throw new AppError(409, "El ocultamiento ya fue confirmado");
+      }
+    }
+    await closeFlags(ReportFlagStatus.dismissed);
+    await tx.report.update({
+      where: { id: reportId },
+      data: { flagCycle: { increment: 1 }, ...(action === "restore" ? { status: "published" } : {}) },
+    });
+    return "published" as const;
+  });
+
+  if (action !== "dismiss") {
+    await notifyOwner(reportId, ACTION_NOTICE[action]);
+  }
+  return { id: reportId, status };
 }

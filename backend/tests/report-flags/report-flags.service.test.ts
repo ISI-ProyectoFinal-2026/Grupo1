@@ -303,116 +303,226 @@ describe("report-flags.service", () => {
       expect(flags.every((f) => f.status === "pending")).toBe(true);
     });
 
-    test("status=reviewed filtra solo los flags aceptados", async () => {
+    test("status=reviewed filtra solo los flags revisados", async () => {
       const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(flag.id);
-      await reportFlagsService.resolve(flag.id, "accept");
+      await prisma.reportFlag.update({ where: { id: flag.id }, data: { status: "reviewed" } });
 
       const flags = await reportFlagsService.list({ status: "reviewed" });
 
       expect(flags.some((f) => f.id === flag.id)).toBe(true);
       expect(flags.every((f) => f.status === "reviewed")).toBe(true);
     });
-
-    test("status=dismissed filtra solo los flags descartados", async () => {
-      const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(flag.id);
-      await reportFlagsService.resolve(flag.id, "dismiss");
-
-      const flags = await reportFlagsService.list({ status: "dismissed" });
-
-      expect(flags.some((f) => f.id === flag.id)).toBe(true);
-      expect(flags.every((f) => f.status === "dismissed")).toBe(true);
-    });
   });
 
-  describe("resolve()", () => {
+  describe("moderate() (#218)", () => {
     const ownerNotifications = () =>
       prisma.notification.findMany({ where: { userId, reportId, type: "report_status_change" } });
+    const reportState = () => prisma.report.findUniqueOrThrow({ where: { id: reportId } });
+    const flagStatuses = async () =>
+      (await prisma.reportFlag.findMany({ where: { reportId } })).map((f) => f.status);
 
-    test("accept marca el flag reviewed y deja el reporte hidden", async () => {
-      const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(flag.id);
+    test("hide oculta el reporte, mantiene las denuncias pendientes y avisa al dueño", async () => {
+      await flagAll([reporterId, secondReporterId]);
 
-      const resolved = await reportFlagsService.resolve(flag.id, "accept");
+      const result = await reportFlagsService.moderate(reportId, "hide");
 
-      expect(resolved.status).toBe("reviewed");
-      expect(resolved.report.status).toBe("hidden");
-    });
-
-    test("accept deja pendientes las demás denuncias del mismo reporte", async () => {
-      const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      const other = await reportFlagsService.create(reportId, { userId: secondReporterId, reason: "spam" });
-      createdFlagIds.push(flag.id, other.id);
-
-      await reportFlagsService.resolve(flag.id, "accept");
-
-      const untouched = await prisma.reportFlag.findUniqueOrThrow({ where: { id: other.id } });
-      expect(untouched.status).toBe("pending");
-    });
-
-    test("accept avisa al autor una sola vez que su reporte se ocultó", async () => {
-      const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      const other = await reportFlagsService.create(reportId, { userId: secondReporterId, reason: "spam" });
-      createdFlagIds.push(flag.id, other.id);
-
-      await reportFlagsService.resolve(flag.id, "accept");
-
+      expect(result.status).toBe("hidden");
+      expect(await flagStatuses()).toEqual(["pending", "pending"]);
       const notifications = await ownerNotifications();
       expect(notifications).toHaveLength(1);
-      expect(notifications[0]).toMatchObject({ title: "Tu reporte fue ocultado" });
       expect(notifications[0].message).toContain("revisa");
-      expect(notifications[0].message).toContain("Perrito encontrado en Plaza de Mayo");
     });
 
-    test("accept avisa al autor aunque haya desactivado los cambios de estado", async () => {
+    test("hide avisa al dueño aunque haya desactivado los cambios de estado", async () => {
       await prisma.notificationPreference.upsert({
         where: { userId },
         create: { userId, notifyStatusChange: false },
         update: { notifyStatusChange: false },
       });
-      const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(flag.id);
+      await flagAll([reporterId]);
 
-      await reportFlagsService.resolve(flag.id, "accept");
+      await reportFlagsService.moderate(reportId, "hide");
 
       expect(await ownerNotifications()).toHaveLength(1);
     });
 
-    test("dismiss marca el flag dismissed y deja el reporte publicado, sin avisar al autor", async () => {
-      const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(flag.id);
+    test("dismiss descarta las denuncias, reinicia el ciclo, deja el reporte publicado y no avisa", async () => {
+      await flagAll([reporterId, secondReporterId]);
 
-      const resolved = await reportFlagsService.resolve(flag.id, "dismiss");
+      const result = await reportFlagsService.moderate(reportId, "dismiss");
 
-      expect(resolved.status).toBe("dismissed");
-      expect(resolved.report.status).toBe("published");
+      expect(result.status).toBe("published");
+      expect(await flagStatuses()).toEqual(["dismissed", "dismissed"]);
+      const flags = await prisma.reportFlag.findMany({ where: { reportId } });
+      expect(flags.every((f) => f.resolvedAt !== null)).toBe(true);
+      expect((await reportState()).flagCycle).toBe(1);
       expect(await ownerNotifications()).toHaveLength(0);
     });
 
-    test("dismiss no toca las demás denuncias pendientes del reporte", async () => {
-      const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      const other = await reportFlagsService.create(reportId, { userId: secondReporterId, reason: "spam" });
-      createdFlagIds.push(flag.id, other.id);
+    test("restore publica de nuevo conservando publishedAt, descarta denuncias, sube el ciclo y avisa", async () => {
+      const publishedAt = new Date("2026-01-02T03:04:05Z");
+      await prisma.report.update({ where: { id: reportId }, data: { publishedAt } });
+      await flagAll([reporterId, secondReporterId]);
+      await reportFlagsService.moderate(reportId, "hide");
 
-      await reportFlagsService.resolve(flag.id, "dismiss");
+      const result = await reportFlagsService.moderate(reportId, "restore");
 
-      const pending = await prisma.reportFlag.findUniqueOrThrow({ where: { id: other.id } });
-      expect(pending.status).toBe("pending");
+      expect(result.status).toBe("published");
+      const report = await reportState();
+      expect(report.publishedAt).toEqual(publishedAt);
+      expect(report.flagCycle).toBe(1);
+      expect(await flagStatuses()).toEqual(["dismissed", "dismissed"]);
+      const titles = (await ownerNotifications()).map((n) => n.title);
+      expect(titles).toContain("Tu reporte volvió a estar visible");
     });
 
-    test.each(["accept", "dismiss"] as const)("lanza AppError 409 si el flag ya fue revisado (%s)", async (action) => {
-      const flag = await reportFlagsService.create(reportId, { userId: reporterId, reason: "false_info" });
-      createdFlagIds.push(flag.id);
+    test("restore funciona sobre un reporte ocultado por umbral", async () => {
+      process.env.REPORT_FLAG_THRESHOLD = "2";
+      await flagAll([reporterId, secondReporterId]);
+      expect((await reportState()).status).toBe("hidden");
 
-      await reportFlagsService.resolve(flag.id, "dismiss");
-      await expect(reportFlagsService.resolve(flag.id, action)).rejects.toMatchObject({ statusCode: 409 });
+      const result = await reportFlagsService.moderate(reportId, "restore");
+
+      expect(result.status).toBe("published");
     });
 
-    test("lanza AppError 404 si el flag no existe", async () => {
-      await expect(reportFlagsService.resolve(999999999, "accept")).rejects.toMatchObject(
-        new AppError(404, "Reporte de moderación no encontrado")
-      );
+    test("confirm deja el reporte oculto, cierra las denuncias y avisa al dueño", async () => {
+      await flagAll([reporterId, secondReporterId]);
+      await reportFlagsService.moderate(reportId, "hide");
+
+      const result = await reportFlagsService.moderate(reportId, "confirm");
+
+      expect(result.status).toBe("hidden");
+      expect(await flagStatuses()).toEqual(["reviewed", "reviewed"]);
+      expect((await reportState()).flagCycle).toBe(0);
+      const titles = (await ownerNotifications()).map((n) => n.title);
+      expect(titles).toContain("La moderación confirmó el ocultamiento");
+    });
+
+    test("confirmar es definitivo: restore responde 409 y no cambia nada (PM #14)", async () => {
+      await flagAll([reporterId]);
+      await reportFlagsService.moderate(reportId, "hide");
+      await reportFlagsService.moderate(reportId, "confirm");
+
+      await expect(reportFlagsService.moderate(reportId, "restore")).rejects.toMatchObject({ statusCode: 409 });
+
+      const report = await reportState();
+      expect(report.status).toBe("hidden");
+      expect(report.flagCycle).toBe(0);
+    });
+
+    test("los denunciantes no reciben avisos", async () => {
+      await flagAll([reporterId]);
+      await reportFlagsService.moderate(reportId, "hide");
+      await reportFlagsService.moderate(reportId, "restore");
+
+      expect(await prisma.notification.count({ where: { userId: { in: [reporterId, secondReporterId] } } })).toBe(0);
+    });
+
+    test.each([
+      ["hide", "hidden"],
+      ["dismiss", "hidden"],
+      ["restore", "published"],
+      ["confirm", "published"],
+    ] as const)("%s con el reporte %s responde 409 sin cambios", async (action, status) => {
+      await flagAll([reporterId]);
+      await prisma.report.update({ where: { id: reportId }, data: { status } });
+
+      await expect(reportFlagsService.moderate(reportId, action)).rejects.toMatchObject({ statusCode: 409 });
+
+      expect(await flagStatuses()).toEqual(["pending"]);
+      expect((await reportState()).status).toBe(status);
+    });
+
+    test.each(["hide", "dismiss"] as const)("%s sin denuncias pendientes responde 409", async (action) => {
+      await expect(reportFlagsService.moderate(reportId, action)).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    test("un segundo moderador recibe 409 de reporte ya revisado", async () => {
+      await flagAll([reporterId]);
+      await reportFlagsService.moderate(reportId, "dismiss");
+
+      await expect(reportFlagsService.moderate(reportId, "dismiss")).rejects.toMatchObject({
+        statusCode: 409,
+        message: "Este reporte ya fue revisado",
+      });
+    });
+
+    test("acciones concurrentes: solo una gana", async () => {
+      await flagAll([reporterId, secondReporterId]);
+
+      const results = await Promise.allSettled([
+        reportFlagsService.moderate(reportId, "hide"),
+        reportFlagsService.moderate(reportId, "dismiss"),
+      ]);
+
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    });
+
+    test("lanza AppError 404 si el reporte no existe", async () => {
+      await expect(reportFlagsService.moderate(999999999, "hide")).rejects.toMatchObject({ statusCode: 404 });
+    });
+  });
+
+  describe("listGroups() (#218)", () => {
+    const extraReportIds: number[] = [];
+    afterEach(async () => {
+      await prisma.reportFlag.deleteMany({ where: { reportId: { in: extraReportIds } } });
+      await prisma.report.deleteMany({ where: { id: { in: extraReportIds } } });
+      extraReportIds.length = 0;
+    });
+
+    async function extraReport(status: "published" | "hidden" | "resolved", title: string) {
+      const report = await prisma.report.create({ data: { userId, reportType: "lost", status, title } });
+      extraReportIds.push(report.id);
+      return report.id;
+    }
+    const flagIt = (rid: number, flaggerId: number, reason: "spam" | "other", detail?: string) =>
+      prisma.reportFlag.create({ data: { reportId: rid, userId: flaggerId, reason, detail } });
+
+    test("agrupa por reporte con conteo, motivos, detalles de 'otro' y snapshot", async () => {
+      const [third] = await makeUsers(1);
+      await flagIt(reportId, reporterId, "spam");
+      await flagIt(reportId, secondReporterId, "other", "es publicidad");
+      await flagIt(reportId, third, "spam");
+
+      const group = (await reportFlagsService.listGroups()).find((g) => g.report.id === reportId)!;
+
+      expect(group.flagCount).toBe(3);
+      expect(group.reasonCounts).toEqual({ spam: 2, other: 1 });
+      expect(group.otherDetails).toEqual(["es publicidad"]);
+      expect(group.report).toMatchObject({ title: "Perrito encontrado en Plaza de Mayo", status: "published" });
+      expect(typeof group.lastFlaggedAt).toBe("string");
+    });
+
+    test("ordena ocultos primero, luego más denunciados", async () => {
+      const [u3] = await makeUsers(1);
+      const hiddenId = await extraReport("hidden", "oculto");
+      const busyId = await extraReport("published", "muy denunciado");
+      await flagIt(hiddenId, reporterId, "spam");
+      await flagIt(busyId, reporterId, "spam");
+      await flagIt(busyId, secondReporterId, "spam");
+      await flagIt(busyId, u3, "spam");
+      await flagIt(reportId, reporterId, "spam");
+
+      const ids = (await reportFlagsService.listGroups())
+        .map((g) => g.report.id)
+        .filter((id) => [hiddenId, busyId, reportId].includes(id));
+
+      expect(ids).toEqual([hiddenId, busyId, reportId]);
+    });
+
+    test("excluye reportes confirmados y reportes resueltos", async () => {
+      const resolvedId = await extraReport("resolved", "resuelto");
+      await flagIt(resolvedId, reporterId, "spam");
+      await flagIt(reportId, reporterId, "spam");
+      await reportFlagsService.moderate(reportId, "hide");
+      await reportFlagsService.moderate(reportId, "confirm");
+
+      const ids = (await reportFlagsService.listGroups()).map((g) => g.report.id);
+
+      expect(ids).not.toContain(resolvedId);
+      expect(ids).not.toContain(reportId);
     });
   });
 });
