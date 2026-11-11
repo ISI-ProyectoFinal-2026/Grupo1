@@ -1,8 +1,8 @@
 import type { AxiosResponse } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/services/api'
-import { createReportFlag, listReportFlags, resolveReportFlag } from '@/services/moderation.service'
-import type { CreatedReportFlagDTO, ReportFlagDTO } from '@/types/moderation.types'
+import { createReportFlag, listReportFlagGroups, moderateReport } from '@/services/moderation.service'
+import type { CreatedReportFlagDTO, ReportFlagGroupDTO } from '@/types/moderation.types'
 
 vi.mock('@/services/api', () => ({
   api: { get: vi.fn(), patch: vi.fn(), post: vi.fn() },
@@ -12,15 +12,20 @@ function respuesta<T>(data: T): AxiosResponse<T> {
   return { data } as AxiosResponse<T>
 }
 
-function flag(overrides: Partial<ReportFlagDTO> = {}): ReportFlagDTO {
+function group(overrides: Partial<ReportFlagGroupDTO> = {}): ReportFlagGroupDTO {
   return {
-    id: 1,
-    reportId: 10,
-    userId: 7,
-    reason: 'Publicacion falsa',
-    status: 'pending',
-    createdAt: '2026-09-01T10:00:00.000Z',
-    report: { id: 10, title: 'Perrito en Plaza de Mayo', status: 'published' },
+    report: {
+      id: 10,
+      title: 'Perrito en Plaza de Mayo',
+      status: 'published',
+      reportType: 'lost',
+      imageUrl: null,
+      description: null,
+    },
+    flagCount: 2,
+    reasonCounts: { spam: 1, other: 1 },
+    otherDetails: ['Es una estafa'],
+    lastFlaggedAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }
 }
@@ -30,37 +35,27 @@ describe('moderation.service', () => {
     vi.clearAllMocks()
   })
 
-  it('lista los flags pendientes por defecto, sin mandar el filtro', async () => {
-    const esperados = [flag(), flag({ id: 2 })]
+  it('lista la cola agrupada por reporte', async () => {
+    const esperados = [group(), group({ flagCount: 5 })]
     vi.mocked(api.get).mockResolvedValue(respuesta(esperados))
 
-    const resultado = await listReportFlags()
+    const resultado = await listReportFlagGroups()
 
-    expect(api.get).toHaveBeenCalledWith('/report-flags', { params: {} })
+    expect(api.get).toHaveBeenCalledWith('/report-flags/reports')
     expect(resultado).toEqual(esperados)
   })
 
-  it('manda status como query param cuando se pide un estado', async () => {
-    vi.mocked(api.get).mockResolvedValue(respuesta([flag({ status: 'reviewed' })]))
+  it.each(['hide', 'dismiss', 'restore', 'confirm'] as const)(
+    'aplica la accion %s sobre el reporte con PATCH',
+    async (action) => {
+      vi.mocked(api.patch).mockResolvedValue(respuesta({ id: 10, status: 'hidden' }))
 
-    await listReportFlags('reviewed')
+      const resultado = await moderateReport(10, action)
 
-    expect(api.get).toHaveBeenCalledWith('/report-flags', { params: { status: 'reviewed' } })
-  })
-
-  it('resuelve un flag con PATCH y la accion elegida', async () => {
-    const resuelto = flag({
-      status: 'reviewed',
-      report: { id: 10, title: 'X', status: 'rejected' },
-    })
-    vi.mocked(api.patch).mockResolvedValue(respuesta(resuelto))
-
-    const resultado = await resolveReportFlag(1, 'accept')
-
-    expect(api.patch).toHaveBeenCalledWith('/report-flags/1', { action: 'accept' })
-    expect(resultado.status).toBe('reviewed')
-    expect(resultado.report.status).toBe('rejected')
-  })
+      expect(api.patch).toHaveBeenCalledWith('/report-flags/reports/10', { action })
+      expect(resultado).toEqual({ id: 10, status: 'hidden' })
+    }
+  )
 
   it('denuncia un reporte contra POST /reports/:id/flags con el motivo', async () => {
     const creado: CreatedReportFlagDTO = {
