@@ -1,5 +1,5 @@
 export type ReportType = 'lost' | 'found'
-export type ReportStatus = 'pending' | 'published' | 'rejected' | 'resolved'
+export type ReportStatus = 'pending' | 'published' | 'rejected' | 'hidden' | 'resolved'
 
 export interface ReportLocation {
   lat: number

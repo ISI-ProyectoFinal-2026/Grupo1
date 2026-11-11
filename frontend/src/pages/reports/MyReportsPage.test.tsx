@@ -60,13 +60,15 @@ describe('MyReportsPage: listado', () => {
       reporte({ id: 2, title: 'Ya publicado', status: 'published' }),
       reporte({ id: 3, title: 'Rechazado por moderación', status: 'rejected' }),
       reporte({ id: 4, title: 'Caso cerrado', status: 'resolved' }),
+      reporte({ id: 6, title: 'Denunciado', status: 'hidden' }),
     ])
     renderPage()
 
     const casos: [string, string][] = [
       ['Pendiente de moderar', 'Pendiente'],
       ['Ya publicado', 'Publicado'],
-      ['Rechazado por moderación', 'Oculto'],
+      ['Rechazado por moderación', 'Rechazado'],
+      ['Denunciado', 'Oculto por denuncias'],
       ['Caso cerrado', 'Resuelto'],
     ]
     for (const [titulo, estado] of casos) {
