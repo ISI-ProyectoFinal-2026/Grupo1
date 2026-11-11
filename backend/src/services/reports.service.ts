@@ -1,4 +1,4 @@
-import { Prisma, ReportType, ReportStatus } from "@prisma/client";
+import { Prisma, ReportType, ReportStatus, ReportFlagReason } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import * as matchingService from "./matching.service";
@@ -49,8 +49,15 @@ function toReportTag(reportType: ReportType, status: ReportStatus): ReportTag {
   return { label, color: REPORT_TAG_COLORS[label] };
 }
 
+export interface HiddenReason {
+  reason: ReportFlagReason;
+  count: number;
+}
+
 export interface ReportDTO extends Omit<ReportRow, "lat" | "lng" | "eventDate"> {
   location: { lat: number; lng: number } | null;
+  // motivos de las denuncias del ciclo, solo para el dueño de un reporte oculto (#218)
+  hiddenReasons?: HiddenReason[];
   // YYYY-MM-DD: sin hora, así no se corre un día por la zona horaria
   eventDate: string | null;
   tag: ReportTag;
@@ -79,10 +86,11 @@ export const reportColumns = Prisma.sql`
 `;
 
 export async function list(filters: ListReportsQuery = {}, viewerId?: number): Promise<ReportDTO[]> {
-  // pending/rejected son estados de moderacion: solo el dueño puede listar
+  // pending/rejected/hidden son estados de moderacion: solo el dueño puede listar
   // los propios, un anonimo o un tercero no debe poder scrapearlos pidiendo
   // el status explicito (ver issue #180).
-  const isPrivateStatus = filters.status === "pending" || filters.status === "rejected";
+  const isPrivateStatus =
+    filters.status === "pending" || filters.status === "rejected" || filters.status === "hidden";
   if (isPrivateStatus && viewerId === undefined) {
     return [];
   }
@@ -109,12 +117,35 @@ export async function list(filters: ListReportsQuery = {}, viewerId?: number): P
   return rows.map(toReportDTO);
 }
 
+// agrega hiddenReasons a los reportes ocultos: denuncias del ciclo actual agrupadas por motivo
+async function withHiddenReasons(reports: ReportDTO[]): Promise<ReportDTO[]> {
+  const hiddenIds = reports.filter((r) => r.status === "hidden").map((r) => r.id);
+  if (hiddenIds.length === 0) return reports;
+
+  const rows = await prisma.$queryRaw<{ reportId: number; reason: ReportFlagReason; count: number }[]>`
+    SELECT f.report_id AS "reportId", f.reason::text AS reason, COUNT(*)::int AS count
+    FROM report_flags f
+    JOIN reports r ON r.id = f.report_id AND f.cycle = r.flag_cycle
+    WHERE f.report_id = ANY(${hiddenIds}::int[])
+    GROUP BY f.report_id, f.reason
+    ORDER BY count DESC, reason ASC
+  `;
+  return reports.map((report) =>
+    report.status === "hidden"
+      ? {
+          ...report,
+          hiddenReasons: rows.filter((row) => row.reportId === report.id).map(({ reason, count }) => ({ reason, count })),
+        }
+      : report
+  );
+}
+
 // "Mis reportes" (#225): todos los estados, solo del dueño
 export async function listOwned(userId: number): Promise<ReportDTO[]> {
   const rows = await prisma.$queryRaw<ReportRow[]>`
     SELECT ${reportColumns} FROM reports r WHERE r.user_id = ${userId} ORDER BY r.created_at DESC, r.id DESC
   `;
-  return rows.map(toReportDTO);
+  return withHiddenReasons(rows.map(toReportDTO));
 }
 
 export async function getById(id: number): Promise<ReportDTO> {
@@ -131,7 +162,7 @@ export async function getVisibleById(id: number, viewerId?: number): Promise<Rep
   const report = await getById(id);
   const isPublicStatus = report.status === "published" || report.status === "resolved";
   if (report.userId === viewerId) {
-    return report;
+    return (await withHiddenReasons([report]))[0];
   }
   if (isPublicStatus && !(await isAuthorSuspended(report.userId))) {
     return report;
@@ -210,6 +241,9 @@ function assertCanResolve(status: ReportStatus): void {
   if (status === "resolved") {
     throw new AppError(409, "El reporte ya está resuelto");
   }
+  if (status === "hidden") {
+    throw new AppError(409, "Un reporte oculto por denuncias no se puede cerrar");
+  }
   if (status !== "published") {
     throw new AppError(409, CLOSE_ONLY_PUBLISHED_MESSAGE);
   }
@@ -219,6 +253,10 @@ export async function update(id: number, userId: number, data: UpdateReportInput
   const existing = await getById(id);
   if (existing.userId !== userId) {
     throw new AppError(403, "No tenés permiso para modificar este reporte");
+  }
+  // oculto por denuncias: sin edición ni cambio de foto (así tampoco se re-modera)
+  if (existing.status === "hidden") {
+    throw new AppError(409, "Un reporte oculto por denuncias no se puede editar");
   }
 
   if (data.status === "resolved") {
@@ -244,7 +282,9 @@ export async function update(id: number, userId: number, data: UpdateReportInput
     }
     await assertImagesHaveAnimals(newImageUrl ? [newImageUrl, ...addedExtras] : addedExtras);
   }
-  const updateData = photosChanged ? { ...scalarData, status: "pending" as const, publishedAt: null } : scalarData;
+  // contentEditedAt habilita volver a denunciar tras una restauración
+  const editedData = { ...scalarData, contentEditedAt: new Date() };
+  const updateData = photosChanged ? { ...editedData, status: "pending" as const, publishedAt: null } : editedData;
 
   await prisma.$transaction(async (tx) => {
     try {
