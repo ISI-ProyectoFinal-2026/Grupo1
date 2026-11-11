@@ -94,6 +94,28 @@ describe('MyReportsPage: listado', () => {
   })
 })
 
+describe('MyReportsPage: reporte oculto por denuncias', () => {
+  it('muestra los motivos y no ofrece editar, pero sí eliminar', async () => {
+    vi.mocked(reportsService.listMyReports).mockResolvedValue([
+      reporte({
+        status: 'hidden',
+        hiddenReasons: [
+          { reason: 'offensive', count: 4 },
+          { reason: 'duplicate', count: 1 },
+        ],
+      }),
+    ])
+    renderPage()
+
+    const card = (await screen.findByRole('heading', { name: 'Perro perdido en Nueva Córdoba' })).closest('li')!
+    expect(within(card).getByText('Contenido ofensivo: 4')).toBeInTheDocument()
+    expect(within(card).getByText('Duplicado: 1')).toBeInTheDocument()
+    expect(within(card).queryByRole('link', { name: /Editar/ })).not.toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: /Ver/ })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Eliminar reporte' })).toBeInTheDocument()
+  })
+})
+
 describe('MyReportsPage: acciones', () => {
   it('lleva al detalle del reporte', async () => {
     vi.mocked(reportsService.listMyReports).mockResolvedValue([reporte()])

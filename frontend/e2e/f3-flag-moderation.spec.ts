@@ -13,7 +13,8 @@ test('F3: a user flags a report and a moderator accepts it, hiding the report an
   await page.goto(`/reports/${report.id}`)
   await page.getByRole('button', { name: 'Denunciar', exact: true }).click()
   const form = page.getByRole('form', { name: 'Denunciar reporte' })
-  await form.getByLabel('Motivo de la denuncia').fill(reason)
+  await form.getByLabel('Motivo de la denuncia').selectOption('other')
+  await form.getByLabel('Detalle').fill(reason)
   await form.getByRole('button', { name: 'Enviar denuncia' }).click()
   // The loading spinner also has role="status", so match by text.
   await expect(

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { buttonClasses } from '@/components/ui/buttonClasses'
 import { BoneTag } from '@/components/ui/canine'
 import DeleteReportButton from '@/components/reports/DeleteReportButton'
+import HiddenReportNotice from '@/components/reports/HiddenReportNotice'
 import ReportTypeBadge from '@/components/reports/ReportTypeBadge'
 import { useDeleteReport } from '@/hooks/useDeleteReport'
 import { REPORT_STATUS_LABELS } from '@/lib/report-status'
@@ -14,6 +15,8 @@ interface MyReportCardProps {
 // la lista se refresca sola: useDeleteReport invalida ['reports']
 export default function MyReportCard({ report }: MyReportCardProps) {
   const deleteReport = useDeleteReport(report.id, () => {})
+  // oculto por denuncias: el dueño solo puede verlo o eliminarlo
+  const isHidden = report.status === 'hidden'
 
   return (
     <li className='card flex flex-col gap-3 p-4'>
@@ -40,7 +43,9 @@ export default function MyReportCard({ report }: MyReportCardProps) {
         </div>
       </div>
 
-      <div className='grid grid-cols-2 gap-2'>
+      {isHidden && <HiddenReportNotice hiddenReasons={report.hiddenReasons} />}
+
+      <div className={isHidden ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-2'}>
         <Link
           to={`/reports/${report.id}`}
           aria-label={`Ver ${report.title}`}
@@ -48,13 +53,15 @@ export default function MyReportCard({ report }: MyReportCardProps) {
         >
           Ver
         </Link>
-        <Link
-          to={`/reports/${report.id}/edit`}
-          aria-label={`Editar ${report.title}`}
-          className={buttonClasses('secondary')}
-        >
-          Editar
-        </Link>
+        {!isHidden && (
+          <Link
+            to={`/reports/${report.id}/edit`}
+            aria-label={`Editar ${report.title}`}
+            className={buttonClasses('secondary')}
+          >
+            Editar
+          </Link>
+        )}
       </div>
       <DeleteReportButton
         onConfirm={deleteReport.remove}

@@ -1,28 +1,34 @@
 import { useMutation } from '@tanstack/react-query'
 import { createReportFlag } from '@/services/moderation.service'
 import { getApiErrorStatus } from '@/services/api'
+import type { CreateReportFlagInput } from '@/types/moderation.types'
 
 const ALREADY_FLAGGED_MESSAGE = 'Ya denunciaste este reporte.'
+const UNAVAILABLE_MESSAGE = 'Este reporte ya no está disponible para denunciar.'
+const OWN_REPORT_MESSAGE = 'No podés denunciar tu propia publicación.'
+
+// errores donde reintentar no sirve
+const FINAL_MESSAGES: Record<number, string> = {
+  409: ALREADY_FLAGGED_MESSAGE,
+  404: UNAVAILABLE_MESSAGE,
+  403: OWN_REPORT_MESSAGE,
+}
 
 export function useFlagReport(reportId: number) {
   const mutation = useMutation({
-    mutationFn: (reason: string) => createReportFlag(reportId, reason),
+    mutationFn: (input: CreateReportFlagInput) => createReportFlag(reportId, input),
   })
 
-  // 409: este usuario ya lo había denunciado. Reintentar no sirve, así que
-  // cuenta como terminado igual que una denuncia exitosa.
-  const alreadyFlagged = mutation.isError && getApiErrorStatus(mutation.error) === 409
-  const error = mutation.isError
-    ? alreadyFlagged
-      ? ALREADY_FLAGGED_MESSAGE
-      : mutation.error.message
-    : null
+  // 409 (ya denunciado), 404 (ya no publicado) y 403 (propio): reintentar no
+  // sirve, así que cuentan como terminado igual que una denuncia exitosa.
+  const finalMessage = mutation.isError ? FINAL_MESSAGES[getApiErrorStatus(mutation.error) ?? 0] : undefined
+  const error = mutation.isError ? (finalMessage ?? mutation.error.message) : null
 
   return {
-    flag: (reason: string) => mutation.mutate(reason),
+    flag: (input: CreateReportFlagInput) => mutation.mutate(input),
     isPending: mutation.isPending,
     isSent: mutation.isSuccess,
-    isDone: mutation.isSuccess || alreadyFlagged,
+    isDone: mutation.isSuccess || finalMessage !== undefined,
     error,
   }
 }
