@@ -26,7 +26,7 @@ test('F1: a new user registers, logs in through the UI and creates a report (pen
   await page.getByLabel('Título *').fill(title)
   await page.getByLabel('Descripción').fill('Collar rojo, responde a Toby')
   await page.locator('input[type=file]').setInputFiles(E2E_PHOTO)
-  await expect(page.getByText('Foto subida correctamente')).toBeVisible()
+  await expect(page.getByAltText('Foto 1')).toBeVisible()
   await page.getByRole('button', { name: /Usar mi ubicación actual/ }).click()
   await expect(page.getByText('Ubicación seleccionada')).toBeVisible()
   // Stubbed Nominatim answer replaces the raw coordinates.
