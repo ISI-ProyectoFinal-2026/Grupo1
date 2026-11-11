@@ -6,22 +6,36 @@ import { createQueryWrapper } from '@/test/query-wrapper'
 import * as moderationService from '@/services/moderation.service'
 import * as adsService from '@/services/ads.service'
 import ModerationPage from '@/pages/moderation/ModerationPage'
-import type { ReportedAccountDTO, ReportFlagDTO } from '@/types/moderation.types'
+import type { ReportedAccountDTO, ReportFlagGroupDTO } from '@/types/moderation.types'
 
 vi.mock('@/services/moderation.service')
 vi.mock('@/services/ads.service')
 
-function flag(overrides: Partial<ReportFlagDTO> = {}): ReportFlagDTO {
+function grupo(overrides: Partial<ReportFlagGroupDTO> = {}): ReportFlagGroupDTO {
   return {
-    id: 1,
-    reportId: 10,
-    userId: 7,
-    reason: 'Publicacion falsa',
-    status: 'pending',
-    createdAt: '2026-09-01T10:00:00.000Z',
-    report: { id: 10, title: 'Perrito en Plaza de Mayo', status: 'published' },
+    report: {
+      id: 10,
+      title: 'Perrito en Plaza de Mayo',
+      status: 'published',
+      reportType: 'lost',
+      imageUrl: null,
+      description: null,
+    },
+    flagCount: 1,
+    reasonCounts: { spam: 1 },
+    otherDetails: [],
+    lastFlaggedAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
   }
+}
+
+function grupoOculto(overrides: Partial<ReportFlagGroupDTO> = {}): ReportFlagGroupDTO {
+  return grupo({
+    report: { ...grupo().report, id: 20, title: 'Gato perdido', status: 'hidden' },
+    flagCount: 5,
+    reasonCounts: { false_info: 5 },
+    ...overrides,
+  })
 }
 
 function cuenta(overrides: Partial<ReportedAccountDTO> = {}): ReportedAccountDTO {
@@ -54,20 +68,18 @@ describe('ModerationPage', () => {
     vi.mocked(moderationService.listReportedAccounts).mockResolvedValue([])
   })
 
-  it('lista los flags pendientes de la cola', async () => {
-    vi.mocked(moderationService.listReportFlags).mockResolvedValue([
-      flag(),
-      flag({ id: 2, reportId: 20, report: { id: 20, title: 'Gato perdido', status: 'published' } }),
-    ])
+  it('lista los reportes denunciados de la cola agrupada', async () => {
+    vi.mocked(moderationService.listReportFlagGroups).mockResolvedValue([grupoOculto(), grupo()])
 
     renderPage()
 
     expect(await screen.findByText('Perrito en Plaza de Mayo')).toBeInTheDocument()
     expect(screen.getByText('Gato perdido')).toBeInTheDocument()
+    expect(screen.getByText('Información falsa: 5')).toBeInTheDocument()
   })
 
   it('avisa mientras carga la cola', () => {
-    vi.mocked(moderationService.listReportFlags).mockReturnValue(new Promise(() => {}))
+    vi.mocked(moderationService.listReportFlagGroups).mockReturnValue(new Promise(() => {}))
 
     renderPage()
 
@@ -75,7 +87,7 @@ describe('ModerationPage', () => {
   })
 
   it('muestra los anuncios denunciados y da de baja uno', async () => {
-    vi.mocked(moderationService.listReportFlags).mockResolvedValue([])
+    vi.mocked(moderationService.listReportFlagGroups).mockResolvedValue([])
     vi.mocked(adsService.listAdFlags).mockResolvedValue([
       {
         id: 5,
@@ -110,7 +122,7 @@ describe('ModerationPage', () => {
   })
 
   it('avisa cuando la cola no se pudo cargar', async () => {
-    vi.mocked(moderationService.listReportFlags).mockRejectedValue(new Error('403'))
+    vi.mocked(moderationService.listReportFlagGroups).mockRejectedValue(new Error('403'))
 
     renderPage()
 
@@ -118,38 +130,50 @@ describe('ModerationPage', () => {
   })
 
   it.each([
-    ['Ocultar reporte', 'accept', 'reviewed', 'Reporte ocultado y denuncia aceptada'],
-    ['Descartar', 'dismiss', 'dismissed', 'Denuncia descartada, el reporte sigue publicado'],
-  ] as const)('"%s" resuelve el flag y confirma la accion', async (boton, accion, status, mensaje) => {
-    vi.mocked(moderationService.listReportFlags).mockResolvedValue([flag({ id: 42 })])
-    vi.mocked(moderationService.resolveReportFlag).mockResolvedValue(flag({ id: 42, status }))
+    ['Ocultar', 'hide', grupo(), 'published', 'Reporte ocultado'],
+    ['Descartar', 'dismiss', grupo(), 'published', 'Denuncias descartadas, el reporte sigue publicado'],
+    ['Restaurar', 'restore', grupoOculto(), 'published', 'Reporte restaurado, vuelve a estar publicado'],
+    ['Confirmar ocultamiento', 'confirm', grupoOculto(), 'hidden', 'Ocultamiento confirmado'],
+  ] as const)('"%s" aplica %s sobre el reporte y confirma la accion', async (boton, accion, item, status, mensaje) => {
+    vi.mocked(moderationService.listReportFlagGroups).mockResolvedValue([item])
+    vi.mocked(moderationService.moderateReport).mockResolvedValue({ id: item.report.id, status })
     const user = userEvent.setup()
     renderPage()
 
     await user.click(await screen.findByRole('button', { name: boton }))
 
-    await waitFor(() => expect(moderationService.resolveReportFlag).toHaveBeenCalledWith(42, accion))
+    await waitFor(() => expect(moderationService.moderateReport).toHaveBeenCalledWith(item.report.id, accion))
     expect(await screen.findByText(mensaje)).toBeInTheDocument()
   })
 
-  it('muestra el error del backend cuando la resolucion falla', async () => {
-    vi.mocked(moderationService.listReportFlags).mockResolvedValue([flag()])
-    vi.mocked(moderationService.resolveReportFlag).mockRejectedValue(
-      new Error('Este reporte de moderación ya fue revisado')
-    )
+  it('refresca la cola despues de una accion', async () => {
+    vi.mocked(moderationService.listReportFlagGroups)
+      .mockResolvedValueOnce([grupo()])
+      .mockResolvedValue([])
+    vi.mocked(moderationService.moderateReport).mockResolvedValue({ id: 10, status: 'hidden' })
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByRole('button', { name: 'Ocultar reporte' }))
+    await user.click(await screen.findByRole('button', { name: 'Ocultar' }))
 
-    expect(
-      await screen.findByText('Este reporte de moderación ya fue revisado')
-    ).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Perrito en Plaza de Mayo')).not.toBeInTheDocument())
+    expect(moderationService.listReportFlagGroups).toHaveBeenCalledTimes(2)
+  })
+
+  it('muestra el error del backend cuando otro moderador ya resolvio el reporte', async () => {
+    vi.mocked(moderationService.listReportFlagGroups).mockResolvedValue([grupo()])
+    vi.mocked(moderationService.moderateReport).mockRejectedValue(new Error('Este reporte ya fue revisado'))
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Ocultar' }))
+
+    expect(await screen.findByText('Este reporte ya fue revisado')).toBeInTheDocument()
   })
 
   describe('cuentas denunciadas', () => {
     beforeEach(() => {
-      vi.mocked(moderationService.listReportFlags).mockResolvedValue([])
+      vi.mocked(moderationService.listReportFlagGroups).mockResolvedValue([])
     })
 
     it('muestra cada cuenta con sus denuncias por gravedad', async () => {

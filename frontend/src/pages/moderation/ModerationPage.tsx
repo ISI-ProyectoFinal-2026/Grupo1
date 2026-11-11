@@ -1,59 +1,62 @@
 import ErrorMessage from '@/components/ui/ErrorMessage'
-import ReportFlagList from '@/components/moderation/ReportFlagList'
+import ReportFlagGroupList from '@/components/moderation/ReportFlagGroupList'
 import Spinner from '@/components/ui/Spinner'
 import { Link } from 'react-router-dom'
 import { CheckIcon, ShieldIcon } from '@/components/ui/icons'
-import { useReportFlagsQuery, useResolveReportFlagMutation } from '@/hooks/useReportFlagsQuery'
+import { useModerateReportMutation, useReportFlagGroupsQuery } from '@/hooks/useReportFlagGroups'
+import type { ModerationAction } from '@/types/moderation.types'
 import { useAdFlagsQuery, useResolveAdFlagMutation } from '@/hooks/useServedAds'
 import AdFlagList from '@/components/moderation/AdFlagList'
 import ReportedAccountList from '@/components/moderation/ReportedAccountList'
 import { useReportedAccountsQuery } from '@/hooks/useAccountReports'
 
+const ACTION_SUCCESS_MESSAGES: Record<ModerationAction, string> = {
+  hide: 'Reporte ocultado',
+  dismiss: 'Denuncias descartadas, el reporte sigue publicado',
+  restore: 'Reporte restaurado, vuelve a estar publicado',
+  confirm: 'Ocultamiento confirmado',
+}
+
 function ModerationPage() {
-  const flagsQuery = useReportFlagsQuery()
-  const resolveFlag = useResolveReportFlagMutation()
+  const groupsQuery = useReportFlagGroupsQuery()
+  const moderate = useModerateReportMutation()
 
   return (
     <div className='mx-auto max-w-3xl px-4 py-5 sm:px-6 lg:py-8'>
       <h1 className='font-display text-display-lg'>Panel de moderación</h1>
       <p className='mt-2 max-w-prose text-ink-muted'>
-        Publicaciones denunciadas pendientes de revisión. Aceptar una denuncia oculta el reporte; descartarla lo deja publicado.
+        Publicaciones denunciadas pendientes de revisión, agrupadas por reporte. Los reportes ocultos automáticamente se
+        restauran o se confirman; los publicados con denuncias se ocultan o se descartan.
       </p>
 
       <div className='mt-6' aria-live='polite'>
-        {flagsQuery.isPending && (
+        {groupsQuery.isPending && (
           <div className='flex justify-center py-10 text-ink-muted'>
             <Spinner />
           </div>
         )}
 
-        {flagsQuery.isError && <ErrorMessage message='No se pudo cargar la cola de moderación' />}
+        {groupsQuery.isError && <ErrorMessage message='No se pudo cargar la cola de moderación' />}
 
-        {flagsQuery.isSuccess && (
+        {groupsQuery.isSuccess && (
           <>
-            {resolveFlag.isError && (
+            {moderate.isError && (
               <ErrorMessage
                 className='mb-3'
-                message={
-                  resolveFlag.error instanceof Error
-                    ? resolveFlag.error.message
-                    : 'Error inesperado, intentá de nuevo'
-                }
+                message={moderate.error instanceof Error ? moderate.error.message : 'Error inesperado, intentá de nuevo'}
               />
             )}
-            {resolveFlag.isSuccess && (
+            {moderate.isSuccess && (
               <p className='mb-3 flex items-center gap-2 font-bold text-success-ink'>
                 <CheckIcon className='h-5 w-5' />
-                {resolveFlag.data.status === 'reviewed'
-                  ? 'Reporte ocultado y denuncia aceptada'
-                  : 'Denuncia descartada, el reporte sigue publicado'}
+                {ACTION_SUCCESS_MESSAGES[moderate.variables.action]}
               </p>
             )}
 
-            <ReportFlagList
-              flags={flagsQuery.data}
-              onResolve={(id, action) => resolveFlag.mutate({ id, action })}
-              isResolving={resolveFlag.isPending}
+            <ReportFlagGroupList
+              groups={groupsQuery.data}
+              onAction={(reportId, action) => moderate.mutate({ reportId, action })}
+              isActing={moderate.isPending}
             />
           </>
         )}
