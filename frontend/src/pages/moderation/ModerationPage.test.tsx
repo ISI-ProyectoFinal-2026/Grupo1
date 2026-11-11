@@ -186,5 +186,16 @@ describe('ModerationPage', () => {
 
       expect(await screen.findByText('No hay cuentas denunciadas')).toBeInTheDocument()
     })
+
+    it('avisa que las cuentas sancionadas pasan a la cola de sanciones', async () => {
+      renderPage()
+
+      const note = await screen.findByRole('note')
+      expect(note).toHaveTextContent('Cuando una cuenta llega a 5 denuncias sale de esta lista')
+      expect(screen.getByRole('link', { name: 'Sanciones pendientes' })).toHaveAttribute(
+        'href',
+        '/admin/sanctions'
+      )
+    })
   })
 })
