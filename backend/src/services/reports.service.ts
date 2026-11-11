@@ -249,6 +249,33 @@ function assertCanResolve(status: ReportStatus): void {
   }
 }
 
+const HIDDEN_EDIT_MESSAGE = "Un reporte oculto por denuncias no se puede editar";
+const PENDING_FLAGS_PHOTO_MESSAGE = "No podés cambiar las fotos mientras el reporte tiene denuncias en revisión";
+
+// cambiar fotos lo pasa a pending y sacaría las denuncias de la cola
+async function assertNoPendingFlags(db: Prisma.TransactionClient, reportId: number): Promise<void> {
+  const pending = await db.reportFlag.count({ where: { reportId, status: "pending" } });
+  if (pending > 0) {
+    throw new AppError(409, PENDING_FLAGS_PHOTO_MESSAGE);
+  }
+}
+
+// revalida bajo el mismo lock que usan las denuncias
+async function assertEditableLocked(tx: Prisma.TransactionClient, reportId: number, photosChanged: boolean): Promise<void> {
+  const [row] = await tx.$queryRaw<{ status: string }[]>`
+    SELECT status::text AS status FROM reports WHERE id = ${reportId} FOR UPDATE
+  `;
+  if (!row) {
+    throw new AppError(404, "Reporte no encontrado");
+  }
+  if (row.status === "hidden") {
+    throw new AppError(409, HIDDEN_EDIT_MESSAGE);
+  }
+  if (photosChanged) {
+    await assertNoPendingFlags(tx, reportId);
+  }
+}
+
 export async function update(id: number, userId: number, data: UpdateReportInput): Promise<ReportDTO> {
   const existing = await getById(id);
   if (existing.userId !== userId) {
@@ -256,7 +283,7 @@ export async function update(id: number, userId: number, data: UpdateReportInput
   }
   // oculto por denuncias: sin edición ni cambio de foto (así tampoco se re-modera)
   if (existing.status === "hidden") {
-    throw new AppError(409, "Un reporte oculto por denuncias no se puede editar");
+    throw new AppError(409, HIDDEN_EDIT_MESSAGE);
   }
 
   if (data.status === "resolved") {
@@ -280,6 +307,8 @@ export async function update(id: number, userId: number, data: UpdateReportInput
     if (existing.status === "resolved" || data.status === "resolved") {
       throw new AppError(409, "No se puede cambiar la foto de un reporte resuelto");
     }
+    // antes de llamar a la IA; se revalida bajo lock
+    await assertNoPendingFlags(prisma, id);
     await assertImagesHaveAnimals(newImageUrl ? [newImageUrl, ...addedExtras] : addedExtras);
   }
   // contentEditedAt habilita volver a denunciar tras una restauración
@@ -287,6 +316,7 @@ export async function update(id: number, userId: number, data: UpdateReportInput
   const updateData = photosChanged ? { ...editedData, status: "pending" as const, publishedAt: null } : editedData;
 
   await prisma.$transaction(async (tx) => {
+    await assertEditableLocked(tx, id, photosChanged);
     try {
       await tx.report.update({ where: { id }, data: updateData });
     } catch (error) {

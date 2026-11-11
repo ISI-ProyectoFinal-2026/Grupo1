@@ -186,6 +186,55 @@ describe("reportes ocultos por denuncias (#218)", () => {
       expect(await prisma.report.findUnique({ where: { id } })).toBeNull();
     });
 
+    test("si se oculta entre la lectura y el bloqueo, update() responde 409 y no cambia nada", async () => {
+      const id = await createReport("published");
+      const original = prisma.$transaction.bind(prisma) as (...args: unknown[]) => Promise<unknown>;
+      // ocultamiento concurrente justo antes de tomar el lock
+      jest.spyOn(prisma, "$transaction").mockImplementationOnce((async (...args: unknown[]) => {
+        await prisma.report.update({ where: { id }, data: { status: "hidden" } });
+        return original(...args);
+      }) as never);
+
+      await expect(reportsService.update(id, ownerId, { title: "Nuevo título" })).rejects.toMatchObject({
+        statusCode: 409,
+      });
+
+      const report = await prisma.report.findUniqueOrThrow({ where: { id } });
+      expect(report).toMatchObject({ title: "Oculto de prueba", status: "hidden", contentEditedAt: null });
+    });
+
+    test.each([
+      ["la foto principal", { imageUrl: "https://cdn.example.com/nueva.jpg" }],
+      ["las fotos extra", { extraImageUrls: ["https://cdn.example.com/extra.jpg"] }],
+    ])("con denuncias pendientes, cambiar %s responde 409 y no re-modera", async (_label, change) => {
+      const id = await createReport("published");
+      await addFlag(id, "spam");
+      const trigger = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue(undefined);
+
+      await expect(reportsService.update(id, ownerId, change)).rejects.toMatchObject({ statusCode: 409 });
+
+      expect(trigger).not.toHaveBeenCalled();
+      const report = await prisma.report.findUniqueOrThrow({ where: { id } });
+      expect(report).toMatchObject({
+        status: "published",
+        imageUrl: "https://cdn.example.com/a.jpg",
+        extraImageUrls: [],
+        contentEditedAt: null,
+      });
+      expect(await prisma.reportFlag.count({ where: { reportId: id, status: "pending" } })).toBe(1);
+    });
+
+    test("con denuncias pendientes, editar el texto sigue permitido y las denuncias quedan en revisión", async () => {
+      const id = await createReport("published");
+      await addFlag(id, "spam");
+
+      await reportsService.update(id, ownerId, { title: "Título corregido" });
+
+      const report = await prisma.report.findUniqueOrThrow({ where: { id } });
+      expect(report).toMatchObject({ title: "Título corregido", status: "published" });
+      expect(await prisma.reportFlag.count({ where: { reportId: id, status: "pending" } })).toBe(1);
+    });
+
     test("una edición exitosa de un publicado sella contentEditedAt", async () => {
       const id = await createReport("published");
       const before = Date.now();
