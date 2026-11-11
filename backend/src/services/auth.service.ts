@@ -6,6 +6,7 @@ import { frontendLink } from "../utils/frontend-link";
 import { signAccessToken } from "../utils/jwt";
 import { PublicUser, toPublicUser } from "../utils/public-user";
 import { LoginInput, RegisterInput, ResetPasswordInput } from "../validators/auth.validator";
+import { assertNotSuspended } from "./account-sanctions.service";
 import { consumeAuthToken, issueAuthToken, latestAuthTokenCreatedAt } from "./auth-tokens.service";
 import { assertMailConfigured } from "./mail";
 import * as mailService from "./mail.service";
@@ -73,6 +74,7 @@ export async function login(input: LoginInput): Promise<LoginResult> {
   if (!user || !isValidPassword) {
     throw new AppError(401, "Credenciales inválidas");
   }
+  await assertNotSuspended(user.id);
 
   // Un reinicio de 2FA cumplido se completa acá, con la contraseña ya validada. La
   // fila se relee siempre: si otro login lo completó en paralelo, esta sesión

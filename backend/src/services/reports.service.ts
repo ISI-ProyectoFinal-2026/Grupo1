@@ -3,6 +3,7 @@ import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import * as matchingService from "./matching.service";
 import { assertImagesHaveAnimals } from "./image-screening.service";
+import { isAuthorSuspended, visibleAuthorSql } from "./account-sanctions/visibility";
 import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
@@ -94,6 +95,7 @@ export async function list(filters: ListReportsQuery = {}, viewerId?: number): P
       : Prisma.sql`r.status = 'published'::report_status`
   );
   if (isPrivateStatus) conditions.push(Prisma.sql`r.user_id = ${viewerId}`);
+  conditions.push(visibleAuthorSql(Prisma.sql`r.user_id`));
   if (filters.breed) conditions.push(Prisma.sql`p.breed ILIKE ${`%${filters.breed}%`}`);
   if (filters.zone) conditions.push(Prisma.sql`r.location_address ILIKE ${`%${filters.zone}%`}`);
   if (filters.dateFrom) conditions.push(Prisma.sql`r.created_at >= ${filters.dateFrom}`);
@@ -128,7 +130,10 @@ export async function getById(id: number): Promise<ReportDTO> {
 export async function getVisibleById(id: number, viewerId?: number): Promise<ReportDTO> {
   const report = await getById(id);
   const isPublicStatus = report.status === "published" || report.status === "resolved";
-  if (isPublicStatus || report.userId === viewerId) {
+  if (report.userId === viewerId) {
+    return report;
+  }
+  if (isPublicStatus && !(await isAuthorSuspended(report.userId))) {
     return report;
   }
   // 404 y no 403: no confirmarle a quien no es el dueño que el reporte existe.

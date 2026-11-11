@@ -1,3 +1,4 @@
+import { AccountSanctionKind } from "@prisma/client";
 import * as mail from "./mail";
 
 /**
@@ -151,5 +152,51 @@ export async function sendTwoFactorResetCompleted(to: string): Promise<void> {
     subject: "Se desactivó el segundo factor de tu cuenta de PATITAS",
     text: `${intro} ${detail}\n\n${warning}`,
     html: `<p>${intro} ${detail}</p><p>${warning}</p>`,
+  });
+}
+
+interface SuspensionNotice {
+  kind: AccountSanctionKind;
+  endsAt: Date | null;
+  warning: boolean;
+}
+
+// aviso de suspensión: texto fijo por tipo, sin datos de denunciantes
+export async function sendAccountSuspended(to: string, { kind, endsAt, warning }: SuspensionNotice): Promise<void> {
+  const intro = "Tu cuenta de PATITAS fue suspendida por recibir denuncias de otros usuarios.";
+  const detail =
+    kind === "temporary" && endsAt
+      ? `No vas a poder iniciar sesión hasta el ${formatArgentinaDate(endsAt)}.`
+      : "La suspensión es preventiva hasta que el equipo de moderación revise el caso; si se confirma, la cuenta se elimina de forma definitiva.";
+  const advice = warning ? "Si volvés a acumular denuncias, tu cuenta puede ser eliminada de forma definitiva." : "";
+  await mail.getMailSender().send({
+    to,
+    subject: "Tu cuenta de PATITAS fue suspendida",
+    text: [intro, detail, advice].filter(Boolean).join(" "),
+    html: `<p>${[intro, detail, advice].filter(Boolean).join(" ")}</p>`,
+  });
+}
+
+// aviso de baja definitiva; se envía con el email leído antes de eliminar la cuenta
+export async function sendAccountDeleted(to: string): Promise<void> {
+  const intro = "Revisamos las denuncias que recibió tu cuenta de PATITAS y decidimos eliminarla de forma definitiva.";
+  const detail = "Se borraron tu perfil, tus reportes, tus mascotas y tus conversaciones.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Tu cuenta de PATITAS fue eliminada",
+    text: `${intro} ${detail}`,
+    html: `<p>${intro} ${detail}</p>`,
+  });
+}
+
+// aviso de reactivación tras revertir una suspensión
+export async function sendAccountReinstated(to: string): Promise<void> {
+  const intro = "Un administrador revisó el caso y tu cuenta de PATITAS fue reactivada.";
+  const detail = "Tus sesiones anteriores siguen cerradas: iniciá sesión de nuevo para volver a usarla.";
+  await mail.getMailSender().send({
+    to,
+    subject: "Tu cuenta de PATITAS fue reactivada",
+    text: `${intro} ${detail}`,
+    html: `<p>${intro} ${detail}</p>`,
   });
 }

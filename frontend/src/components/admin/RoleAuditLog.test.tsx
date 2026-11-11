@@ -60,6 +60,14 @@ describe('RoleAuditLog', () => {
     expect(await screen.findByText('ana@example.com')).toBeInTheDocument()
   })
 
+  it('muestra "Cuenta eliminada" si el admin que hizo el cambio ya no existe', async () => {
+    vi.mocked(adminService.listRoleAudit).mockResolvedValue(pagina([entrada({ actor: null })]))
+    renderLog()
+
+    const fila = (await screen.findByText('Ana Pérez')).closest('tr')!
+    expect(within(fila).getByText('Cuenta eliminada')).toBeInTheDocument()
+  })
+
   it('avisa cuando todavía no hay cambios', async () => {
     vi.mocked(adminService.listRoleAudit).mockResolvedValue(pagina([]))
     renderLog()

@@ -90,6 +90,7 @@ async function esperarDetalle() {
 
 const cerrar = () => screen.queryByRole('button', { name: 'Cerrar reporte' })
 const denunciar = () => screen.queryByRole('button', { name: 'Denunciar' })
+const reportarCuenta = () => screen.queryByRole('button', { name: 'Reportar cuenta' })
 
 describe('ReportDetailPage cerrar y denunciar', () => {
   beforeEach(() => {
@@ -121,6 +122,26 @@ describe('ReportDetailPage cerrar y denunciar', () => {
         await esperarDetalle()
 
         expect(cerrar()).not.toBeInTheDocument()
+      }
+    )
+
+    it('el dueño no ve Reportar cuenta sobre su propio reporte', async () => {
+      loguear(DUENO_ID)
+      renderPage()
+      await esperarDetalle()
+
+      expect(reportarCuenta()).not.toBeInTheDocument()
+    })
+
+    it.each<ReportStatus>(['published', 'resolved'])(
+      'otro usuario logueado ve Reportar cuenta sobre el autor si el reporte está %s',
+      async (status) => {
+        vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ status }))
+        loguear(OTRO_ID)
+        renderPage()
+        await esperarDetalle()
+
+        expect(reportarCuenta()).toBeInTheDocument()
       }
     )
 

@@ -56,6 +56,9 @@ vi.mock('@/pages/pets/MyPetsPage', () => ({ default: () => <div>pagina mis masco
 vi.mock('@/pages/pets/CreatePetPage', () => ({ default: () => <div>pagina alta mascota</div> }))
 vi.mock('@/pages/pets/EditPetPage', () => ({ default: () => <div>pagina editar mascota</div> }))
 vi.mock('@/pages/admin/AdminUsersPage', () => ({ default: () => <div>pagina admin usuarios</div> }))
+vi.mock('@/pages/admin/SanctionQueuePage', () => ({
+  default: () => <div>pagina cola sanciones</div>,
+}))
 
 const usuario: AuthUser = {
   id: 7,
@@ -218,6 +221,31 @@ describe('router: administracion de usuarios', () => {
       expect(screen.queryByText('pagina admin usuarios')).not.toBeInTheDocument()
     }
   )
+})
+
+describe('router: cola de sanciones', () => {
+  it('/admin/sanctions manda al login sin token', () => {
+    const memoria = renderRuta('/admin/sanctions')
+
+    expect(memoria.state.location.pathname).toBe('/login')
+  })
+
+  it.each(['admin', 'moderador'] as const)('/admin/sanctions se renderiza para el rol %s', (role) => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', { ...usuario, role })
+
+    renderRuta('/admin/sanctions')
+
+    expect(screen.getByText('pagina cola sanciones')).toBeInTheDocument()
+  })
+
+  it('/admin/sanctions redirige a home a un usuario regular', () => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', { ...usuario, role: 'usuario_regular' })
+
+    const memoria = renderRuta('/admin/sanctions')
+
+    expect(memoria.state.location.pathname).toBe('/')
+    expect(screen.queryByText('pagina cola sanciones')).not.toBeInTheDocument()
+  })
 })
 
 describe('router: rutas desconocidas', () => {

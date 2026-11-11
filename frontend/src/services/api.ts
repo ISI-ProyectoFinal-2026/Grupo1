@@ -1,6 +1,7 @@
 import axios, { type AxiosError } from "axios";
 import { useAuthStore } from "@/stores/auth.store";
-import type { ApiErrorDetail, ApiErrorResponse } from "@/types/auth";
+import { ACCOUNT_SUSPENDED } from "@/types/auth";
+import type { ApiErrorDetail, ApiErrorResponse, SuspensionDetails } from "@/types/auth";
 
 const DEFAULT_ERROR_MESSAGE = "Error inesperado, intentá de nuevo";
 
@@ -17,6 +18,7 @@ const LINK_FLOW_PATHS = [
 interface ApiError extends Error {
   code?: string;
   details?: ApiErrorDetail[];
+  suspension?: SuspensionDetails;
   status?: number;
 }
 
@@ -44,6 +46,13 @@ api.interceptors.response.use(
       }
     }
 
+    // Cuenta suspendida: la sesión ya no sirve. En /login se queda para mostrar el aviso.
+    const isSuspended = error.response?.data?.error?.code === ACCOUNT_SUSPENDED;
+    if (isSuspended && window.location.pathname !== "/login") {
+      useAuthStore.getState().logout();
+      window.location.href = "/login";
+    }
+
     const message = error.response?.data?.error?.message ?? DEFAULT_ERROR_MESSAGE;
     const details = error.response?.data?.error?.details;
     const code = error.response?.data?.error?.code;
@@ -52,7 +61,10 @@ api.interceptors.response.use(
     if (code) {
       apiError.code = code;
     }
-    if (details) {
+    if (isSuspended) {
+      // el backend manda un objeto (no la lista de campos) en details
+      apiError.suspension = details as unknown as SuspensionDetails;
+    } else if (details) {
       apiError.details = details;
     }
     apiError.status = error.response?.status;
@@ -70,6 +82,13 @@ export function getApiErrorCode(error: unknown): string | undefined {
 export function getApiErrorDetails(error: unknown): ApiErrorDetail[] | undefined {
   if (error instanceof Error && "details" in error) {
     return (error as ApiError).details;
+  }
+  return undefined;
+}
+
+export function getApiErrorSuspension(error: unknown): SuspensionDetails | undefined {
+  if (error instanceof Error && "suspension" in error) {
+    return (error as ApiError).suspension;
   }
   return undefined;
 }
