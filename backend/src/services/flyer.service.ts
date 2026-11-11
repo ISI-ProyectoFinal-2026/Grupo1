@@ -5,44 +5,57 @@ import { prisma } from "../db/client";
 import { ReportDTO, ReportTag } from "./reports.service";
 import * as storageService from "./storage.service";
 
-// 1080x1920 (9:16) banda superior e inferior
+// 1080x1920 (9:16), mundo "Filete de barrio"
 const WIDTH = 1080;
 const HEIGHT = 1920;
-const SAFE_TOP = 250;
-const SAFE_BOTTOM = 250;
+const MARGIN = 72;
+const CONTENT_WIDTH = WIDTH - MARGIN * 2;
 
-const BANNER_HEIGHT = 340;
-const FOOTER_HEIGHT = 130;
-const PHOTO_Y_START = BANNER_HEIGHT;
-const FOOTER_Y_START = HEIGHT - SAFE_BOTTOM - FOOTER_HEIGHT;
-// Peor caso (#259): offset 80 + título 2 líneas (128) + gap 20 + descripción
-// 2 líneas (88) + gap 20 + 4 filas con ícono (4 × 52) ≈ 544, más descendentes.
-const PANEL_TEXT_BUDGET = 570;
-const PANEL_Y_START = FOOTER_Y_START - PANEL_TEXT_BUDGET;
-const PHOTO_Y_END = PANEL_Y_START;
+// alturas fijas; la foto absorbe el resto
+const HEADER_HEIGHT = 290;
+const FOOTER_HEIGHT = 200;
+const THUMB_GAP = 24;
+const THUMB_SIZE = (CONTENT_WIDTH - THUMB_GAP * 2) / 3;
+const THUMBS_HEIGHT = THUMB_SIZE + 20;
+const MAX_EXTRA_IMAGES = 3;
+
+// paleta (DESIGN.md)
+const COLOR = {
+  surface: "#F8EDEA",
+  paper: "#FFFFFF",
+  ink: "#2A1F1A",
+  inkMuted: "#6E584E",
+  line: "#EEDFD4",
+  signal: "#F4B43E",
+  caramel: "#C98042",
+  caramelSoft: "#F6D6B2",
+};
 
 const PLATFORM_NAME = "PATITAS";
 const PLATFORM_TAGLINE = "Ayudamos a reencontrar mascotas · patitas.app";
+const FONT_DISPLAY = "PatitasFlyerDisplay";
 const FONT_BOLD = "PatitasFlyerSansBold";
 const FONT_REGULAR = "PatitasFlyerSansRegular";
 
 /**
  * El nombre lógico "sans-serif" no resuelve a ningún font en @napi-rs/canvas
- * (a diferencia del CSS de un navegador) y cae en un fallback sin acentos ni
- * ñ. Se empaqueta una fuente propia y se registra a mano para que el flyer
- * se vea igual en Windows (dev) y en el server de producción (que no tiene
- * por qué tener ninguna fuente del sistema instalada).
- *
- * Los dos pesos se registran bajo nombres sin guion ("Bold"/"Regular" como
- * sufijo pegado, no "-regular"): con un guion, el matcher de fuentes de
- * napi-rs/canvas lo interpreta como sufijo de estilo de la MISMA familia y
- * termina resolviendo mal el glyph de la ñ en el peso regular.
+ * y cae en un fallback sin acentos ni ñ: se registran fuentes empaquetadas.
+ * Nombres sin guion: con guion, napi-rs/canvas los toma como estilos de la
+ * misma familia y resuelve mal la ñ.
  */
 function registerFlyerFonts(): void {
   if (GlobalFonts.has(FONT_BOLD)) return;
-  const fontsDir = path.dirname(require.resolve("@fontsource/inter/package.json"));
-  GlobalFonts.registerFromPath(path.join(fontsDir, "files/inter-latin-700-normal.woff2"), FONT_BOLD);
-  GlobalFonts.registerFromPath(path.join(fontsDir, "files/inter-latin-400-normal.woff2"), FONT_REGULAR);
+  const fontFile = (pkg: string, file: string) =>
+    path.join(path.dirname(require.resolve(`@fontsource/${pkg}/package.json`)), "files", file);
+  GlobalFonts.registerFromPath(fontFile("abril-fatface", "abril-fatface-latin-400-normal.woff2"), FONT_DISPLAY);
+  GlobalFonts.registerFromPath(
+    fontFile("atkinson-hyperlegible", "atkinson-hyperlegible-latin-700-normal.woff2"),
+    FONT_BOLD
+  );
+  GlobalFonts.registerFromPath(
+    fontFile("atkinson-hyperlegible", "atkinson-hyperlegible-latin-400-normal.woff2"),
+    FONT_REGULAR
+  );
 }
 registerFlyerFonts();
 
@@ -116,23 +129,6 @@ export function wrapLines(text: string, maxWidth: number, maxLines: number, meas
   return kept;
 }
 
-function wrapText(
-  ctx: SKRSContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  maxLines: number
-): number {
-  let cursorY = y;
-  for (const line of wrapLines(text, maxWidth, maxLines, (value) => ctx.measureText(value).width)) {
-    ctx.fillText(line, x, cursorY);
-    cursorY += lineHeight;
-  }
-  return cursorY;
-}
-
 // datos fuera del reporte que se imprimen en el flyer (#259)
 export interface FlyerDetails {
   petName: string | null;
@@ -151,19 +147,35 @@ export interface FlyerInfoRow {
   text: string;
 }
 
-// íconos 24x24 como paths: no dependen de fuentes del sistema
+// huella rellena del wordmark (misma del empapelado de la app)
+const PAW_FILLED =
+  "M12 11.5c-2.6 0-5.5 3.4-5.5 6 0 1.6 1.2 2.5 2.7 2.5 1.2 0 1.8-.6 2.8-.6s1.6.6 2.8.6c1.5 0 2.7-.9 2.7-2.5 0-2.6-2.9-6-5.5-6z" +
+  "M3.2 10a2.3 2.3 0 1 0 4.6 0a2.3 2.3 0 1 0-4.6 0zM7.2 5.5a2.3 2.3 0 1 0 4.6 0a2.3 2.3 0 1 0-4.6 0z" +
+  "M12.2 5.5a2.3 2.3 0 1 0 4.6 0a2.3 2.3 0 1 0-4.6 0zM16.2 10a2.3 2.3 0 1 0 4.6 0a2.3 2.3 0 1 0-4.6 0z";
+
+// íconos de línea 24x24 (trazo, estilo lucide): no dependen de fuentes del sistema
 const ICON_PATHS: Record<FlyerIcon, string> = {
-  paw:
-    "M12 12.5c-3 0-6 3.6-6 6.2 0 1.6 1.3 2.3 2.8 2.3 1.3 0 2.1-.7 3.2-.7s1.9.7 3.2.7c1.5 0 2.8-.7 2.8-2.3 0-2.6-3-6.2-6-6.2z" +
-    "M2.5 10.5a2 2.5 0 1 0 4 0a2 2.5 0 1 0-4 0z" +
-    "M17.5 10.5a2 2.5 0 1 0 4 0a2 2.5 0 1 0-4 0z" +
-    "M6.5 5a2 2.5 0 1 0 4 0a2 2.5 0 1 0-4 0z" +
-    "M13.5 5a2 2.5 0 1 0 4 0a2 2.5 0 1 0-4 0z",
-  pin: "M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 4.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z",
-  calendar: "M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2zM5 9v11h14V9z",
+  paw: PAW_FILLED,
+  pin:
+    "M20 10c0 5-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 15 4 10a8 8 0 0 1 16 0z" +
+    "M9 10a3 3 0 1 0 6 0a3 3 0 1 0-6 0z",
+  calendar: "M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 10h18",
   phone:
-    "M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z",
+    "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67" +
+    "A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6" +
+    "l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z",
 };
+
+// tonos del sistema para las etiquetas conocidas (como tag-tone.ts del front)
+const TAG_TONES: Record<string, string> = {
+  PERDIDO: "#C4342B",
+  ENCONTRADO: "#2457A6",
+  RESUELTO: "#1F7A4D",
+};
+
+export function flyerTone(tag: Pick<ReportTag, "color"> & { label: string }): string {
+  return TAG_TONES[tag.label.trim().toUpperCase()] ?? tag.color;
+}
 
 const EVENT_LABEL: Record<ReportDTO["reportType"], string> = {
   lost: "Se perdió el",
@@ -204,11 +216,24 @@ export function flyerInfoRows(report: ReportDTO, details: FlyerDetails): FlyerIn
   return rows;
 }
 
-function drawIcon(ctx: SKRSContext2D, icon: FlyerIcon, x: number, y: number, size: number): void {
+function strokeIcon(ctx: SKRSContext2D, icon: FlyerIcon, x: number, y: number, size: number, color: string): void {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(size / 24, size / 24);
-  ctx.fill(new Path2D(ICON_PATHS[icon]), "evenodd");
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.stroke(new Path2D(ICON_PATHS[icon]));
+  ctx.restore();
+}
+
+function fillPaw(ctx: SKRSContext2D, x: number, y: number, size: number, color: string): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 24, size / 24);
+  ctx.fillStyle = color;
+  ctx.fill(new Path2D(PAW_FILLED));
   ctx.restore();
 }
 
@@ -218,89 +243,364 @@ function fitText(ctx: SKRSContext2D, text: string, maxWidth: number): string {
   return measure(text) <= maxWidth ? text : withEllipsis(text, maxWidth, measure);
 }
 
-const ROW_HEIGHT = 52;
-const ICON_SIZE = 36;
-const ROW_TEXT_X = 40 + ICON_SIZE + 18;
+export interface FlyerBox {
+  y: number;
+  height: number;
+}
 
-export function composeFlyer(report: ReportDTO, petImage: Image | null, details: FlyerDetails = NO_DETAILS): Buffer {
+export interface FlyerLayout {
+  header: FlyerBox;
+  photo: FlyerBox;
+  thumbs: FlyerBox | null;
+  info: FlyerBox;
+  footer: FlyerBox;
+}
+
+// reparto vertical sin huecos: la foto se queda con lo que sobra
+export function flyerLayout({ hasExtras, infoHeight }: { hasExtras: boolean; infoHeight: number }): FlyerLayout {
+  const thumbsHeight = hasExtras ? THUMBS_HEIGHT : 0;
+  const photoHeight = HEIGHT - HEADER_HEIGHT - thumbsHeight - infoHeight - FOOTER_HEIGHT;
+  const header = { y: 0, height: HEADER_HEIGHT };
+  const photo = { y: HEADER_HEIGHT, height: photoHeight };
+  const thumbs = hasExtras ? { y: photo.y + photo.height, height: thumbsHeight } : null;
+  const info = { y: photo.y + photo.height + thumbsHeight, height: infoHeight };
+  const footer = { y: info.y + info.height, height: FOOTER_HEIGHT };
+  return { header, photo, thumbs, info, footer };
+}
+
+// tipografía del bloque de información
+const TITLE = { size: 60, line: 70, maxLines: 2 };
+const BODY = { size: 38, line: 52 };
+const ROW = { size: 38, line: 64, icon: 42, phoneSize: 44 };
+const INFO_PAD_TOP = 44;
+const INFO_PAD_BOTTOM = 28;
+const DESC_GAP = 14;
+const ROWS_GAP = 26;
+const ROW_TEXT_X = MARGIN + ROW.icon + 22;
+
+interface InfoPlan {
+  titleLines: string[];
+  descLines: string[];
+  rows: FlyerInfoRow[];
+  height: number;
+}
+
+function planInfo(ctx: SKRSContext2D, report: ReportDTO, details: FlyerDetails, hasExtras: boolean): InfoPlan {
+  const measure = (value: string) => ctx.measureText(value).width;
+  ctx.font = `${TITLE.size}px ${FONT_BOLD}`;
+  const titleLines = wrapLines(report.title, CONTENT_WIDTH, TITLE.maxLines, measure);
+  ctx.font = `${BODY.size}px ${FONT_REGULAR}`;
+  // con miniaturas la descripción cede una línea a la foto
+  const descLines = wrapLines(present(report.description) ?? "", CONTENT_WIDTH, hasExtras ? 2 : 3, measure);
+  const rows = flyerInfoRows(report, details);
+  const height =
+    INFO_PAD_TOP +
+    titleLines.length * TITLE.line +
+    (descLines.length ? DESC_GAP + descLines.length * BODY.line : 0) +
+    ROWS_GAP +
+    rows.length * ROW.line +
+    INFO_PAD_BOTTOM;
+  return { titleLines, descLines, rows, height };
+}
+
+// empapelado de barrio: huellas y huesitos muy tenues (como el body de la app)
+// el texto queda sobre revoque liso
+function drawWallpaper(ctx: SKRSContext2D, textBox: FlyerBox): void {
+  const tile = 280;
+  const k = tile / 140;
+  ctx.save();
+  const clip = new Path2D();
+  clip.rect(0, 0, WIDTH, HEIGHT);
+  clip.rect(0, textBox.y, WIDTH, textBox.height);
+  ctx.clip(clip, "evenodd");
+  ctx.fillStyle = "rgba(42, 31, 26, 0.05)";
+  for (let ty = 0; ty < HEIGHT; ty += tile) {
+    for (let tx = 0; tx < WIDTH; tx += tile) {
+      ctx.save();
+      ctx.translate(tx + 18 * k, ty + 20 * k);
+      ctx.rotate((-18 * Math.PI) / 180);
+      ctx.scale(k, k);
+      ctx.fill(new Path2D(PAW_FILLED));
+      ctx.restore();
+      ctx.save();
+      ctx.translate(tx + 78 * k, ty + 88 * k);
+      ctx.rotate((28 * Math.PI) / 180);
+      ctx.scale(k, k);
+      ctx.fill(
+        new Path2D(
+          "M6 3h16a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" +
+            "M1.5 3.5a3 3 0 1 0 6 0a3 3 0 1 0-6 0zM1.5 8.5a3 3 0 1 0 6 0a3 3 0 1 0-6 0z" +
+            "M20.5 3.5a3 3 0 1 0 6 0a3 3 0 1 0-6 0zM20.5 8.5a3 3 0 1 0 6 0a3 3 0 1 0-6 0z"
+        )
+      );
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+// filete: doble línea dorada con un rombo al centro
+function drawFilete(ctx: SKRSContext2D, y: number, accent: string): void {
+  const cx = WIDTH / 2;
+  const gap = 34;
+  ctx.save();
+  ctx.fillStyle = COLOR.signal;
+  ctx.fillRect(MARGIN, y - 4, cx - gap - MARGIN, 5);
+  ctx.fillRect(cx + gap, y - 4, WIDTH - MARGIN - cx - gap, 5);
+  ctx.fillRect(MARGIN, y + 6, cx - gap - MARGIN, 2);
+  ctx.fillRect(cx + gap, y + 6, WIDTH - MARGIN - cx - gap, 2);
+  ctx.beginPath();
+  ctx.moveTo(cx, y - 18);
+  ctx.lineTo(cx + 20, y + 2);
+  ctx.lineTo(cx, y + 22);
+  ctx.lineTo(cx - 20, y + 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(cx, y + 2, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// foto pegada sobre papel: borde blanco y sombra suave
+function drawPaperFrame(ctx: SKRSContext2D, x: number, y: number, w: number, h: number, blur: number): void {
+  ctx.save();
+  ctx.shadowColor = "rgba(42, 31, 26, 0.18)";
+  ctx.shadowBlur = blur;
+  ctx.shadowOffsetY = blur / 3;
+  ctx.fillStyle = COLOR.paper;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+// recorte "cover" dentro del rectángulo
+function drawCover(ctx: SKRSContext2D, image: Image, x: number, y: number, w: number, h: number): void {
+  const scale = Math.max(w / image.width, h / image.height);
+  const sw = w / scale;
+  const sh = h / scale;
+  ctx.drawImage(image, (image.width - sw) / 2, (image.height - sh) / 2, sw, sh, x, y, w, h);
+}
+
+// perro de la app (DogFace) para el reporte sin foto
+function drawDogFace(ctx: SKRSContext2D, cx: number, cy: number, width: number): void {
+  const k = width / 80;
+  ctx.save();
+  ctx.translate(cx - 48 * k, cy - 45 * k);
+  ctx.scale(k, k);
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = COLOR.ink;
+  ctx.lineWidth = 2.5;
+  for (const ear of ["M33 28C24 20 12 24 12 36c0 10 6 16 12 14 5-8 8-14 9-22Z", "M63 28c9-8 21-4 21 8 0 10-6 16-12 14-5-8-8-14-9-22Z"]) {
+    const p = new Path2D(ear);
+    ctx.fillStyle = COLOR.caramel;
+    ctx.fill(p);
+    ctx.stroke(p);
+  }
+  ctx.beginPath();
+  ctx.ellipse(48, 46, 22, 21, 0, 0, Math.PI * 2);
+  ctx.fillStyle = COLOR.caramelSoft;
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(48, 53, 11, 8, 0, 0, Math.PI * 2);
+  ctx.fillStyle = COLOR.paper;
+  ctx.fill();
+  ctx.fillStyle = COLOR.ink;
+  ctx.beginPath();
+  ctx.arc(40, 41, 2.8, 0, Math.PI * 2);
+  ctx.arc(56, 41, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(48, 50, 4.5, 3.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// chapita de collar con argolla (como .tag-sticker)
+function drawNameTag(ctx: SKRSContext2D, name: string, x: number, centerY: number, tone: string): void {
+  const height = 84;
+  const ring = 13;
+  ctx.font = `44px ${FONT_BOLD}`;
+  const text = fitText(ctx, name, CONTENT_WIDTH - 160);
+  const textWidth = ctx.measureText(text).width;
+  const width = 30 + ring * 2 + 18 + textWidth + 36;
+  const y = centerY - height / 2;
+  ctx.save();
+  ctx.shadowColor = "rgba(42, 31, 26, 0.22)";
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = tone;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, height / 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.fillStyle = COLOR.paper;
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.18)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x + 30 + ring, centerY, ring, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = COLOR.paper;
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x + 30 + ring * 2 + 18, centerY + 2);
+  ctx.restore();
+}
+
+function drawHeader(ctx: SKRSContext2D, box: FlyerBox, label: string, tone: string): void {
+  const ruleY = box.y + box.height - 46;
+  const word = label.trim().toUpperCase();
+  let size = 200;
+  ctx.font = `${size}px ${FONT_DISPLAY}`;
+  while (size > 80 && ctx.measureText(word).width > CONTENT_WIDTH) {
+    size -= 4;
+    ctx.font = `${size}px ${FONT_DISPLAY}`;
+  }
+  const metrics = ctx.measureText(word);
+  const capHeight = metrics.actualBoundingBoxAscent;
+  // centrado óptico entre el borde y el filete
+  const top = box.y + 70;
+  const baseline = top + (ruleY - 34 - top + capHeight) / 2;
+  ctx.save();
+  ctx.fillStyle = tone;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(word, WIDTH / 2, baseline);
+  ctx.restore();
+  drawFilete(ctx, ruleY, tone);
+}
+
+function drawPhoto(
+  ctx: SKRSContext2D,
+  box: FlyerBox,
+  petImage: Image | null,
+  petName: string | null,
+  tone: string
+): void {
+  const border = 16;
+  // espacio bajo la foto para la mitad de la chapita
+  const bottom = petName ? 56 : 12;
+  const frame = { x: MARGIN, y: box.y + 12, w: CONTENT_WIDTH, h: box.height - 12 - bottom };
+  drawPaperFrame(ctx, frame.x, frame.y, frame.w, frame.h, 36);
+  const inner = { x: frame.x + border, y: frame.y + border, w: frame.w - border * 2, h: frame.h - border * 2 };
+  if (petImage) {
+    drawCover(ctx, petImage, inner.x, inner.y, inner.w, inner.h);
+  } else {
+    ctx.fillStyle = COLOR.caramelSoft;
+    ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
+    drawDogFace(ctx, WIDTH / 2, inner.y + inner.h / 2, Math.min(inner.w, inner.h) * 0.5);
+  }
+  if (petName) drawNameTag(ctx, petName, frame.x + 40, frame.y + frame.h, tone);
+}
+
+function drawThumbs(ctx: SKRSContext2D, box: FlyerBox, images: Image[]): void {
+  const border = 8;
+  const total = images.length * THUMB_SIZE + (images.length - 1) * THUMB_GAP;
+  let x = (WIDTH - total) / 2;
+  const y = box.y + box.height - THUMB_SIZE;
+  for (const image of images) {
+    drawPaperFrame(ctx, x, y, THUMB_SIZE, THUMB_SIZE, 22);
+    drawCover(ctx, image, x + border, y + border, THUMB_SIZE - border * 2, THUMB_SIZE - border * 2);
+    x += THUMB_SIZE + THUMB_GAP;
+  }
+}
+
+function drawInfo(ctx: SKRSContext2D, box: FlyerBox, plan: InfoPlan, tone: string): void {
+  ctx.save();
+  ctx.textBaseline = "middle";
+  let y = box.y + INFO_PAD_TOP;
+  ctx.fillStyle = COLOR.ink;
+  ctx.font = `${TITLE.size}px ${FONT_BOLD}`;
+  for (const line of plan.titleLines) {
+    ctx.fillText(line, MARGIN, y + TITLE.line / 2);
+    y += TITLE.line;
+  }
+  if (plan.descLines.length) {
+    y += DESC_GAP;
+    ctx.fillStyle = COLOR.inkMuted;
+    ctx.font = `${BODY.size}px ${FONT_REGULAR}`;
+    for (const line of plan.descLines) {
+      ctx.fillText(line, MARGIN, y + BODY.line / 2);
+      y += BODY.line;
+    }
+  }
+  y += ROWS_GAP;
+  for (const row of plan.rows) {
+    const mid = y + ROW.line / 2;
+    strokeIcon(ctx, row.icon, MARGIN, mid - ROW.icon / 2, ROW.icon, tone);
+    // el teléfono es la acción: más grande y en negrita
+    const isPhone = row.icon === "phone";
+    ctx.font = isPhone ? `${ROW.phoneSize}px ${FONT_BOLD}` : `${ROW.size}px ${FONT_REGULAR}`;
+    ctx.fillStyle = COLOR.ink;
+    ctx.fillText(fitText(ctx, row.text, WIDTH - MARGIN - ROW_TEXT_X), ROW_TEXT_X, mid + 1);
+    y += ROW.line;
+  }
+  ctx.restore();
+}
+
+// wordmark de la app: chapita dorada con huella + PATITAS
+function drawFooter(ctx: SKRSContext2D, box: FlyerBox): void {
+  ctx.save();
+  ctx.fillStyle = COLOR.line;
+  ctx.fillRect(MARGIN, box.y + 10, CONTENT_WIDTH, 2);
+  const badge = 72;
+  ctx.font = `64px ${FONT_DISPLAY}`;
+  const wordWidth = ctx.measureText(PLATFORM_NAME).width;
+  const rowWidth = badge + 22 + wordWidth;
+  const left = (WIDTH - rowWidth) / 2;
+  const midY = box.y + 74;
+  ctx.save();
+  ctx.translate(left + badge / 2, midY);
+  ctx.rotate((-6 * Math.PI) / 180);
+  ctx.fillStyle = COLOR.signal;
+  ctx.beginPath();
+  ctx.arc(0, 0, badge / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLOR.paper;
+  ctx.strokeStyle = "rgba(42, 31, 26, 0.7)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, -badge / 2 + 2, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  fillPaw(ctx, -20, -18, 40, COLOR.ink);
+  ctx.restore();
+  ctx.fillStyle = COLOR.ink;
+  ctx.textBaseline = "middle";
+  ctx.fillText(PLATFORM_NAME, left + badge + 22, midY + 4);
+  ctx.font = `30px ${FONT_REGULAR}`;
+  ctx.fillStyle = COLOR.inkMuted;
+  ctx.textAlign = "center";
+  ctx.fillText(PLATFORM_TAGLINE, WIDTH / 2, box.y + 138);
+  ctx.restore();
+}
+
+export function composeFlyer(
+  report: ReportDTO,
+  petImage: Image | null,
+  details: FlyerDetails = NO_DETAILS,
+  extraImages: Image[] = []
+): Buffer {
   const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx = canvas.getContext("2d");
-  const tag: ReportTag = report.tag;
+  const tone = flyerTone(report.tag);
+  const thumbs = extraImages.slice(0, MAX_EXTRA_IMAGES);
+  const hasExtras = thumbs.length > 0;
 
-  // Fondo
-  ctx.fillStyle = "#111827";
+  const plan = planInfo(ctx, report, details, hasExtras);
+  const layout = flyerLayout({ hasExtras, infoHeight: plan.height });
+
+  ctx.fillStyle = COLOR.surface;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  drawWallpaper(ctx, { y: layout.info.y, height: layout.info.height + 130 });
 
-  // Foto de la mascota
-  const photoHeight = PHOTO_Y_END - PHOTO_Y_START;
-  if (petImage) {
-    const scale = Math.max(WIDTH / petImage.width, photoHeight / petImage.height);
-    const drawWidth = petImage.width * scale;
-    const drawHeight = petImage.height * scale;
-    ctx.drawImage(
-      petImage,
-      (WIDTH - drawWidth) / 2,
-      PHOTO_Y_START + (photoHeight - drawHeight) / 2,
-      drawWidth,
-      drawHeight
-    );
-  } else {
-    ctx.fillStyle = tag.color;
-    ctx.fillRect(0, PHOTO_Y_START, WIDTH, photoHeight);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-    drawIcon(ctx, "paw", (WIDTH - 240) / 2, PHOTO_Y_START + (photoHeight - 240) / 2, 240);
-  }
-
-  // Banda superior con el estado (PERDIDO / ENCONTRADO / RESUELTO).
-  ctx.fillStyle = tag.color;
-  ctx.fillRect(0, 0, WIDTH, BANNER_HEIGHT);
-  ctx.fillStyle = "#FFFFFF";
-  drawIcon(ctx, "paw", 40, SAFE_TOP + 45 - 30, 60);
-  ctx.font = `64px ${FONT_BOLD}`;
-  ctx.textBaseline = "middle";
-  ctx.fillText(tag.label, 40 + 60 + 20, SAFE_TOP + 45);
-
-  // Panel con los datos del reporte, ocupa hasta el fondo del canvas para no
-  // dejar un corte raro, pero todo el texto (incluido el pie de marca) vive
-  // por encima de SAFE_BOTTOM.
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(0, PANEL_Y_START, WIDTH, HEIGHT - PANEL_Y_START);
-  ctx.fillStyle = tag.color;
-  ctx.fillRect(0, PANEL_Y_START, WIDTH, 8);
-
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `56px ${FONT_BOLD}`;
-  ctx.textBaseline = "alphabetic";
-  let cursorY = PANEL_Y_START + 80;
-  cursorY = wrapText(ctx, report.title, 40, cursorY, WIDTH - 80, 64, 2);
-
-  const description = present(report.description);
-  if (description) {
-    ctx.font = `36px ${FONT_REGULAR}`;
-    ctx.fillStyle = "#D1D5DB";
-    // Máximo 2 líneas: el peor caso tiene que entrar en PANEL_TEXT_BUDGET.
-    cursorY = wrapText(ctx, description, 40, cursorY + 20, WIDTH - 80, 44, 2);
-  }
-
-  // filas con ícono: mascota, zona, fecha del suceso y teléfono (#259)
-  ctx.font = `34px ${FONT_REGULAR}`;
-  let rowY = cursorY + 20;
-  for (const row of flyerInfoRows(report, details)) {
-    ctx.fillStyle = tag.color;
-    drawIcon(ctx, row.icon, 40, rowY - ICON_SIZE + 6, ICON_SIZE);
-    ctx.fillStyle = "#E5E7EB";
-    ctx.fillText(fitText(ctx, row.text, WIDTH - 40 - ROW_TEXT_X), ROW_TEXT_X, rowY);
-    rowY += ROW_HEIGHT;
-  }
-
-  // Pie de marca
-  ctx.fillStyle = tag.color;
-  ctx.fillRect(0, FOOTER_Y_START, WIDTH, FOOTER_HEIGHT);
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = `34px ${FONT_BOLD}`;
-  ctx.fillText(PLATFORM_NAME, 40, FOOTER_Y_START + 55);
-  ctx.font = `26px ${FONT_REGULAR}`;
-  ctx.fillText(PLATFORM_TAGLINE, 40, FOOTER_Y_START + 95);
+  drawHeader(ctx, layout.header, report.tag.label, tone);
+  if (layout.thumbs) drawThumbs(ctx, layout.thumbs, thumbs);
+  drawPhoto(ctx, layout.photo, petImage, present(details.petName), tone);
+  drawInfo(ctx, layout.info, plan, tone);
+  drawFooter(ctx, layout.footer);
 
   return canvas.toBuffer("image/png");
 }
@@ -311,7 +611,7 @@ function flyerObjectKey(reportId: number): string {
 
 // Subir este número cuando cambie el diseño de composeFlyer, para invalidar
 // todos los flyers ya generados con el layout anterior.
-const FLYER_LAYOUT_VERSION = 2;
+const FLYER_LAYOUT_VERSION = 3;
 const FLYER_VERSION_METADATA_KEY = "flyer-version";
 // Presente solo si el flyer se compuso con el placeholder porque la foto del
 // reporte no se pudo bajar. Guarda cuándo (ISO 8601).
@@ -338,6 +638,7 @@ function flyerVersion(report: ReportDTO, details: FlyerDetails): string {
     report.description,
     report.locationAddress,
     report.imageUrl,
+    (report.extraImageUrls ?? []).slice(0, MAX_EXTRA_IMAGES),
     report.tag.label,
     report.tag.color,
     report.reportType,
@@ -405,6 +706,25 @@ async function loadFlyerDetails(report: ReportDTO): Promise<FlyerDetails> {
   };
 }
 
+// fotos extra: mismas reglas que la principal; la que falla se omite
+async function fetchExtraImages(urls: string[] | undefined): Promise<Image[]> {
+  const images = await Promise.all((urls ?? []).slice(0, MAX_EXTRA_IMAGES).map(fetchPetImage));
+  return images.filter((image): image is Image => image !== null);
+}
+
+// compone el PNG; photoMissing indica foto principal que no se pudo bajar
+export async function renderFlyer(
+  report: ReportDTO,
+  details: FlyerDetails
+): Promise<{ buffer: Buffer; photoMissing: boolean }> {
+  const [petImage, extraImages] = await Promise.all([
+    fetchPetImage(report.imageUrl),
+    fetchExtraImages(report.extraImageUrls),
+  ]);
+  const buffer = composeFlyer(report, petImage, details, extraImages);
+  return { buffer, photoMissing: Boolean(report.imageUrl) && petImage === null };
+}
+
 export async function getOrCreateFlyerUrl(report: ReportDTO): Promise<string> {
   const key = flyerObjectKey(report.id);
   const details = await loadFlyerDetails(report);
@@ -422,14 +742,12 @@ export async function getOrCreateFlyerUrl(report: ReportDTO): Promise<string> {
     // flyer degradado con la ventana vencida: se reintenta bajar la foto
   }
 
-  const petImage = await fetchPetImage(report.imageUrl);
-  const buffer = composeFlyer(report, petImage, details);
+  const { buffer, photoMissing } = await renderFlyer(report, details);
 
   // Si el reporte tiene foto pero no se pudo bajar, el flyer sale con el
   // placeholder: se sube igual para no dejar al usuario sin flyer, marcado
   // como degradado para que se sirva desde el cache solo hasta que venza
   // DEGRADED_FLYER_RETRY_MS (y no se recomponga en cada request).
-  const photoMissing = Boolean(report.imageUrl) && petImage === null;
   const degradedAt = photoMissing ? new Date().toISOString() : undefined;
   const metadata: Record<string, string> = { [FLYER_VERSION_METADATA_KEY]: version };
   if (degradedAt) {

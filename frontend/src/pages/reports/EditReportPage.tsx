@@ -73,6 +73,7 @@ export default function EditReportPage() {
             title: report.title,
             description: report.description ?? '',
             imageUrl: report.imageUrl ?? undefined,
+            extraImageUrls: report.extraImageUrls ?? [],
             location: report.location ?? undefined,
             locationAddress: report.locationAddress ?? '',
             petId: report.petId ?? undefined,

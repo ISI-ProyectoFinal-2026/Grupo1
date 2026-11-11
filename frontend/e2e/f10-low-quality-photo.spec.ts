@@ -21,17 +21,20 @@ test('F10: a blurry photo shows a non-blocking warning and the report can still 
 
   const warning = page.getByRole('status').filter({ hasText: QUALITY_MESSAGE })
   await expect(warning).toBeVisible()
-  await expect(page.getByText('Foto subida correctamente')).toBeVisible()
+  await expect(page.getByAltText('Foto 1')).toBeVisible()
 
   // A sharper photo clears the warning.
   publicUrl = E2E_IMAGE_URL
   await page.locator('input[type=file]').setInputFiles(E2E_PHOTO)
-  await expect(page.getByRole('img', { name: 'Foto subida' })).toHaveAttribute('src', E2E_IMAGE_URL)
+  await expect(page.getByAltText('Foto 2')).toHaveAttribute('src', E2E_IMAGE_URL)
   await expect(warning).toHaveCount(0)
 
   // Back to the blurry one: publishing stays enabled anyway.
+  // The first photo goes away so its URL is not repeated (the backend rejects it).
+  await page.getByRole('button', { name: 'Quitar foto 1' }).click()
   publicUrl = E2E_LOW_QUALITY_IMAGE_URL
   await page.locator('input[type=file]').setInputFiles(E2E_PHOTO)
+  await expect(page.getByAltText('Foto 2')).toHaveAttribute('src', E2E_LOW_QUALITY_IMAGE_URL)
   await expect(warning).toBeVisible()
   await page.getByRole('button', { name: /Usar mi ubicación actual/ }).click()
   await expect(page.getByText('Ubicación seleccionada')).toBeVisible()

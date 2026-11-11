@@ -93,6 +93,22 @@ describe("reports.service", () => {
     expect(report.location?.lng).toBeCloseTo(-58.3816, 5);
   });
 
+  test("create() guarda las fotos extra y todas las lecturas las devuelven", async () => {
+    const extras = ["https://cdn.example.com/extra-1.jpg", "https://cdn.example.com/extra-2.jpg"];
+    const report = await reportsService.create({ userId, ...baseReportData, extraImageUrls: extras });
+    createdReportIds.push(report.id);
+
+    expect(report.extraImageUrls).toEqual(extras);
+    expect((await reportsService.getById(report.id)).extraImageUrls).toEqual(extras);
+    expect((await reportsService.listOwned(userId)).find((r) => r.id === report.id)?.extraImageUrls).toEqual(extras);
+  });
+
+  test("create() sin fotos extra devuelve una lista vacía", async () => {
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+    expect(report.extraImageUrls).toEqual([]);
+  });
+
   test("create() asocia un petId cuando se provee", async () => {
     const report = await reportsService.create({ userId, petId, ...baseReportData });
     createdReportIds.push(report.id);

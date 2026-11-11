@@ -35,6 +35,7 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: 'Perro perdido en Nueva Cordoba',
     description: null,
     imageUrl: null,
+    extraImageUrls: [],
     customFlyerUrl: null,
     showPhoneOnFlyer: false,
     eventDate: null,

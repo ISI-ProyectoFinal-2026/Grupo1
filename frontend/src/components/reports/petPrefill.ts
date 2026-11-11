@@ -1,9 +1,13 @@
 import type { PetDTO } from "@/types/pet.types";
+import { MAX_REPORT_PHOTOS } from "@/types/validators/report.validator";
 
-export type PrefillField = "title" | "description" | "imageUrl";
-export type Prefill = Partial<Record<PrefillField, string>>;
+export type PrefillField = "title" | "description";
+export type Prefill = Partial<Record<PrefillField, string>> & {
+  imageUrl?: string;
+  extraImageUrls?: string[];
+};
 
-export const PREFILL_FIELDS: PrefillField[] = ["title", "description", "imageUrl"];
+export const PREFILL_FIELDS: PrefillField[] = ["title", "description"];
 
 const SPECIES_LABELS: Record<string, string> = { dog: "Perro", cat: "Gato", other: "Otra" };
 
@@ -15,5 +19,6 @@ export function petPrefill(pet: PetDTO): Prefill {
     title: title || undefined,
     description: pet.description || undefined,
     imageUrl: pet.photoUrls[0],
+    extraImageUrls: pet.photoUrls.slice(1, MAX_REPORT_PHOTOS),
   };
 }

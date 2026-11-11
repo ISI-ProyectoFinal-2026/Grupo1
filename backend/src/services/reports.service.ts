@@ -2,7 +2,7 @@ import { Prisma, ReportType, ReportStatus } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import * as matchingService from "./matching.service";
-import { assertImageHasAnimal } from "./image-screening.service";
+import { assertImagesHaveAnimals } from "./image-screening.service";
 import { isAuthorSuspended, visibleAuthorSql } from "./account-sanctions/visibility";
 import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
 
@@ -19,6 +19,7 @@ export interface ReportRow {
   title: string;
   description: string | null;
   imageUrl: string | null;
+  extraImageUrls: string[];
   customFlyerUrl: string | null;
   locationAddress: string | null;
   showPhoneOnFlyer: boolean;
@@ -68,6 +69,7 @@ export function toReportDTO(row: ReportRow): ReportDTO {
 export const reportColumns = Prisma.sql`
   r.id, r.user_id AS "userId", r.pet_id AS "petId", r.report_type AS "reportType",
   r.status, r.title, r.description, r.image_url AS "imageUrl",
+  r.extra_image_urls AS "extraImageUrls",
   r.custom_flyer_url AS "customFlyerUrl",
   r.location_address AS "locationAddress",
   r.show_phone_on_flyer AS "showPhoneOnFlyer",
@@ -150,7 +152,8 @@ function triggerModeration(reportId: number, imageUrl: string): void {
 }
 
 export async function create(data: CreateReportInput & { userId: number }): Promise<ReportDTO> {
-  await assertImageHasAnimal(data.imageUrl);
+  const extraImageUrls = data.extraImageUrls ?? [];
+  await assertImagesHaveAnimals([data.imageUrl, ...extraImageUrls]);
 
   const reportId = await prisma.$transaction(async (tx) => {
     let created;
@@ -167,6 +170,7 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
           title: data.title,
           description: data.description ?? null,
           imageUrl: data.imageUrl,
+          extraImageUrls,
           locationAddress: data.locationAddress ?? null,
           showPhoneOnFlyer: data.showPhoneOnFlyer ?? false,
           eventDate: data.eventDate ?? null,
@@ -191,6 +195,11 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
   const report = await getById(reportId);
   triggerModeration(report.id, data.imageUrl);
   return report;
+}
+
+// mismo contenido sin importar el orden: reordenar no re-modera
+function sameUrls(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((url) => b.includes(url));
 }
 
 const CLOSE_ONLY_PUBLISHED_MESSAGE = "Solo se pueden cerrar reportes publicados";
@@ -222,15 +231,20 @@ export async function update(id: number, userId: number, data: UpdateReportInput
   // report published with a dog photo could be edited to show anything. The
   // report is hidden again ("pending") until the async pipeline approves it.
   const newImageUrl = data.imageUrl !== undefined && data.imageUrl !== existing.imageUrl ? data.imageUrl : null;
-  if (newImageUrl) {
+  // fotos extra: cualquier cambio re-modera igual que la principal (D4)
+  const currentExtras = existing.extraImageUrls ?? [];
+  const extrasChanged = data.extraImageUrls !== undefined && !sameUrls(data.extraImageUrls, currentExtras);
+  const addedExtras = extrasChanged ? data.extraImageUrls!.filter((url) => !currentExtras.includes(url)) : [];
+  const photosChanged = Boolean(newImageUrl) || extrasChanged;
+  if (photosChanged) {
     // Re-moderating a closed report would publish it again, and "resolved"
     // sent along with the new photo would be overwritten by "pending".
     if (existing.status === "resolved" || data.status === "resolved") {
       throw new AppError(409, "No se puede cambiar la foto de un reporte resuelto");
     }
-    await assertImageHasAnimal(newImageUrl);
+    await assertImagesHaveAnimals(newImageUrl ? [newImageUrl, ...addedExtras] : addedExtras);
   }
-  const updateData = newImageUrl ? { ...scalarData, status: "pending" as const, publishedAt: null } : scalarData;
+  const updateData = photosChanged ? { ...scalarData, status: "pending" as const, publishedAt: null } : scalarData;
 
   await prisma.$transaction(async (tx) => {
     try {
@@ -253,8 +267,9 @@ export async function update(id: number, userId: number, data: UpdateReportInput
     }
   });
 
-  if (newImageUrl) {
-    triggerModeration(id, newImageUrl);
+  const moderatedImageUrl = newImageUrl ?? existing.imageUrl;
+  if (photosChanged && moderatedImageUrl) {
+    triggerModeration(id, moderatedImageUrl);
   }
   return getById(id);
 }

@@ -26,6 +26,10 @@ const eventDateField = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha del suceso inválida")
   .refine((value) => value <= todayInArgentina(), "La fecha del suceso no puede ser futura");
 
+// fotos extra además de la principal (4 en total)
+export const MAX_REPORT_EXTRA_PHOTOS = 3;
+export const MAX_REPORT_PHOTOS = MAX_REPORT_EXTRA_PHOTOS + 1;
+
 const blankToUndefined = (value: unknown) => (value === "" ? undefined : value);
 
 export const createReportSchema = z.object({
@@ -33,6 +37,10 @@ export const createReportSchema = z.object({
   title: z.string().min(5, "Mínimo 5 caracteres").max(255),
   description: optionalText,
   imageUrl: z.string({ error: "Sube una foto de la mascota" }).url(),
+  extraImageUrls: z
+    .array(z.string().url())
+    .max(MAX_REPORT_EXTRA_PHOTOS, `Podés subir hasta ${MAX_REPORT_PHOTOS} fotos`)
+    .optional(),
   // El mensaje por defecto de Zod para una clave ausente es "expected object,
   // received undefined", que no le dice nada al usuario del formulario.
   location: z.object(reportLocationSchema.shape, {

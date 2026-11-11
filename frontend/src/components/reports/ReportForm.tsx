@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ZodError } from "zod";
 import {
+  MAX_REPORT_PHOTOS,
   createReportSchema,
   newReportSchema,
   type CreateReportFormData,
@@ -18,13 +19,28 @@ import type { ReportLocation } from "@/types/report.types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import ErrorMessage from "@/components/ui/ErrorMessage";
-import { CheckIcon } from "@/components/ui/icons";
 import ActionErrorMessage from "@/components/auth/ActionErrorMessage";
 import { getApiErrorCode } from "@/services/api";
-import { EMAIL_NOT_VERIFIED } from "@/types/auth";
-import ImageUploader from "./ImageUploader";
+import MultiImageUploader from "@/components/common/MultiImageUploader";
 import SimilarReportsSuggestions from "./SimilarReportsSuggestions";
 import LocationPicker from "@/components/maps/LocationPicker";
+
+interface PhotoNotice {
+  url: string;
+  message: string;
+}
+
+function toPhotoList(imageUrl?: string, extraImageUrls?: string[]): string[] {
+  return imageUrl ? [imageUrl, ...(extraImageUrls ?? [])] : [];
+}
+
+function prefilledPhotos(prefill: Prefill): string[] {
+  return toPhotoList(prefill.imageUrl, prefill.extraImageUrls);
+}
+
+function samePhotos(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((url, index) => url === b[index]);
+}
 
 // "create" posts a new report and opens it. "edit" hands the validated data to
 // the caller, which owns the PUT and the navigation afterwards.
@@ -48,25 +64,23 @@ export default function ReportForm(props: ReportFormProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [formErrorCode, setFormErrorCode] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  // Set when the screening found no animal in the uploaded photo: the report
-  // cannot be submitted until the user uploads a different one.
-  const [imageRejection, setImageRejection] = useState<string | null>(null);
-  // Blurry or moved photo (#212): only a warning, the report can still be sent.
-  const [imageQualityWarning, setImageQualityWarning] = useState<string | null>(null);
-  // While the photo uploads and is analyzed there is no imageUrl nor verdict yet:
-  // submitting then would create the report without image, skipping the screening.
+  // While the photos upload and are analyzed there is no verdict yet:
+  // submitting then would create the report skipping the screening.
   const [isImageUploading, setIsImageUploading] = useState(false);
   // valores precargados desde la mascota propia (#255)
   const [prefilled, setPrefilled] = useState<Prefill>({});
   const [isPrefillScreening, setIsPrefillScreening] = useState(false);
-  const prefillScreeningUrl = useRef<string | null>(null);
-  const canSubmit = !imageRejection && !isImageUploading && !isPrefillScreening;
+  const prefillScreeningToken = useRef(0);
+  // veredicto de las fotos precargadas: la subida ya filtra las propias
+  const [prefillRejection, setPrefillRejection] = useState<PhotoNotice | null>(null);
+  const [prefillQualityWarning, setPrefillQualityWarning] = useState<PhotoNotice | null>(null);
 
   const [formData, setFormData] = useState<Partial<CreateReportFormData>>({
     reportType: "lost",
     title: "",
     description: "",
     imageUrl: undefined,
+    extraImageUrls: [],
     location: undefined,
     locationAddress: "",
     // editar no inventa la fecha de un reporte anterior
@@ -74,8 +88,14 @@ export default function ReportForm(props: ReportFormProps) {
     ...initialData,
   });
 
-  // In edit mode the photo already saved is shown as such, not as a new upload.
-  const isCurrentImage = isEdit && formData.imageUrl === initialData?.imageUrl;
+  // la principal va primero; el resto son fotos extra
+  const photos = toPhotoList(formData.imageUrl, formData.extraImageUrls);
+  const imageRejection =
+    prefillRejection && photos.includes(prefillRejection.url) ? prefillRejection.message : null;
+  const imageQualityWarning =
+    prefillQualityWarning && photos.includes(prefillQualityWarning.url) ? prefillQualityWarning.message : null;
+  const canSubmit = !imageRejection && !isImageUploading && !isPrefillScreening;
+  const usesPetPhotos = Boolean(prefilled.imageUrl) && samePhotos(photos, prefilledPhotos(prefilled));
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -87,37 +107,29 @@ export default function ReportForm(props: ReportFormProps) {
     }
   };
 
-  const handleImageUploadSuccess = (
-    publicUrl: string,
-    rejection: string | null,
-    qualityWarning: string | null
-  ) => {
-    setFormData((prev) => ({ ...prev, imageUrl: publicUrl }));
-    prefillScreeningUrl.current = null;
-    setIsPrefillScreening(false);
-    setImageRejection(rejection);
-    setImageQualityWarning(qualityWarning);
-    setFormError(null);
-    setFieldErrors((prev) => ({ ...prev, imageUrl: "" }));
+  const handlePhotosChange = (urls: string[]) => {
+    setFormData((prev) => ({ ...prev, imageUrl: urls[0], extraImageUrls: urls.slice(1) }));
+    if (urls.length > 0) setFieldErrors((prev) => ({ ...prev, imageUrl: "" }));
   };
 
-  const handleImageUploadError = (error: string, code?: string) => {
-    // El uploader ya muestra el aviso de email sin verificar junto a la foto.
-    if (code === EMAIL_NOT_VERIFIED) return;
-    setFormError(error);
-    setFormErrorCode(null);
-  };
-
-  // foto precargada: misma verificación que una subida (#255)
-  const screenPrefilledImage = async (url: string) => {
-    prefillScreeningUrl.current = url;
+  // fotos precargadas: misma verificación que una subida (#255)
+  const screenPrefilledImages = async (urls: string[]) => {
+    const token = ++prefillScreeningToken.current;
     setIsPrefillScreening(true);
-    const { rejection, qualityWarning } = await screenImage(url);
-    if (prefillScreeningUrl.current !== url) return;
-    prefillScreeningUrl.current = null;
-    setImageRejection(rejection);
-    setImageQualityWarning(qualityWarning);
+    const results = await Promise.all(urls.map(async (url) => ({ url, ...(await screenImage(url)) })));
+    if (prefillScreeningToken.current !== token) return;
+    const rejected = results.find((result) => result.rejection);
+    const blurry = results.find((result) => result.qualityWarning);
+    setPrefillRejection(rejected ? { url: rejected.url, message: rejected.rejection! } : null);
+    setPrefillQualityWarning(blurry ? { url: blurry.url, message: blurry.qualityWarning! } : null);
     setIsPrefillScreening(false);
+  };
+
+  const resetPrefillScreening = () => {
+    prefillScreeningToken.current += 1;
+    setIsPrefillScreening(false);
+    setPrefillRejection(null);
+    setPrefillQualityWarning(null);
   };
 
   // solo se pisan campos vacíos o que siguen con el valor precargado (#255)
@@ -133,18 +145,26 @@ export default function ReportForm(props: ReportFormProps) {
         updated[field] = value;
         applied[field] = value;
       } else if (current !== "") {
-        updated[field] = field === "imageUrl" ? undefined : "";
+        updated[field] = "";
+      }
+    }
+    // las fotos se pisan solo si no hay o siguen siendo las precargadas
+    const canReplacePhotos = photos.length === 0 || usesPetPhotos;
+    const nextPhotos = prefilledPhotos(next);
+    if (canReplacePhotos) {
+      updated.imageUrl = nextPhotos[0];
+      updated.extraImageUrls = nextPhotos.slice(1);
+      if (nextPhotos.length > 0) {
+        applied.imageUrl = next.imageUrl;
+        applied.extraImageUrls = next.extraImageUrls;
       }
     }
     setFormData(updated);
     setPrefilled(applied);
 
-    if (updated.imageUrl !== formData.imageUrl) {
-      prefillScreeningUrl.current = null;
-      setIsPrefillScreening(false);
-      setImageRejection(null);
-      setImageQualityWarning(null);
-      if (applied.imageUrl) void screenPrefilledImage(applied.imageUrl);
+    if (canReplacePhotos && !samePhotos(nextPhotos, photos)) {
+      resetPrefillScreening();
+      if (nextPhotos.length > 0) void screenPrefilledImages(nextPhotos);
     }
   };
 
@@ -270,59 +290,49 @@ export default function ReportForm(props: ReportFormProps) {
       </div>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="field-label mb-1.5">Foto *</legend>
+        <legend className="field-label mb-1.5">Fotos *</legend>
         {canChangeImage ? (
-          <ImageUploader
-            onSuccess={handleImageUploadSuccess}
-            onError={handleImageUploadError}
+          <MultiImageUploader
+            value={photos}
+            onChange={handlePhotosChange}
+            max={MAX_REPORT_PHOTOS}
             onUploadingChange={setIsImageUploading}
             screenForAnimals
           />
         ) : (
-          <p className="text-sm text-ink-muted">La foto de un reporte resuelto no se puede cambiar.</p>
+          <>
+            {photos.length > 0 && (
+              <ul className="flex flex-wrap gap-3">
+                {photos.map((url, index) => (
+                  <li key={url}>
+                    <img
+                      src={url}
+                      alt={`Foto ${index + 1}`}
+                      className="size-20 rounded-control border border-line object-cover"
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-sm text-ink-muted">Las fotos de un reporte resuelto no se pueden cambiar.</p>
+          </>
+        )}
+        {usesPetPhotos && (
+          <p className="text-sm text-ink-muted">
+            Usamos las fotos de tu mascota. Podés quitarlas o subir otras.
+          </p>
         )}
         {isEdit && canChangeImage && (
           <p className="text-sm text-ink-muted">
-            Si cambiás la foto, el reporte vuelve a revisión y no se muestra hasta que se apruebe.
+            Si cambiás las fotos, el reporte vuelve a revisión y no se muestra hasta que se apruebe.
           </p>
         )}
         {imageRejection ? (
           <ErrorMessage message={imageRejection} />
-        ) : fieldErrors.imageUrl ? (
-          <ErrorMessage message={fieldErrors.imageUrl} />
         ) : (
-          formData.imageUrl &&
-          (formData.imageUrl === prefilled.imageUrl ? (
-            <div className="flex items-center gap-3">
-              <img
-                src={formData.imageUrl}
-                alt="Foto de tu mascota"
-                className="size-20 shrink-0 rounded-control border border-line object-cover"
-              />
-              <p className="text-sm text-ink-muted">
-                Usamos la primera foto de tu mascota. Podés cambiarla subiendo otra.
-              </p>
-            </div>
-          ) : isCurrentImage ? (
-            <img
-              src={formData.imageUrl}
-              alt="Foto actual"
-              className="size-20 shrink-0 rounded-control border border-line object-cover"
-            />
-          ) : (
-            <div className="flex items-center gap-3">
-              <img
-                src={formData.imageUrl}
-                alt="Foto subida"
-                className="size-20 shrink-0 rounded-control border border-line object-cover"
-              />
-              <p className="flex items-center gap-1.5 text-sm font-bold text-success-ink">
-                <CheckIcon className="h-4 w-4 shrink-0" />
-                Foto subida correctamente
-              </p>
-            </div>
-          ))
+          fieldErrors.imageUrl && <ErrorMessage message={fieldErrors.imageUrl} />
         )}
+        {fieldErrors.extraImageUrls && <ErrorMessage message={fieldErrors.extraImageUrls} />}
         {!imageRejection && imageQualityWarning && (
           <p
             role="status"

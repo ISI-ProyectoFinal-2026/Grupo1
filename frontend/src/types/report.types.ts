@@ -15,6 +15,8 @@ export interface ReportDTO {
   title: string
   description: string | null
   imageUrl: string | null
+  // fotos extra; imageUrl es la principal
+  extraImageUrls: string[]
   customFlyerUrl: string | null
   locationAddress: string | null
   // telefono del autor en el flyer (#259)
@@ -53,6 +55,7 @@ export interface CreateReportInput {
   title: string
   description?: string
   imageUrl?: string
+  extraImageUrls?: string[]
   location: ReportLocation
   locationAddress?: string
   showPhoneOnFlyer?: boolean

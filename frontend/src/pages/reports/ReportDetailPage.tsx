@@ -22,6 +22,7 @@ import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import PendingBanner from "@/components/reports/PendingBanner";
 import MatchCard from "@/components/reports/MatchCard";
 import ImageUploader from "@/components/reports/ImageUploader";
+import ReportPhotoGallery from "@/components/reports/ReportPhotoGallery";
 import CloseReportButton from "@/components/reports/CloseReportButton";
 import DeleteReportButton from "@/components/reports/DeleteReportButton";
 import FlagReportForm from "@/components/reports/FlagReportForm";
@@ -171,14 +172,7 @@ export default function ReportDetailPage() {
         <article className="min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <div className="relative -mx-4 overflow-hidden bg-surface sm:mx-0 sm:rounded-card sm:border sm:border-line sm:shadow-card">
             {report.imageUrl ? (
-              <img
-                src={report.imageUrl}
-                alt={report.title}
-                width={1200}
-                height={900}
-                fetchPriority="high"
-                className="aspect-[4/3] max-h-[70vh] w-full bg-surface object-cover"
-              />
+              <ReportPhotoGallery mainUrl={report.imageUrl} extraUrls={report.extraImageUrls} alt={report.title} />
             ) : (
               <div className="flex aspect-[16/9] flex-col items-center justify-center gap-3 bg-signal-soft text-ink-muted">
                 <DogFace className="w-32" />

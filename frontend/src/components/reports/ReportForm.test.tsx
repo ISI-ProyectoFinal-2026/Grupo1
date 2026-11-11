@@ -19,7 +19,7 @@ vi.mock('@/services/auth.service')
 vi.mock('@/services/pets.service')
 vi.mock('@/services/uploads.service')
 
-// LocationPicker y ImageUploader arrastran leaflet y el flujo de subida a R2:
+// LocationPicker y MultiImageUploader arrastran leaflet y el flujo de subida a R2:
 // nada de eso hace falta para probar la validacion y el envio del formulario.
 // Los dobles exponen un boton por callback para dispararlos desde el test.
 vi.mock('@/components/maps/LocationPicker', () => ({
@@ -48,49 +48,46 @@ vi.mock('@/components/maps/LocationPicker', () => ({
   ),
 }))
 
-vi.mock('@/components/reports/ImageUploader', () => ({
+vi.mock('@/components/common/MultiImageUploader', () => ({
   default: ({
-    onSuccess,
-    onError,
+    value,
+    onChange,
+    max,
     onUploadingChange,
   }: {
-    onSuccess: (url: string, rejection: string | null, qualityWarning: string | null) => void
-    onError: (error: string, code?: string) => void
+    value: string[]
+    onChange: (urls: string[]) => void
+    max: number
     onUploadingChange?: (uploading: boolean) => void
   }) => (
     <>
+      <p>{`${value.length}/${max}`}</p>
+      {value.map((url, index) => (
+        <img key={url} src={url} alt={`Foto ${index + 1}`} />
+      ))}
       <button type='button' onClick={() => onUploadingChange?.(true)}>
         Simular subida en curso
       </button>
       <button
         type='button'
         onClick={() => {
-          onSuccess('https://cdn/foto.jpg', null, null)
+          onChange([...value, 'https://cdn/foto.jpg'].slice(0, max))
           onUploadingChange?.(false)
         }}
       >
         Simular foto subida
       </button>
-      <button type='button' onClick={() => onSuccess('https://cdn/paisaje.jpg', 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM', null)}>
-        Simular foto sin animales
-      </button>
       <button
         type='button'
-        onClick={() => onSuccess('https://cdn/borrosa.jpg', null, 'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.')}
+        onClick={() => onChange([...value, 'https://cdn/extra-1.jpg', 'https://cdn/extra-2.jpg'].slice(0, max))}
       >
-        Simular foto borrosa
+        Simular fotos extra
       </button>
-      <button type='button' onClick={() => onSuccess('https://cdn/foto.jpg', null, null)}>
-        Simular analisis no disponible
+      <button type='button' onClick={() => onChange([value[1], value[0], ...value.slice(2)])}>
+        Simular cambio de principal
       </button>
-      <button type='button' onClick={() => onError('No se pudo subir la imagen (HTTP 403)')}>
-        Simular falla de subida
-      </button>
-      <button
-        type='button'
-        onClick={() => onError('Verificá tu email para continuar', 'EMAIL_NOT_VERIFIED')}
-      >
-        Simular falla por email sin verificar
+      <button type='button' onClick={() => onChange(value.slice(1))}>
+        Simular quitar principal
       </button>
     </>
   ),
@@ -106,6 +103,7 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: 'Perro perdido en Nueva Córdoba',
     description: null,
     imageUrl: 'https://cdn/foto.jpg',
+    extraImageUrls: [],
     customFlyerUrl: null,
     showPhoneOnFlyer: false,
     eventDate: null,
@@ -201,38 +199,10 @@ describe('ReportForm: render', () => {
     expect(screen.getByLabelText('Título *')).toHaveValue('Gato encontrado en Güemes')
   })
 
-  it('confirma en pantalla cuando la foto ya subio', async () => {
-    const user = userEvent.setup()
+  it('ofrece hasta 4 fotos', () => {
     renderForm()
 
-    expect(screen.queryByText('Foto subida correctamente')).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
-
-    expect(screen.getByText('Foto subida correctamente')).toBeInTheDocument()
-  })
-
-  it('muestra una miniatura de la foto subida', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    expect(screen.queryByRole('img', { name: 'Foto subida' })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
-
-    expect(screen.getByRole('img', { name: 'Foto subida' })).toHaveAttribute(
-      'src',
-      'https://cdn/foto.jpg'
-    )
-  })
-
-  it('muestra el error que reporta el uploader', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular falla de subida' }))
-
-    expect(screen.getByText('No se pudo subir la imagen (HTTP 403)')).toBeInTheDocument()
+    expect(screen.getByText('0/4')).toBeInTheDocument()
   })
 })
 
@@ -320,6 +290,39 @@ describe('ReportForm: envio', () => {
 
   // Una descripcion vacia no puede viajar como "": el backend la declara
   // min(1).optional() y responde 400.
+  it('manda la principal y las fotos extra', async () => {
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Simular fotos extra' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0]).toMatchObject({
+      imageUrl: 'https://cdn/foto.jpg',
+      extraImageUrls: ['https://cdn/extra-1.jpg', 'https://cdn/extra-2.jpg'],
+    })
+  })
+
+  it('quitar la principal convierte la siguiente en principal', async () => {
+    vi.mocked(createReport).mockResolvedValue(reporte())
+    const user = userEvent.setup()
+    renderForm()
+
+    await completarMinimo(user)
+    await user.click(screen.getByRole('button', { name: 'Simular fotos extra' }))
+    await user.click(screen.getByRole('button', { name: 'Simular quitar principal' }))
+    await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
+
+    await waitFor(() => expect(createReport).toHaveBeenCalled())
+    expect(vi.mocked(createReport).mock.calls[0][0]).toMatchObject({
+      imageUrl: 'https://cdn/extra-1.jpg',
+      extraImageUrls: ['https://cdn/extra-2.jpg'],
+    })
+  })
+
   it('no manda los textos opcionales vacios', async () => {
     vi.mocked(createReport).mockResolvedValue(reporte())
     const user = userEvent.setup()
@@ -465,7 +468,7 @@ describe('ReportForm: precarga de la mascota propia (#255)', () => {
     await user.selectOptions(await screen.findByLabelText('Mascota'), opcion)
   }
 
-  it('precarga titulo, descripcion y la primera foto: solo falta la ubicacion', async () => {
+  it('precarga titulo, descripcion y las fotos: solo falta la ubicacion', async () => {
     vi.mocked(listMyPets).mockResolvedValue([firulais()])
     vi.mocked(createReport).mockResolvedValue(reporte({ petId: 3 }))
     const user = userEvent.setup()
@@ -475,10 +478,9 @@ describe('ReportForm: precarga de la mascota propia (#255)', () => {
 
     expect(screen.getByLabelText('Título *')).toHaveValue('Firulais (Labrador)')
     expect(screen.getByLabelText('Descripción')).toHaveValue('Collar azul con chapita')
-    expect(await screen.findByAltText('Foto de tu mascota')).toHaveAttribute(
-      'src',
-      'https://pub.r2.dev/pets/a.jpg'
-    )
+    expect(screen.getByAltText('Foto 1')).toHaveAttribute('src', 'https://pub.r2.dev/pets/a.jpg')
+    expect(screen.getByAltText('Foto 2')).toHaveAttribute('src', 'https://pub.r2.dev/pets/b.jpg')
+    expect(screen.getByText(/Usamos las fotos de tu mascota/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
     await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
@@ -489,6 +491,7 @@ describe('ReportForm: precarga de la mascota propia (#255)', () => {
       title: 'Firulais (Labrador)',
       description: 'Collar azul con chapita',
       imageUrl: 'https://pub.r2.dev/pets/a.jpg',
+      extraImageUrls: ['https://pub.r2.dev/pets/b.jpg'],
     })
   })
 
@@ -513,13 +516,15 @@ describe('ReportForm: precarga de la mascota propia (#255)', () => {
     await user.clear(titulo)
     await user.type(titulo, 'Firulais perdido en Güemes')
     await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    await user.click(screen.getByRole('button', { name: 'Simular quitar principal' }))
     await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
     await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
 
     await waitFor(() => expect(createReport).toHaveBeenCalled())
     expect(vi.mocked(createReport).mock.calls[0][0]).toMatchObject({
       title: 'Firulais perdido en Güemes',
-      imageUrl: 'https://cdn/foto.jpg',
+      imageUrl: 'https://pub.r2.dev/pets/b.jpg',
+      extraImageUrls: ['https://cdn/foto.jpg'],
     })
   })
 
@@ -534,7 +539,7 @@ describe('ReportForm: precarga de la mascota propia (#255)', () => {
 
     expect(screen.getByLabelText('Título *')).toHaveValue('Firulais (Labrador) perdido')
     expect(screen.getByLabelText('Descripción')).toHaveValue('')
-    expect(screen.queryByAltText('Foto de tu mascota')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 
   it('no limpia la foto que el usuario subio en reemplazo', async () => {
@@ -546,7 +551,7 @@ describe('ReportForm: precarga de la mascota propia (#255)', () => {
     await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
     await elegirMascota(user, 'Ninguna')
 
-    expect(screen.getByAltText('Foto subida')).toHaveAttribute('src', 'https://cdn/foto.jpg')
+    expect(screen.getByAltText('Foto 3')).toHaveAttribute('src', 'https://cdn/foto.jpg')
   })
 
   it('no pisa lo que el usuario ya habia escrito', async () => {
@@ -570,7 +575,50 @@ describe('ReportForm: precarga de la mascota propia (#255)', () => {
     await elegirMascota(user, 'Firulais (Labrador)')
 
     expect(screen.getByLabelText('Título *')).toHaveValue('')
-    expect(screen.queryByAltText('Foto de tu mascota')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('copia como maximo 4 fotos de la mascota', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([
+      mascota({ photoUrls: [1, 2, 3, 4, 5].map((n) => `https://pub.r2.dev/pets/${n}.jpg`) }),
+    ])
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    expect(screen.getByText('4/4')).toBeInTheDocument()
+  })
+
+  it('todas las fotos precargadas pasan por la verificacion', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+
+    await waitFor(() => expect(analyzeImage).toHaveBeenCalledWith('https://pub.r2.dev/pets/b.jpg'))
+    expect(analyzeImage).toHaveBeenCalledWith('https://pub.r2.dev/pets/a.jpg')
+  })
+
+  it('una foto precargada sin animales bloquea hasta quitarla', async () => {
+    vi.mocked(listMyPets).mockResolvedValue([firulais()])
+    vi.mocked(analyzeImage).mockImplementation(async (url: string) =>
+      url.endsWith('a.jpg')
+        ? { hasAnimal: false, lowQuality: false, message: 'Sin animales en la foto' }
+        : { hasAnimal: true, lowQuality: false }
+    )
+    const user = userEvent.setup()
+    renderForm()
+
+    await elegirMascota(user, 'Firulais (Labrador)')
+    expect(await screen.findByText('Sin animales en la foto')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear Reporte' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Simular quitar principal' }))
+
+    expect(screen.queryByText('Sin animales en la foto')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear Reporte' })).toBeEnabled()
   })
 
   it('la foto precargada pasa por la misma verificacion que una subida', async () => {
@@ -750,7 +798,6 @@ describe('ReportForm: animal screening of the uploaded photo', () => {
     renderForm()
 
     await completarMinimo(user)
-    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
 
     expect(screen.queryByText(NO_ANIMAL_MESSAGE)).not.toBeInTheDocument()
     const submit = screen.getByRole('button', { name: 'Crear Reporte' })
@@ -765,41 +812,12 @@ describe('ReportForm: animal screening of the uploaded photo', () => {
     )
   })
 
-  it('warns about SPAM and blocks submission when no animal is detected', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await completarMinimo(user)
-    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
-
-    expect(screen.getByRole('alert')).toHaveTextContent(NO_ANIMAL_MESSAGE)
-    expect(screen.queryByText('Foto subida correctamente')).not.toBeInTheDocument()
-    const submit = screen.getByRole('button', { name: 'Crear Reporte' })
-    expect(submit).toBeDisabled()
-
-    await user.click(submit)
-
-    expect(createReport).not.toHaveBeenCalled()
-  })
-
-  it('unblocks submission once a photo with an animal replaces the rejected one', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
-    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
-
-    expect(screen.queryByText(NO_ANIMAL_MESSAGE)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Crear Reporte' })).toBeEnabled()
-  })
-
   it('allows creating the report when the analysis is unavailable', async () => {
     vi.mocked(createReport).mockResolvedValue(reporte())
     const user = userEvent.setup()
     renderForm()
 
     await completarMinimo(user)
-    await user.click(screen.getByRole('button', { name: 'Simular analisis no disponible' }))
 
     expect(screen.queryByText(NO_ANIMAL_MESSAGE)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
@@ -813,63 +831,10 @@ describe('ReportForm: animal screening of the uploaded photo', () => {
     renderForm()
 
     await completarMinimo(user)
-    await user.click(screen.getByRole('button', { name: 'Simular analisis no disponible' }))
     await user.click(screen.getByRole('button', { name: 'Crear Reporte' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(NO_ANIMAL_MESSAGE)
     expect(screen.queryByText('Detalle del reporte')).not.toBeInTheDocument()
-  })
-})
-
-// #212: a blurry or moved photo only gets a warning, the report can still be published.
-describe('ReportForm: low quality photo warning', () => {
-  const QUALITY_MESSAGE =
-    'La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.'
-
-  it('shows a non-blocking warning and still creates the report with that photo', async () => {
-    vi.mocked(createReport).mockResolvedValue(reporte())
-    const user = userEvent.setup()
-    renderForm()
-
-    await completarMinimo(user)
-    await user.click(screen.getByRole('button', { name: 'Simular foto borrosa' }))
-
-    expect(screen.getByText(QUALITY_MESSAGE).closest('[role="status"]')).not.toBeNull()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Foto subida' })).toHaveAttribute('src', 'https://cdn/borrosa.jpg')
-    const submit = screen.getByRole('button', { name: 'Crear Reporte' })
-    expect(submit).toBeEnabled()
-
-    await user.click(submit)
-
-    await waitFor(() =>
-      expect(createReport).toHaveBeenCalledWith(
-        expect.objectContaining({ imageUrl: 'https://cdn/borrosa.jpg' })
-      )
-    )
-  })
-
-  it('clears the warning once a sharper photo replaces the blurry one', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto borrosa' }))
-    expect(screen.getByText(QUALITY_MESSAGE)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
-
-    expect(screen.queryByText(QUALITY_MESSAGE)).not.toBeInTheDocument()
-  })
-
-  it('shows the rejection instead of the warning when the new photo has no animal', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular foto borrosa' }))
-    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
-
-    expect(screen.queryByText(QUALITY_MESSAGE)).not.toBeInTheDocument()
-    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 })
 
@@ -955,16 +920,6 @@ describe('ReportForm: email sin verificar (403 EMAIL_NOT_VERIFIED)', () => {
     expect(createReport).toHaveBeenCalledTimes(2)
   })
 
-  // El uploader ya muestra su propio aviso: el formulario no puede repetirlo.
-  it('si la subida de la foto da 403 muestra un solo aviso', async () => {
-    const user = userEvent.setup()
-    renderForm()
-
-    await user.click(screen.getByRole('button', { name: 'Simular falla por email sin verificar' }))
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-
   it('un error comun sigue mostrandose como texto sin aviso de verificacion', async () => {
     vi.mocked(createReport).mockRejectedValue(new Error('Reporte duplicado'))
     const user = userEvent.setup()
@@ -992,7 +947,7 @@ describe('ReportForm: modo edicion', () => {
     props: {
       onSubmit?: (data: unknown) => Promise<void>
       canChangeImage?: boolean
-      initialData?: Partial<typeof datosIniciales>
+      initialData?: Partial<typeof datosIniciales> & { extraImageUrls?: string[] }
     } = {}
   ) {
     const onSubmit = props.onSubmit ?? vi.fn().mockResolvedValue(undefined)
@@ -1023,7 +978,11 @@ describe('ReportForm: modo edicion', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith({ ...datosIniciales, title: 'Perro encontrado en Güemes' })
+      expect(onSubmit).toHaveBeenCalledWith({
+        ...datosIniciales,
+        extraImageUrls: [],
+        title: 'Perro encontrado en Güemes',
+      })
     )
     expect(createReport).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Crear Reporte' })).not.toBeInTheDocument()
@@ -1032,22 +991,41 @@ describe('ReportForm: modo edicion', () => {
   it('muestra la foto actual y avisa que cambiarla vuelve a revision', () => {
     renderEdicion()
 
-    expect(screen.getByAltText('Foto actual')).toHaveAttribute('src', 'https://cdn/actual.jpg')
-    expect(screen.queryByText(/Foto subida correctamente/)).not.toBeInTheDocument()
-    expect(screen.getByText(/Si cambiás la foto, el reporte vuelve a revisión/)).toBeInTheDocument()
+    expect(screen.getByAltText('Foto 1')).toHaveAttribute('src', 'https://cdn/actual.jpg')
+    expect(screen.getByText(/Si cambiás las fotos, el reporte vuelve a revisión/)).toBeInTheDocument()
   })
 
-  it('confirma la foto nueva cuando el usuario la reemplaza', async () => {
+  it('guarda la foto nueva cuando el usuario reemplaza la principal', async () => {
     const user = userEvent.setup()
     const { onSubmit } = renderEdicion()
 
     await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
-    expect(screen.getByText(/Foto subida correctamente/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Simular quitar principal' }))
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({ imageUrl: 'https://cdn/foto.jpg' })
+        expect.objectContaining({ imageUrl: 'https://cdn/foto.jpg', extraImageUrls: [] })
+      )
+    )
+  })
+
+  it('precarga las fotos extra y guarda los cambios sobre ellas', async () => {
+    const user = userEvent.setup()
+    const { onSubmit } = renderEdicion({
+      initialData: { ...datosIniciales, extraImageUrls: ['https://cdn/extra-0.jpg'] },
+    })
+
+    expect(screen.getByAltText('Foto 2')).toHaveAttribute('src', 'https://cdn/extra-0.jpg')
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          imageUrl: 'https://cdn/actual.jpg',
+          extraImageUrls: ['https://cdn/extra-0.jpg', 'https://cdn/foto.jpg'],
+        })
       )
     )
   })
@@ -1110,7 +1088,8 @@ describe('ReportForm: modo edicion', () => {
     renderEdicion({ canChangeImage: false })
 
     expect(screen.queryByRole('button', { name: 'Simular foto subida' })).not.toBeInTheDocument()
-    expect(screen.getByText(/La foto de un reporte resuelto no se puede cambiar/)).toBeInTheDocument()
+    expect(screen.getByText(/Las fotos de un reporte resuelto no se pueden cambiar/)).toBeInTheDocument()
+    expect(screen.getByAltText('Foto 1')).toHaveAttribute('src', 'https://cdn/actual.jpg')
   })
 
   it('muestra el error que devuelve el guardado', async () => {
@@ -1180,16 +1159,19 @@ describe('ReportForm: reportes similares (#211)', () => {
     )
   })
 
-  it('no usa una foto rechazada por no tener animales', async () => {
+  it('busca con la foto principal aunque haya fotos extra', async () => {
     const user = userEvent.setup()
     renderForm()
 
-    await user.click(screen.getByRole('button', { name: 'Simular foto sin animales' }))
     await user.click(screen.getByRole('button', { name: 'Elegir ubicación' }))
+    await user.click(screen.getByRole('button', { name: 'Simular foto subida' }))
+    await user.click(screen.getByRole('button', { name: 'Simular fotos extra' }))
+    await user.click(screen.getByRole('button', { name: 'Simular cambio de principal' }))
 
-    await waitFor(() => expect(findSimilarReports).toHaveBeenCalled())
-    expect(findSimilarReports).not.toHaveBeenCalledWith(
-      expect.objectContaining({ imageUrl: expect.anything() })
+    await waitFor(() =>
+      expect(findSimilarReports).toHaveBeenLastCalledWith(
+        expect.objectContaining({ imageUrl: 'https://cdn/extra-1.jpg' })
+      )
     )
   })
 

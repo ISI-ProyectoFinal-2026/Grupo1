@@ -16,7 +16,9 @@ vi.mock('@/services/pets.service')
 
 // Leaflet, geolocalizacion y subida a R2 no hacen falta para probar la pagina.
 vi.mock('@/components/maps/LocationPicker', () => ({ default: () => null }))
-vi.mock('@/components/reports/ImageUploader', () => ({ default: () => <p>uploader de fotos</p> }))
+vi.mock('@/components/common/MultiImageUploader', () => ({
+  default: ({ value }: { value: string[] }) => <p>{`uploader de fotos: ${value.join(', ')}`}</p>,
+}))
 
 const DUENO_ID = 7
 
@@ -43,6 +45,7 @@ function reporte(overrides: Partial<ReportDTO> = {}): ReportDTO {
     title: 'Perra perdida en Caballito',
     description: 'Collar rojo',
     imageUrl: 'https://cdn/actual.jpg',
+    extraImageUrls: [],
     customFlyerUrl: null,
     locationAddress: 'Caballito, CABA',
     showPhoneOnFlyer: false,
@@ -118,6 +121,17 @@ describe('EditReportPage', () => {
     expect(reportsService.getReport).toHaveBeenCalledWith(5)
   })
 
+  it('precarga la foto principal y las extra en el uploader', async () => {
+    vi.mocked(reportsService.getReport).mockResolvedValue(
+      reporte({ extraImageUrls: ['https://cdn/extra-1.jpg'] })
+    )
+    renderPage()
+
+    expect(
+      await screen.findByText('uploader de fotos: https://cdn/actual.jpg, https://cdn/extra-1.jpg')
+    ).toBeInTheDocument()
+  })
+
   it('precarga la fecha del suceso (#259)', async () => {
     vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ eventDate: '2026-09-18' }))
     renderPage()
@@ -168,6 +182,7 @@ describe('EditReportPage', () => {
       title: 'Perra encontrada en Caballito',
       description: 'Collar rojo',
       imageUrl: 'https://cdn/actual.jpg',
+      extraImageUrls: [],
       location: { lat: -34.61, lng: -58.44 },
       locationAddress: 'Caballito, CABA',
       showPhoneOnFlyer: false,
@@ -206,9 +221,9 @@ describe('EditReportPage', () => {
     renderPage()
 
     expect(
-      await screen.findByText(/La foto de un reporte resuelto no se puede cambiar/)
+      await screen.findByText(/Las fotos de un reporte resuelto no se pueden cambiar/)
     ).toBeInTheDocument()
-    expect(screen.queryByText('uploader de fotos')).not.toBeInTheDocument()
+    expect(screen.queryByText(/uploader de fotos/)).not.toBeInTheDocument()
   })
 
   it('precarga un reporte sin datos opcionales', async () => {
@@ -218,7 +233,7 @@ describe('EditReportPage', () => {
     renderPage()
 
     expect(await screen.findByLabelText('Descripción')).toHaveValue('')
-    expect(screen.queryByAltText('Foto actual')).not.toBeInTheDocument()
+    expect(screen.getByText('uploader de fotos:')).toBeInTheDocument()
   })
 
   it('muestra un error si el reporte no carga', async () => {
