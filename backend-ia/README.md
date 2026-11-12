@@ -73,7 +73,17 @@ Internamente (`app/services/embedding_service.py` + `app/services/matching_servi
 
 1. Descarga la imagen y corre **YOLOv8n** (`app/ml/pipeline.py`) para detectar y recortar el animal (cualquier clase animal de COCO: `bird`, `cat`, `dog`, `horse`, etc.).
 2. Genera el embedding con **DINOv2 ViT-B/14** (`vit_base_patch14_dinov2.lvd142m` vía `timm`, entrada a 224px) y lo guarda en `report_embeddings` (`vector(768)`). La inferencia corre en un thread (`asyncio.to_thread`) para no bloquear el event loop.
-3. Busca candidatos por similitud coseno (pgvector) entre reportes de tipo opuesto (lost↔found), dentro de 5km / 30 días / publicados, **los 5 más parecidos** (`LIMIT 5`), y guarda en `report_matches` los que superen `MATCH_THRESHOLD` (0.45). Los que además superen `NOTIFY_THRESHOLD` (0.63) disparan la notificación a los dueños (ver `NODE_BACKEND_URL`). Ambas constantes están documentadas en `matching_service.py` y calibradas con un benchmark propio (FPR 3% / 0.3%).
+3. Busca candidatos por similitud coseno (pgvector) entre reportes de tipo opuesto (lost↔found), dentro de un radio y una ventana de tiempo, publicados, **los más parecidos** (top K), y guarda en `report_matches` los que superen `MATCH_THRESHOLD`. Los que además superen `NOTIFY_THRESHOLD` disparan la notificación a los dueños (ver `NODE_BACKEND_URL`). Los umbrales están documentados en `matching_service.py` y calibrados con un benchmark propio (FPR 3% / 0.3%).
+
+Los parámetros se leen de variables de entorno (`app/config.py`); sin definirlas valen:
+
+| Variable | Valor por defecto | Significado |
+| --- | --- | --- |
+| `MATCH_THRESHOLD` | `0.45` | similitud mínima para guardar un match |
+| `NOTIFY_THRESHOLD` | `0.63` | similitud mínima para notificar |
+| `MATCH_RADIUS_METERS` | `5000` | radio de búsqueda |
+| `MATCH_WINDOW_DAYS` | `90` | antigüedad máxima de los candidatos |
+| `MATCH_TOP_K` | `5` | cantidad de candidatos evaluados |
 
 La similitud se calcula con `1 - (a <=> b)`: **`<=>` es distancia coseno**, y es el único operador que puede usar el índice HNSW (creado con `vector_cosine_ops`). No cambiarlo por `<->` (distancia L2): aun con embeddings normalizados `1 - L2` no es la similitud coseno y el umbral deja de tener sentido — dos fotos de la misma mascota con coseno 0.87 dan L2 0.51, o sea 0.49 de "similitud", y no matchearían nunca.
 

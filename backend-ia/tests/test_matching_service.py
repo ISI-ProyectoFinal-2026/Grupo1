@@ -106,7 +106,7 @@ async def scenario():
       - lost_baja_similitud: coseno 0.20 (otra mascota), opuesto, cerca, reciente -> NO matchea (similitud < umbral).
       - found_mismo_tipo: coseno 0.70, MISMO tipo, cerca, reciente -> filtrado por tipo.
       - lost_fuera_de_radio: coseno 0.70, opuesto, LEJOS, reciente -> filtrado por radio.
-      - lost_fuera_de_recencia: coseno 0.70, opuesto, cerca, VIEJO (>30 días) -> filtrado por recencia.
+      - lost_fuera_de_recencia: coseno 0.70, opuesto, cerca, VIEJO (>90 días) -> filtrado por recencia.
     """
     email = f"matching-service-test-{uuid.uuid4()}@example.com"
     async with async_session_factory() as session:
@@ -131,7 +131,7 @@ async def scenario():
         await _insert_embedding(session, lost_fuera_de_radio_id, EMBEDDING_MISMA_MASCOTA)
 
         lost_fuera_de_recencia_id = await _insert_report(
-            session, user_id, "lost", NEAR_LAT, NEAR_LNG, created_at_expr="now() - interval '40 days'"
+            session, user_id, "lost", NEAR_LAT, NEAR_LNG, created_at_expr="now() - interval '100 days'"
         )
         await _insert_embedding(session, lost_fuera_de_recencia_id, EMBEDDING_MISMA_MASCOTA)
 
@@ -382,3 +382,129 @@ async def test_sanciones_no_vigentes_no_excluyen(pair, notified, user_key, statu
     assert [(row["report_lost_id"], row["report_found_id"]) for row in await _pair_matches(pair)] == [
         (pair["lost_id"], pair["found_id"])
     ]
+
+
+# parámetros configurables (#217)
+async def _seed_pair_aged(candidate_age_days: int, candidate_cosine: float = 0.70, candidate_lat: float = NEAR_LAT):
+    async with async_session_factory() as session:
+        user_id = await _insert_user(session, f"matching-config-{uuid.uuid4()}@example.com")
+        found_id = await _insert_report(session, user_id, "found", NEAR_LAT, NEAR_LNG)
+        await _insert_embedding(session, found_id, EMBEDDING_BASE)
+        lost_id = await _insert_report(
+            session,
+            user_id,
+            "lost",
+            candidate_lat,
+            NEAR_LNG,
+            created_at_expr=f"now() - interval '{candidate_age_days} days'",
+        )
+        await _insert_embedding(session, lost_id, _unit_vector_at_cosine(candidate_cosine))
+        await session.commit()
+    return {"user_id": user_id, "found_id": found_id, "lost_id": lost_id}
+
+
+async def _cleanup_pair_aged(ids):
+    report_ids = [ids["found_id"], ids["lost_id"]]
+    async with async_session_factory() as session:
+        await session.execute(
+            text("DELETE FROM report_matches WHERE report_lost_id = ANY(:ids) OR report_found_id = ANY(:ids)"),
+            {"ids": report_ids},
+        )
+        await session.execute(text("DELETE FROM report_embeddings WHERE report_id = ANY(:ids)"), {"ids": report_ids})
+        await session.execute(text("DELETE FROM reports WHERE id = ANY(:ids)"), {"ids": report_ids})
+        await session.execute(text("DELETE FROM users WHERE id = :id"), {"id": ids["user_id"]})
+        await session.commit()
+
+
+def test_los_valores_por_defecto_conservan_los_calibrados_y_la_ventana_es_de_90_dias():
+    from app.config import Settings
+
+    defaults = Settings(_env_file=None)
+
+    assert defaults.match_threshold == 0.45
+    assert defaults.notify_threshold == 0.63
+    assert defaults.match_radius_meters == 5000
+    assert defaults.match_window_days == 90
+    assert defaults.match_top_k == 5
+
+
+@pytest.mark.asyncio
+async def test_matchea_un_candidato_de_60_dias_con_la_ventana_por_defecto(notified):
+    ids = await _seed_pair_aged(candidate_age_days=60)
+    try:
+        async with async_session_factory() as session:
+            created = await matching_service.find_and_store_matches(ids["found_id"], session)
+        assert created == 1
+    finally:
+        await _cleanup_pair_aged(ids)
+
+
+@pytest.mark.asyncio
+async def test_no_matchea_un_candidato_mas_viejo_que_la_ventana_por_defecto(notified):
+    ids = await _seed_pair_aged(candidate_age_days=100)
+    try:
+        async with async_session_factory() as session:
+            created = await matching_service.find_and_store_matches(ids["found_id"], session)
+        assert created == 0
+    finally:
+        await _cleanup_pair_aged(ids)
+
+
+@pytest.mark.asyncio
+async def test_la_ventana_se_lee_de_la_configuracion(notified, monkeypatch):
+    monkeypatch.setattr(matching_service.settings, "match_window_days", 30)
+    ids = await _seed_pair_aged(candidate_age_days=60)
+    try:
+        async with async_session_factory() as session:
+            created = await matching_service.find_and_store_matches(ids["found_id"], session)
+        assert created == 0
+    finally:
+        await _cleanup_pair_aged(ids)
+
+
+@pytest.mark.asyncio
+async def test_el_umbral_de_match_se_lee_de_la_configuracion(notified, monkeypatch):
+    monkeypatch.setattr(matching_service.settings, "match_threshold", 0.80)
+    ids = await _seed_pair_aged(candidate_age_days=1, candidate_cosine=0.70)
+    try:
+        async with async_session_factory() as session:
+            created = await matching_service.find_and_store_matches(ids["found_id"], session)
+        assert created == 0
+    finally:
+        await _cleanup_pair_aged(ids)
+
+
+@pytest.mark.asyncio
+async def test_el_umbral_de_notificacion_se_lee_de_la_configuracion(notified, monkeypatch):
+    monkeypatch.setattr(matching_service.settings, "notify_threshold", 0.90)
+    ids = await _seed_pair_aged(candidate_age_days=1, candidate_cosine=0.70)
+    try:
+        async with async_session_factory() as session:
+            created = await matching_service.find_and_store_matches(ids["found_id"], session)
+        assert created == 1
+        assert notified == []
+    finally:
+        await _cleanup_pair_aged(ids)
+
+
+@pytest.mark.asyncio
+async def test_el_radio_se_lee_de_la_configuracion(notified, monkeypatch):
+    # 0.01 grados de latitud ≈ 1.1 km: dentro de 5 km, fuera de 500 m
+    monkeypatch.setattr(matching_service.settings, "match_radius_meters", 500)
+    ids = await _seed_pair_aged(candidate_age_days=1, candidate_lat=NEAR_LAT + 0.01)
+    try:
+        async with async_session_factory() as session:
+            created = await matching_service.find_and_store_matches(ids["found_id"], session)
+        assert created == 0
+    finally:
+        await _cleanup_pair_aged(ids)
+
+
+@pytest.mark.asyncio
+async def test_el_top_se_lee_de_la_configuracion(scenario, notified, monkeypatch):
+    monkeypatch.setattr(matching_service.settings, "match_top_k", 1)
+    async with async_session_factory() as session:
+        created = await matching_service.find_and_store_matches(scenario["found_id"], session)
+
+    assert created == 1
+    assert [row["report_lost_id"] for row in await _scenario_matches(scenario)] == [scenario["lost_match_id"]]

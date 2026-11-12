@@ -15,7 +15,9 @@ Se sugiere una coincidencia cuando la similitud coseno entre embeddings supera u
 
 ## Consecuencias
 
-- El umbral (0,75) y la ventana temporal (30 días) son provisionales: el umbral se calibra con el benchmark y se propone ampliar la ventana a 90 días, porque hay mascotas que se recuperan casi tres meses después ([#217](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/217)).
+- La ventana temporal se amplió de 30 a 90 días, porque hay mascotas que se recuperan casi tres meses después ([#217](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/217)).
+- Los umbrales son 0,45 para registrar una coincidencia y 0,63 para notificar, calibrados con el benchmark de identidad ([ADR-0021](0021-modelo-embeddings-dinov2.md)). Siguen siendo provisionales: se recalibran con coincidencias confirmadas y rechazadas reales.
+- El radio, la ventana, el tope de candidatos y los umbrales se leen de variables de entorno (`MATCH_RADIUS_METERS`, `MATCH_WINDOW_DAYS`, `MATCH_TOP_K`, `MATCH_THRESHOLD`, `NOTIFY_THRESHOLD`; `backend-ia/app/config.py`), de modo que se ajustan sin cambiar código.
 - No hay datos publicados de distancia para perros: el radio se revisará con datos del piloto.
 
 ## Referencias
