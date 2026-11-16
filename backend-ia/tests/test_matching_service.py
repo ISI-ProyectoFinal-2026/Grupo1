@@ -364,6 +364,23 @@ async def test_no_busca_matches_si_el_autor_del_origen_esta_suspendido(pair, not
     assert notified == []
 
 
+# reporte oculto por denuncias (#218)
+@pytest.mark.asyncio
+async def test_excluye_candidatos_ocultos_por_denuncias(pair, notified):
+    async with async_session_factory() as session:
+        await session.execute(
+            text("UPDATE reports SET status = 'hidden'::report_status WHERE id = :id"),
+            {"id": pair["lost_id"]},
+        )
+        await session.commit()
+    async with async_session_factory() as session:
+        created = await matching_service.find_and_store_matches(pair["found_id"], session)
+
+    assert created == 0
+    assert await _pair_matches(pair) == []
+    assert notified == []
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("user_key", "status", "ends_at_expr"),

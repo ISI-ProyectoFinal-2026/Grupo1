@@ -88,7 +88,9 @@ export const reportMatchParamsSchema = z.object({
 
 export const listReportsQuerySchema = z.object({
   type: z.enum([ReportType.lost, ReportType.found]).optional(),
-  status: z.enum([ReportStatus.pending, ReportStatus.published, ReportStatus.rejected, ReportStatus.resolved]).optional(),
+  status: z
+    .enum([ReportStatus.pending, ReportStatus.published, ReportStatus.rejected, ReportStatus.resolved, ReportStatus.hidden])
+    .optional(),
   breed: z.string().min(1).optional(),
   zone: z.string().min(1).optional(),
   dateFrom: z.coerce.date().optional(),

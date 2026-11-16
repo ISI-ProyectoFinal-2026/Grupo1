@@ -30,7 +30,14 @@ describe("reports.service create() image screening", () => {
     process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
     reportCreate = jest.fn().mockResolvedValue({ id: 99 });
     reportUpdate = jest.fn().mockResolvedValue({ id: 99 });
-    const fakeTx = { report: { create: reportCreate, update: reportUpdate }, $executeRaw: jest.fn().mockResolvedValue(1) };
+    // reporte editable y sin denuncias pendientes
+    const fakeTx = {
+      report: { create: reportCreate, update: reportUpdate },
+      reportFlag: { count: jest.fn().mockResolvedValue(0) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $queryRaw: jest.fn().mockResolvedValue([{ status: "published" }]),
+    };
+    jest.spyOn(prisma.reportFlag, "count").mockResolvedValue(0);
     jest
       .spyOn(prisma, "$transaction")
       .mockImplementation((async (callback: (tx: unknown) => Promise<unknown>) => callback(fakeTx)) as never);
