@@ -1,9 +1,16 @@
 import { z } from "zod";
-import { ReportFlagStatus } from "@prisma/client";
+import { ReportFlagReason, ReportFlagStatus } from "@prisma/client";
 
-export const createReportFlagSchema = z.object({
-  reason: z.string().min(1),
-});
+// other exige un detalle (#218)
+export const createReportFlagSchema = z
+  .object({
+    reason: z.nativeEnum(ReportFlagReason),
+    detail: z.string().trim().max(500).optional(),
+  })
+  .refine((data) => data.reason !== ReportFlagReason.other || !!data.detail, {
+    message: "El detalle es obligatorio cuando el motivo es other",
+    path: ["detail"],
+  });
 
 export const reportFlagReportIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),

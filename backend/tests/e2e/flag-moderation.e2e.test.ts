@@ -7,7 +7,7 @@ import { createE2EContext, E2EUser, promoteTo } from "./helpers/factories";
 /**
  * Journey B5 (issue #39): un usuario denuncia la publicación de otro, un
  * usuario común no puede ver la cola de moderación, y un moderador la ve y
- * acepta el flag, lo que oculta (rechaza) el reporte y avisa al dueño (#223).
+ * acepta el flag, lo que oculta el reporte y avisa al dueño (#223).
  */
 describe("E2E: moderación de reportes denunciados (B5)", () => {
   const ctx = createE2EContext("flag-moderation");
@@ -52,7 +52,7 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     const res = await request(app)
       .post(`/api/reports/${reportId}/flags`)
       .set(auth(owner))
-      .send({ reason: "Me denuncio a mí mismo" });
+      .send({ reason: "other", detail: "Me denuncio a mí mismo" });
 
     expect(res.status).toBe(403);
     expect(await prisma.reportFlag.count({ where: { reportId } })).toBe(0);
@@ -62,7 +62,7 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     const res = await request(app)
       .post(`/api/reports/${reportId}/flags`)
       .set(auth(reporter))
-      .send({ reason: "Es spam, no es una mascota" });
+      .send({ reason: "not_an_animal" });
 
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ reportId, userId: reporter.id, status: "pending" });
@@ -73,7 +73,7 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     const res = await request(app)
       .post(`/api/reports/${reportId}/flags`)
       .set(auth(reporter))
-      .send({ reason: "Otra vez" });
+      .send({ reason: "spam" });
 
     expect(res.status).toBe(409);
   });
@@ -100,21 +100,21 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(flag).toMatchObject({ status: "pending", report: { id: reportId, status: "published" } });
   });
 
-  test("el moderador acepta el flag, el reporte queda rejected y el dueño recibe el aviso", async () => {
+  test("el moderador acepta el flag, el reporte queda hidden y el dueño recibe el aviso", async () => {
     const res = await request(app)
       .patch(`/api/report-flags/${flagId}`)
       .set(auth(moderator))
       .send({ action: "accept" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ id: flagId, status: "reviewed", report: { id: reportId, status: "rejected" } });
+    expect(res.body).toMatchObject({ id: flagId, status: "reviewed", report: { id: reportId, status: "hidden" } });
 
     // Ya no es visible para la comunidad, pero el dueño lo sigue viendo.
     const anonymous = await request(app).get(`/api/reports/${reportId}`);
     expect(anonymous.status).toBe(404);
     const asOwner = await request(app).get(`/api/reports/${reportId}`).set(auth(owner));
     expect(asOwner.status).toBe(200);
-    expect(asOwner.body.status).toBe("rejected");
+    expect(asOwner.body.status).toBe("hidden");
 
     const notifications = await request(app).get("/api/notifications").set(auth(owner));
     expect(notifications.body).toEqual(
@@ -128,11 +128,11 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(queue.body.some((f: { id: number }) => f.id === flagId)).toBe(false);
   });
 
-  test("un reporte ya rechazado no se puede denunciar (404)", async () => {
+  test("un reporte oculto no se puede denunciar (404)", async () => {
     const res = await request(app)
       .post(`/api/reports/${reportId}/flags`)
       .set(auth(bystander))
-      .send({ reason: "Llego tarde" });
+      .send({ reason: "spam" });
 
     expect(res.status).toBe(404);
   });

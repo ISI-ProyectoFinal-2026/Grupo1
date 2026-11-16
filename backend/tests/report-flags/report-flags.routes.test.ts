@@ -57,7 +57,7 @@ describe("report-flags routes", () => {
       await prisma.reportFlag.deleteMany({ where: { id } });
     }
     await prisma.notification.deleteMany({ where: { reportId } });
-    await prisma.report.update({ where: { id: reportId }, data: { status: "published" } });
+    await prisma.report.update({ where: { id: reportId }, data: { status: "published", flagCycle: 0 } });
   });
 
   afterAll(async () => {
@@ -72,13 +72,30 @@ describe("report-flags routes", () => {
   test("POST /api/reports/:id/flags crea un reporte de moderación y responde 201", async () => {
     const res = await request(app)
       .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-      .send({ userId: reporterId, reason: "Publicación falsa" });
+      .send({ userId: reporterId, reason: "false_info" });
 
     expect(res.status).toBe(201);
     expect(res.body.reportId).toBe(reportId);
     expect(res.body.userId).toBe(reporterId);
-    expect(res.body.reason).toBe("Publicación falsa");
+    expect(res.body.reason).toBe("false_info");
     expect(res.body.status).toBe("pending");
+    createdFlagIds.push(res.body.id);
+  });
+
+  test("POST /api/reports/:id/flags responde 400 con un motivo fuera de la lista o other sin detalle", async () => {
+    for (const body of [{ reason: "me cae mal" }, { reason: "other" }, { reason: "other", detail: "  " }]) {
+      const res = await request(app).post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`).send(body);
+      expect(res.status).toBe(400);
+    }
+    expect(await prisma.reportFlag.count({ where: { reportId } })).toBe(0);
+  });
+
+  test("POST /api/reports/:id/flags acepta other con detalle", async () => {
+    const res = await request(app)
+      .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
+      .send({ reason: "other", detail: "Es publicidad" });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ reason: "other", detail: "Es publicidad" });
     createdFlagIds.push(res.body.id);
   });
 
@@ -91,45 +108,45 @@ describe("report-flags routes", () => {
   test("POST /api/reports/:id/flags responde 404 si el reporte no existe", async () => {
     const res = await request(app)
       .post("/api/reports/999999999/flags").set("Authorization", `Bearer ${token}`)
-      .send({ userId: reporterId, reason: "Publicación falsa" });
+      .send({ userId: reporterId, reason: "false_info" });
     expect(res.status).toBe(404);
   });
 
   test("POST /api/reports/:id/flags responde 400 si el id no es numérico", async () => {
     const res = await request(app)
       .post("/api/reports/abc/flags").set("Authorization", `Bearer ${token}`)
-      .send({ userId: reporterId, reason: "Publicación falsa" });
+      .send({ userId: reporterId, reason: "false_info" });
     expect(res.status).toBe(400);
   });
 
   test("POST /api/reports/:id/flags responde 409 si el mismo usuario reporta la misma publicación dos veces", async () => {
     const first = await request(app)
       .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-      .send({ userId: reporterId, reason: "Publicación falsa" });
+      .send({ userId: reporterId, reason: "false_info" });
     createdFlagIds.push(first.body.id);
 
     const res = await request(app)
       .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-      .send({ userId: reporterId, reason: "Otra vez" });
+      .send({ userId: reporterId, reason: "spam" });
     expect(res.status).toBe(409);
   });
 
   test("POST /api/reports/:id/flags responde 403 si el dueño denuncia su propio reporte", async () => {
     const res = await request(app)
       .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${ownerToken}`)
-      .send({ reason: "Publicación falsa" });
+      .send({ reason: "false_info" });
     expect(res.status).toBe(403);
     expect(res.body.error.message).toBe("No podés denunciar tu propia publicación");
   });
 
-  test.each(["pending", "rejected", "resolved"] as const)(
+  test.each(["pending", "rejected", "resolved", "hidden"] as const)(
     "POST /api/reports/:id/flags responde 404 si el reporte está %s",
     async (status) => {
       await prisma.report.update({ where: { id: reportId }, data: { status } });
 
       const res = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ reason: "Publicación falsa" });
+        .send({ reason: "false_info" });
       expect(res.status).toBe(404);
     }
   );
@@ -148,7 +165,7 @@ describe("report-flags routes", () => {
     test("un moderador lista flags pending por defecto, con contexto del reporte", async () => {
       const created = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ userId: reporterId, reason: "Publicación falsa" });
+        .send({ userId: reporterId, reason: "false_info" });
       createdFlagIds.push(created.body.id);
 
       const res = await request(app).get("/api/report-flags").set("Authorization", `Bearer ${moderatorToken}`);
@@ -165,7 +182,7 @@ describe("report-flags routes", () => {
     test("status=reviewed filtra solo los flags ya revisados", async () => {
       const created = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ userId: reporterId, reason: "Publicación falsa" });
+        .send({ userId: reporterId, reason: "false_info" });
       createdFlagIds.push(created.body.id);
 
       await request(app)
@@ -190,7 +207,7 @@ describe("report-flags routes", () => {
     test("responde 403 si el usuario no es moderador ni admin", async () => {
       const created = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ userId: reporterId, reason: "Publicación falsa" });
+        .send({ userId: reporterId, reason: "false_info" });
       createdFlagIds.push(created.body.id);
 
       const res = await request(app)
@@ -201,7 +218,7 @@ describe("report-flags routes", () => {
     test("responde 400 sin una acción válida", async () => {
       const created = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ reason: "Publicación falsa" });
+        .send({ reason: "false_info" });
       createdFlagIds.push(created.body.id);
 
       for (const body of [{}, { action: "hide" }]) {
@@ -215,7 +232,7 @@ describe("report-flags routes", () => {
     test("un moderador descarta el flag: queda dismissed y el reporte sigue publicado", async () => {
       const created = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ reason: "Publicación falsa" });
+        .send({ reason: "false_info" });
       createdFlagIds.push(created.body.id);
 
       const res = await request(app)
@@ -226,10 +243,10 @@ describe("report-flags routes", () => {
       expect(res.body).toMatchObject({ status: "dismissed", report: { id: reportId, status: "published" } });
     });
 
-    test("un moderador acepta el flag: queda reviewed y el reporte queda rejected", async () => {
+    test("un moderador acepta el flag: queda reviewed y el reporte queda hidden", async () => {
       const created = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ userId: reporterId, reason: "Publicación falsa" });
+        .send({ userId: reporterId, reason: "false_info" });
       createdFlagIds.push(created.body.id);
 
       const res = await request(app)
@@ -240,13 +257,13 @@ describe("report-flags routes", () => {
       expect(res.body.status).toBe("reviewed");
 
       const report = await prisma.report.findUnique({ where: { id: reportId } });
-      expect(report?.status).toBe("rejected");
+      expect(report?.status).toBe("hidden");
     });
 
     test("responde 409 si el flag ya fue revisado", async () => {
       const created = await request(app)
         .post(`/api/reports/${reportId}/flags`).set("Authorization", `Bearer ${token}`)
-        .send({ userId: reporterId, reason: "Publicación falsa" });
+        .send({ userId: reporterId, reason: "false_info" });
       createdFlagIds.push(created.body.id);
 
       await request(app)
