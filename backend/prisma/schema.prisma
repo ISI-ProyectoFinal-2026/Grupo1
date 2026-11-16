@@ -146,6 +146,7 @@ enum ReportStatus {
   published
   rejected
   resolved
+  hidden // oculto por denuncias (#218), restaurable
 
   @@map("report_status")
 }
@@ -174,6 +175,10 @@ model Report {
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
   publishedAt     DateTime?    @map("published_at")
+  // ciclo de denuncias abierto (#218): sube al restaurar o descartar
+  flagCycle       Int          @default(0) @map("flag_cycle")
+  // última edición del autor; habilita re-denunciar tras restaurar
+  contentEditedAt DateTime?    @map("content_edited_at")
 
   user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   pet    Pet?             @relation(fields: [petId], references: [id])
@@ -197,18 +202,34 @@ enum ReportFlagStatus {
   @@map("report_flag_status")
 }
 
+enum ReportFlagReason {
+  not_an_animal
+  offensive
+  spam
+  duplicate
+  false_info
+  other
+
+  @@map("report_flag_reason")
+}
+
 model ReportFlag {
   id        Int               @id @default(autoincrement())
   reportId  Int               @map("report_id")
   userId    Int               @map("user_id")
-  reason    String
+  reason    ReportFlagReason
+  // texto libre; obligatorio con reason=other (#218)
+  detail    String?
   status    ReportFlagStatus  @default(pending)
+  // ciclo del reporte al denunciar
+  cycle     Int               @default(0)
+  resolvedAt DateTime?        @map("resolved_at")
   createdAt DateTime          @default(now()) @map("created_at")
 
   report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([reportId, userId])
+  @@unique([reportId, userId, cycle])
   @@index([status])
   @@index([reportId])
   @@map("report_flags")

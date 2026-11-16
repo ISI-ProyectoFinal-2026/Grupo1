@@ -92,6 +92,27 @@ describe("notificaciones respetan las preferencias (#33)", () => {
       await setPrefs(ownerA, { notifyStatusChange: true });
       await expect(createForStatusChange(reportA, "rejected")).resolves.not.toBeNull();
     });
+
+    it.each(["auto_hidden", "hidden_by_flag", "restored", "hide_confirmed"] as const)(
+      "%s se envía aunque notifyStatusChange sea false (#218)",
+      async (status) => {
+        await setPrefs(ownerA, { notifyStatusChange: false });
+        const n = await createForStatusChange(reportA, status);
+        expect(n).toMatchObject({ userId: ownerA, type: "report_status_change", reportId: reportA });
+      }
+    );
+
+    it.each([
+      ["auto_hidden", "Tu reporte fue ocultado", "varias denuncias"],
+      ["hidden_by_flag", "Tu reporte fue ocultado", "revisa"],
+      ["restored", "Tu reporte volvió a estar visible", "visible"],
+      ["hide_confirmed", "La moderación confirmó el ocultamiento", "confirm"],
+    ] as const)("%s usa su propio texto", async (status, title, fragment) => {
+      const n = await createForStatusChange(reportA, status);
+      expect(n?.title).toBe(title);
+      expect(n?.message).toContain("Perdido A");
+      expect(n?.message).toContain(fragment);
+    });
   });
 
   describe("notifyNewMessage", () => {

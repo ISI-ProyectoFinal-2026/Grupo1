@@ -3,9 +3,9 @@ import * as reportFlagsService from "../services/report-flags.service";
 import {
   createReportFlagSchema,
   listReportFlagsQuerySchema,
-  reportFlagIdParamSchema,
+  moderationActionSchema,
+  moderationReportIdParamSchema,
   reportFlagReportIdParamSchema,
-  resolveReportFlagSchema,
 } from "../validators/report-flags.validator";
 
 export async function create(req: Request, res: Response): Promise<void> {
@@ -21,9 +21,13 @@ export async function list(req: Request, res: Response): Promise<void> {
   res.status(200).json(flags);
 }
 
-export async function resolve(req: Request, res: Response): Promise<void> {
-  const { id } = reportFlagIdParamSchema.parse(req.params);
-  const { action } = resolveReportFlagSchema.parse(req.body);
-  const flag = await reportFlagsService.resolve(id, action);
-  res.status(200).json(flag);
+export async function listGroups(_req: Request, res: Response): Promise<void> {
+  res.status(200).json(await reportFlagsService.listGroups());
+}
+
+export async function moderate(req: Request, res: Response): Promise<void> {
+  const { reportId } = moderationReportIdParamSchema.parse(req.params);
+  const { action } = moderationActionSchema.parse(req.body);
+  const result = await reportFlagsService.moderate(reportId, action);
+  res.status(200).json(result);
 }
