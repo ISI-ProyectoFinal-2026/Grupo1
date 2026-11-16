@@ -30,7 +30,7 @@ Plataforma web para reportar y buscar mascotas perdidas/encontradas con **matchi
 │   (Node.js/Express)  │  │  (Python/FastAPI)       │
 │                      │  │                         │
 │ - Orquestación       │  │ - YOLO (validación)     │
-│ - CRUD reportes      │  │ - OpenCLIP (embeddings) │
+│ - CRUD reportes      │  │ - DINOv2 (embeddings)   │
 │ - Geolocalización    │  │ - Búsqueda vectorial    │
 │ - Auth/Users         │  │                         │
 │ - Notificaciones     │  │ Procesa jobs de cola    │
@@ -66,38 +66,48 @@ Plataforma web para reportar y buscar mascotas perdidas/encontradas con **matchi
 ## 3. Stack Tecnológico
 
 ### Frontend
-- **React** 18.x - Framework UI
-- **TypeScript** - Tipado estático
-- **Vite** - Build tool
-- **Tailwind CSS** - Estilos
-- **React Router** - Enrutamiento
-- **React Query** - Manejo de datos servidor
-- **Zustand** - Estado global
-- **Socket.io Client** - Chat real-time
-- **Leaflet.js** - Mapas
+> Versiones según `frontend/package.json`.
+
+- **React** 19.2 - Framework UI
+- **TypeScript** 6.0 - Tipado estático
+- **Vite** 8.2 - Build tool
+- **Tailwind CSS** 3.4 - Estilos
+- **React Router** 6.30 - Enrutamiento
+- **TanStack Query** 5 - Manejo de datos servidor
+- **Zustand** 5 - Estado global
+- **Axios** 1.19 - Cliente HTTP
+- **Socket.io Client** 4.8 - Chat real-time
+- **Leaflet.js** 1.9 - Mapas
 
 ### Backend Principal
-- **Node.js** 20.x LTS
-- **Express.js** - Framework HTTP
-- **TypeScript** - Tipado estático
-- **Prisma** - ORM + Migraciones
-- **Socket.io** - WebSockets
-- **Redis** - Queue + Cache + Sesiones
-- **JWT** - Autenticación
+> Versiones según `backend/package.json`; Node.js según `.github/workflows/ci.yml`.
+
+- **Node.js** 24 (versión del CI)
+- **Express.js** 5.2 - Framework HTTP
+- **TypeScript** 5.6 - Tipado estático
+- **Zod** 4 - Validación
+- **Prisma** 5.20 - ORM + Migraciones
+- **Socket.io** 4.8 - WebSockets
+- **Redis** - Queue + Cache + Sesiones (no implementado, ver sección 7)
+- **JWT** (`jsonwebtoken` 9) - Autenticación
 
 ### Backend IA
-- **Python** 3.11+
-- **FastAPI** - Framework web
-- **OpenCLIP** - Embeddings de imágenes
-- **YOLOv8** - Detección de mascotas
-- **Faiss** o **pgvector** - Búsqueda vectorial
-- **Pillow/OpenCV** - Procesamiento de imágenes
-- **Pydantic** - Validación de datos
+> Versiones según `backend-ia/requirements.txt`; Python según `.github/workflows/ci.yml`.
+
+- **Python** 3.11
+- **FastAPI** 0.115 - Framework web
+- **DINOv2 ViT-B/14** (`timm` 1.0.28, `torch` 2.13) - Embeddings de imágenes ([ADR-0021](adr/0021-modelo-embeddings-dinov2.md))
+- **YOLOv8n** (`ultralytics` 8.3.28) - Detección de mascotas
+- **pgvector** (`pgvector` 0.3.4 para SQLAlchemy) - Búsqueda vectorial
+- **Pillow** 10.4 / **NumPy** 2.1 - Procesamiento de imágenes y nitidez ([ADR-0023](adr/0023-aviso-calidad-imagen.md))
+- **Pydantic** 2.9 - Validación de datos
 
 ### Base de Datos
-- **PostgreSQL** 15.x
-- **PostGIS** 3.x - Geolocalización
-- **pgvector** 0.5.x - Búsqueda vectorial
+> Según `docker/postgres/Dockerfile`.
+
+- **PostgreSQL** 16
+- **PostGIS** 3 - Geolocalización
+- **pgvector** - Búsqueda vectorial (paquete `postgresql-16-pgvector` de PGDG, versión No disponible: no está fijada)
 
 ### Almacenamiento
 - **Cloudflare R2** - Imágenes (alternativa: AWS S3, Google Cloud Storage)
@@ -108,7 +118,7 @@ Plataforma web para reportar y buscar mascotas perdidas/encontradas con **matchi
 
 ### Infraestructura
 - **Docker** - Containerización
-- **GitHub Actions** - CI/CD
+- **GitHub Actions** - CI/CD: `ci.yml` (backend, frontend, e2e-ui y backend-ia), `snyk-security.yml` (falla ante vulnerabilidades críticas de Snyk Open Source en backend y frontend) y `publish-report.yml` (publicación manual del sitio del informe en GitHub Pages)
 - **AWS/Google Cloud/Hetzner** - Hosting
 
 ---
@@ -134,7 +144,7 @@ Usuario                 Frontend                 Backend Ppal          R2       
   │                        │                         │                  │          │ (validar) │
   │                        │                         │                  │          │<─ OK ─────┤
   │                        │                         │                  │          │           │
-  │                        │                         │                  │          ├─ OpenCLIP─>│
+  │                        │                         │                  │          ├─ DINOv2 ──>│
   │                        │                         │                  │          │ (embedding)
   │                        │                         │                  │          │<─ Vector ──┤
   │                        │                         │<─ Actualizar ─────────────────────────┤
@@ -175,19 +185,21 @@ sincrónicamente dentro de esa misma request:
    if not is_pet(image):
      return 422  # sin más efecto, no se guarda nada
 
-3. Ejecutar OpenCLIP (ViT-B-32, pretrained laion2b_s34b_b79k)
-   embedding = generate_embedding(image)  # vector [512]
-   (dimensión validada empíricamente en docs/pocs/POC_Similitudes.ipynb;
-   no todo checkpoint de OpenCLIP da 1536, por eso el ajuste de schema)
+3. Ejecutar DINOv2 ViT-B/14 (vit_base_patch14_dinov2.lvd142m vía timm,
+   entrada 224 px) sobre el recorte de YOLO rellenado a cuadrado
+   embedding = generate_embedding(crop)  # vector [768], norma L2 = 1
+   (reemplaza a OpenCLIP ViT-B-32 de 512 dims, ver ADR-0021 y
+   backend-ia/app/ml/pipeline.py; migración
+   20261014000000_dinov2_embedding_dimension)
 
 4. Backend IA guarda directo en Postgres (sin callback a Backend Ppal):
    - UPSERT embedding en report_embeddings
    - Busca coincidencias (pgvector, ver 4.3) y las guarda en report_matches
    - responde 201 a Backend Ppal (que no espera ni usa el body)
 
-Pendiente: notificar al usuario (no existe aún ruta/servicio de
-notifications), y mover este paso a un worker de cola en vez de síncrono
-dentro de la request.
+Pendiente: mover este paso a un worker de cola en vez de síncrono
+dentro de la request. La notificación al usuario está implementada
+(ver 4.3, paso 2).
 ```
 
 ### 4.3 Matching por Similitud
@@ -204,8 +216,12 @@ en el mismo paso 4 de arriba (no es un servicio ni un endpoint aparte):
    WHERE r.status = 'published'
      AND r.report_type != :report_type  -- Tipo opuesto
      AND r.id != :report_id
-     AND ST_DWithin(r.location::geography, CAST(:location AS geography), 5000)  -- 5km reales
-     AND r.created_at > NOW() - INTERVAL '30 days'
+     AND ST_DWithin(r.location::geography, CAST(:location AS geography), :radius_meters)  -- MATCH_RADIUS_METERS (5000)
+     AND r.created_at > NOW() - make_interval(days => :window_days)  -- MATCH_WINDOW_DAYS (90)
+     AND NOT EXISTS (  -- autor sin suspensión vigente (#38)
+       SELECT 1 FROM account_sanctions s
+       WHERE s.user_id = r.user_id AND s.status = 'active'
+         AND (s.ends_at IS NULL OR s.ends_at > :now))
    ORDER BY re.embedding <=> :embedding ASC
    LIMIT 5;
 
@@ -213,21 +229,24 @@ en el mismo paso 4 de arriba (no es un servicio ni un endpoint aparte):
    similitud coseno con la que se calibro el umbral en el POC, y es el
    unico operador que puede usar el indice HNSW `vector_cosine_ops`.
    `<->` es distancia L2 y NO sirve aca: dos fotos de la misma mascota
-   con coseno 0.87 dan L2 0.51, o sea 0.49 de "similitud", debajo del
-   umbral de 0.75)
+   con coseno 0.70 dan L2 0.77, o sea 0.23 de "similitud", debajo de
+   ambos umbrales)
 
    (el cast a `::geography` es necesario: `reports.location` es
    `geometry(Point, 4326)` en grados, no metros — sin el cast, "5000"
    se interpreta como 5000 grados, no como 5km)
 
-2. Si similarity >= SIMILARITY_THRESHOLD (0.75 hoy — punto medio del rango
-   65%-85% que midió el POC, documentado como provisional, ver
-   docs/pocs/poc_similitudes.md):
-   - UPSERT en report_matches (no pisa un match ya confirmed/rejected)
+2. Umbrales (backend-ia/app/services/matching_service.py, ADR-0021;
+   provisionales, a recalibrar con matches reales):
+   - similarity >= MATCH_THRESHOLD (0.45): UPSERT en report_matches
+     (no pisa un match ya confirmed/rejected)
+   - similarity >= NOTIFY_THRESHOLD (0.63): además avisa al Backend
+     Principal con POST /api/notifications/internal/match
+     (X-Internal-Key), que notifica a los dueños. Best-effort: sin
+     NODE_BACKEND_URL no se notifica.
 
-3. Pendiente (no implementado en la issue #18): notificar al usuario
-   dueño del reporte, y el flujo de confirmar/rechazar un match desde
-   el frontend (hoy solo hay GET /api/reports/:id/matches de lectura).
+3. El dueño confirma o rechaza la coincidencia con
+   POST /api/reports/:id/matches/:matchId/confirm | reject.
 ```
 
 ---
@@ -300,7 +319,7 @@ CREATE TABLE pets (
   age INT,
   color VARCHAR(100),
   description TEXT,
-  photo_urls TEXT[],  -- URLs subidas a Cloudflare R2, mínimo 1 al registrar
+  photo_urls TEXT[],  -- URLs subidas a Cloudflare R2, de 1 a 4 (pets.validator.ts)
   microchip_id VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW(),
   FOREIGN KEY (user_id) REFERENCES users(id)
@@ -319,7 +338,10 @@ CREATE TABLE reports (
   
   title VARCHAR(255) NOT NULL,
   description TEXT,
-  image_url VARCHAR(500),  -- URL en Cloudflare R2
+  image_url VARCHAR(500),  -- URL en Cloudflare R2; foto principal (IA, flyer, mapa)
+  extra_image_urls TEXT[] DEFAULT '{}',  -- hasta 3 fotos extra (reports.validator.ts)
+  show_phone_on_flyer BOOLEAN NOT NULL DEFAULT false,  -- teléfono del autor en el flyer (#259)
+  event_date DATE,  -- fecha del suceso (#259)
   
   location GEOMETRY(Point, 4326),  -- PostGIS: lat/long
   location_address VARCHAR(500),
@@ -341,7 +363,7 @@ CREATE TABLE reports (
 CREATE TABLE report_embeddings (
   id SERIAL PRIMARY KEY,
   report_id INT UNIQUE NOT NULL REFERENCES reports(id),
-  embedding vector(512),  -- OpenCLIP ViT-B-32 output (validado en el POC)
+  embedding vector(768),  -- DINOv2 ViT-B/14 output (ADR-0021)
   created_at TIMESTAMP DEFAULT NOW(),
   FOREIGN KEY (report_id) REFERENCES reports(id)
 );
@@ -402,6 +424,20 @@ CREATE TABLE notifications (
   INDEX(user_id)
 );
 ```
+
+#### Tablas agregadas desde la revisión del 2026-10-21
+
+La fuente de verdad es `backend/prisma/schema.prisma`; el detalle de columnas está en `docs/informe/1-2-4-modelo-de-datos.md`.
+
+| Tabla | Migración |
+|---|---|
+| `notification_preferences` | `20261028000000_add_notification_preferences` |
+| `subscriptions` | `20261101000000_premium_subscriptions` |
+| `ads`, `ad_events`, `ad_flags` | `20261101020000_add_ads`, `20261101030000_add_ad_events`, `20261101040000_add_ad_flags` |
+| `role_change_audits` | `20261104000000_add_role_change_audits` |
+| `account_reports`, `account_sanctions`, `account_sanction_events` | `20261105000000_account_reports_and_sanctions` |
+
+Desde `20261110000000_cascade_user_deletion`, eliminar un usuario borra en cascada sus datos; el actor de `account_sanction_events` y `role_change_audits` pasa a nulo.
 
 ---
 
@@ -484,6 +520,8 @@ PUT /api/users/me
 GET /api/users/:id (perfil público)
 ```
 
+> No implementados: `backend/src/app.ts` no monta un router `/api/users`.
+
 ### Mascotas
 ```http
 GET /api/pets
@@ -496,6 +534,7 @@ DELETE /api/pets/:id
 ### Almacenamiento (Cloudflare R2)
 ```http
 POST /api/uploads/presign
+POST /api/uploads/analyze   { imageUrl } → { hasAnimal, lowQuality } (consulta POST /images/analyze del Backend IA)
 ```
 El backend no recibe los bytes de la imagen: genera una URL PUT firmada (expira a los 5 min) para que el frontend suba directo a R2, y el frontend le pasa la URL final al backend recién en el `POST /pets` o `POST /reports` correspondiente.
 
@@ -515,10 +554,16 @@ Response `201`:
 ### Reportes
 ```http
 GET /api/reports?type=lost&status=published&page=1
+GET /api/reports/mine (requiere sesión)
 POST /api/reports
 GET /api/reports/:id
 PUT /api/reports/:id
 DELETE /api/reports/:id
+POST /api/reports/:id/close
+POST /api/reports/:id/flags (denuncia de un reporte)
+GET /api/reports/:id/flyer
+PUT /api/reports/:id/flyer/custom
+GET /api/reports/:id/nearby-businesses (comercios cercanos, ADR-0024)
 
 GET /api/reports/:id/matches (candidatos sugeridos)
 POST /api/reports/:id/matches/:match_id/confirm
@@ -531,6 +576,7 @@ POST /api/reports/similar (posibles duplicados al crear un reporte, #211)
 ```http
 GET /api/geo/nearby?lat=xx&lng=xx&radius=5000
 GET /api/geo/map?bounds=...
+GET /api/geo/reverse (proxy de Nominatim con caché, ADR-0025)
 ```
 
 ### Chat
@@ -548,6 +594,58 @@ WebSocket: /ws/chat/:chat_id
 GET /api/notifications
 PUT /api/notifications/:id/read
 DELETE /api/notifications/:id
+POST /api/notifications/internal/match (interno, X-Internal-Key; lo llama el Backend IA)
+
+GET /api/notification-preferences
+PUT /api/notification-preferences
+PUT /api/notification-preferences/location-consent
+PUT /api/notification-preferences/location
+```
+
+### Comercios, planes y anuncios (ADR-0019, ADR-0024)
+```http
+POST /api/businesses
+GET  /api/businesses
+GET  /api/businesses/:id
+POST /api/businesses/:id/contact
+GET  /api/businesses/me
+PUT  /api/businesses/me
+GET  /api/businesses/me/stats
+POST /api/businesses/me/subscription (compra de Premium, pago simulado)
+GET  /api/businesses/me/ads
+POST /api/businesses/me/ads
+PUT  /api/businesses/me/ads/:adId
+PATCH /api/businesses/me/ads/:adId/status
+DELETE /api/businesses/me/ads/:adId
+GET  /api/businesses/me/ads/:adId/stats
+
+GET  /api/plans
+GET  /api/ads (anuncio por cercanía)
+POST /api/ads/:adId/events (impresión o clic)
+POST /api/ads/:adId/flags (denuncia de un anuncio)
+```
+
+### Moderación y administración
+```http
+GET   /api/report-flags            (moderador, admin)
+PATCH /api/report-flags/:id        (moderador, admin)
+GET   /api/ad-flags                (moderador, admin)
+PATCH /api/ad-flags/:id            (moderador, admin)
+POST  /api/account-reports         (denuncia de una cuenta; requiere email verificado)
+GET   /api/account-reports         (moderador, admin)
+GET   /api/admin/account-sanctions/pending      (moderador, admin)
+POST  /api/admin/account-sanctions/:id/confirm  (moderador, admin)
+POST  /api/admin/account-sanctions/:id/revert   (moderador, admin)
+GET   /api/admin/users             (admin)
+GET   /api/admin/role-audit        (admin)
+PATCH /api/admin/users/:id/role    (admin)
+```
+
+### Salud
+```http
+GET /health
+GET /health/db
+GET /health/ai   → 200 si el Backend IA responde; 503 si no responde o falta AI_SERVICE_URL
 ```
 
 ### Endpoints Internos (Backend Principal → Backend IA)
@@ -574,6 +672,17 @@ POST {AI_SERVICE_URL}/images/embedding
 → 200 { "embedding": [512 floats] }
 → 422 si no detectó una mascota o no pudo procesar la imagen
 ```
+
+Para el control temprano de la foto (y el aviso de calidad de ADR-0023):
+
+```http
+POST {AI_SERVICE_URL}/images/analyze
+{ "image_url": "https://r2.../image-123.jpg" }
+→ 200 { "has_animal": bool, "low_quality": bool }
+→ 422 si no pudo descargar o decodificar la imagen
+```
+
+Todos los endpoints `POST` del Backend IA exigen la cabecera `X-Internal-Key`.
 
 `POST /api/internal/reports/:report_id/reject` (planteado originalmente
 para auditar rechazos) no está implementado — hoy un 422 no deja rastro
@@ -691,7 +800,7 @@ interface ImageProcessingJob {
      │  BACKEND IA (Python/FastAPI)  │
      │  :8000 (interno)              │
      │  - YOLO validation            │
-     │  - OpenCLIP embeddings        │
+     │  - DINOv2 embeddings          │
      │  - Queue worker               │
      └───────────────────────────────┘
 ```
@@ -725,6 +834,16 @@ R2_ENDPOINT=https://your-account.r2.cloudflarestorage.com
 
 # Backend IA (nombre real de la variable en backend/src/services/matching.service.ts)
 AI_SERVICE_URL=http://ia-backend:8000
+# Clave compartida con el Backend IA (mismo valor en backend-ia/.env)
+INTERNAL_API_KEY=
+
+# Monetización (backend/src/config/plans.ts, backend/src/services/payments/index.ts)
+PREMIUM_MONTHLY_PRICE_USD=30   # default 30
+PREMIUM_ANNUAL_PRICE_USD=300   # default 300
+PAYMENT_PROVIDER=fake          # único proveedor disponible
+
+# Geocodificación inversa (backend/src/services/reverse-geocode.service.ts)
+NOMINATIM_USER_AGENT=
 
 # Mail (verificación de email y reset de contraseña, vía SMTP con cualquier proveedor).
 # Sin SMTP_HOST los mails no se envían: se imprimen en la consola del backend
@@ -747,17 +866,20 @@ FRONTEND_URL=https://patitas.app
 PYTHON_ENV=production
 PORT=8000
 
-# YOLO / OpenCLIP — nombres de modelo hardcodeados hoy en
-# backend-ia/app/ml/pipeline.py (no son variables de entorno todavía),
-# validados en docs/pocs/POC_Similitudes.ipynb:
+# YOLO / DINOv2 — nombres de modelo hardcodeados en
+# backend-ia/app/ml/pipeline.py (no son variables de entorno):
 # YOLO: yolov8n.pt (nano, se descarga solo vía ultralytics)
-# OpenCLIP: ViT-B-32, pretrained=laion2b_s34b_b79k (NO "openai" — da 512 dims)
+# DINOv2: vit_base_patch14_dinov2.lvd142m vía timm, 224 px, 768 dims (ADR-0021)
 
 DATABASE_URL=postgresql+asyncpg://patitas:patitas@localhost:5433/patitas
 
-# Backend Principal — no implementado (no hay callback HTTP, ver 4.2/6)
-# BACKEND_URL=http://backend-principal:3001
-# BACKEND_API_KEY=internal-key-for-auth
+# Autenticación de los endpoints internos (backend-ia/app/config.py)
+INTERNAL_API_KEY=                # mismo valor que en backend/.env
+ALLOW_INSECURE_INTERNAL=false    # true solo en desarrollo local
+
+# Backend Principal: destino de la notificación de matches
+# (POST /api/notifications/internal/match); vacío = no notifica
+NODE_BACKEND_URL=http://backend-principal:3001
 
 # Redis (para queue) — no implementado todavía, ver sección 7
 # REDIS_URL=redis://redis:6379
@@ -770,7 +892,7 @@ DATABASE_URL=postgresql+asyncpg://patitas:patitas@localhost:5433/patitas
 1. **Búsqueda vectorial (pgvector):**
    - Pre-filtrar por tipo de reporte (perdida vs encontrada)
    - Pre-filtrar por radio geográfico (ST_DWithin)
-   - Limitar a reportes recientes (últimos 30 días)
+   - Limitar a reportes recientes (últimos 90 días, `MATCH_WINDOW_DAYS`)
    - Esto reduce el espacio de búsqueda drásticamente
 
 2. **Cache (Redis):**

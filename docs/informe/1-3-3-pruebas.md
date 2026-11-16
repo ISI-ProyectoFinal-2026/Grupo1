@@ -54,6 +54,6 @@ No disponible (issue [#40](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issu
 
 | Medición | Antes | Después |
 |---|---|---|
-| Vulnerabilidades detectadas por Snyk | No disponible | No disponible |
+| Vulnerabilidades críticas detectadas por Snyk Open Source | No disponible | 0 en backend y frontend (backend: 1 alta; frontend: 2 altas y 2 medias) |
 
-No disponible hasta que se integre el pull request [#207](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/207) (abierto). El workflow de Snyk existe en [`snyk-security.yml`](../../.github/workflows/snyk-security.yml).
+Fuente: [`SECURITY_REPORT.md`](../SECURITY_REPORT.md) (issue [#41](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/41), commit base `8ff5c26`), integrado con el pull request [#207](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/207) (merge `66106fd`). Snyk se corrió solo después de los fixes, por lo que la columna Antes no está disponible; la línea base de `npm audit` registra 2 críticas en el backend antes de los fixes. El workflow [`snyk-security.yml`](../../.github/workflows/snyk-security.yml) falla ante vulnerabilidades críticas de Snyk Open Source en backend y frontend (líneas 46-51).

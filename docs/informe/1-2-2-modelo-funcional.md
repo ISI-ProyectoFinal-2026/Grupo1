@@ -4,7 +4,7 @@ titulo: "Modelo funcional"
 nivel: 3
 fase: A
 estado: borrador
-actualizado: 2026-10-27
+actualizado: 2026-11-15
 ---
 
 # 1.2.2 Modelo funcional
@@ -31,9 +31,9 @@ Los diagramas describen el sistema tal como está implementado. Reemplazan a los
 | Dueño | Actor conceptual que especializa al usuario verificado: perdió su mascota y publica un reporte de pérdida. En el sistema es la misma cuenta | `backend/src/validators/reports.validator.ts:12` |
 | Persona que encuentra | Actor conceptual que especializa al usuario verificado: publica un reporte de hallazgo, que el matching vincula con el de pérdida, o ve un reporte de pérdida y abre un chat con su autor. No se puede abrir un chat con uno mismo | `backend/src/validators/reports.validator.ts:12`; `backend/src/services/chats.service.ts:39-41`, `:49-51` |
 | Titular de comercio | Usuario registrado con un perfil de comercio. No es un rol ([ADR-0019](../adr/0019-comercio-perfil-no-rol.md)) | `backend/prisma/schema.prisma:312-314`; `backend/src/routes/businesses.routes.ts:10-13` |
-| Moderador o administrador | Roles `moderador` y `admin`, con los mismos permisos: resolver denuncias. `admin` se crea solo con el seed y no existe forma de asignar `moderador` ([#224](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/224)) | `backend/src/routes/report-flags.routes.ts:10-11`; `backend/prisma/seed.ts:17-21` |
+| Moderador o administrador | Roles `moderador` y `admin`: resuelven denuncias de reportes y deciden casos de sanción de cuentas (el `moderador`, solo reincidencias de usuarios regulares). El `admin` además asigna roles ([#224](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/224)); el primero se crea con el seed | `backend/src/routes/report-flags.routes.ts:10-11`; `backend/src/routes/admin.routes.ts:8-19`; `backend/src/services/account-sanctions/policy.ts:78-87`; `backend/prisma/seed.ts:15-21` |
 | Temporizador | Proceso de la API que cada 5 min reenvía al Backend IA los reportes que siguen pendientes | `backend/src/services/matching.service.ts:198-200` |
-| Sistemas externos | Backend IA (YOLOv8n y OpenCLIP), Cloudflare R2, servidor SMTP, OpenStreetMap y Nominatim | Figura 1.2.2-1 en [1.2.2.2](1-2-2-2-historias-y-flujos.md#visión-general-del-funcionamiento) |
+| Sistemas externos | Backend IA (YOLOv8n y DINOv2 ViT-B/14), Cloudflare R2, servidor SMTP, OpenStreetMap y Nominatim | Figura 1.2.2-1 en [1.2.2.2](1-2-2-2-historias-y-flujos.md#visión-general-del-funcionamiento) |
 
 Tabla 1.2.2-22. Actores del sistema. Fuente: archivos de la columna Fuente.
 
@@ -143,18 +143,19 @@ flowchart LR
     R8(["Ver el detalle de un reporte"])
     R9(["Cerrar el reporte propio"])
     R10(["Denunciar un reporte ajeno"])
+    R11(["Editar o eliminar el reporte propio"])
+    R12(["Gestionar mascotas propias"])
   end
   IA[["Backend IA"]]
   CF[["Cloudflare R2"]]
   OSM[["OpenStreetMap y Nominatim"]]
-  N1>"Con foto, el alta dispara la moderación y el matching, Figura 1.2.2-11"]
-  N2>"Mascotas, edición y eliminación de reportes: solo en la API, issue 225"]
+  N1>"El alta dispara la moderación y el matching, Figura 1.2.2-11"]
   DUE --- R1
   PQE --- R2
   R1 -.->|"«include»"| R3
   R2 -.->|"«include»"| R3
-  R4 -.->|"«extend»"| R1
-  R4 -.->|"«extend»"| R2
+  R1 -.->|"«include»"| R4
+  R2 -.->|"«include»"| R4
   R4 -.->|"«include»"| R5
   REG --- R6
   REG --- R7
@@ -162,15 +163,17 @@ flowchart LR
   REG --- R10
   DUE --- R9
   PQE --- R9
+  DUE --- R11
+  PQE --- R11
+  REG --- R12
   R4 --- CF
   R5 --- IA
   R3 --- OSM
   R7 --- OSM
   R4 -.- N1
-  R8 -.- N2
 ```
 
-Figura 1.2.2-10. Casos de uso de reportes. La foto es opcional ([#219](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/219)), por eso extiende el alta. Fuente: `backend/src/routes/reports.routes.ts:19-45`, `backend/src/validators/reports.validator.ts:10-18`, `backend/src/routes/uploads.routes.ts:17`, `:29`, `frontend/src/pages/reports/FeedPage.tsx:22-31`, `frontend/src/components/reports/MapView.tsx:40-65`.
+Figura 1.2.2-10. Casos de uso de reportes. La foto principal es obligatoria (commit `e545c61`), por eso el alta la incluye; se admiten hasta 3 fotos extra. Fuente: `backend/src/routes/reports.routes.ts:20-52`, `backend/src/validators/reports.validator.ts:33-51`, `backend/src/routes/pets.routes.ts:7-11`, `backend/src/routes/uploads.routes.ts:17`, `:29`, `frontend/src/pages/reports/FeedPage.tsx:41-60`, `frontend/src/components/reports/MapView.tsx:64-98`.
 
 ### IA, matching y moderación
 
@@ -196,7 +199,7 @@ flowchart LR
   PUB -.->|"«include»"| I1
   I2 -.->|"«extend» si hay un animal"| I1
   I2 -.->|"«include»"| I3
-  I4 -.->|"«extend» similitud de 0,75 o más"| I3
+  I4 -.->|"«extend» similitud de 0,63 o más"| I3
   TMP --- I5
   I5 -.->|"«include»"| I1
   REG --- I6
@@ -303,32 +306,32 @@ Cada requerimiento funcional (RF) del PDD v1.0 se traza hasta el issue, el códi
 | RF-01 | Registro con email y contraseña | [#10](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/10), [#63](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/63) | `backend/src/services/auth.service.ts:36` | `backend/tests/auth/auth.routes.test.ts`, `frontend/e2e/f1-register-login-create-report.spec.ts` | Implementado |
 | RF-02 | Verificación de email | [#185](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/185) | `backend/src/services/auth.service.ts:106` | `backend/tests/auth/account.routes.test.ts`, `backend/tests/auth/email-gate.routes.test.ts`, `frontend/e2e/f6-email-verification.spec.ts` | Implementado |
 | RF-03 | Recuperación de contraseña | [#185](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/185) | `backend/src/services/auth.service.ts:153`, `:163` | `backend/tests/auth/account.routes.test.ts`, `frontend/e2e/f7-password-reset.spec.ts` | Implementado |
-| RF-04 | Roles `usuario_regular`, `moderador`, `admin` y `comercio` | [#31](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/31), [#224](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/224) | `backend/prisma/schema.prisma:18-24`; `backend/src/middlewares/auth.middleware.ts:78` | `backend/tests/middlewares/auth.middleware.test.ts` | Parcial: tres roles; el comercio es un perfil ([ADR-0019](../adr/0019-comercio-perfil-no-rol.md)); no se puede asignar `moderador` |
+| RF-04 | Roles `usuario_regular`, `moderador`, `admin` y `comercio` | [#31](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/31), [#224](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/224) | `backend/prisma/schema.prisma:18-24`; `backend/src/middlewares/auth.middleware.ts:78`; `backend/src/routes/admin.routes.ts:14-19` | `backend/tests/middlewares/auth.middleware.test.ts`, `backend/tests/admin/admin-users.routes.test.ts`, `frontend/e2e/f14-admin-role-management.spec.ts` | Parcial: tres roles, asignables por un `admin`; el comercio es un perfil ([ADR-0019](../adr/0019-comercio-perfil-no-rol.md)) |
 | RF-05 | Autenticación de dos factores | [#35](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/35), [#203](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/203) | `backend/src/services/two-factor/service.ts:91`, `:183` | `backend/tests/auth/two-factor.login.test.ts`, `backend/tests/auth/two-factor.routes.test.ts`, `frontend/e2e/f8-two-factor.spec.ts` | Implementado |
-| RF-06 | Registro, edición y eliminación de mascotas | [#12](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/12), [#13](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/13), [#225](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/225) | `backend/src/routes/pets.routes.ts:7-11` | `backend/tests/pets/pets.routes.test.ts` | Parcial: solo API |
-| RF-07 | Reporte de pérdida con foto, ubicación y datos de contacto | [#14](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/14), [#65](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/65), [#219](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/219) | `backend/src/services/reports.service.ts:148`; `backend/src/validators/reports.validator.ts:10-18` | `backend/tests/reports/reports.routes.test.ts`, `frontend/e2e/f1-register-login-create-report.spec.ts` | Parcial: el reporte no tiene campo de contacto; el contacto se da por el chat interno |
+| RF-06 | Registro, edición y eliminación de mascotas | [#12](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/12), [#13](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/13), [#225](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/225) | `backend/src/routes/pets.routes.ts:7-11`; `frontend/src/pages/pets/` | `backend/tests/pets/pets.routes.test.ts`, `frontend/src/pages/pets/MyPetsPage.test.tsx` | Implementado: hasta 4 fotos por mascota, con el control de la IA |
+| RF-07 | Reporte de pérdida con foto, ubicación y datos de contacto | [#14](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/14), [#65](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/65), [#219](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/219) | `backend/src/services/reports.service.ts:154`; `backend/src/validators/reports.validator.ts:36-51` | `backend/tests/reports/reports.routes.test.ts`, `frontend/e2e/f1-register-login-create-report.spec.ts` | Parcial: foto principal obligatoria y hasta 3 extra; el reporte no tiene campo de contacto: el contacto se da por el chat interno y, si el autor lo autoriza, su teléfono figura en el flyer |
 | RF-08 | Reporte de avistamiento o mascota encontrada | [#14](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/14) | `backend/src/validators/reports.validator.ts:12` | `backend/tests/reports/reports.service.test.ts` | Implementado |
 | RF-09 | Etiquetas PERDIDO, ENCONTRADO y RESUELTO | [#15](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/15) | `backend/src/services/reports.service.ts:38` | `backend/tests/reports/reports.service.test.ts` | Implementado |
 | RF-10 | Filtrado avanzado de reportes | [#16](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/16) | `backend/src/services/reports.service.ts:72`, `:89-90`; `frontend/src/pages/reports/FeedPage.tsx:22-31` | `backend/tests/reports/reports.service.test.ts`, `frontend/src/pages/reports/FeedPage.test.tsx` | Parcial: la interfaz filtra por tipo, zona y fecha; el filtro por raza existe solo en la API |
-| RF-11 | Cierre de reportes | [#17](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/17) | `backend/src/services/reports.service.ts:263` | `backend/tests/e2e/report-lifecycle.e2e.test.ts`, `frontend/e2e/f4-close-report.spec.ts` | Implementado |
+| RF-11 | Cierre de reportes | [#17](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/17) | `backend/src/services/reports.service.ts:277` | `backend/tests/e2e/report-lifecycle.e2e.test.ts`, `frontend/e2e/f4-close-report.spec.ts` | Implementado |
 | RF-12 | Notificación de nuevos reportes a usuarios cercanos | [#32](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/32) | — | — | No implementado |
 | RF-13 | Configuración del tipo de notificación y del radio | [#33](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/33), [#226](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/226) | — | — | No implementado |
 | RF-14 | Notificación de posibles coincidencias | [#176](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/176) | `backend/src/services/notifications.service.ts:58` | `backend/tests/notifications/notifications.routes.test.ts`, `frontend/e2e/f2-match-notification.spec.ts` | Implementado |
 | RF-15 | Notificación de nuevos mensajes de chat | [#32](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/32) | `backend/src/services/notifications.service.ts:189` | `backend/tests/sockets/chat.socket.test.ts` | Implementado, dentro de la aplicación |
-| RF-16 | Notificación de cambios de estado de los reportes | [#182](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/182), [#223](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/223) | `backend/src/services/notifications.service.ts:151` | `backend/tests/notifications/notifications.service.test.ts` | Parcial: solo el veredicto de la IA; no al cerrar ni al ocultar por una denuncia |
+| RF-16 | Notificación de cambios de estado de los reportes | [#182](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/182), [#223](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/223) | `backend/src/services/notifications.service.ts:168` | `backend/tests/notifications/notifications.service.test.ts` | Parcial: veredicto de la IA y ocultamiento por una denuncia; no al cerrar |
 | RF-17 | Detección automática de coincidencias | [#18](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/18), [#127](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/127) | `backend-ia/app/services/matching_service.py:58` | `backend-ia/tests/test_matching_service.py` | Implementado |
 | RF-18 | Listado de coincidencias con porcentaje de similitud | [#34](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/34), [#66](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/66) | `backend/src/services/matching.service.ts:274`; `frontend/src/components/reports/MatchCard.tsx:76` | `backend/tests/matching/matching.routes.test.ts` | Implementado |
-| RF-19 | Mapa interactivo con reportes activos y etiquetas | [#21](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/21), [#64](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/64), [#209](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/209) | `frontend/src/components/reports/MapView.tsx:40-65` | `frontend/src/pages/reports/FeedPage.test.tsx` | Parcial: el marcador no muestra la etiqueta |
+| RF-19 | Mapa interactivo con reportes activos y etiquetas | [#21](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/21), [#64](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/64), [#209](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/209) | `frontend/src/components/reports/MapView.tsx:64-98`; `frontend/src/components/reports/reportPinIcon.ts:5-9` | `frontend/src/pages/reports/FeedPage.test.tsx` | Implementado: el color del marcador distingue perdido y encontrado |
 | RF-20 | Filtro del mapa por tipo de reporte | [#22](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/22) | `frontend/src/pages/reports/FeedPage.tsx:22-31` | `frontend/src/pages/reports/FeedPage.test.tsx` | Implementado |
-| RF-21 | Al hacer clic en un marcador, abrir el detalle | [#23](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/23) | `frontend/src/components/reports/MapView.tsx:59` | No identificada | Implementado |
+| RF-21 | Al hacer clic en un marcador, abrir el detalle | [#23](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/23) | `frontend/src/components/reports/MapView.tsx:89-94` | No identificada | Implementado |
 | RF-22 | Búsqueda por radio de cercanía | [#24](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/24), [#71](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/71) | `backend/src/services/geo.service.ts:11` | `backend/tests/geo/geo.routes.test.ts` | Parcial: solo API |
-| RF-23 | Generación automática del flyer | [#25](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/25) | `backend/src/services/flyer.service.ts:247` | `backend/tests/reports/flyer.service.test.ts` | Parcial: sin dato de contacto |
+| RF-23 | Generación automática del flyer | [#25](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/25) | `backend/src/services/flyer.service.ts:728` | `backend/tests/reports/flyer.service.test.ts` | Implementado: incluye el teléfono del autor solo si este lo autoriza |
 | RF-24 | Descarga del flyer como imagen | [#26](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/26) | `frontend/src/pages/reports/ReportDetailPage.tsx:243` | `backend/tests/reports/flyer.routes.test.ts` | Implementado |
 | RF-25 | Compartir en WhatsApp, Instagram y Facebook | [#26](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/26) | `frontend/src/pages/reports/ReportDetailPage.tsx:75-85` | No identificada | Parcial: menú de compartir del sistema, sin botón por red |
 | RF-26 | [SHOULD] Flyer personalizado | [#36](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/36) | `backend/src/services/reports.service.ts:281` | `backend/tests/reports/flyer.routes.test.ts` | Parcial: se sube una imagen propia |
 | RF-27 | Validación y moderación automática de publicaciones | [#19](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/19) | `backend-ia/app/ml/pipeline.py:73`; `backend/src/services/matching.service.ts:149` | `backend/tests/e2e/ai-moderation.e2e.test.ts`, `backend-ia/tests/test_image_analysis_service.py` | Implementado: detecta si hay un animal |
 | RF-28 | Denuncia de publicaciones inapropiadas | [#20](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/20), [#183](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/183), [#186](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/186) | `backend/src/services/report-flags.service.ts:16`, `:67` | `backend/tests/e2e/flag-moderation.e2e.test.ts`, `frontend/e2e/f3-flag-moderation.spec.ts` | Implementado |
-| RF-29 | [SHOULD] Suspensión de cuentas | [#38](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/38) | — | — | No implementado |
+| RF-29 | [SHOULD] Suspensión de cuentas | [#38](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/38) | `backend/src/services/account-reports.service.ts:18`; `backend/src/services/account-sanctions/policy.ts:56`, `:93`; `frontend/src/pages/admin/SanctionQueuePage.tsx` | `backend/tests/account-reports/account-reports.routes.test.ts`, `backend/tests/account-sanctions/policy.test.ts`, `frontend/src/pages/admin/SanctionQueuePage.test.tsx` | Implementado: con 5 denuncias de la cuenta se suspende 14 días (leve), un mes (moderada) o hasta decidir la eliminación (grave o reincidencia); la suspensión bloquea el acceso y oculta el contenido del usuario |
 | RF-30 | Chat en tiempo real | [#27](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/27), [#68](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/68) | `backend/src/sockets/chat.socket.ts:83` | `backend/tests/chats/chat-realtime.test.ts`, `backend/tests/sockets/chat.socket.test.ts` | Implementado |
 | RF-31 | Continuar por WhatsApp u otros canales externos | — | `backend/src/validators/chats.validator.ts:15`; `backend/src/validators/chat-socket.validator.ts:15` | No identificada | Implementado, vía chat interno: intercambio voluntario de contacto |
 | RF-32 | [SHOULD] Envío de imágenes en el chat | [#37](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/37) | `frontend/src/components/chat/ChatWindow.tsx:117` | `backend/tests/sockets/chat.socket.test.ts` | Implementado |
@@ -359,10 +362,10 @@ Los requerimientos no funcionales (RNF) se marcan *Medido* solo cuando existe un
 | RNF | Categoría | Métrica del PDD | Estado | Evidencia |
 |---|---|---|---|---|
 | RNF-01 | Rendimiento: tiempo de respuesta de la API | Menos de 500 ms (p95) con 200 usuarios concurrentes | No medido | Sin pruebas de carga ([#40](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/40), abierto) |
-| RNF-02 | Rendimiento: matching de imágenes | Menos de 5 s por solicitud (p95) | No medido como p95 | Objetivo del PDD, no comprometido para el MVP (decisión del equipo: el modelo de IA y los recursos todavía pueden cambiar, con impacto en el costo). Medición indicativa con la configuración actual (YOLO + OpenCLIP, CPU): ~0,68 s de inferencia y hasta 2,1 s end-to-end en caliente; 4,7 s en el primer request en frío. Son pocas muestras y no hay p95 ([`QA_IA_PIPELINE.md`](../QA_IA_PIPELINE.md) §7, `docs/QA_IA_PIPELINE.md:191-193`) |
+| RNF-02 | Rendimiento: matching de imágenes | Menos de 5 s por solicitud (p95) | No medido como p95 | Objetivo del PDD, no comprometido para el MVP (decisión del equipo: el modelo de IA y los recursos todavía pueden cambiar, con impacto en el costo). Medición indicativa con la configuración anterior (YOLO + OpenCLIP, CPU): ~0,68 s de inferencia y hasta 2,1 s end-to-end en caliente; 4,7 s en el primer request en frío. Son pocas muestras y no hay p95 ([`QA_IA_PIPELINE.md`](../QA_IA_PIPELINE.md) §7, `docs/QA_IA_PIPELINE.md:191-193`). Con la configuración actual (YOLO + DINOv2 ViT-B/14 a 224 px, CPU), el benchmark del equipo registra cerca de 0,4 s por reporte ([ADR-0021](../adr/0021-modelo-embeddings-dinov2.md)); p95: No disponible |
 | RNF-03 | Disponibilidad | Uptime de 99 % mensual o más | No medido | El repositorio no contiene configuración de despliegue ni de monitoreo |
 | RNF-04 | Seguridad: cifrado de comunicaciones | HTTPS obligatorio | Parcial, no medido en producción | La API envía la cabecera HSTS (`backend/src/app.ts:28`) y una prueba lo verifica (`backend/tests/app/health.test.ts:45`); la terminación TLS depende del despliegue: No disponible |
-| RNF-05 | Seguridad: vulnerabilidades | 0 vulnerabilidades críticas | No medido | [#41](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/41) y PR [#207](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/207) abiertos; el workflow de Snyk no bloquea (`.github/workflows/snyk-security.yml:44`, `:47`) |
+| RNF-05 | Seguridad: vulnerabilidades | 0 vulnerabilidades críticas | Medido | PR [#207](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/207) integrado (merge `66106fd`). Snyk Open Source falla el pipeline ante vulnerabilidades críticas en backend y frontend (`.github/workflows/snyk-security.yml:46-51`); Snyk Code no bloquea (`:53-60`). Último escaneo documentado: 0 críticas ([`SECURITY_REPORT.md`](../SECURITY_REPORT.md)) |
 | RNF-06 | Privacidad: protección de datos | Política de privacidad publicada | No implementado | No existe una página de política de privacidad en `frontend/src` |
 | RNF-07 | Usabilidad: responsividad | Compatible con Chrome, Firefox y Safari en móvil, tablet y PC | Parcial | Las pruebas E2E corren solo en Chromium de escritorio (`frontend/playwright.config.ts:36`); Firefox, Safari y los tamaños móviles no se miden |
 | RNF-08 | Usabilidad: interfaz intuitiva | Opinión positiva sin capacitación previa | No medido | Sin pruebas de usabilidad registradas |

@@ -38,6 +38,8 @@ Fuente: `frontend/package.json`, `backend/package.json`, `backend-ia/requirement
 | Integración continua | 4 jobs en cada push y pull request a `main`: backend, frontend, e2e-ui y backend-ia (Node 24 y Python 3.11) | [`ci.yml`](../../.github/workflows/ci.yml) |
 | Verificaciones | Backend: `typecheck`, `typecheck:tests` y Jest con cobertura. Frontend: `oxlint`, `tsc -b` y Vitest con cobertura. E2E: Playwright. IA: pytest con cobertura | [`ci.yml`](../../.github/workflows/ci.yml) |
 | Esquema de base | Migraciones de Prisma aplicadas con `prisma migrate deploy` antes de las pruebas | [`ci.yml`](../../.github/workflows/ci.yml), [1.2.4](1-2-4-modelo-de-datos.md) |
+| Análisis de seguridad | Workflow Snyk en cada push y pull request a `main`: Snyk Open Source en backend y frontend falla ante vulnerabilidades críticas; Snyk Code (backend, frontend y backend-ia) y `snyk monitor` son informativos | [`snyk-security.yml`](../../.github/workflows/snyk-security.yml) |
+| Publicación del informe | Workflow manual (`workflow_dispatch`) con dos jobs: `build` (pytest de `tools/informe-site` y `mkdocs build --strict`) y `deploy` a GitHub Pages ([ADR-0020](../adr/0020-sitio-web-del-informe.md)) | [`publish-report.yml`](../../.github/workflows/publish-report.yml) |
 
 Los resultados de las verificaciones se detallan en [1.3.3](1-3-3-pruebas.md).
 
