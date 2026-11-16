@@ -5,23 +5,20 @@ import type {
   CreatedReportFlagDTO,
   CreateReportFlagInput,
   ReportedAccountDTO,
-  ReportFlagDTO,
-  ReportFlagStatus,
-  ResolveReportFlagAction,
+  ModerationAction,
+  ModerationResultDTO,
+  ReportFlagGroupDTO,
 } from '@/types/moderation.types'
 
-// Cola de moderacion. Ambos endpoints exigen rol moderador/admin: sin el, el
-// backend responde 403.
-export async function listReportFlags(status?: ReportFlagStatus): Promise<ReportFlagDTO[]> {
-  const { data } = await api.get<ReportFlagDTO[]>('/report-flags', {
-    params: status ? { status } : {},
-  })
+// Cola de moderación agrupada por reporte. Exige rol moderador/admin: sin él, 403.
+export async function listReportFlagGroups(): Promise<ReportFlagGroupDTO[]> {
+  const { data } = await api.get<ReportFlagGroupDTO[]>('/report-flags/reports')
   return data
 }
 
-// accept oculta el reporte y cierra sus demas denuncias; dismiss lo deja publicado
-export async function resolveReportFlag(id: number, action: ResolveReportFlagAction): Promise<ReportFlagDTO> {
-  const { data } = await api.patch<ReportFlagDTO>(`/report-flags/${id}`, { action })
+// hide/dismiss sobre publicados; restore/confirm sobre ocultos. 409 si otro moderador ya lo resolvió
+export async function moderateReport(reportId: number, action: ModerationAction): Promise<ModerationResultDTO> {
+  const { data } = await api.patch<ModerationResultDTO>(`/report-flags/reports/${reportId}`, { action })
   return data
 }
 
