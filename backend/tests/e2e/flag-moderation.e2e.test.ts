@@ -11,8 +11,8 @@ import { createE2EContext, E2EUser, promoteTo } from "./helpers/factories";
  */
 describe("E2E: moderación de reportes denunciados (B5)", () => {
   const ctx = createE2EContext("flag-moderation");
-  // Ningún id de flag llega a este valor en la base de pruebas.
-  const UNKNOWN_FLAG_ID = 2_147_483_647;
+  // Ningún id de reporte llega a este valor en la base de pruebas.
+  const UNKNOWN_REPORT_ID = 2_147_483_647;
 
   let owner: E2EUser;
   let reporter: E2EUser;
@@ -83,9 +83,9 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(list.status).toBe(403);
 
     const resolve = await request(app)
-      .patch(`/api/report-flags/${flagId}`)
+      .patch(`/api/report-flags/reports/${reportId}`)
       .set(auth(reporter))
-      .send({ action: "accept" });
+      .send({ action: "hide" });
     expect(resolve.status).toBe(403);
   });
 
@@ -100,14 +100,14 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(flag).toMatchObject({ status: "pending", report: { id: reportId, status: "published" } });
   });
 
-  test("el moderador acepta el flag, el reporte queda hidden y el dueño recibe el aviso", async () => {
+  test("el moderador oculta el reporte, el dueño recibe el aviso y la denuncia sigue pendiente", async () => {
     const res = await request(app)
-      .patch(`/api/report-flags/${flagId}`)
+      .patch(`/api/report-flags/reports/${reportId}`)
       .set(auth(moderator))
-      .send({ action: "accept" });
+      .send({ action: "hide" });
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ id: flagId, status: "reviewed", report: { id: reportId, status: "hidden" } });
+    expect(res.body).toEqual({ id: reportId, status: "hidden" });
 
     // Ya no es visible para la comunidad, pero el dueño lo sigue viendo.
     const anonymous = await request(app).get(`/api/reports/${reportId}`);
@@ -122,10 +122,6 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
         expect.objectContaining({ type: "report_status_change", title: "Tu reporte fue ocultado", reportId }),
       ])
     );
-
-    // Y sale de la cola de pendientes.
-    const queue = await request(app).get("/api/report-flags").set(auth(moderator));
-    expect(queue.body.some((f: { id: number }) => f.id === flagId)).toBe(false);
   });
 
   test("un reporte oculto no se puede denunciar (404)", async () => {
@@ -137,21 +133,86 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(res.status).toBe(404);
   });
 
-  test("resolver dos veces el mismo flag responde 409", async () => {
+  test("ocultar dos veces el mismo reporte responde 409", async () => {
     const res = await request(app)
-      .patch(`/api/report-flags/${flagId}`)
+      .patch(`/api/report-flags/reports/${reportId}`)
       .set(auth(moderator))
-      .send({ action: "accept" });
+      .send({ action: "hide" });
 
     expect(res.status).toBe(409);
   });
 
-  test("resolver un flag inexistente responde 404", async () => {
+  test("moderar un reporte inexistente responde 404", async () => {
     const res = await request(app)
-      .patch(`/api/report-flags/${UNKNOWN_FLAG_ID}`)
+      .patch(`/api/report-flags/reports/${UNKNOWN_REPORT_ID}`)
       .set(auth(moderator))
-      .send({ action: "accept" });
+      .send({ action: "hide" });
 
     expect(res.status).toBe(404);
+  });
+});
+
+// umbral 1: una denuncia oculta, así el flujo completo usa pocos usuarios (#218)
+describe("E2E: ocultamiento por umbral, restauración y confirmación (#218)", () => {
+  const ctx = createE2EContext("flag-threshold");
+  let owner: E2EUser;
+  let flagger1: E2EUser;
+  let flagger2: E2EUser;
+  let moderator: E2EUser;
+  let reportId: number;
+
+  const auth = (user: E2EUser) => ({ Authorization: `Bearer ${user.token}` });
+  const flag = (user: E2EUser) =>
+    request(app).post(`/api/reports/${reportId}/flags`).set(auth(user)).send({ reason: "spam" });
+  const act = (action: string) =>
+    request(app).patch(`/api/report-flags/reports/${reportId}`).set(auth(moderator)).send({ action });
+
+  beforeAll(async () => {
+    process.env.REPORT_FLAG_THRESHOLD = "1";
+    owner = await ctx.registerAndLogin("owner");
+    flagger1 = await ctx.registerAndLogin("flagger1");
+    flagger2 = await ctx.registerAndLogin("flagger2");
+    moderator = await ctx.registerAndLogin("moderator");
+    await promoteTo(moderator.id, "moderador");
+
+    mockImageModeration();
+    const report = await createPublishedReport(owner.token, {
+      reportType: "lost",
+      title: "Gato perdido en Caballito",
+      location: { lat: -34.62, lng: -58.44 },
+    });
+    jest.restoreAllMocks();
+    reportId = report.id;
+    ctx.trackReport(reportId);
+  }, 30_000);
+
+  afterAll(async () => {
+    delete process.env.REPORT_FLAG_THRESHOLD;
+    await ctx.cleanup();
+    await prisma.$disconnect();
+  });
+
+  test("la denuncia que alcanza el umbral oculta el reporte y aparece primero en la cola", async () => {
+    expect((await flag(flagger1)).status).toBe(201);
+    expect((await request(app).get(`/api/reports/${reportId}`)).status).toBe(404);
+
+    const queue = await request(app).get("/api/report-flags/reports").set(auth(moderator));
+    expect(queue.body[0]).toMatchObject({ report: { id: reportId, status: "hidden" }, flagCount: 1 });
+  });
+
+  test("restaurar lo vuelve visible y quien denunció no puede repetir sin edición del dueño", async () => {
+    expect((await act("restore")).body.status).toBe("published");
+    expect((await request(app).get(`/api/reports/${reportId}`)).status).toBe(200);
+    expect((await flag(flagger1)).status).toBe(409);
+  });
+
+  test("confirmar es definitivo: sale de la cola y restaurar responde 409", async () => {
+    expect((await flag(flagger2)).status).toBe(201);
+    expect((await act("confirm")).body.status).toBe("hidden");
+
+    const queue = await request(app).get("/api/report-flags/reports").set(auth(moderator));
+    expect(queue.body.some((g: { report: { id: number } }) => g.report.id === reportId)).toBe(false);
+    expect((await act("restore")).status).toBe(409);
+    expect((await request(app).get(`/api/reports/${reportId}`)).status).toBe(404);
   });
 });
