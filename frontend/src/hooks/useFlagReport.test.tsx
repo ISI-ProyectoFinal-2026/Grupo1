@@ -25,16 +25,17 @@ describe('useFlagReport', () => {
       id: 3,
       reportId: 5,
       userId: 8,
-      reason: 'Es una estafa',
+      reason: 'other',
+      detail: 'Es una estafa',
       status: 'pending',
       createdAt: '2026-09-01T10:00:00.000Z',
     })
     const { result } = renderFlag()
 
-    act(() => result.current.flag('Es una estafa'))
+    act(() => result.current.flag({ reason: 'other', detail: 'Es una estafa' }))
 
     await waitFor(() => expect(result.current.isSent).toBe(true))
-    expect(moderationService.createReportFlag).toHaveBeenCalledWith(5, 'Es una estafa')
+    expect(moderationService.createReportFlag).toHaveBeenCalledWith(5, { reason: 'other', detail: 'Es una estafa' })
     expect(result.current.isDone).toBe(true)
     expect(result.current.error).toBeNull()
   })
@@ -45,11 +46,24 @@ describe('useFlagReport', () => {
     )
     const { result } = renderFlag()
 
-    act(() => result.current.flag('Es una estafa'))
+    act(() => result.current.flag({ reason: 'other', detail: 'Es una estafa' }))
 
     await waitFor(() => expect(result.current.error).toBe('Ya denunciaste este reporte.'))
     expect(result.current.isDone).toBe(true)
     expect(result.current.isSent).toBe(false)
+  })
+
+  it.each([
+    [404, 'Este reporte ya no está disponible para denunciar.'],
+    [403, 'No podés denunciar tu propia publicación.'],
+  ])('ante un %i explica el motivo y no deja volver a intentar', async (status, mensaje) => {
+    vi.mocked(moderationService.createReportFlag).mockRejectedValue(errorConStatus('x', status))
+    const { result } = renderFlag()
+
+    act(() => result.current.flag({ reason: 'spam' }))
+
+    await waitFor(() => expect(result.current.error).toBe(mensaje))
+    expect(result.current.isDone).toBe(true)
   })
 
   it('ante otro error expone el mensaje de la API y permite reintentar', async () => {
@@ -58,7 +72,7 @@ describe('useFlagReport', () => {
     )
     const { result } = renderFlag()
 
-    act(() => result.current.flag('Es una estafa'))
+    act(() => result.current.flag({ reason: 'other', detail: 'Es una estafa' }))
 
     await waitFor(() => expect(result.current.error).toBe('Error inesperado, intentá de nuevo'))
     expect(result.current.isDone).toBe(false)

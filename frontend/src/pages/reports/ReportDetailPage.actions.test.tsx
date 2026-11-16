@@ -113,7 +113,7 @@ describe('ReportDetailPage cerrar y denunciar', () => {
       expect(denunciar()).not.toBeInTheDocument()
     })
 
-    it.each<ReportStatus>(['resolved', 'pending', 'rejected'])(
+    it.each<ReportStatus>(['resolved', 'pending', 'rejected', 'hidden'])(
       'el dueño no ve Cerrar reporte si el reporte está %s',
       async (status) => {
         vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ status }))
@@ -154,7 +154,7 @@ describe('ReportDetailPage cerrar y denunciar', () => {
       expect(cerrar()).not.toBeInTheDocument()
     })
 
-    it.each<ReportStatus>(['resolved', 'pending', 'rejected'])(
+    it.each<ReportStatus>(['resolved', 'pending', 'rejected', 'hidden'])(
       'nadie ve Denunciar si el reporte está %s',
       async (status) => {
         vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ status }))
@@ -212,7 +212,8 @@ describe('ReportDetailPage cerrar y denunciar', () => {
         id: 3,
         reportId: 5,
         userId: OTRO_ID,
-        reason: 'Es una estafa',
+        reason: 'spam',
+        detail: null,
         status: 'pending',
         createdAt: '2026-09-20T10:00:00.000Z',
       })
@@ -220,11 +221,11 @@ describe('ReportDetailPage cerrar y denunciar', () => {
       renderPage()
 
       await user.click(await screen.findByRole('button', { name: 'Denunciar' }))
-      await user.type(screen.getByLabelText('Motivo de la denuncia'), 'Es una estafa')
+      await user.selectOptions(screen.getByLabelText('Motivo de la denuncia'), 'spam')
       await user.click(screen.getByRole('button', { name: 'Enviar denuncia' }))
 
       expect(await screen.findByRole('status')).toHaveTextContent('Recibimos tu denuncia')
-      expect(moderationService.createReportFlag).toHaveBeenCalledWith(5, 'Es una estafa')
+      expect(moderationService.createReportFlag).toHaveBeenCalledWith(5, { reason: 'spam' })
       expect(denunciar()).toBeDisabled()
     })
 
@@ -236,7 +237,7 @@ describe('ReportDetailPage cerrar y denunciar', () => {
       await user.click(await screen.findByRole('button', { name: 'Denunciar' }))
       await user.click(screen.getByRole('button', { name: 'Enviar denuncia' }))
 
-      expect(screen.getByText('Contanos el motivo de la denuncia.')).toBeInTheDocument()
+      expect(screen.getByText('Elegí un motivo para la denuncia.')).toBeInTheDocument()
       expect(moderationService.createReportFlag).not.toHaveBeenCalled()
     })
 
@@ -249,7 +250,7 @@ describe('ReportDetailPage cerrar y denunciar', () => {
       renderPage()
 
       await user.click(await screen.findByRole('button', { name: 'Denunciar' }))
-      await user.type(screen.getByLabelText('Motivo de la denuncia'), 'Es una estafa')
+      await user.selectOptions(screen.getByLabelText('Motivo de la denuncia'), 'spam')
       await user.click(screen.getByRole('button', { name: 'Enviar denuncia' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent('Ya denunciaste este reporte.')
@@ -308,6 +309,40 @@ describe('ReportDetailPage editar y eliminar', () => {
       expect(eliminar()).toBeInTheDocument()
     }
   )
+
+  describe('reporte oculto por denuncias', () => {
+    beforeEach(() => {
+      vi.mocked(reportsService.getReport).mockResolvedValue(
+        reporte({
+          status: 'hidden',
+          hiddenReasons: [
+            { reason: 'spam', count: 3 },
+            { reason: 'other', count: 2 },
+          ],
+        })
+      )
+    })
+
+    it('el dueño no puede editarlo pero sí eliminarlo', async () => {
+      loguear(DUENO_ID)
+      renderConRutas()
+      await esperarDetalle()
+
+      expect(editar()).not.toBeInTheDocument()
+      expect(eliminar()).toBeInTheDocument()
+    })
+
+    it('el dueño ve el estado y los motivos de las denuncias', async () => {
+      loguear(DUENO_ID)
+      renderConRutas()
+      await esperarDetalle()
+
+      const aviso = screen.getByRole('region', { name: 'Reporte oculto por denuncias' })
+      expect(within(aviso).getByText('Spam o publicidad: 3')).toBeInTheDocument()
+      expect(within(aviso).getByText('Otro: 2')).toBeInTheDocument()
+      expect(screen.getByText('Oculto por denuncias', { selector: 'span' })).toBeInTheDocument()
+    })
+  })
 
   it('otro usuario no ve Editar ni Eliminar', async () => {
     loguear(OTRO_ID)

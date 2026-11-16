@@ -3,6 +3,15 @@ import type { ReportStatus } from '@/types/report.types'
 // valores segun el enum ReportFlagStatus de Prisma
 export type ReportFlagStatus = 'pending' | 'reviewed' | 'dismissed'
 
+// valores segun el enum ReportFlagReason de Prisma
+export type ReportFlagReason = 'not_an_animal' | 'offensive' | 'spam' | 'duplicate' | 'false_info' | 'other'
+
+// cuerpo de POST /api/reports/:id/flags; detail es obligatorio solo con 'other'
+export interface CreateReportFlagInput {
+  reason: ReportFlagReason
+  detail?: string
+}
+
 // accept = ocultar el reporte; dismiss = descartar la denuncia (#223)
 export type ResolveReportFlagAction = 'accept' | 'dismiss'
 
@@ -18,6 +27,7 @@ export interface ReportFlagDTO {
   reportId: number
   userId: number
   reason: string
+  detail?: string | null
   status: ReportFlagStatus
   createdAt: string
   report: ReportFlagReport

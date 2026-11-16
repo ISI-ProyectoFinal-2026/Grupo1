@@ -60,13 +60,15 @@ describe('MyReportsPage: listado', () => {
       reporte({ id: 2, title: 'Ya publicado', status: 'published' }),
       reporte({ id: 3, title: 'Rechazado por moderación', status: 'rejected' }),
       reporte({ id: 4, title: 'Caso cerrado', status: 'resolved' }),
+      reporte({ id: 6, title: 'Denunciado', status: 'hidden' }),
     ])
     renderPage()
 
     const casos: [string, string][] = [
       ['Pendiente de moderar', 'Pendiente'],
       ['Ya publicado', 'Publicado'],
-      ['Rechazado por moderación', 'Oculto'],
+      ['Rechazado por moderación', 'Rechazado'],
+      ['Denunciado', 'Oculto por denuncias'],
       ['Caso cerrado', 'Resuelto'],
     ]
     for (const [titulo, estado] of casos) {
@@ -89,6 +91,28 @@ describe('MyReportsPage: listado', () => {
     renderPage()
 
     expect(await screen.findByText('No se pudieron cargar tus reportes')).toBeInTheDocument()
+  })
+})
+
+describe('MyReportsPage: reporte oculto por denuncias', () => {
+  it('muestra los motivos y no ofrece editar, pero sí eliminar', async () => {
+    vi.mocked(reportsService.listMyReports).mockResolvedValue([
+      reporte({
+        status: 'hidden',
+        hiddenReasons: [
+          { reason: 'offensive', count: 4 },
+          { reason: 'duplicate', count: 1 },
+        ],
+      }),
+    ])
+    renderPage()
+
+    const card = (await screen.findByRole('heading', { name: 'Perro perdido en Nueva Córdoba' })).closest('li')!
+    expect(within(card).getByText('Contenido ofensivo: 4')).toBeInTheDocument()
+    expect(within(card).getByText('Duplicado: 1')).toBeInTheDocument()
+    expect(within(card).queryByRole('link', { name: /Editar/ })).not.toBeInTheDocument()
+    expect(within(card).getByRole('link', { name: /Ver/ })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Eliminar reporte' })).toBeInTheDocument()
   })
 })
 

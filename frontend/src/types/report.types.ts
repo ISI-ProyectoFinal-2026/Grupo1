@@ -1,5 +1,12 @@
+import type { ReportFlagReason } from '@/types/moderation.types'
+
 export type ReportType = 'lost' | 'found'
-export type ReportStatus = 'pending' | 'published' | 'rejected' | 'resolved'
+export type ReportStatus = 'pending' | 'published' | 'rejected' | 'hidden' | 'resolved'
+
+export interface HiddenReasonDTO {
+  reason: ReportFlagReason
+  count: number
+}
 
 export interface ReportLocation {
   lat: number
@@ -28,6 +35,8 @@ export interface ReportDTO {
   createdAt: string
   updatedAt: string
   publishedAt: string | null
+  // motivos de las denuncias del ciclo actual; solo lo ve el dueño de un reporte oculto
+  hiddenReasons?: HiddenReasonDTO[]
 }
 
 export type MatchStatus = 'pending' | 'confirmed' | 'rejected'

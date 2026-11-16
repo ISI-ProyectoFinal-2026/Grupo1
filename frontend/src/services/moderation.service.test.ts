@@ -67,15 +67,16 @@ describe('moderation.service', () => {
       id: 3,
       reportId: 5,
       userId: 7,
-      reason: 'Es una estafa',
+      reason: 'other',
+      detail: 'Es una estafa',
       status: 'pending',
       createdAt: '2026-09-01T10:00:00.000Z',
     }
     vi.mocked(api.post).mockResolvedValue(respuesta(creado))
 
-    const resultado = await createReportFlag(5, 'Es una estafa')
+    const resultado = await createReportFlag(5, { reason: 'other', detail: 'Es una estafa' })
 
-    expect(api.post).toHaveBeenCalledWith('/reports/5/flags', { reason: 'Es una estafa' })
+    expect(api.post).toHaveBeenCalledWith('/reports/5/flags', { reason: 'other', detail: 'Es una estafa' })
     expect(resultado).toEqual(creado)
   })
 })

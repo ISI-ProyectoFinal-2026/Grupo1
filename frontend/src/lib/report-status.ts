@@ -4,6 +4,7 @@ import type { ReportStatus } from "@/types/report.types";
 export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
   pending: "Pendiente",
   published: "Publicado",
-  rejected: "Oculto",
+  rejected: "Rechazado",
+  hidden: "Oculto por denuncias",
   resolved: "Resuelto",
 };

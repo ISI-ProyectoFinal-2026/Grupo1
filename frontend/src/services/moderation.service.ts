@@ -3,6 +3,7 @@ import type {
   AccountReportDTO,
   AccountReportSeverity,
   CreatedReportFlagDTO,
+  CreateReportFlagInput,
   ReportedAccountDTO,
   ReportFlagDTO,
   ReportFlagStatus,
@@ -24,10 +25,10 @@ export async function resolveReportFlag(id: number, action: ResolveReportFlagAct
   return data
 }
 
-// Denuncia de un usuario logueado sobre un reporte. 409 si ese usuario ya lo
-// habia denunciado.
-export async function createReportFlag(reportId: number, reason: string): Promise<CreatedReportFlagDTO> {
-  const { data } = await api.post<CreatedReportFlagDTO>(`/reports/${reportId}/flags`, { reason })
+// Denuncia de un usuario logueado sobre un reporte, con motivo tipificado. 409 si
+// ya lo habia denunciado.
+export async function createReportFlag(reportId: number, input: CreateReportFlagInput): Promise<CreatedReportFlagDTO> {
+  const { data } = await api.post<CreatedReportFlagDTO>(`/reports/${reportId}/flags`, input)
   return data
 }
 

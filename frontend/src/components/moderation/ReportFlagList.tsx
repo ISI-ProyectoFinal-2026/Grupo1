@@ -10,6 +10,7 @@ const REPORT_STATUS_COLORS: Record<ReportStatus, string> = {
   pending: '#8A5A0B',
   published: '#1F7A4D',
   rejected: '#C4342B',
+  hidden: '#C4342B',
   resolved: '#2457A6',
 }
 

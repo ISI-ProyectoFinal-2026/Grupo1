@@ -25,7 +25,8 @@ import ImageUploader from "@/components/reports/ImageUploader";
 import ReportPhotoGallery from "@/components/reports/ReportPhotoGallery";
 import CloseReportButton from "@/components/reports/CloseReportButton";
 import DeleteReportButton from "@/components/reports/DeleteReportButton";
-import FlagReportForm from "@/components/reports/FlagReportForm";
+import ReportFlagReasonForm from "@/components/reports/ReportFlagReasonForm";
+import HiddenReportNotice from "@/components/reports/HiddenReportNotice";
 import ReportAccountForm from "@/components/reports/ReportAccountForm";
 import LocationMap from "@/components/maps/LocationMap";
 import AdBanner from "@/components/ads/AdBanner";
@@ -149,6 +150,8 @@ export default function ReportDetailPage() {
   const canFlag = isPublished && currentUserId !== undefined && !isOwner;
   const canContact = currentUserId !== undefined && currentUserId !== report.userId;
   const canClose = isOwner && isPublished;
+  // oculto por denuncias: el dueño no edita ni cierra, solo elimina
+  const isHidden = report.status === "hidden";
   // denuncia la cuenta del autor, no la publicación (#267)
   const canReportAccount = currentUserId !== undefined && !isOwner;
   const hasActions = canContact || isOwner || canFlag || canReportAccount;
@@ -243,6 +246,12 @@ export default function ReportDetailPage() {
           <p className="mt-6 text-sm text-ink-muted">
             Estado: <span className="font-bold text-ink">{REPORT_STATUS_LABELS[report.status]}</span>
           </p>
+
+          {isOwner && isHidden && (
+            <div className="mt-4">
+              <HiddenReportNotice hiddenReasons={report.hiddenReasons} />
+            </div>
+          )}
 
           {report.status !== "pending" && (
             <section className="card mt-6 p-4 sm:p-5">
@@ -402,13 +411,14 @@ export default function ReportDetailPage() {
               />
             )}
 
-            {/* El backend deja editar y eliminar en cualquier estado: solo exige
-                ser el dueño. */}
+            {/* Editar y eliminar exigen ser el dueño; un reporte oculto solo se elimina. */}
             {isOwner && (
               <div className="grid grid-cols-1 gap-2">
-                <Link to={`/reports/${report.id}/edit`} className={buttonClasses("secondary", "md", "w-full")}>
-                  Editar reporte
-                </Link>
+                {!isHidden && (
+                  <Link to={`/reports/${report.id}/edit`} className={buttonClasses("secondary", "md", "w-full")}>
+                    Editar reporte
+                  </Link>
+                )}
                 <DeleteReportButton
                   onConfirm={deleteReport.remove}
                   isPending={deleteReport.isPending}
@@ -418,7 +428,7 @@ export default function ReportDetailPage() {
             )}
 
             {canFlag && (
-              <FlagReportForm
+              <ReportFlagReasonForm
                 onSubmit={flagReport.flag}
                 isPending={flagReport.isPending}
                 isSent={flagReport.isSent}
