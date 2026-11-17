@@ -180,6 +180,7 @@ describe("/api/chats", () => {
     const forRecipient = await prisma.notification.findMany({ where: { userId: userBId, type: "message" } });
     expect(forRecipient).toHaveLength(1);
     expect(forRecipient[0].reportId).toBe(reportId);
+    expect(forRecipient[0].chatId).toBe(chatId);
     expect(forRecipient[0].isRead).toBe(false);
 
     const forSender = await prisma.notification.findMany({ where: { userId: userAId, type: "message" } });
@@ -203,6 +204,7 @@ describe("/api/chats", () => {
 
     const forAuthor = await prisma.notification.findMany({ where: { userId: userAId, type: "message" } });
     expect(forAuthor).toHaveLength(1);
+    expect(forAuthor[0].chatId).toBe(created.body.id);
     const forSender = await prisma.notification.findMany({ where: { userId: outsiderId, type: "message" } });
     expect(forSender).toHaveLength(0);
   });
