@@ -17,7 +17,7 @@ import ErrorMessage from "@/components/ui/ErrorMessage";
 import SuccessMessage from "@/components/ui/SuccessMessage";
 import { CalendarIcon, ChatIcon, ChevronLeftIcon, PawIcon, PinIcon } from "@/components/ui/icons";
 import EmailNotVerifiedNotice from "@/components/auth/EmailNotVerifiedNotice";
-import { getApiErrorCode } from "@/services/api";
+import { getApiErrorCode, getApiErrorStatus } from "@/services/api";
 import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import PendingBanner from "@/components/reports/PendingBanner";
 import MatchCard from "@/components/reports/MatchCard";
@@ -119,6 +119,23 @@ export default function ReportDetailPage() {
           <Skeleton className="hidden h-40 rounded-card lg:block" />
         </div>
       </SkeletonGroup>
+    );
+  }
+
+  // 404: oculto, rechazado, eliminado o de un autor suspendido (#187)
+  if (getApiErrorStatus(error) === 404) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+        <div className="card p-5 sm:p-6">
+          <h1 className="font-display text-display-md">Este reporte ya no está disponible</h1>
+          <p className="mt-2 text-ink-muted">
+            Puede que lo hayan eliminado o que esté oculto. Seguí buscando en el resto de los reportes.
+          </p>
+        </div>
+        <Link to="/reports" className={buttonClasses("secondary", "md", "mt-4")}>
+          Volver a reportes
+        </Link>
+      </div>
     );
   }
 
