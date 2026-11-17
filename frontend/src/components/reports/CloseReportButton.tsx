@@ -7,6 +7,7 @@ interface CloseReportButtonProps {
   onConfirm: () => void
   isPending?: boolean
   error?: string | null
+  label?: string
 }
 
 // Confirmación en línea en vez de window.confirm: no bloquea la página y se
@@ -15,6 +16,7 @@ export default function CloseReportButton({
   onConfirm,
   isPending = false,
   error = null,
+  label = 'Cerrar reporte',
 }: CloseReportButtonProps) {
   const [isConfirming, setIsConfirming] = useState(false)
 
@@ -37,7 +39,7 @@ export default function CloseReportButton({
       ) : (
         <Button variant='primary' className='w-full' onClick={() => setIsConfirming(true)}>
           <CheckIcon className='h-5 w-5' />
-          Cerrar reporte
+          {label}
         </Button>
       )}
       {error && <ErrorMessage message={error} />}

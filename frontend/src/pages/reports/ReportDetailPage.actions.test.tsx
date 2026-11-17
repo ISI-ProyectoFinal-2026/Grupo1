@@ -205,6 +205,81 @@ describe('ReportDetailPage cerrar y denunciar', () => {
     })
   })
 
+  describe('cierre tras confirmar una coincidencia (#221)', () => {
+    const coincidencia = (status: 'pending' | 'confirmed') => ({
+      matchId: 11,
+      reportId: 9,
+      title: 'Perra encontrada en Flores',
+      imageUrl: null,
+      reportType: 'found' as const,
+      similarityScore: 0.8,
+      status,
+      createdAt: '2026-09-20T10:00:00.000Z',
+    })
+    const cerrarMio = () => screen.queryByRole('button', { name: 'Cerrar mi reporte' })
+
+    it('el dueño con una coincidencia confirmada ve el aviso para cerrar su reporte', async () => {
+      vi.mocked(reportsService.getMatches).mockResolvedValue([coincidencia('confirmed')])
+      loguear(DUENO_ID)
+      renderPage()
+      await esperarDetalle()
+
+      expect(await screen.findByText(/Confirmaste una coincidencia/)).toBeInTheDocument()
+      expect(cerrarMio()).toBeInTheDocument()
+    })
+
+    it('el botón del aviso cierra el reporte con la misma confirmación', async () => {
+      vi.mocked(reportsService.getMatches).mockResolvedValue([coincidencia('confirmed')])
+      vi.mocked(reportsService.closeReport).mockResolvedValue(reporte({ status: 'resolved' }))
+      loguear(DUENO_ID)
+      const user = userEvent.setup()
+      renderPage()
+
+      await user.click(await screen.findByRole('button', { name: 'Cerrar mi reporte' }))
+      await user.click(screen.getByRole('button', { name: 'Confirmar cierre' }))
+
+      expect(await screen.findByText('Resuelto')).toBeInTheDocument()
+      expect(reportsService.closeReport).toHaveBeenCalledWith(5)
+      expect(cerrarMio()).not.toBeInTheDocument()
+    })
+
+    it('no hay aviso si la coincidencia sigue pendiente', async () => {
+      vi.mocked(reportsService.getMatches).mockResolvedValue([coincidencia('pending')])
+      loguear(DUENO_ID)
+      renderPage()
+      await esperarDetalle()
+      await screen.findByText('Perra encontrada en Flores')
+
+      expect(screen.queryByText(/Confirmaste una coincidencia/)).not.toBeInTheDocument()
+      expect(cerrarMio()).not.toBeInTheDocument()
+    })
+
+    it('quien no es dueño no ve el aviso', async () => {
+      vi.mocked(reportsService.getMatches).mockResolvedValue([coincidencia('confirmed')])
+      loguear(OTRO_ID)
+      renderPage()
+      await esperarDetalle()
+      await screen.findByText('Perra encontrada en Flores')
+
+      expect(screen.queryByText(/Confirmaste una coincidencia/)).not.toBeInTheDocument()
+      expect(cerrarMio()).not.toBeInTheDocument()
+    })
+
+    it.each<ReportStatus>(['resolved', 'hidden'])(
+      'no hay aviso si el reporte ya está %s',
+      async (status) => {
+        vi.mocked(reportsService.getReport).mockResolvedValue(reporte({ status }))
+        vi.mocked(reportsService.getMatches).mockResolvedValue([coincidencia('confirmed')])
+        loguear(DUENO_ID)
+        renderPage()
+        await esperarDetalle()
+
+        expect(screen.queryByText(/Confirmaste una coincidencia/)).not.toBeInTheDocument()
+        expect(cerrarMio()).not.toBeInTheDocument()
+      }
+    )
+  })
+
   describe('denunciar', () => {
     it('envía la denuncia, la confirma y deshabilita el botón', async () => {
       loguear(OTRO_ID)
