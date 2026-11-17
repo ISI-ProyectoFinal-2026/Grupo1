@@ -38,6 +38,13 @@ function renderContent(notification: NotificationDTO) {
   )
 }
 
+// destino de la notificación: el chat tiene prioridad sobre el reporte (#222)
+function targetOf(notification: NotificationDTO): string | null {
+  if (notification.chatId !== null) return `/chats/${notification.chatId}`
+  if (notification.reportId !== null) return `/reports/${notification.reportId}`
+  return null
+}
+
 function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: NotificationListProps) {
   const [page, setPage] = useState(0)
 
@@ -46,6 +53,23 @@ function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: N
   const currentPage = Math.min(page, Math.max(totalPages - 1, 0))
   const start = currentPage * NOTIFICATIONS_PAGE_SIZE
   const visible = notifications.slice(start, start + NOTIFICATIONS_PAGE_SIZE)
+
+  function renderBody(notification: NotificationDTO) {
+    const target = targetOf(notification)
+    if (target === null) return renderContent(notification)
+    return (
+      <Link
+        to={target}
+        onClick={() => {
+          if (!notification.isRead) onMarkRead(notification.id)
+          onNavigate?.()
+        }}
+        className='-mx-2 block min-h-11 rounded-control px-2 py-1 hover:bg-surface'
+      >
+        {renderContent(notification)}
+      </Link>
+    )
+  }
 
   if (notifications.length === 0) {
     return (
@@ -69,21 +93,7 @@ function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: N
               !notification.isRead && 'bg-signal/10 before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-signal'
             )}
           >
-            {notification.reportId === null ? (
-              renderContent(notification)
-            ) : (
-              // abre el reporte mencionado (#222)
-              <Link
-                to={`/reports/${notification.reportId}`}
-                onClick={() => {
-                  if (!notification.isRead) onMarkRead(notification.id)
-                  onNavigate?.()
-                }}
-                className='-mx-2 block min-h-11 rounded-control px-2 py-1 hover:bg-surface'
-              >
-                {renderContent(notification)}
-              </Link>
-            )}
+            {renderBody(notification)}
             <div className='mt-1 flex flex-wrap items-center gap-x-1'>
               <time className='mr-auto text-xs text-ink-muted' dateTime={notification.createdAt}>
                 {formatDate(notification.createdAt)}

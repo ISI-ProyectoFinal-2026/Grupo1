@@ -11,12 +11,18 @@ function DetalleFalso() {
   return <p>Detalle del reporte {id}</p>
 }
 
+function ChatFalso() {
+  const { id } = useParams()
+  return <p>Chat {id}</p>
+}
+
 function renderConRouter(ui: ReactElement) {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <Routes>
         <Route path='/' element={ui} />
         <Route path='/reports/:id' element={<DetalleFalso />} />
+        <Route path='/chats/:id' element={<ChatFalso />} />
       </Routes>
     </MemoryRouter>
   )
@@ -41,6 +47,7 @@ function notificacion(overrides: Partial<NotificationDTO> = {}): NotificationDTO
     title: 'Nuevo mensaje',
     message: 'Tenes un mensaje nuevo',
     reportId: null,
+    chatId: null,
     isRead: false,
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
@@ -215,6 +222,50 @@ describe('NotificationList', () => {
       await user.keyboard('{Enter}')
 
       expect(screen.getByText('Detalle del reporte 15')).toBeInTheDocument()
+    })
+
+    it('un mensaje con chat enlaza al chat antes que al reporte', () => {
+      renderConRouter(
+        <NotificationList
+          notifications={[notificacion({ id: 33, reportId: 15, chatId: 8 })]}
+          onMarkRead={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      expect(screen.getByRole('link', { name: /Nuevo mensaje/ })).toHaveAttribute('href', '/chats/8')
+    })
+
+    it('al abrir un mensaje navega al chat, lo marca como leido y avisa la navegacion', async () => {
+      const user = userEvent.setup()
+      const onMarkRead = vi.fn()
+      const onNavigate = vi.fn()
+      renderConRouter(
+        <NotificationList
+          notifications={[notificacion({ id: 33, reportId: 15, chatId: 8 })]}
+          onMarkRead={onMarkRead}
+          onDelete={vi.fn()}
+          onNavigate={onNavigate}
+        />
+      )
+
+      await user.click(screen.getByRole('link', { name: /Nuevo mensaje/ }))
+
+      expect(screen.getByText('Chat 8')).toBeInTheDocument()
+      expect(onMarkRead).toHaveBeenCalledWith(33)
+      expect(onNavigate).toHaveBeenCalledTimes(1)
+    })
+
+    it('un mensaje anterior sin chat sigue enlazando al reporte', () => {
+      renderConRouter(
+        <NotificationList
+          notifications={[notificacion({ reportId: 15, chatId: null })]}
+          onMarkRead={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      expect(screen.getByRole('link', { name: /Nuevo mensaje/ })).toHaveAttribute('href', '/reports/15')
     })
 
     it('marcar como leida y eliminar no navegan', async () => {
