@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { BellIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import type { NotificationDTO } from '@/types/notification.types'
@@ -9,6 +10,7 @@ interface NotificationListProps {
   notifications: NotificationDTO[]
   onMarkRead: (id: number) => void
   onDelete: (id: number) => void
+  onNavigate?: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat('es-AR', {
@@ -25,7 +27,18 @@ function formatDate(value: string) {
 const actionClasses =
   'press inline-flex min-h-11 items-center rounded-control px-2 text-sm font-bold hover:bg-surface'
 
-function NotificationList({ notifications, onMarkRead, onDelete }: NotificationListProps) {
+function renderContent(notification: NotificationDTO) {
+  return (
+    <>
+      <p className='font-bold text-ink'>{notification.title}</p>
+      {notification.message && (
+        <p className='mt-0.5 break-words text-sm text-ink-muted'>{notification.message}</p>
+      )}
+    </>
+  )
+}
+
+function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: NotificationListProps) {
   const [page, setPage] = useState(0)
 
   const totalPages = Math.ceil(notifications.length / NOTIFICATIONS_PAGE_SIZE)
@@ -56,9 +69,20 @@ function NotificationList({ notifications, onMarkRead, onDelete }: NotificationL
               !notification.isRead && 'bg-signal/10 before:absolute before:inset-y-3 before:left-0 before:w-1 before:rounded-r-full before:bg-signal'
             )}
           >
-            <p className='font-bold text-ink'>{notification.title}</p>
-            {notification.message && (
-              <p className='mt-0.5 break-words text-sm text-ink-muted'>{notification.message}</p>
+            {notification.reportId === null ? (
+              renderContent(notification)
+            ) : (
+              // abre el reporte mencionado (#222)
+              <Link
+                to={`/reports/${notification.reportId}`}
+                onClick={() => {
+                  if (!notification.isRead) onMarkRead(notification.id)
+                  onNavigate?.()
+                }}
+                className='-mx-2 block min-h-11 rounded-control px-2 py-1 hover:bg-surface'
+              >
+                {renderContent(notification)}
+              </Link>
             )}
             <div className='mt-1 flex flex-wrap items-center gap-x-1'>
               <time className='mr-auto text-xs text-ink-muted' dateTime={notification.createdAt}>

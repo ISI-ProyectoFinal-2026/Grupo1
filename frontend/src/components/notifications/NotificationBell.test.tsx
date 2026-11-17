@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import { createQueryWrapper } from '@/test/query-wrapper'
@@ -118,5 +119,39 @@ describe('NotificationBell', () => {
     await user.click(boton)
 
     expect(screen.queryByText('Posible coincidencia')).not.toBeInTheDocument()
+  })
+
+  it('abrir una notificacion con reporte navega, la marca como leida y cierra el panel (#222)', async () => {
+    const user = userEvent.setup()
+    const coincidencia = notificacion({
+      id: 12,
+      type: 'match_suggested',
+      title: 'Posible coincidencia',
+      reportId: 30,
+    })
+    vi.mocked(notificationsService.listNotifications).mockResolvedValue([coincidencia])
+    vi.mocked(notificationsService.markNotificationAsRead).mockResolvedValue({
+      ...coincidencia,
+      isRead: true,
+    })
+
+    const { Wrapper } = createQueryWrapper()
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <NotificationBell />
+        <Routes>
+          <Route path='/' element={null} />
+          <Route path='/reports/:id' element={<p>Detalle del reporte</p>} />
+        </Routes>
+      </MemoryRouter>,
+      { wrapper: Wrapper }
+    )
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones' }))
+    await user.click(screen.getByRole('link', { name: /Posible coincidencia/ }))
+
+    expect(screen.getByText('Detalle del reporte')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Posible coincidencia/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Notificaciones' })).toHaveAttribute('aria-expanded', 'false')
+    await waitFor(() => expect(notificationsService.markNotificationAsRead).toHaveBeenCalledWith(12))
   })
 })

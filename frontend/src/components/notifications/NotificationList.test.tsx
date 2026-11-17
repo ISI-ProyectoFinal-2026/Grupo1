@@ -1,8 +1,37 @@
+import type { ReactElement } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import NotificationList from '@/components/notifications/NotificationList'
 import type { NotificationDTO } from '@/types/notification.types'
+
+function DetalleFalso() {
+  const { id } = useParams()
+  return <p>Detalle del reporte {id}</p>
+}
+
+function renderConRouter(ui: ReactElement) {
+  return render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path='/' element={ui} />
+        <Route path='/reports/:id' element={<DetalleFalso />} />
+      </Routes>
+    </MemoryRouter>
+  )
+}
+
+function coincidencia(overrides: Partial<NotificationDTO> = {}): NotificationDTO {
+  return notificacion({
+    id: 21,
+    type: 'match_suggested',
+    title: '¡Posible coincidencia encontrada!',
+    message: 'Encontramos una publicación que podría coincidir.',
+    reportId: 15,
+    ...overrides,
+  })
+}
 
 function notificacion(overrides: Partial<NotificationDTO> = {}): NotificationDTO {
   return {
@@ -116,5 +145,92 @@ describe('NotificationList', () => {
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))
 
     expect(onDelete).toHaveBeenCalledWith(9)
+  })
+
+  describe('enlace al reporte mencionado (#222)', () => {
+    it('una notificacion con reporte enlaza a su detalle', () => {
+      renderConRouter(
+        <NotificationList notifications={[coincidencia()]} onMarkRead={vi.fn()} onDelete={vi.fn()} />
+      )
+
+      expect(
+        screen.getByRole('link', { name: /Posible coincidencia encontrada/ })
+      ).toHaveAttribute('href', '/reports/15')
+    })
+
+    it('una notificacion sin reporte no es un enlace', () => {
+      render(
+        <NotificationList notifications={[notificacion()]} onMarkRead={vi.fn()} onDelete={vi.fn()} />
+      )
+
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getByText('Nuevo mensaje')).toBeInTheDocument()
+    })
+
+    it('al abrirla navega al reporte, la marca como leida y avisa la navegacion', async () => {
+      const user = userEvent.setup()
+      const onMarkRead = vi.fn()
+      const onNavigate = vi.fn()
+      renderConRouter(
+        <NotificationList
+          notifications={[coincidencia()]}
+          onMarkRead={onMarkRead}
+          onDelete={vi.fn()}
+          onNavigate={onNavigate}
+        />
+      )
+
+      await user.click(screen.getByRole('link', { name: /Posible coincidencia encontrada/ }))
+
+      expect(screen.getByText('Detalle del reporte 15')).toBeInTheDocument()
+      expect(onMarkRead).toHaveBeenCalledWith(21)
+      expect(onNavigate).toHaveBeenCalledTimes(1)
+    })
+
+    it('no vuelve a marcar como leida una ya leida', async () => {
+      const user = userEvent.setup()
+      const onMarkRead = vi.fn()
+      renderConRouter(
+        <NotificationList
+          notifications={[coincidencia({ isRead: true })]}
+          onMarkRead={onMarkRead}
+          onDelete={vi.fn()}
+        />
+      )
+
+      await user.click(screen.getByRole('link', { name: /Posible coincidencia encontrada/ }))
+
+      expect(screen.getByText('Detalle del reporte 15')).toBeInTheDocument()
+      expect(onMarkRead).not.toHaveBeenCalled()
+    })
+
+    it('se abre con el teclado', async () => {
+      const user = userEvent.setup()
+      renderConRouter(
+        <NotificationList notifications={[coincidencia()]} onMarkRead={vi.fn()} onDelete={vi.fn()} />
+      )
+
+      await user.tab()
+      expect(screen.getByRole('link', { name: /Posible coincidencia encontrada/ })).toHaveFocus()
+      await user.keyboard('{Enter}')
+
+      expect(screen.getByText('Detalle del reporte 15')).toBeInTheDocument()
+    })
+
+    it('marcar como leida y eliminar no navegan', async () => {
+      const user = userEvent.setup()
+      const onMarkRead = vi.fn()
+      const onDelete = vi.fn()
+      renderConRouter(
+        <NotificationList notifications={[coincidencia()]} onMarkRead={onMarkRead} onDelete={onDelete} />
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Marcar como leída' }))
+      await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+
+      expect(onMarkRead).toHaveBeenCalledWith(21)
+      expect(onDelete).toHaveBeenCalledWith(21)
+      expect(screen.queryByText(/Detalle del reporte/)).not.toBeInTheDocument()
+    })
   })
 })
