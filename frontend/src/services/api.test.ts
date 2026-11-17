@@ -25,6 +25,10 @@ vi.mock('axios', () => ({
   },
 }))
 
+// el cache de queries se limpia al perder la sesion (#187)
+const queryClientFalso = vi.hoisted(() => ({ clear: vi.fn() }))
+vi.mock('@/lib/query-client', () => ({ queryClient: queryClientFalso }))
+
 const { getApiErrorCode, getApiErrorDetails, getApiErrorStatus, getApiErrorSuspension } =
   await import('@/services/api')
 const { useAuthStore } = await import('@/stores/auth.store')
@@ -78,6 +82,7 @@ describe('interceptor de response', () => {
   let locationFalsa: { pathname: string; href: string }
 
   beforeEach(() => {
+    queryClientFalso.clear.mockClear()
     locationFalsa = { pathname: '/reports/5', href: '/reports/5' }
     Object.defineProperty(window, 'location', {
       value: locationFalsa,
@@ -112,13 +117,29 @@ describe('interceptor de response', () => {
     expect(getApiErrorDetails(rechazado)).toEqual(details)
   })
 
-  it('cierra la sesion y manda al login ante un 401', async () => {
+  // Sin recarga dura: una pagina publica sigue como anonima y ProtectedRoute
+  // manda al login a las privadas al quedar sin token (#187).
+  it('cierra la sesion y limpia el cache ante un 401, sin redirigir', async () => {
     useAuthStore.getState().setAuth('jwt-vencido', usuario)
 
     await alFallar(errorAxios(401, { error: { message: 'Token vencido' } })).catch(() => {})
 
     expect(useAuthStore.getState().token).toBeNull()
-    expect(locationFalsa.href).toBe('/login')
+    expect(useAuthStore.getState().user).toBeNull()
+    expect(queryClientFalso.clear).toHaveBeenCalledTimes(1)
+    expect(locationFalsa.href).toBe('/reports/5')
+  })
+
+  // Un 401 sin sesion (credenciales invalidas, o el segundo 401 de una sesion
+  // ya cerrada) no repite la limpieza: evita bucles de refetch.
+  it('un 401 sin sesion no limpia nada', async () => {
+    const rechazado = await alFallar(errorAxios(401, { error: { message: 'Credenciales invalidas' } })).catch(
+      (e: unknown) => e
+    )
+
+    expect(queryClientFalso.clear).not.toHaveBeenCalled()
+    expect(getApiErrorStatus(rechazado)).toBe(401)
+    expect(rechazado).toHaveProperty('message', 'Credenciales invalidas')
   })
 
   // Sin este guard, un 401 del propio login dispara otra navegacion a /login y
@@ -131,6 +152,7 @@ describe('interceptor de response', () => {
     )
 
     expect(locationFalsa.href).toBe('/reports/5')
+    expect(queryClientFalso.clear).not.toHaveBeenCalled()
   })
 
   // El codigo de maquina deja decidir la UI sin parsear mensajes en español.

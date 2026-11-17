@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuthStore } from '@/stores/auth.store'
@@ -16,14 +16,27 @@ const usuario: AuthUser = {
   updatedAt: '2026-09-01T10:00:00.000Z',
 }
 
-function renderRutaProtegida() {
+function SondaLogin() {
+  const location = useLocation()
+  return <div data-testid='state-login'>{JSON.stringify(location.state)}</div>
+}
+
+function renderRutaProtegida(ruta = '/reports/new') {
   return render(
-    <MemoryRouter initialEntries={['/reports/new']}>
+    <MemoryRouter initialEntries={[ruta]}>
       <Routes>
         <Route element={<ProtectedRoute />}>
           <Route path='/reports/new' element={<div>Crear reporte</div>} />
         </Route>
-        <Route path='/login' element={<div>Iniciar sesión</div>} />
+        <Route
+          path='/login'
+          element={
+            <>
+              <div>Iniciar sesión</div>
+              <SondaLogin />
+            </>
+          }
+        />
       </Routes>
     </MemoryRouter>
   )
@@ -47,5 +60,14 @@ describe('ProtectedRoute', () => {
 
     expect(screen.getByText('Iniciar sesión')).toBeInTheDocument()
     expect(screen.queryByText('Crear reporte')).not.toBeInTheDocument()
+  })
+
+  // el login vuelve a la pagina pedida tras iniciar sesion (#187)
+  it('pasa al login la ruta pedida con search y hash', () => {
+    renderRutaProtegida('/reports/new?tipo=lost#foto')
+
+    expect(JSON.parse(screen.getByTestId('state-login').textContent ?? 'null')).toEqual({
+      from: { pathname: '/reports/new', search: '?tipo=lost', hash: '#foto' },
+    })
   })
 })

@@ -1,19 +1,10 @@
 import axios, { type AxiosError } from "axios";
+import { queryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/stores/auth.store";
 import { ACCOUNT_SUSPENDED } from "@/types/auth";
 import type { ApiErrorDetail, ApiErrorResponse, SuspensionDetails } from "@/types/auth";
 
 const DEFAULT_ERROR_MESSAGE = "Error inesperado, intentá de nuevo";
-
-// Páginas de links de email: ahí un 401 de una sesión vieja limpia la sesión
-// pero no debe arrancar al usuario de la página hacia /login.
-const LINK_FLOW_PATHS = [
-  "/verify-email",
-  "/forgot-password",
-  "/reset-password",
-  "/two-factor/reset/confirm",
-  "/two-factor/reset/cancel",
-];
 
 interface ApiError extends Error {
   code?: string;
@@ -38,12 +29,13 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiErrorResponse>) => {
     // Solo el 401 cierra la sesión: un 403 (p. ej. EMAIL_NOT_VERIFIED) es una
-    // sesión válida a la que le falta un paso, no una sesión vencida.
-    if (error.response?.status === 401 && window.location.pathname !== "/login") {
+    // sesión válida a la que le falta un paso, no una sesión vencida. Sin
+    // recarga: la página pública sigue como anónima y ProtectedRoute manda al
+    // login a las privadas (#187). Sin sesión (credenciales inválidas, o un
+    // segundo 401) no hay nada que limpiar.
+    if (error.response?.status === 401 && useAuthStore.getState().token !== null) {
       useAuthStore.getState().logout();
-      if (!LINK_FLOW_PATHS.includes(window.location.pathname)) {
-        window.location.href = "/login";
-      }
+      queryClient.clear();
     }
 
     // Cuenta suspendida: la sesión ya no sirve. En /login se queda para mostrar el aviso.

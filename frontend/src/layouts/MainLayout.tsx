@@ -9,6 +9,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useIsModerator } from "@/hooks/useIsModerator";
 import { buttonClasses } from "@/components/ui/buttonClasses";
+import { toRedirectFrom } from "@/utils/redirect";
 import { useLocationSync } from "@/hooks/useLocationSync";
 import { cn } from "@/lib/cn";
 import {
@@ -44,6 +45,9 @@ const isOwnBusinessPath = (path: string) =>
 const isOwnPetsPath = (path: string) => path === "/pets" || path.startsWith("/pets/");
 // en el login y el registro los accesos de invitado sobran
 const isAuthFormPath = (path: string) => path === "/login" || path === "/register";
+// páginas públicas a las que vuelve el login; no los links de email, de un solo uso (#187)
+const isPublicBrowsePath = (path: string) =>
+  path === "/reports" || path.startsWith("/reports/") || path === "/businesses" || path.startsWith("/businesses/");
 
 const PRIMARY_ITEMS: NavItemConfig[] = [
   { to: "/reports", label: "Reportes", icon: ListIcon, isActive: isReportsPath },
@@ -105,7 +109,8 @@ function TabLink({ item, pathname, onNavigate }: { item: NavItemConfig; pathname
 
 function MainLayout() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -129,9 +134,9 @@ function MainLayout() {
     // Limpiar el caché de queries evita que, en un navegador compartido, el
     // próximo usuario vea datos cacheados del anterior (['notifications'],
     // ['business','me'], ['chats']) durante el primer render antes del refetch.
-    // El QueryClient vive una sola vez (main.tsx) y sobrevive al logout; el
-    // camino de 401 ya lo evita con un reload duro (api.ts), pero el botón de
-    // logout no recarga, así que hay que limpiar acá (issue #175).
+    // El QueryClient vive una sola vez (lib/query-client.ts) y sobrevive al
+    // logout; el camino de 401 lo limpia en api.ts y el botón de logout acá
+    // (issue #175).
     queryClient.clear();
     navigate("/login");
   }
@@ -175,7 +180,11 @@ function MainLayout() {
         {/* visitante en una página pública (feed, detalle, comercios) (#187) */}
         {!user && !isAuthFormPath(pathname) && (
           <div className="flex items-center gap-2">
-            <Link to="/login" className={buttonClasses("ghost", "sm")}>
+            <Link
+              to="/login"
+              state={isPublicBrowsePath(pathname) ? toRedirectFrom(location) : undefined}
+              className={buttonClasses("ghost", "sm")}
+            >
               Ingresar
             </Link>
             <Link to="/register" className={buttonClasses("signal", "sm", "hidden sm:inline-flex")}>
