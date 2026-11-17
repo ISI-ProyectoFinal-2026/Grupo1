@@ -50,3 +50,7 @@ docs/diagramas/**/*.finalize*.json
 docs/diagramas/**/*.delivery.json
 docs/diagramas/**/*.browser-check.json
 docs/diagramas/**/.archify-delivery-*/
+
+# Backups locales (issue #263): por defecto viven fuera del repo, en ../patitas-backups
+backups/
+patitas-backups/

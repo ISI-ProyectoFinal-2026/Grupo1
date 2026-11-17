@@ -1,0 +1,27 @@
+{
+  "name": "patitas-backup",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PATITAS - Backup diario de la base y de las imágenes (sidecar Docker)",
+  "main": "dist/cli.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc -p tests/tsconfig.json",
+    "start": "node dist/cli.js daemon",
+    "run-once": "node dist/cli.js run-once",
+    "restore": "node dist/cli.js restore",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.19.43",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
+    "typescript": "^5.9.3"
+  }
+}
