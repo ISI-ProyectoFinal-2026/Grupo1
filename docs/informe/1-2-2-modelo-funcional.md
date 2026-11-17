@@ -429,7 +429,7 @@ Tabla 1.2.2-20. Tareas por milestone. Fuente: los dos comandos `gh` de esta secc
 | Sprint 5 | [#40](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/40) | Tests de carga y performance | Abierto |
 | Sprint 5 | [#41](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/41) | Análisis de vulnerabilidades | Abierto |
 | Sprint 5 | [#42](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/42) | Tests unitarios | Cerrado |
-| Sprint 5 | [#215](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/215) | Mover el JWT de `localStorage` a una cookie httpOnly | Abierto |
+| Sprint 5 | [#215](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/215) | Mover el JWT de `localStorage` a una cookie httpOnly | Cerrado |
 
 Tabla 1.2.2-21. Tareas por milestone. Fuente: `gh issue list --repo ISI-ProyectoFinal-2026/Grupo1 --state all --label "type: task" --limit 200 --json number,title,state,milestone`.
 
