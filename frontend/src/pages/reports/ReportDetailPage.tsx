@@ -150,6 +150,8 @@ export default function ReportDetailPage() {
   const canFlag = isPublished && currentUserId !== undefined && !isOwner;
   const canContact = currentUserId !== undefined && currentUserId !== report.userId;
   const canClose = isOwner && isPublished;
+  // tras confirmar una coincidencia se ofrece cerrar el propio reporte (#221)
+  const offerClose = canClose && (matches?.some((match) => match.status === "confirmed") ?? false);
   // oculto por denuncias: el dueño no edita ni cierra, solo elimina
   const isHidden = report.status === "hidden";
   // denuncia la cuenta del autor, no la publicación (#267)
@@ -321,6 +323,19 @@ export default function ReportDetailPage() {
               <h2 id="coincidencias" className={sectionTitle}>
                 Coincidencias sugeridas
               </h2>
+              {offerClose && (
+                <div className="card mt-3 flex flex-col gap-3 border-signal p-4">
+                  <p className="text-ink">
+                    Confirmaste una coincidencia. Si ya resolviste el caso, podés cerrar tu reporte.
+                  </p>
+                  <CloseReportButton
+                    label="Cerrar mi reporte"
+                    onConfirm={closeReport.close}
+                    isPending={closeReport.isPending}
+                    error={closeReport.error}
+                  />
+                </div>
+              )}
               <div className="mt-3">
                 {isLoadingMatches ? (
                   <SkeletonGroup className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
