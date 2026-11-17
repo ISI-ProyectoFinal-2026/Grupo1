@@ -83,3 +83,26 @@ TWO_FACTOR_ENCRYPTION_KEY=   # openssl rand -base64 32
 **En producción `TWO_FACTOR_ENCRYPTION_KEY` es obligatoria** (32 bytes en base64 o 64 caracteres hexadecimales): sin ella, activar o usar el 2FA responde `503` `TWO_FACTOR_NOT_CONFIGURED`; el login de cuentas sin 2FA sigue funcionando. En desarrollo y test, si falta, se deriva de `JWT_SECRET`.
 
 Si se pierde o se cambia la clave, los secretos ya cifrados no se pueden descifrar y los usuarios con 2FA quedan sin poder pasar el segundo paso. Ellos mismos pueden pedir el reinicio por autoservicio de 72 h desde el login (el mail de confirmación necesita `SMTP_HOST` en producción y los links usan `FRONTEND_URL`); ese reinicio no necesita la clave. La otra salida es desactivarles el 2FA directo en la base.
+
+---
+
+## Backup — `BACKUP_*` y `SOURCE_IMAGES_BUCKET` (solo `backup/.env`)
+
+El servicio `backup` (perfil `backup` de `docker-compose.yml`) hace el dump diario de la base y la copia incremental de las imágenes. El procedimiento completo, incluida la restauración, está en `docs/BACKUP.md`. Las variables van en `backup/.env` (copiar `backup/.env.example`):
+
+```
+# backup/.env
+BACKUP_R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+BACKUP_R2_ACCESS_KEY_ID=          # token con lectura/escritura sobre los DOS buckets
+BACKUP_R2_SECRET_ACCESS_KEY=
+BACKUP_R2_BUCKET=patitas-backups  # bucket exclusivo para backups
+SOURCE_IMAGES_BUCKET=             # bucket de imágenes (= R2_BUCKET_NAME del backend)
+BACKUP_HOUR=3                     # hora local diaria, 0-23 (default 3)
+TZ=America/Argentina/Buenos_Aires # zona horaria de BACKUP_HOUR (sin TZ: UTC)
+```
+
+`DATABASE_URL` y `BACKUP_DIR` no van en `backup/.env`: `docker-compose.yml` los fija para el contenedor (`postgres:5432` con `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`, y `/backups`). Solo hay que definirlos al correr el servicio fuera de Docker.
+
+En el `.env` de la raíz, `BACKUP_HOST_DIR` define la carpeta del host donde quedan los dumps locales (default `../patitas-backups`, fuera del repo).
+
+Si falta alguna variable obligatoria, el servicio no arranca y el log lista exactamente cuáles faltan. Sin el perfil `backup`, `docker compose up -d` no levanta este servicio y estas variables no hacen falta.
