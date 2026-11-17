@@ -112,6 +112,42 @@ describe('router: rutas publicas', () => {
   })
 })
 
+// El feed, el detalle y el directorio de comercios son material de difusion:
+// se ven sin sesion (#187).
+describe('router: rutas publicas de difusion', () => {
+  const publicas = [
+    ['/reports', 'pagina feed'],
+    ['/reports/5', 'pagina detalle reporte'],
+    ['/businesses', 'pagina directorio comercios'],
+    ['/businesses/9', 'pagina perfil comercio'],
+  ]
+
+  it.each(publicas)('%s se renderiza sin sesion', (ruta, texto) => {
+    const memoria = renderRuta(ruta)
+
+    expect(screen.getByText(texto)).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe(ruta)
+  })
+
+  it.each(publicas)('%s tambien se renderiza con sesion', (ruta, texto) => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
+
+    renderRuta(ruta)
+
+    expect(screen.getByText(texto)).toBeInTheDocument()
+  })
+
+  it.each(['/reports/new', '/reports/mine'])(
+    '%s no se confunde con el detalle publico /reports/:id',
+    (ruta) => {
+      const memoria = renderRuta(ruta)
+
+      expect(memoria.state.location.pathname).toBe('/login')
+      expect(screen.queryByText('pagina detalle reporte')).not.toBeInTheDocument()
+    }
+  )
+})
+
 describe('router: rutas solo para invitados', () => {
   // Con sesion, el login y el registro no tienen sentido: se vuelve al inicio
   // en vez de mostrar el formulario al lado de la barra lateral logueada.
@@ -135,18 +171,16 @@ describe('router: rutas solo para invitados', () => {
 describe('router: rutas protegidas', () => {
   const protegidas = [
     '/',
-    '/reports',
     '/reports/new',
-    '/reports/5',
     '/reports/5/edit',
     '/reports/mine',
     '/chats',
     '/chats/3',
-    '/businesses',
     '/businesses/register',
     '/businesses/dashboard',
-    '/businesses/9',
+    '/businesses/plan',
     '/account/security',
+    '/account/notifications',
     '/pets',
     '/pets/new',
     '/pets/3/edit',
@@ -161,17 +195,13 @@ describe('router: rutas protegidas', () => {
 
   it.each([
     ['/', 'pagina home'],
-    ['/reports', 'pagina feed'],
     ['/reports/new', 'pagina crear reporte'],
-    ['/reports/5', 'pagina detalle reporte'],
     ['/reports/5/edit', 'pagina editar reporte'],
     ['/reports/mine', 'pagina mis reportes'],
     ['/chats', 'pagina chat'],
     ['/chats/3', 'pagina chat'],
-    ['/businesses', 'pagina directorio comercios'],
     ['/businesses/register', 'pagina alta comercio'],
     ['/businesses/dashboard', 'pagina panel comercio'],
-    ['/businesses/9', 'pagina perfil comercio'],
     ['/account/security', 'pagina seguridad'],
     ['/pets', 'pagina mis mascotas'],
     ['/pets/new', 'pagina alta mascota'],
@@ -183,6 +213,15 @@ describe('router: rutas protegidas', () => {
 
     expect(screen.getByText(texto)).toBeInTheDocument()
   })
+
+  it.each(['/businesses/register', '/businesses/dashboard', '/businesses/plan'])(
+    '%s sin sesion no cae en el perfil publico /businesses/:id',
+    (ruta) => {
+      renderRuta(ruta)
+
+      expect(screen.queryByText('pagina perfil comercio')).not.toBeInTheDocument()
+    }
+  )
 
   it('/businesses/dashboard no se confunde con el perfil /businesses/:id', () => {
     useAuthStore.getState().setAuth('jwt-de-prueba', usuario)

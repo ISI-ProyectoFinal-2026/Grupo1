@@ -1,9 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import * as reportsService from '@/services/reports.service'
 import { useMatchActions } from '@/hooks/useMatchActions'
 import { useReportMatchesQuery } from '@/hooks/useReportMatchesQuery'
+import { useAuthStore } from '@/stores/auth.store'
 import type { MatchDecisionDTO, MatchDTO } from '@/types/report.types'
 
 vi.mock('@/services/reports.service')
@@ -45,6 +46,12 @@ function diferida<T>() {
 describe('useMatchActions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // la lista de coincidencias solo se pide con sesión (#187)
+    useAuthStore.setState({ token: 'token' })
+  })
+
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
   })
 
   it('confirmar llama al servicio y refresca las coincidencias del reporte', async () => {

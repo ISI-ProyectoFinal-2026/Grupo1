@@ -1,10 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import * as businessService from '@/services/business.service'
 import BusinessProfilePage from '@/pages/business/BusinessProfilePage'
+import { useAuthStore } from '@/stores/auth.store'
 import type { PublicBusiness } from '@/types/business.types'
 
 vi.mock('@/services/business.service')
@@ -47,6 +48,10 @@ describe('BusinessProfilePage', () => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
   it('carga el perfil y registra la visita (GET dispara el evento VIEW)', async () => {
     vi.mocked(businessService.getBusiness).mockResolvedValue(comercioPublico())
     renderPage()
@@ -76,6 +81,19 @@ describe('BusinessProfilePage', () => {
   })
 
   it('registra el contacto al tocar el boton y muestra la confirmacion', async () => {
+    useAuthStore.setState({
+      token: 'token',
+      user: {
+        id: 8,
+        email: 'vecino@patitas.test',
+        fullName: null,
+        phone: null,
+        role: 'usuario_regular',
+        emailVerifiedAt: '2026-09-01T10:00:00.000Z',
+        createdAt: '2026-09-01T10:00:00.000Z',
+        updatedAt: '2026-09-01T10:00:00.000Z',
+      },
+    })
     vi.mocked(businessService.getBusiness).mockResolvedValue(comercioPublico())
     vi.mocked(businessService.contactBusiness).mockResolvedValue(undefined)
     const user = userEvent.setup()
@@ -85,6 +103,17 @@ describe('BusinessProfilePage', () => {
 
     await waitFor(() => expect(businessService.contactBusiness).toHaveBeenCalledWith(9))
     expect(await screen.findByText(/registramos tu interés/i)).toBeInTheDocument()
+  })
+
+  // registrar el contacto exige sesion; el telefono ya queda a la vista (#187)
+  it('sin sesion muestra el perfil sin el boton de contactar', async () => {
+    vi.mocked(businessService.getBusiness).mockResolvedValue(comercioPublico())
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Veterinaria San Roque' })
+
+    expect(screen.getByText('1122334455')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /contactar/i })).not.toBeInTheDocument()
   })
 
   it('muestra la descripción y los enlaces externos en una pestaña nueva', async () => {

@@ -6,6 +6,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import * as adsService from '@/services/ads.service'
 import AdBanner from '@/components/ads/AdBanner'
+import { useAuthStore } from '@/stores/auth.store'
 import type { ServedAd } from '@/types/ad.types'
 
 vi.mock('@/services/ads.service')
@@ -29,6 +30,22 @@ class FakeIntersectionObserver {
   observe() {}
   disconnect() {}
   unobserve() {}
+}
+
+function iniciarSesion() {
+  useAuthStore.setState({
+    token: 'token',
+    user: {
+      id: 8,
+      email: 'vecino@patitas.test',
+      fullName: null,
+      phone: null,
+      role: 'usuario_regular',
+      emailVerifiedAt: '2026-09-01T10:00:00.000Z',
+      createdAt: '2026-09-01T10:00:00.000Z',
+      updatedAt: '2026-09-01T10:00:00.000Z',
+    },
+  })
 }
 
 function renderBanner(props: { placement: 'feed' | 'report_detail'; reportId?: number }, client?: QueryClient) {
@@ -56,6 +73,7 @@ describe('AdBanner', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    useAuthStore.setState({ token: null, user: null })
   })
 
   it('muestra el anuncio marcado como publicidad y con el comercio', async () => {
@@ -118,6 +136,7 @@ describe('AdBanner', () => {
   })
 
   it('permite denunciar el anuncio con un motivo', async () => {
+    iniciarSesion()
     vi.mocked(adsService.flagAd).mockResolvedValue(undefined)
     const user = userEvent.setup()
     renderBanner({ placement: 'feed' })
@@ -133,7 +152,16 @@ describe('AdBanner', () => {
     expect(await screen.findByText(/Recibimos tu denuncia/)).toBeInTheDocument()
   })
 
+  // denunciar exige sesion: un visitante anonimo no ve el formulario (#187)
+  it('sin sesion no ofrece denunciar el anuncio', async () => {
+    renderBanner({ placement: 'feed' })
+
+    await screen.findByText('Publicidad')
+    expect(screen.queryByRole('button', { name: 'Denunciar anuncio' })).not.toBeInTheDocument()
+  })
+
   it('no ofrece denunciar el anuncio propio', async () => {
+    iniciarSesion()
     vi.mocked(adsService.getAdFor).mockResolvedValue({ ...anuncio, isOwn: true })
     renderBanner({ placement: 'feed' })
 
@@ -154,6 +182,7 @@ describe('AdBanner', () => {
   })
 
   it('una denuncia repetida se informa sin volver a ofrecer el formulario', async () => {
+    iniciarSesion()
     vi.mocked(adsService.flagAd).mockRejectedValue(Object.assign(new Error('Ya denunciaste este anuncio'), { status: 409 }))
     const user = userEvent.setup()
     renderBanner({ placement: 'feed' })

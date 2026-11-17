@@ -8,6 +8,7 @@ import NotificationBell from "@/components/notifications/NotificationBell";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useIsModerator } from "@/hooks/useIsModerator";
+import { buttonClasses } from "@/components/ui/buttonClasses";
 import { useLocationSync } from "@/hooks/useLocationSync";
 import { cn } from "@/lib/cn";
 import {
@@ -41,6 +42,8 @@ const isReportsPath = (path: string) =>
 const isOwnBusinessPath = (path: string) =>
   path === "/businesses/dashboard" || path === "/businesses/register" || path === "/businesses/plan";
 const isOwnPetsPath = (path: string) => path === "/pets" || path.startsWith("/pets/");
+// en el login y el registro los accesos de invitado sobran
+const isAuthFormPath = (path: string) => path === "/login" || path === "/register";
 
 const PRIMARY_ITEMS: NavItemConfig[] = [
   { to: "/reports", label: "Reportes", icon: ListIcon, isActive: isReportsPath },
@@ -169,6 +172,17 @@ function MainLayout() {
       >
         <Wordmark />
         {user && <NotificationBell />}
+        {/* visitante en una página pública (feed, detalle, comercios) (#187) */}
+        {!user && !isAuthFormPath(pathname) && (
+          <div className="flex items-center gap-2">
+            <Link to="/login" className={buttonClasses("ghost", "sm")}>
+              Ingresar
+            </Link>
+            <Link to="/register" className={buttonClasses("signal", "sm", "hidden sm:inline-flex")}>
+              Crear cuenta
+            </Link>
+          </div>
+        )}
       </header>
 
       {user && (
