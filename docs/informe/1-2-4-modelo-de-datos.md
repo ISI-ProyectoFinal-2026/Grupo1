@@ -38,7 +38,7 @@ El sistema usa una única base PostgreSQL 16 con las extensiones PostGIS y pgvec
 | `AdFlag` | `ad_flags` | Denuncia de un usuario sobre un anuncio, con motivo y estado: pendiente, anuncio dado de baja (`removed`) o denuncia desestimada (`dismissed`) | único `(ad_id, user_id)`; índice `status`; cascada con el anuncio |
 | `BusinessEvent` | `business_events` | Registro de visitas y contactos al perfil de un comercio; `user_id` nulo para visitantes anónimos | índice `(business_id, type)`; cascada con el comercio |
 
-Fuente: `backend/prisma/schema.prisma`, líneas 26-647.
+Fuente: `backend/prisma/schema.prisma`, líneas 26-671.
 
 ## Relaciones
 
