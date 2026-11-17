@@ -54,11 +54,11 @@ El rol del usuario se lee de la base en cada request y no viaja en el JWT (`back
 
 | Perfil | Cómo se obtiene | Qué puede hacer | Fuente |
 |---|---|---|---|
-| Anónimo | Sin sesión | La API permite leer el feed, el detalle de reportes publicados o resueltos, el flyer y el directorio de comercios; la interfaz exige iniciar sesión para todas esas pantallas ([#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187)) | `backend/src/routes/reports.routes.ts:20-47`, `backend/src/routes/businesses.routes.ts:18-19`, `frontend/src/router.tsx:54-74` |
+| Anónimo | Sin sesión | Ver el feed, el detalle de reportes publicados o resueltos, el flyer y el directorio y el perfil de los comercios, sin las coincidencias ni acciones de cuenta ([#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187)) | `backend/src/routes/reports.routes.ts:20-47`, `backend/src/routes/businesses.routes.ts:18-19`, `frontend/src/router.tsx:54-59` |
 | `usuario_regular` sin email verificado | Registro | Navegar, denunciar reportes, registrar un comercio, ver coincidencias; no puede crear reportes, subir imágenes, chatear, denunciar cuentas ni activar el 2FA | `backend/src/middlewares/auth.middleware.ts:110-119`, `backend/src/routes/uploads.routes.ts:17`, `backend/src/routes/chats.routes.ts:8-10`, `backend/src/routes/account-reports.routes.ts:9-15`, `backend/src/routes/auth.routes.ts:35-36` |
 | `usuario_regular` verificado | Enlace del mail de verificación | Todo lo anterior más crear reportes, subir imágenes, chatear, denunciar cuentas y activar el 2FA | `backend/src/routes/reports.routes.ts:24` |
-| `moderador` | Lo asigna un `admin` desde `/admin/users` (`PATCH /api/admin/users/:id/role`) | Además, el panel `/moderation` (listar y resolver denuncias de reportes) y la cola de sanciones `/admin/sanctions`, donde solo decide reincidencias de usuarios regulares | `backend/src/routes/admin.routes.ts:8-19`, `backend/src/services/account-sanctions/policy.ts:78-87`, `frontend/src/router.tsx:79-86` |
-| `admin` | El seed o la asignación por otro `admin` | Lo mismo que `moderador`, más cambiar roles, ver el registro de cambios de rol y decidir cualquier caso de sanción | `backend/prisma/seed.ts:15-21`, `backend/src/routes/admin.routes.ts:14-19`, `frontend/src/router.tsx:87-90` |
+| `moderador` | Lo asigna un `admin` desde `/admin/users` (`PATCH /api/admin/users/:id/role`) | Además, el panel `/moderation` (listar y resolver denuncias de reportes) y la cola de sanciones `/admin/sanctions`, donde solo decide reincidencias de usuarios regulares | `backend/src/routes/admin.routes.ts:8-19`, `backend/src/services/account-sanctions/policy.ts:78-87`, `frontend/src/router.tsx:81-88` |
+| `admin` | El seed o la asignación por otro `admin` | Lo mismo que `moderador`, más cambiar roles, ver el registro de cambios de rol y decidir cualquier caso de sanción | `backend/prisma/seed.ts:15-21`, `backend/src/routes/admin.routes.ts:14-19`, `frontend/src/router.tsx:89-92` |
 
 Tabla 1.2.2-1. Perfiles de usuario y permisos. Fuente: `backend/prisma/schema.prisma:18-24` y los archivos de la tabla.
 
@@ -145,7 +145,6 @@ Tabla 1.2.2-3. Reglas del módulo de autenticación. Fuente: archivos de la colu
 ### Limitaciones conocidas
 
 - El JWT se guarda en `localStorage` ([#215](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/215)).
-- La interfaz exige sesión incluso para el contenido que la API sirve sin login ([#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187)).
 
 ## 1.2.2.2.2 Módulo de Reportes de mascotas (alta, detalle, feed y cierre)
 
@@ -160,7 +159,7 @@ Tabla 1.2.2-3. Reglas del módulo de autenticación. Fuente: archivos de la colu
 | [#16](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/16) | Como usuario quiero ver y filtrar el feed de reportes para encontrar casos relevantes | Cerrado | Parcial: filtra por tipo, zona y fecha; no por raza |
 | [#17](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/17) | Como dueño quiero cerrar un reporte cuando aparece mi mascota para marcarlo resuelto | Cerrado | Implementada (`backend/src/services/reports.service.ts:277`) |
 | [#65](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/65) | Como usuario quiero publicar un reporte de mascota perdida o encontrada con foto e información desde el navegador | Cerrado | Implementada (`frontend/src/components/reports/ReportForm.tsx`) |
-| [#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187) | Como visitante anónimo quiero ver el feed y el detalle de un reporte sin iniciar sesión | Abierto | No implementada en la interfaz (`frontend/src/router.tsx:54-74`) |
+| [#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187) | Como visitante anónimo quiero ver el feed y el detalle de un reporte sin iniciar sesión | Abierto | Implementada (`frontend/src/router.tsx:54-59`, `frontend/src/pages/reports/ReportDetailPage.tsx`) |
 | [#225](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/225) | Interfaz para mascotas y para editar o eliminar un reporte | Abierto | Implementada (`frontend/src/pages/pets/`, `frontend/src/pages/reports/EditReportPage.tsx`, `frontend/src/pages/reports/MyReportsPage.tsx`, `frontend/src/components/reports/DeleteReportButton.tsx`) |
 
 Tabla 1.2.2-4. Historias del módulo de reportes. Fuente: `gh issue list` (comando al inicio de la sección).
@@ -178,7 +177,7 @@ Tabla 1.2.2-4. Historias del módulo de reportes. Fuente: `gh issue list` (coman
 9. **Feed.** `/reports` pide `GET /api/reports` con `status=published` y los filtros de tipo, zona y fechas (`frontend/src/pages/reports/FeedPage.tsx:41-52`). `list` filtra la zona con `ILIKE` sobre `location_address` y excluye a los autores suspendidos (`backend/src/services/reports.service.ts:81-111`). El feed se ve como lista o como mapa (1.2.2.2.8).
 10. **Cierre.** El autor presiona cerrar y `POST /api/reports/:id/close` llega a `close` (`backend/src/services/reports.service.ts:277-293`): solo el autor (403) y solo desde `published` (409). El reporte pasa a `resolved` y sale del feed, que solo pide publicados.
 11. **Edición, eliminación y "Mis reportes".** El autor edita en `/reports/:id/edit` con `PUT /api/reports/:id`; si cambia la foto principal o las extra, las nuevas pasan por el control y el reporte vuelve a `pending` (`backend/src/services/reports.service.ts:218-275`). `DELETE /api/reports/:id` lo elimina (`:304-321`). `/reports/mine` lista los reportes propios en cualquier estado (`backend/src/routes/reports.routes.ts:22`, `backend/src/services/reports.service.ts:113-118`).
-12. **Mascotas.** En `/pets` el usuario crea, edita y elimina sus mascotas con hasta 4 fotos, que pasan por el mismo control de la IA (`frontend/src/router.tsx:72-74`, `backend/src/validators/pets.validator.ts:4`, `backend/src/services/pets.service.ts:15-16`, `:51`). `GET /api/pets` lista solo las del usuario autenticado (`backend/src/services/pets.service.ts:11-13`).
+12. **Mascotas.** En `/pets` el usuario crea, edita y elimina sus mascotas con hasta 4 fotos, que pasan por el mismo control de la IA (`frontend/src/router.tsx:74-76`, `backend/src/validators/pets.validator.ts:4`, `backend/src/services/pets.service.ts:15-16`, `:51`). `GET /api/pets` lista solo las del usuario autenticado (`backend/src/services/pets.service.ts:11-13`).
 
 ```mermaid
 stateDiagram-v2
@@ -375,7 +374,7 @@ Tabla 1.2.2-8. Historias del módulo de notificaciones. Fuente: `gh issue list` 
    - `message`: por cada mensaje de chat, para el receptor, con una vista previa (`backend/src/services/notifications.service.ts:209-227`).
    - `nearby_report`: cuando un reporte pasa a `published`, `applyModerationVerdict` llama a `createForNearbyReport` (`backend/src/services/matching.service.ts:93-98`). Avisa a los usuarios que no son el autor, tienen el aviso de zona activado, aceptaron compartir su ubicación, coincide el tipo de reporte elegido y su última ubicación está dentro del radio (consulta PostGIS `ST_DWithin`); no repite el aviso para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:237-276`).
    - `role_change`: cuando un `admin` cambia el rol de un usuario; no consulta las preferencias (`backend/src/services/admin-users.service.ts:116-124`).
-3. **Visualización.** La campana del encabezado (`frontend/src/layouts/MainLayout.tsx:171`) consulta `GET /api/notifications` cada 30 s (`frontend/src/hooks/useNotificationsQuery.ts:12`, `:23`), que devuelve las del usuario de la más nueva a la más vieja (`backend/src/services/notifications.service.ts:7-12`).
+3. **Visualización.** La campana del encabezado (`frontend/src/layouts/MainLayout.tsx:174`) consulta `GET /api/notifications` cada 30 s (`frontend/src/hooks/useNotificationsQuery.ts:12`, `:23`), que devuelve las del usuario de la más nueva a la más vieja (`backend/src/services/notifications.service.ts:7-12`).
 4. **Gestión.** `PUT /api/notifications/:id/read` marca como leída y `DELETE /api/notifications/:id` borra; solo el destinatario (403 para otro usuario) (`backend/src/services/notifications.service.ts:14-36`).
 
 ### Reglas de negocio
@@ -583,7 +582,7 @@ Tabla 1.2.2-15. Reglas del módulo de moderación comunitaria. Fuente: archivos 
 
 - Dos moderadores que resuelven la misma denuncia: gana el primero y el segundo recibe 409 (`backend/src/services/report-flags.service.ts:71-82`).
 - Si falla la notificación al autor, la denuncia queda resuelta igual y el error se registra en el log (`backend/src/services/report-flags.service.ts:97-102`).
-- Un usuario sin rol que llama a la API recibe 403; la interfaz no le muestra la pantalla (`frontend/src/router.tsx:79-86`).
+- Un usuario sin rol que llama a la API recibe 403; la interfaz no le muestra la pantalla (`frontend/src/router.tsx:81-88`).
 
 ### Limitaciones conocidas
 

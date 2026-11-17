@@ -25,7 +25,7 @@ Los diagramas describen el sistema tal como está implementado. Reemplazan a los
 
 | Actor | Quién es en el sistema | Fuente |
 |---|---|---|
-| Visitante anónimo | Persona sin sesión. Se registra, inicia sesión y recupera su cuenta. La API le permite leer reportes, flyers y comercios, pero la interfaz exige iniciar sesión ([#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187)) | `backend/src/routes/reports.routes.ts:19`, `:22`, `:40`; `backend/src/routes/businesses.routes.ts:15-16` |
+| Visitante anónimo | Persona sin sesión. Se registra, inicia sesión y recupera su cuenta. Además ve el feed, el detalle de los reportes, el flyer y los comercios ([#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187)) | `backend/src/routes/reports.routes.ts:19`, `:22`, `:40`; `backend/src/routes/businesses.routes.ts:15-16`; `frontend/src/router.tsx:54-59` |
 | Usuario registrado | Cuenta con rol `usuario_regular` y el email todavía sin verificar. Consulta, denuncia, registra un comercio y recibe notificaciones | `backend/prisma/schema.prisma:18-24`, `:32` |
 | Usuario verificado | Especializa al usuario registrado: además publica reportes, sube imágenes, chatea y activa el 2FA | `backend/src/middlewares/auth.middleware.ts:110`; `backend/src/routes/reports.routes.ts:21`; `backend/src/routes/chats.routes.ts:8`, `:10`; `backend/src/routes/auth.routes.ts:35-36` |
 | Dueño | Actor conceptual que especializa al usuario verificado: perdió su mascota y publica un reporte de pérdida. En el sistema es la misma cuenta | `backend/src/validators/reports.validator.ts:12` |
@@ -64,7 +64,7 @@ flowchart LR
   CF[["Cloudflare R2"]]
   SMTP[["Servidor SMTP"]]
   OSM[["OpenStreetMap y Nominatim"]]
-  N1>"La API permite leer reportes, flyers y comercios sin sesión; la interfaz exige iniciar sesión, issue 187"]
+  N1>"Sin sesión ve el feed, el detalle de los reportes, el flyer y los comercios, issue 187"]
   VIS --- S1
   VIS -.- N1
   REG --- S2
