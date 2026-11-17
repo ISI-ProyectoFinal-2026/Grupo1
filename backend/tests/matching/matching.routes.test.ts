@@ -66,6 +66,7 @@ describe("confirmar y descartar coincidencias (#181)", () => {
   });
 
   afterEach(async () => {
+    await prisma.notification.deleteMany({ where: { userId: { in: [lostOwnerId, foundOwnerId, strangerId] } } });
     const ids = allReportIds();
     await prisma.reportMatch.deleteMany({
       where: { OR: [{ reportLostId: { in: ids } }, { reportFoundId: { in: ids } }] },
@@ -195,7 +196,60 @@ describe("confirmar y descartar coincidencias (#181)", () => {
     expect(stored.status).toBe(winner.body.status);
   });
 
+  describe("aviso a la otra parte al confirmar (#221)", () => {
+    const notificationsOf = (token: string) =>
+      request(app).get("/api/notifications").set("Authorization", `Bearer ${token}`);
+
+    test("confirmar deja una notificación match_confirmed al dueño del otro reporte, apuntando al reporte de quien confirmó", async () => {
+      await decide(lostReportId, matchId, "confirm", lostOwnerToken);
+
+      const res = await notificationsOf(foundOwnerToken);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([
+        expect.objectContaining({ userId: foundOwnerId, type: "match_confirmed", reportId: lostReportId, isRead: false }),
+      ]);
+    });
+
+    test("quien confirma no recibe notificación", async () => {
+      await decide(lostReportId, matchId, "confirm", lostOwnerToken);
+
+      const res = await notificationsOf(lostOwnerToken);
+      expect(res.body).toEqual([]);
+    });
+
+    test("descartar no genera notificaciones", async () => {
+      await decide(lostReportId, matchId, "reject", lostOwnerToken);
+
+      expect((await notificationsOf(foundOwnerToken)).body).toEqual([]);
+      expect((await notificationsOf(lostOwnerToken)).body).toEqual([]);
+    });
+
+    test("una confirmación rechazada (403 o 409) no genera notificaciones", async () => {
+      expect((await decide(lostReportId, matchId, "confirm", strangerToken)).status).toBe(403);
+      await decide(lostReportId, matchId, "confirm", lostOwnerToken);
+      expect((await decide(foundReportId, matchId, "confirm", foundOwnerToken)).status).toBe(409);
+
+      const res = await notificationsOf(foundOwnerToken);
+      expect(res.body).toHaveLength(1);
+      expect((await notificationsOf(lostOwnerToken)).body).toEqual([]);
+    });
+  });
+
   describe("GET /api/reports/:id/matches", () => {
+    test.each(["rejected", "hidden"] as const)("omite las coincidencias con un reporte %s (#221)", async (status) => {
+      await prisma.report.update({ where: { id: foundReportId }, data: { status } });
+      try {
+        const res = await request(app)
+          .get(`/api/reports/${lostReportId}/matches`)
+          .set("Authorization", `Bearer ${lostOwnerToken}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual([]);
+      } finally {
+        await prisma.report.update({ where: { id: foundReportId }, data: { status: "published" } });
+      }
+    });
+
     test("incluye matchId en cada coincidencia", async () => {
       const res = await request(app)
         .get(`/api/reports/${lostReportId}/matches`)

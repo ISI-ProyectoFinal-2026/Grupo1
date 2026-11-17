@@ -351,6 +351,7 @@ export async function listMatches(reportId: number): Promise<MatchDTO[]> {
       ON other.id = CASE WHEN rm.report_lost_id = ${reportId} THEN rm.report_found_id ELSE rm.report_lost_id END
     WHERE (rm.report_lost_id = ${reportId} OR rm.report_found_id = ${reportId})
       AND rm.status <> 'rejected'::match_status
+      AND other.status IN ('published'::report_status, 'resolved'::report_status)
       AND ${visibleAuthorSql(Prisma.sql`other.user_id`)}
       AND EXISTS (SELECT 1 FROM reports src WHERE src.id = ${reportId} AND ${visibleAuthorSql(Prisma.sql`src.user_id`)})
     ORDER BY rm.similarity_score DESC
@@ -401,7 +402,27 @@ async function decideMatch(
     );
   }
 
+  if (decision === "confirmed") {
+    await notifyOtherParty(match, reportId, userId);
+  }
+
   return { matchId, status: decision, confirmedAt };
+}
+
+// avisa al autor del otro reporte; un fallo no deshace la decisión
+async function notifyOtherParty(
+  match: { reportLostId: number; reportFoundId: number },
+  reportId: number,
+  deciderId: number
+): Promise<void> {
+  const otherReportId = match.reportLostId === reportId ? match.reportFoundId : match.reportLostId;
+  try {
+    const other = await prisma.report.findUnique({ where: { id: otherReportId }, select: { userId: true } });
+    if (!other || other.userId === deciderId) return;
+    await notificationsService.notifyMatchConfirmed({ recipientId: other.userId, reportId });
+  } catch (error) {
+    console.error(`[matching] no se pudo avisar la confirmación del match del report ${reportId}:`, error);
+  }
 }
 
 export function confirmMatch(reportId: number, matchId: number, userId: number): Promise<MatchDecisionDTO> {

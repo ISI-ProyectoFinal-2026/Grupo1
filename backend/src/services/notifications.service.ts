@@ -143,6 +143,30 @@ export async function notifyMatch(data: NotifyMatchInput): Promise<Notification[
   });
 }
 
+interface NotifyMatchConfirmedInput {
+  recipientId: number;
+  reportId: number; // reporte de quien confirmó, el que ve el destinatario
+}
+
+// aviso a la otra parte cuando se confirma una coincidencia (#221)
+export async function notifyMatchConfirmed(data: NotifyMatchConfirmedInput): Promise<Notification | null> {
+  if (await isAuthorSuspended(data.recipientId)) {
+    return null;
+  }
+  if (!(await isNotificationEnabled(data.recipientId, "notifyMatch"))) {
+    return null;
+  }
+  return prisma.notification.create({
+    data: {
+      userId: data.recipientId,
+      type: "match_confirmed",
+      title: "Confirmaron una coincidencia con tu reporte",
+      message: "El dueño de otra publicación confirmó que coincide con la tuya. Revisá los detalles y contactalo.",
+      reportId: data.reportId,
+    },
+  });
+}
+
 export type ModerationVerdict = "published" | "rejected";
 
 // avisos por denuncias (#218): auto_hidden (umbral), hidden_by_flag (moderador oculta), restored, hide_confirmed

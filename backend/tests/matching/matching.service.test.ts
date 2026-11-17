@@ -1,4 +1,10 @@
-import { triggerEmbeddingGeneration, listMatches, reconcilePendingReports } from "../../src/services/matching.service";
+import {
+  triggerEmbeddingGeneration,
+  listMatches,
+  reconcilePendingReports,
+  confirmMatch,
+  rejectMatch,
+} from "../../src/services/matching.service";
 import * as notificationsService from "../../src/services/notifications.service";
 import { prisma } from "../../src/db/client";
 
@@ -409,6 +415,98 @@ describe("matching.service listMatches", () => {
 
     await prisma.report.delete({ where: { id: otherReport.id } });
   });
+});
+
+describe("matching.service confirmMatch y listMatches con estado del otro reporte (#221)", () => {
+  let ownerAId: number;
+  let ownerBId: number;
+  let lostId: number;
+  let foundId: number;
+  let matchId: number;
+
+  beforeEach(async () => {
+    const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    ownerAId = (await prisma.user.create({ data: { email: `m221-a-${stamp}@example.com`, passwordHash: "h" } })).id;
+    ownerBId = (await prisma.user.create({ data: { email: `m221-b-${stamp}@example.com`, passwordHash: "h" } })).id;
+    lostId = (
+      await prisma.report.create({
+        data: { userId: ownerAId, reportType: "lost", status: "published", title: "Perdido 221" },
+      })
+    ).id;
+    foundId = (
+      await prisma.report.create({
+        data: { userId: ownerBId, reportType: "found", status: "published", title: "Encontrado 221" },
+      })
+    ).id;
+    matchId = (
+      await prisma.reportMatch.create({
+        data: { reportLostId: lostId, reportFoundId: foundId, similarityScore: 0.8, status: "pending" },
+      })
+    ).id;
+  });
+
+  afterEach(async () => {
+    await prisma.notification.deleteMany({ where: { userId: { in: [ownerAId, ownerBId] } } });
+    await prisma.notificationPreference.deleteMany({ where: { userId: { in: [ownerAId, ownerBId] } } });
+    await prisma.reportMatch.deleteMany({ where: { id: matchId } });
+    await prisma.report.deleteMany({ where: { id: { in: [lostId, foundId] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [ownerAId, ownerBId] } } });
+  });
+
+  test("confirmMatch() notifica al autor del otro reporte, apuntando al reporte de quien confirmó", async () => {
+    await confirmMatch(lostId, matchId, ownerAId);
+
+    const notifications = await prisma.notification.findMany({ where: { userId: ownerBId } });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({ type: "match_confirmed", reportId: lostId, isRead: false });
+  });
+
+  test("confirmMatch() no notifica a quien confirma", async () => {
+    await confirmMatch(lostId, matchId, ownerAId);
+
+    expect(await prisma.notification.count({ where: { userId: ownerAId } })).toBe(0);
+  });
+
+  test("confirmMatch() respeta la preferencia notifyMatch desactivada de la otra parte", async () => {
+    await prisma.notificationPreference.create({ data: { userId: ownerBId, notifyMatch: false } });
+
+    await confirmMatch(lostId, matchId, ownerAId);
+
+    expect(await prisma.notification.count({ where: { userId: ownerBId } })).toBe(0);
+  });
+
+  test("rejectMatch() no genera notificaciones", async () => {
+    await rejectMatch(lostId, matchId, ownerAId);
+
+    expect(await prisma.notification.count({ where: { userId: { in: [ownerAId, ownerBId] } } })).toBe(0);
+  });
+
+  test("una decisión repetida (409) no duplica la notificación", async () => {
+    await confirmMatch(lostId, matchId, ownerAId);
+    await expect(confirmMatch(lostId, matchId, ownerAId)).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(await prisma.notification.count({ where: { userId: ownerBId } })).toBe(1);
+  });
+
+  test.each(["rejected", "hidden", "pending"] as const)(
+    "listMatches() no muestra coincidencias con un reporte en estado %s",
+    async (status) => {
+      await prisma.report.update({ where: { id: foundId }, data: { status } });
+
+      expect(await listMatches(lostId)).toEqual([]);
+    }
+  );
+
+  test.each(["published", "resolved"] as const)(
+    "listMatches() muestra coincidencias con un reporte en estado %s",
+    async (status) => {
+      await prisma.report.update({ where: { id: foundId }, data: { status } });
+
+      const matches = await listMatches(lostId);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].reportId).toBe(foundId);
+    }
+  );
 });
 
 describe("matching.service reconcilePendingReports", () => {
