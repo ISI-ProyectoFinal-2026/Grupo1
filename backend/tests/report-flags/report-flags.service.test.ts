@@ -376,6 +376,38 @@ describe("report-flags.service", () => {
       expect(titles).toContain("Tu reporte volvió a estar visible");
     });
 
+    test("restore reinicia la actividad y los avisos de inactividad y marca leído el aviso", async () => {
+      const old = new Date("2026-01-01T00:00:00Z");
+      await prisma.report.update({
+        where: { id: reportId },
+        data: { lastActivityAt: old, inactivityWarned30At: old, inactivityWarned37At: old },
+      });
+      await prisma.notification.create({ data: { userId, type: "inactivity_warning", reportId } });
+      await flagAll([reporterId, secondReporterId]);
+      await reportFlagsService.moderate(reportId, "hide");
+
+      await reportFlagsService.moderate(reportId, "restore");
+
+      const report = await reportState();
+      expect(report.lastActivityAt.getTime()).toBeGreaterThan(old.getTime());
+      expect(report.inactivityWarned30At).toBeNull();
+      expect(report.inactivityWarned37At).toBeNull();
+      const warning = await prisma.notification.findFirstOrThrow({ where: { reportId, type: "inactivity_warning" } });
+      expect(warning.isRead).toBe(true);
+    });
+
+    test("dismiss no toca la actividad del reporte", async () => {
+      const old = new Date("2026-01-01T00:00:00Z");
+      await prisma.report.update({ where: { id: reportId }, data: { lastActivityAt: old, inactivityWarned30At: old } });
+      await flagAll([reporterId, secondReporterId]);
+
+      await reportFlagsService.moderate(reportId, "dismiss");
+
+      const report = await reportState();
+      expect(report.lastActivityAt).toEqual(old);
+      expect(report.inactivityWarned30At).toEqual(old);
+    });
+
     test("restore funciona sobre un reporte ocultado por umbral", async () => {
       process.env.REPORT_FLAG_THRESHOLD = "2";
       await flagAll([reporterId, secondReporterId]);

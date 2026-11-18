@@ -5,6 +5,7 @@ import * as reportsService from "../../src/services/reports.service";
 import * as matchingService from "../../src/services/matching.service";
 import * as chatsService from "../../src/services/chats.service";
 import * as notificationsService from "../../src/services/notifications.service";
+import { runInactivitySweep } from "../../src/services/report-inactivity.service";
 import { createTestUser } from "../helpers/users";
 
 const OLD = new Date("2026-01-01T00:00:00.000Z");
@@ -131,6 +132,41 @@ describe("actividad y cierre por inactividad (#264)", () => {
       await chatsService.createMessage(chat.id, ownerId, { content: "hola" });
 
       expect((await readByType(id)).inactivity_warning).toBe(true);
+    });
+  });
+
+  describe("autor suspendido", () => {
+    test("no se avisa ni se cierra mientras dura la suspensión y se procesa después", async () => {
+      const { user } = await createTestUser({ prefix: "inact-susp" });
+      try {
+        const id = await createReport(user.id);
+        const sanction = await prisma.accountSanction.create({
+          data: {
+            userId: user.id,
+            severity: "mild",
+            kind: "temporary",
+            status: "active",
+            reason: "fixed",
+            triggeringReportIds: [],
+            startsAt: new Date(Date.now() - 1000),
+            endsAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
+
+        const during = await runInactivitySweep(new Date());
+        expect(during.closed).toBe(0);
+        expect(await activity(id)).toMatchObject({ status: "published", lastActivityAt: OLD, closedReason: null });
+
+        await prisma.accountSanction.update({ where: { id: sanction.id }, data: { status: "expired" } });
+
+        await runInactivitySweep(new Date());
+        expect(await activity(id)).toMatchObject({ status: "resolved", closedReason: "inactivity" });
+      } finally {
+        await prisma.notification.deleteMany({ where: { userId: user.id } });
+        await prisma.report.deleteMany({ where: { userId: user.id } });
+        await prisma.accountSanction.deleteMany({ where: { userId: user.id } });
+        await prisma.user.delete({ where: { id: user.id } });
+      }
     });
   });
 

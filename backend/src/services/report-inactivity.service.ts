@@ -1,5 +1,6 @@
 import { prisma } from "../db/client";
 import * as notificationsService from "./notifications.service";
+import { visibleUserWhere } from "./account-sanctions/visibility";
 
 export const INACTIVITY_WARNING_1_DAYS = 30;
 export const INACTIVITY_WARNING_2_DAYS = 37;
@@ -67,7 +68,10 @@ async function claimAndNotify(
 ): Promise<number> {
   let claimed = 0;
   for (const id of ids) {
-    const { count } = await prisma.report.updateMany({ where: { id, status: "published", ...where }, data });
+    const { count } = await prisma.report.updateMany({
+      where: { id, status: "published", user: visibleUserWhere(), ...where },
+      data,
+    });
     if (count !== 1) continue;
     claimed++;
     try {
@@ -80,7 +84,10 @@ async function claimAndNotify(
 }
 
 async function findIds(where: Record<string, unknown>): Promise<number[]> {
-  const rows = await prisma.report.findMany({ where: { status: "published", ...where }, select: { id: true } });
+  const rows = await prisma.report.findMany({
+    where: { status: "published", user: visibleUserWhere(), ...where },
+    select: { id: true },
+  });
   return rows.map((row) => row.id);
 }
 

@@ -137,6 +137,20 @@ describe("report-inactivity.service", () => {
     expect(warnedBeforeGrace.getTime() <= limit.getTime()).toBe(true);
   });
 
+  test("excluye autores con suspensión vigente en la búsqueda y en el reclamo condicional", async () => {
+    ids = { close: [1], warn2: [2], warn1: [3] };
+
+    await runInactivitySweep(NOW);
+
+    for (const [args] of findManySpy.mock.calls) {
+      expect(args.where.user).toEqual({ accountSanctions: { none: expect.anything() } });
+    }
+    expect(updateManySpy.mock.calls.length).toBe(3);
+    for (const [args] of updateManySpy.mock.calls) {
+      expect(args.where.user).toEqual({ accountSanctions: { none: expect.anything() } });
+    }
+  });
+
   test("el cierre por inactividad marca como leídos los avisos del reporte", async () => {
     ids.close = [13];
 

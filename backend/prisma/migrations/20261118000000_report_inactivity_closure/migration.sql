@@ -7,8 +7,7 @@ ADD COLUMN "inactivity_warned_37_at" TIMESTAMP(3),
 ADD COLUMN "closed_reason" "report_closed_reason",
 ADD COLUMN "closed_at" TIMESTAMP(3);
 
--- Reportes existentes: la actividad parte de la publicación (o la creación)
-UPDATE "reports" SET "last_activity_at" = COALESCE("published_at", "created_at");
+-- Reportes existentes: la actividad parte de la fecha de la migración
 
 CREATE INDEX "reports_status_last_activity_at_idx" ON "reports"("status", "last_activity_at");
 
