@@ -100,25 +100,15 @@ describe("E2E: errores del ciclo de vida de un reporte (B6)", () => {
     });
   });
 
-  describe("endpoint interno de notificación de match", () => {
-    const payload = () => ({ lostReportId, foundReportId, similarityScore: 0.88 });
-
-    test("sin X-Internal-Key responde 401", async () => {
-      const res = await request(app).post("/api/notifications/internal/match").send(payload());
-
-      expect(res.status).toBe(401);
-    });
-
-    test("con una X-Internal-Key incorrecta responde 401", async () => {
+  // #307: el match se notifica dentro del backend, ya no hay endpoint interno
+  describe("endpoint interno de notificación de match (eliminado)", () => {
+    test("responde 404 aun con la X-Internal-Key correcta y no genera notificaciones", async () => {
       const res = await request(app)
         .post("/api/notifications/internal/match")
-        .set("X-Internal-Key", "clave-equivocada")
-        .send(payload());
+        .set("X-Internal-Key", INTERNAL_API_KEY)
+        .send({ lostReportId, foundReportId, similarityScore: 0.88 });
 
-      expect(res.status).toBe(401);
-    });
-
-    test("ninguno de los intentos rechazados generó notificaciones", async () => {
+      expect(res.status).toBe(404);
       expect(await prisma.notification.count({ where: { type: "match_suggested", userId: owner.id } })).toBe(0);
     });
   });

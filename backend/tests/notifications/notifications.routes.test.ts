@@ -2,6 +2,7 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
+import * as notificationsService from "../../src/services/notifications.service";
 
 describe("/api/notifications", () => {
   let userId: number;
@@ -160,51 +161,29 @@ describe("/api/notifications", () => {
     expect(deleted).toBeNull();
   });
 
-  describe("POST /api/notifications/internal/match", () => {
-    const originalKey = process.env.INTERNAL_API_KEY;
+  // #307: el match se notifica dentro del backend, ya no hay endpoint interno
+  test("POST /api/notifications/internal/match ya no existe (404)", async () => {
+    const res = await request(app)
+      .post("/api/notifications/internal/match")
+      .set("X-Internal-Key", process.env.INTERNAL_API_KEY ?? "")
+      .send({ lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 });
 
-    beforeAll(() => {
-      process.env.INTERNAL_API_KEY = "test-internal-key";
-    });
+    expect(res.status).toBe(404);
+  });
 
-    afterAll(() => {
-      if (originalKey === undefined) {
-        delete process.env.INTERNAL_API_KEY;
-      } else {
-        process.env.INTERNAL_API_KEY = originalKey;
-      }
-    });
-
+  describe("notificationsService.notifyMatch", () => {
     afterEach(async () => {
-      await prisma.notification.deleteMany({ where: { type: "match_suggested" } });
+      await prisma.notification.deleteMany({ where: { type: "match_suggested", userId: { in: [userId, otherUserId] } } });
     });
 
-    test("responde 401 si falta el header X-Internal-Key", async () => {
-      const res = await request(app)
-        .post("/api/notifications/internal/match")
-        .send({ lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 });
+    test("crea una notificación para cada dueño de los reportes", async () => {
+      const created = await notificationsService.notifyMatch({
+        lostReportId: reportId,
+        foundReportId: otherReportId,
+        similarityScore: 0.83,
+      });
 
-      expect(res.status).toBe(401);
-    });
-
-    test("responde 401 si el header X-Internal-Key es incorrecto", async () => {
-      const res = await request(app)
-        .post("/api/notifications/internal/match")
-        .set("X-Internal-Key", "clave-incorrecta")
-        .send({ lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 });
-
-      expect(res.status).toBe(401);
-    });
-
-    test("crea una notificación para cada dueño de los reportes con la clave correcta", async () => {
-      const res = await request(app)
-        .post("/api/notifications/internal/match")
-        .set("X-Internal-Key", "test-internal-key")
-        .send({ lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 });
-
-      expect(res.status).toBe(201);
-      expect(res.body).toHaveLength(2);
-
+      expect(created).toHaveLength(2);
       const notifications = await prisma.notification.findMany({
         where: { type: "match_suggested", userId: { in: [userId, otherUserId] } },
       });
@@ -217,34 +196,15 @@ describe("/api/notifications", () => {
     });
 
     test("no duplica notificaciones al llamarse dos veces para el mismo par de reportes", async () => {
-      const body = { lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 };
+      const data = { lostReportId: reportId, foundReportId: otherReportId, similarityScore: 0.83 };
 
-      const first = await request(app)
-        .post("/api/notifications/internal/match")
-        .set("X-Internal-Key", "test-internal-key")
-        .send(body);
-      expect(first.status).toBe(201);
-      expect(first.body).toHaveLength(2);
-
-      const second = await request(app)
-        .post("/api/notifications/internal/match")
-        .set("X-Internal-Key", "test-internal-key")
-        .send(body);
-      expect(second.status).toBe(201);
+      await expect(notificationsService.notifyMatch(data)).resolves.toHaveLength(2);
+      await notificationsService.notifyMatch(data);
 
       const notifications = await prisma.notification.findMany({
         where: { type: "match_suggested", userId: { in: [userId, otherUserId] } },
       });
       expect(notifications).toHaveLength(2);
-    });
-
-    test("responde 400 si el body es inválido", async () => {
-      const res = await request(app)
-        .post("/api/notifications/internal/match")
-        .set("X-Internal-Key", "test-internal-key")
-        .send({ lostReportId: reportId });
-
-      expect(res.status).toBe(400);
     });
   });
 });
