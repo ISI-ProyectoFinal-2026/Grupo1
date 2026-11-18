@@ -98,7 +98,7 @@ npm run dev   # http://localhost:5173
 | `GET :3001/health` | El backend responde; `ai` informa si `AI_SERVICE_URL` está configurada |
 | `GET :3001/health/db` | La base de datos responde |
 | `GET :3001/health/ai` | El Backend IA responde |
-| `GET :8000/health/db` | El Backend IA llega a la base y pgvector está activo |
+| `GET :8000/health` | El Backend IA responde (no usa base de datos) |
 
 ---
 

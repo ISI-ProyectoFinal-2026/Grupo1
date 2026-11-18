@@ -38,7 +38,7 @@ La lógica se prueba a nivel de servicio en `backend/tests/` (por ejemplo [`matc
 
 - **Backend contra base real.** El job construye la imagen de PostgreSQL del proyecto, aplica las migraciones y ejecuta Jest. Las pruebas de extremo a extremo del backend están en [`backend/tests/e2e/`](../../backend/tests/e2e): ciclo de vida del reporte, moderación por IA, moderación de denuncias y errores del ciclo de vida.
 - **Interfaz.** [`frontend/e2e/`](../../frontend/e2e) contiene 8 especificaciones (F1 a F8): registro, login y creación de reporte; coincidencia y notificación; denuncia y moderación; cierre de reporte; errores; verificación de email; recuperación de contraseña; segundo factor. La corrida registra 18 pruebas aprobadas en 33,9 s. Esta suite usa un stub del servicio de IA, por lo que el Backend IA real no participa ([`ci.yml`](../../.github/workflows/ci.yml)).
-- **Backend IA contra base real.** El job levanta PostgreSQL y aplica las migraciones de Prisma antes de ejecutar pytest.
+- **Backend IA sin base.** El job ejecuta pytest sin PostgreSQL: el servicio no accede a la base ([ADR-0029](../adr/0029-backend-unico-acceso-base-de-datos.md)). La persistencia de embeddings y el matching se prueban en el backend contra la base real ([`report-matching.service.test.ts`](../../backend/tests/matching/report-matching.service.test.ts)).
 
 ## 1.3.3.5 Pruebas de carga
 

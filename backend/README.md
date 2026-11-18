@@ -60,10 +60,7 @@ Restablecer la contraseña por email no toca el 2FA ni un reinicio pendiente.
 
 Es la clave que usan el Backend Principal y el Backend IA para reconocerse entre sí en las llamadas server-to-server, donde no hay usuario logueado ni JWT. **Tiene que tener el mismo valor en los dos servicios.**
 
-Se usa en las dos direcciones, y las dos fallan cerrado si falta:
-
-- **Node → Backend IA** (`POST /reports/{id}/embedding`): se manda en el header `X-Internal-Key`. Si no coincide, el Backend IA responde `401` y el reporte con imagen **se queda en `pending`** — el log lo dice explícitamente para que no se confunda con una caída del servicio.
-- **Backend IA → Node** (`POST /api/notifications/internal/match`): lo valida `requireInternalKey`. Si falta, el match se guarda igual pero nadie recibe la notificación.
+Se usa en una sola dirección, **Node → Backend IA** (`POST /images/analyze` y `POST /images/embedding`): se manda en el header `X-Internal-Key` y el Backend IA falla cerrado si falta. Si no coincide, el Backend IA responde `401` y el reporte con imagen **se queda en `pending`** — el log lo dice explícitamente para que no se confunda con una caída del servicio. El Backend IA no llama de vuelta a este backend (ADR-0029).
 
 Detalle completo en `../docker/ENV_VARS.md` y en `../backend-ia/README.md`.
 
@@ -113,11 +110,31 @@ Este comando necesita una terminal interactiva real. Si se corre desde un entorn
 
 Ver `prisma/schema.prisma`. Mapea 1:1 el esquema documentado en `../docs/ARQUITECTURA.md` (sección 5): `users`, `pets`, `reports`, `report_embeddings`, `report_matches`, `chats`, `messages`, `notifications`.
 
-**Prisma es la única fuente de migraciones** para toda la base de datos, incluidas las tablas que también usa el Backend IA (`reports`, `report_embeddings`, `report_matches`). El Backend IA solo lee/escribe sobre esas tablas vía SQLAlchemy, sin generar sus propias migraciones (ver `../backend-ia/README.md`).
+**Prisma es la única fuente de migraciones** y este backend es el único servicio que accede a la base (ADR-0029): el Backend IA no tiene conexión ni credenciales. `report_embeddings` usa `vector(768)`, que Prisma no modela, así que se lee y escribe con SQL crudo (`src/services/report-matching.service.ts`).
 
 ## Matching por similitud (issue #18)
 
-`src/services/matching.service.ts` dispara (fire-and-forget) la generación de embedding en Backend IA al crear un reporte (la foto es obligatoria), y expone `GET /api/reports/:id/matches` para listar los candidatos que Backend IA ya calculó y guardó en `report_matches`. El cálculo de embeddings/similitud en sí vive en `../backend-ia` (ver su README).
+`src/services/matching.service.ts` pide (fire-and-forget) el embedding de la foto al Backend IA (`POST /images/embedding`) al crear un reporte (la foto es obligatoria) y resuelve la moderación:
+
+- con mascota: guarda el embedding en `report_embeddings` (solo si el reporte sigue mostrando esa foto), busca matches (best-effort: si falla se loguea y no frena la publicación) y publica el reporte;
+- sin mascota (`has_animal: false`): rechaza el reporte;
+- `422` (imagen no disponible), `401`, otro status, cuerpo inválido o falla de red: inconcluso, el reporte queda `pending`. Ante falla de red o `5xx` reintenta tras 1 s, 5 s y 30 s (4 intentos en total).
+
+La búsqueda (`src/services/report-matching.service.ts`) toma candidatos publicados de tipo opuesto (lost↔found), dentro de un radio y una ventana de tiempo, de autores sin suspensión vigente, ordenados por similitud coseno (top K); guarda en `report_matches` los que superan `MATCH_THRESHOLD` (sin pisar un match ya confirmado o rechazado) y notifica a los dueños de los que además superan `NOTIFY_THRESHOLD` (un fallo al notificar se loguea y no corta el matching). `GET /api/reports/:id/matches` lista esos candidatos.
+
+Los parámetros se leen de variables de entorno en cada búsqueda (`src/config/matching.ts`, ADR-0014); un valor ausente o inválido usa el default:
+
+| Variable | Valor por defecto | Significado |
+| --- | --- | --- |
+| `MATCH_THRESHOLD` | `0.45` | similitud mínima para guardar un match (entre 0 y 1) |
+| `NOTIFY_THRESHOLD` | `0.63` | similitud mínima para notificar (entre 0 y 1) |
+| `MATCH_RADIUS_METERS` | `5000` | radio de búsqueda |
+| `MATCH_WINDOW_DAYS` | `90` | antigüedad máxima de los candidatos |
+| `MATCH_TOP_K` | `5` | cantidad de candidatos evaluados |
+
+La similitud se calcula con `1 - (a <=> b)`: **`<=>` es distancia coseno**, y es el único operador que puede usar el índice HNSW (creado con `vector_cosine_ops`). No cambiarlo por `<->` (distancia L2): aun con embeddings normalizados `1 - L2` no es la similitud coseno y el umbral deja de tener sentido. `ST_DWithin` mide en metros porque ambos operandos se castean a `geography`.
+
+Con `LIMIT 5` los matches visibles dependen del orden de carga: un reporte con más de 5 candidatos sobre el umbral solo guarda los 5 mejores; el resto aparece cuando se recalcula desde el otro lado (por ejemplo con `npm run reembed:reports`, que regenera todos los embeddings y después recalcula los matches; ver `../backend-ia/README.md`, "Cambiar de modelo de embeddings").
 
 ### Reportes atascados en `pending`
 

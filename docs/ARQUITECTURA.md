@@ -98,9 +98,9 @@ Plataforma web para reportar y buscar mascotas perdidas/encontradas con **matchi
 - **FastAPI** 0.115 - Framework web
 - **DINOv2 ViT-B/14** (`timm` 1.0.28, `torch` 2.13) - Embeddings de imágenes ([ADR-0021](adr/0021-modelo-embeddings-dinov2.md))
 - **YOLOv8n** (`ultralytics` 8.3.28) - Detección de mascotas
-- **pgvector** (`pgvector` 0.3.4 para SQLAlchemy) - Búsqueda vectorial
 - **Pillow** 10.4 / **NumPy** 2.1 - Procesamiento de imágenes y nitidez ([ADR-0023](adr/0023-aviso-calidad-imagen.md))
 - **Pydantic** 2.9 - Validación de datos
+- Sin base de datos: servicio de inferencia sin estado ([ADR-0029](adr/0029-backend-unico-acceso-base-de-datos.md))
 
 ### Base de Datos
 > Según `docker/postgres/Dockerfile`.
@@ -164,10 +164,11 @@ Usuario                 Frontend                 Backend Ppal          R2       
 > objetivo. Lo implementado hasta ahora (sin cola todavía) es una versión
 > simplificada: el Backend Ppal llama a Backend IA de forma síncrona
 > *fire-and-forget* (sin esperar la respuesta, sin bloquear al usuario) al
-> crear el reporte, y **Backend IA escribe el embedding y los matches
-> directo en Postgres** (no hay callback HTTP de vuelta a Backend Ppal). La
-> cola Redis y el callback `POST /api/internal/...` quedan como trabajo
-> futuro — ver detalle real en 4.2/4.3 y en `backend-ia/README.md`.
+> crear el reporte; Backend IA solo devuelve el embedding y **Backend Ppal
+> guarda el embedding y los matches en Postgres**, único servicio con acceso
+> a la base ([ADR-0029](adr/0029-backend-unico-acceso-base-de-datos.md)). La
+> cola Redis queda como trabajo futuro — ver detalle real en 4.2/4.3 y en
+> `backend/README.md`.
 
 ### 4.2 Procesamiento de IA
 
@@ -175,16 +176,18 @@ Usuario                 Frontend                 Backend Ppal          R2       
 Objetivo (con cola, futuro): Backend IA desencola un job de Redis con
 { report_id, image_url } y procesa async.
 
-Implementado hoy (issue #18, sin cola): Backend Ppal llama fire-and-forget
-POST {AI_SERVICE_URL}/reports/{report_id}/embedding con { "image_url": ... }
-apenas crea el reporte (la foto es obligatoria). Backend IA responde
+Implementado hoy (issue #18, sin cola; ADR-0029): Backend Ppal llama
+fire-and-forget POST {AI_SERVICE_URL}/images/embedding con
+{ "image_url": ... } apenas crea el reporte (la foto es obligatoria).
+Backend IA es un servicio de inferencia sin base de datos y responde
 sincrónicamente dentro de esa misma request:
 
 1. Descargar imagen desde la URL recibida (R2 en producción)
+   si no se puede descargar o decodificar: return 422
 
 2. Ejecutar YOLOv8 (yolov8n.pt)
    if not is_pet(image):
-     return 422  # sin más efecto, no se guarda nada
+     return 200 { "has_animal": false, "embedding": null }
 
 3. Ejecutar DINOv2 ViT-B/14 (vit_base_patch14_dinov2.lvd142m vía timm,
    entrada 224 px) sobre el recorte de YOLO rellenado a cuadrado
@@ -193,10 +196,16 @@ sincrónicamente dentro de esa misma request:
    backend-ia/app/ml/pipeline.py; migración
    20261014000000_dinov2_embedding_dimension)
 
-4. Backend IA guarda directo en Postgres (sin callback a Backend Ppal):
-   - UPSERT embedding en report_embeddings
-   - Busca coincidencias (pgvector, ver 4.3) y las guarda en report_matches
-   - responde 201 a Backend Ppal (que no espera ni usa el body)
+4. return 200 { "has_animal": true, "embedding": [768 floats] }
+
+5. Backend Ppal (backend/src/services/matching.service.ts,
+   triggerEmbeddingGeneration) resuelve con el único acceso a Postgres:
+   - con mascota: UPSERT del embedding en report_embeddings (solo si el
+     reporte sigue mostrando esa foto), busca coincidencias (ver 4.3;
+     best-effort) y publica el reporte
+   - sin mascota: rechaza el reporte
+   - 422, 401, otro status o falla de red: queda pending (reintenta
+     tras 1 s, 5 s y 30 s ante red o 5xx)
 
 Pendiente: mover este paso a un worker de cola en vez de síncrono
 dentro de la request. La notificación al usuario está implementada
@@ -206,10 +215,11 @@ dentro de la request. La notificación al usuario está implementada
 ### 4.3 Matching por Similitud
 
 ```
-Implementado en backend-ia/app/services/matching_service.py, se ejecuta
-en el mismo paso 4 de arriba (no es un servicio ni un endpoint aparte):
+Implementado en backend/src/services/report-matching.service.ts
+(findAndStoreMatches), se ejecuta en el paso 5 de arriba (no es un
+servicio ni un endpoint aparte):
 
-1. Backend IA, luego de guardar el embedding nuevo, ejecuta:
+1. Backend Ppal, luego de guardar el embedding nuevo, ejecuta:
    SELECT r.id, r.report_type,
      1 - (re.embedding <=> :embedding) AS similarity
    FROM reports r
@@ -224,7 +234,7 @@ en el mismo paso 4 de arriba (no es un servicio ni un endpoint aparte):
        WHERE s.user_id = r.user_id AND s.status = 'active'
          AND (s.ends_at IS NULL OR s.ends_at > :now))
    ORDER BY re.embedding <=> :embedding ASC
-   LIMIT 5;
+   LIMIT :top_k;  -- MATCH_TOP_K (5)
 
    (`<=>` es la distancia COSENO de pgvector: `1 - (a <=> b)` es la
    similitud coseno con la que se calibro el umbral en el POC, y es el
@@ -237,14 +247,13 @@ en el mismo paso 4 de arriba (no es un servicio ni un endpoint aparte):
    `geometry(Point, 4326)` en grados, no metros — sin el cast, "5000"
    se interpreta como 5000 grados, no como 5km)
 
-2. Umbrales (backend-ia/app/services/matching_service.py, ADR-0021;
+2. Umbrales (backend/src/config/matching.ts, ADR-0014 y ADR-0021;
    provisionales, a recalibrar con matches reales):
    - similarity >= MATCH_THRESHOLD (0.45): UPSERT en report_matches
      (no pisa un match ya confirmed/rejected)
-   - similarity >= NOTIFY_THRESHOLD (0.63): además avisa al Backend
-     Principal con POST /api/notifications/internal/match
-     (X-Internal-Key), que notifica a los dueños. Best-effort: sin
-     NODE_BACKEND_URL no se notifica.
+   - similarity >= NOTIFY_THRESHOLD (0.63): además llama a
+     notificationsService.notifyMatch, que notifica a los dueños.
+     Best-effort: un fallo se loguea y no corta el matching.
 
 3. El dueño confirma o rechaza la coincidencia con
    POST /api/reports/:id/matches/:matchId/confirm | reject.
@@ -596,7 +605,6 @@ WebSocket: /ws/chat/:chat_id
 GET /api/notifications
 PUT /api/notifications/:id/read
 DELETE /api/notifications/:id
-POST /api/notifications/internal/match (interno, X-Internal-Key; lo llama el Backend IA)
 
 GET /api/notification-preferences
 PUT /api/notification-preferences
@@ -652,27 +660,17 @@ GET /health/ai   → 200 si el Backend IA responde; 503 si no responde o falta A
 
 ### Endpoints Internos (Backend Principal → Backend IA)
 
-**Implementado (issue #18)** — al revés de lo planteado originalmente:
-Backend IA no le devuelve nada a Backend Ppal, escribe directo en Postgres
-(ver 4.2/4.3). El endpoint real vive en Backend IA:
-
-```http
-POST {AI_SERVICE_URL}/reports/:report_id/embedding
-{
-  "image_url": "https://r2.../image-123.jpg"
-}
-→ 201 si detectó la mascota y guardó embedding + matches
-→ 422 si no detectó una mascota en la imagen
-```
-
-Para sugerir reportes similares durante el alta (#211), el Backend IA expone
-además un embedding efímero, sin escribir en la base:
+**Implementado (issue #18, ADR-0029)**: el Backend IA no tiene base de datos.
+Devuelve el embedding y el Backend Ppal lo guarda, busca los matches y
+notifica (ver 4.2/4.3). El mismo endpoint sirve para la moderación de cada
+reporte y para sugerir reportes similares durante el alta (#211):
 
 ```http
 POST {AI_SERVICE_URL}/images/embedding
 { "image_url": "https://r2.../image-123.jpg" }
-→ 200 { "embedding": [512 floats] }
-→ 422 si no detectó una mascota o no pudo procesar la imagen
+→ 200 { "has_animal": true, "embedding": [768 floats] }
+→ 200 { "has_animal": false, "embedding": null }   sin mascota
+→ 422 si no pudo descargar o decodificar la imagen
 ```
 
 Para el control temprano de la foto (y el aviso de calidad de ADR-0023):
@@ -687,8 +685,8 @@ POST {AI_SERVICE_URL}/images/analyze
 Todos los endpoints `POST` del Backend IA exigen la cabecera `X-Internal-Key`.
 
 `POST /api/internal/reports/:report_id/reject` (planteado originalmente
-para auditar rechazos) no está implementado — hoy un 422 no deja rastro
-más que la respuesta HTTP.
+para auditar rechazos) no está implementado: el rechazo queda en el estado
+del reporte y en la notificación al dueño.
 
 ---
 
@@ -839,6 +837,13 @@ AI_SERVICE_URL=http://ia-backend:8000
 # Clave compartida con el Backend IA (mismo valor en backend-ia/.env)
 INTERNAL_API_KEY=
 
+# Matching (backend/src/config/matching.ts, ADR-0014); inválido o vacío = default
+MATCH_THRESHOLD=0.45
+NOTIFY_THRESHOLD=0.63
+MATCH_RADIUS_METERS=5000
+MATCH_WINDOW_DAYS=90
+MATCH_TOP_K=5
+
 # Monetización (backend/src/config/plans.ts, backend/src/services/payments/index.ts)
 PREMIUM_MONTHLY_PRICE_USD=30   # default 30
 PREMIUM_ANNUAL_PRICE_USD=300   # default 300
@@ -873,15 +878,11 @@ PORT=8000
 # YOLO: yolov8n.pt (nano, se descarga solo vía ultralytics)
 # DINOv2: vit_base_patch14_dinov2.lvd142m vía timm, 224 px, 768 dims (ADR-0021)
 
-DATABASE_URL=postgresql+asyncpg://patitas:patitas@localhost:5433/patitas
+# Sin DATABASE_URL: el Backend IA no accede a la base (ADR-0029)
 
 # Autenticación de los endpoints internos (backend-ia/app/config.py)
 INTERNAL_API_KEY=                # mismo valor que en backend/.env
 ALLOW_INSECURE_INTERNAL=false    # true solo en desarrollo local
-
-# Backend Principal: destino de la notificación de matches
-# (POST /api/notifications/internal/match); vacío = no notifica
-NODE_BACKEND_URL=http://backend-principal:3001
 
 # Redis (para queue) — no implementado todavía, ver sección 7
 # REDIS_URL=redis://redis:6379

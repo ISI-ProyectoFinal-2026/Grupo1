@@ -17,7 +17,7 @@ El código fuente vive en un monorepo con cuatro paquetes ejecutables y la carpe
 |---|---|---|
 | `frontend/` | React ^19.2.8, Vite ^8.2.0, TypeScript ~6.0.2, Tailwind CSS ^3.4.19, React Router ^6.30.6; TanStack Query ^5.101.4, zustand ^5.0.15, Axios ^1.19.0; Leaflet ^1.9.4 | [ADR-0006](../adr/0006-stack-frontend.md), [ADR-0007](../adr/0007-estado-y-datos-frontend.md), [ADR-0009](../adr/0009-mapas-leaflet-osm-nominatim-postgis.md) |
 | `backend/` | Express ^5.2.1, TypeScript ^5.6.2, Zod ^4.4.3, Prisma ^5.20.0, Socket.IO ^4.8.3 | [ADR-0002](../adr/0002-express-5-typescript-zod.md), [ADR-0004](../adr/0004-prisma-5-orm.md) |
-| `backend-ia/` | FastAPI 0.115.0, SQLAlchemy 2.0.35, ultralytics 8.3.28, open_clip_torch 2.24.0, torch 2.13.0 | [ADR-0005](../adr/0005-fastapi-servicio-ia.md); ADR del pipeline de IA: Pendiente |
+| `backend-ia/` | FastAPI 0.115.0, ultralytics 8.3.28, open_clip_torch 2.24.0, torch 2.13.0 | [ADR-0005](../adr/0005-fastapi-servicio-ia.md); ADR del pipeline de IA: Pendiente |
 | `docker/` | Imagen de PostgreSQL 16 con PostGIS y pgvector | [ADR-0011](../adr/0011-imagen-docker-postgres.md) |
 
 Fuente: `frontend/package.json`, `backend/package.json`, `backend-ia/requirements.txt`.
@@ -26,7 +26,7 @@ Fuente: `frontend/package.json`, `backend/package.json`, `backend-ia/requirement
 
 - `backend/src/`: `routes`, `controllers`, `services`, `validators`, `middlewares`, `sockets`, `config`, `db`, `errors`, `constants` y `utils`. La estructura en capas la define el equipo ([ADR-0002](../adr/0002-express-5-typescript-zod.md)).
 - `frontend/src/`: `pages`, `components`, `layouts`, `hooks`, `services`, `stores`, `lib`, `types`, `utils` y `workflows`.
-- `backend-ia/app/`: `main.py`, `config.py`, `db.py`, `models.py`, `ml/` (pipeline de visión) y `services/` (embeddings, análisis de imagen y matching).
+- `backend-ia/app/`: `main.py`, `config.py`, `ml/` (pipeline de visión) y `services/` (análisis de imagen y embeddings, sin acceso a la base).
 
 ### Proceso de desarrollo
 
