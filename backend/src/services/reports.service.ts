@@ -4,6 +4,7 @@ import { AppError } from "../errors/app-error";
 import * as matchingService from "./matching.service";
 import { assertImagesHaveAnimals } from "./image-screening.service";
 import { isAuthorSuspended, visibleAuthorSql } from "./account-sanctions/visibility";
+import { activityReset, markWarningsRead } from "./report-inactivity.service";
 import { CreateReportInput, UpdateReportInput, ListReportsQuery } from "../validators/reports.validator";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
@@ -312,7 +313,13 @@ export async function update(id: number, userId: number, data: UpdateReportInput
     await assertImagesHaveAnimals(newImageUrl ? [newImageUrl, ...addedExtras] : addedExtras);
   }
   // contentEditedAt habilita volver a denunciar tras una restauración
-  const editedData = { ...scalarData, contentEditedAt: new Date() };
+  // editar cuenta como actividad (#264); resolved manual registra el cierre
+  const editedData = {
+    ...scalarData,
+    contentEditedAt: new Date(),
+    ...activityReset(),
+    ...(data.status === "resolved" ? { closedReason: "manual" as const, closedAt: new Date() } : {}),
+  };
   const updateData = photosChanged ? { ...editedData, status: "pending" as const, publishedAt: null } : editedData;
 
   await prisma.$transaction(async (tx) => {
@@ -337,6 +344,7 @@ export async function update(id: number, userId: number, data: UpdateReportInput
     }
   });
 
+  await markWarningsRead([id]);
   const moderatedImageUrl = newImageUrl ?? existing.imageUrl;
   if (photosChanged && moderatedImageUrl) {
     triggerModeration(id, moderatedImageUrl);
@@ -354,11 +362,26 @@ export async function close(id: number, userId: number): Promise<ReportDTO> {
   // the read above and this update, the close must not publish it anyway.
   const { count } = await prisma.report.updateMany({
     where: { id, status: "published" },
-    data: { status: "resolved" },
+    data: { status: "resolved", closedReason: "manual", closedAt: new Date() },
   });
   if (count === 0) {
     throw new AppError(409, CLOSE_ONLY_PUBLISHED_MESSAGE);
   }
+  await markWarningsRead([id]);
+  return getById(id);
+}
+
+// "Seguir mostrando" (#264): reinicia el contador de inactividad
+export async function keepShowing(id: number, userId: number): Promise<ReportDTO> {
+  const report = await getById(id);
+  if (report.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para modificar este reporte");
+  }
+  const { count } = await prisma.report.updateMany({ where: { id, status: "published" }, data: activityReset() });
+  if (count === 0) {
+    throw new AppError(409, "Solo se pueden mantener visibles reportes publicados");
+  }
+  await markWarningsRead([id]);
   return getById(id);
 }
 

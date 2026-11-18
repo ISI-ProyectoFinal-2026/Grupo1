@@ -4,6 +4,7 @@ import { app } from "./app";
 import { initChatSocket } from "./sockets/chat.socket";
 import { startPendingReportsReconciliation } from "./services/matching.service";
 import { startSanctionExpirySweep } from "./services/account-sanctions/sweep";
+import { startInactivitySweep } from "./services/report-inactivity.service";
 import { assertMonetizationConfig } from "./config/plans";
 import { warnIfAiServiceMissing } from "./config/ai-service";
 
@@ -23,4 +24,6 @@ httpServer.listen(PORT, () => {
   startPendingReportsReconciliation();
   // Registra el vencimiento de las suspensiones temporales cumplidas (#38).
   startSanctionExpirySweep();
+  // avisos y cierre por inactividad de reportes (#264)
+  startInactivitySweep();
 });

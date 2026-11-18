@@ -4,6 +4,7 @@ import { AppError } from "../errors/app-error";
 import { visibleAuthorSql } from "./account-sanctions/visibility";
 import * as notificationsService from "./notifications.service";
 import { normalizeR2PublicUrl } from "./storage.service";
+import { touchActivity } from "./report-inactivity.service";
 
 /**
  * Dispara la generación de embedding en el Backend IA para un reporte
@@ -403,10 +404,20 @@ async function decideMatch(
   }
 
   if (decision === "confirmed") {
+    await touchDecidingReport(reportId);
     await notifyOtherParty(match, reportId, userId);
   }
 
   return { matchId, status: decision, confirmedAt };
+}
+
+// confirmar cuenta como actividad solo del reporte de quien confirma (#264); un fallo no deshace la decisión
+async function touchDecidingReport(reportId: number): Promise<void> {
+  try {
+    await touchActivity([reportId]);
+  } catch (error) {
+    console.error(`[matching] no se pudo registrar la actividad del report ${reportId}:`, error);
+  }
 }
 
 // avisa al autor del otro reporte; un fallo no deshace la decisión

@@ -61,6 +61,12 @@ export async function close(req: Request, res: Response): Promise<void> {
   res.status(200).json(report);
 }
 
+export async function keepShowing(req: Request, res: Response): Promise<void> {
+  const { id } = reportIdParamSchema.parse(req.params);
+  const report = await reportsService.keepShowing(id, req.userId!);
+  res.status(200).json(report);
+}
+
 export async function getMatches(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
   await reportsService.getById(id); // dispara 404 si no existe
