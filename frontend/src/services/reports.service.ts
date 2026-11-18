@@ -45,6 +45,11 @@ export async function closeReport(id: number): Promise<ReportDTO> {
   return data;
 }
 
+export async function keepReportActive(id: number): Promise<ReportDTO> {
+  const { data } = await api.post<ReportDTO>(`/reports/${id}/keep-active`);
+  return data;
+}
+
 export async function getMatches(id: number): Promise<MatchDTO[]> {
   const { data } = await api.get<MatchDTO[]>(`/reports/${id}/matches`);
   return data;

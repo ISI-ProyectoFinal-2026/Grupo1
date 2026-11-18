@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import InactivityWarningActions from '@/components/notifications/InactivityWarningActions'
 import { BellIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import type { NotificationDTO } from '@/types/notification.types'
@@ -59,6 +60,9 @@ function NotificationList({ notifications, onMarkRead, onDelete }: NotificationL
             <p className='font-bold text-ink'>{notification.title}</p>
             {notification.message && (
               <p className='mt-0.5 break-words text-sm text-ink-muted'>{notification.message}</p>
+            )}
+            {notification.type === 'inactivity_warning' && notification.reportId !== null && (
+              <InactivityWarningActions reportId={notification.reportId} />
             )}
             <div className='mt-1 flex flex-wrap items-center gap-x-1'>
               <time className='mr-auto text-xs text-ink-muted' dateTime={notification.createdAt}>

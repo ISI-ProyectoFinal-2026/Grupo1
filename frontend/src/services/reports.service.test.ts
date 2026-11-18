@@ -10,6 +10,7 @@ import {
   getFlyer,
   getMatches,
   getReport,
+  keepReportActive,
   listReports,
   rejectMatch,
   updateReport,
@@ -113,6 +114,15 @@ describe('reports.service escritura', () => {
 
     expect(api.post).toHaveBeenCalledWith('/reports/5/close')
     expect(resultado.status).toBe('resolved')
+  })
+
+  it('mantiene activo el reporte contra POST /reports/:id/keep-active', async () => {
+    vi.mocked(api.post).mockResolvedValue(respuesta(reporte()))
+
+    const resultado = await keepReportActive(5)
+
+    expect(api.post).toHaveBeenCalledWith('/reports/5/keep-active')
+    expect(resultado.status).toBe('published')
   })
 
   it('edita el reporte contra PUT /reports/:id con los campos parciales', async () => {
