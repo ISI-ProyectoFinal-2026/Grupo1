@@ -18,5 +18,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # Backup diario de la base y de las imágenes (docs/BACKUP.md).
+  # Perfil propio: solo arranca con `docker compose --profile backup up -d`.
+  backup:
+    build: ./backup
+    container_name: patitas-backup
+    profiles: ["backup"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: ./backup/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-patitas}:${POSTGRES_PASSWORD:-patitas}@postgres:5432/${POSTGRES_DB:-patitas}
+      BACKUP_DIR: /backups
+    volumes:
+      # Fuera del repo: por defecto, carpeta hermana ../patitas-backups.
+      - ${BACKUP_HOST_DIR:-../patitas-backups}:/backups
+
 volumes:
   postgres_data:

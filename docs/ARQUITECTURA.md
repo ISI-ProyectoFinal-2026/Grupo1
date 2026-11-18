@@ -119,6 +119,7 @@ Plataforma web para reportar y buscar mascotas perdidas/encontradas con **matchi
 ### Infraestructura
 - **Docker** - Containerización
 - **GitHub Actions** - CI/CD: `ci.yml` (backend, frontend, e2e-ui y backend-ia), `snyk-security.yml` (falla ante vulnerabilidades críticas de Snyk Open Source en backend y frontend) y `publish-report.yml` (publicación manual del sitio del informe en GitHub Pages)
+- **Backup** - Servicio `backup` de Docker Compose (perfil `backup`): dump diario de PostgreSQL con rotación local y en un bucket R2 propio, y copia incremental de las imágenes ([ADR-0026](adr/0026-backup-servicio-node-docker.md), [BACKUP.md](BACKUP.md))
 - **AWS/Google Cloud/Hetzner** - Hosting
 
 ---
