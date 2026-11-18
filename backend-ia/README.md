@@ -1,6 +1,6 @@
 # Backend IA
 
-Servicio de generación de embeddings y búsqueda de similitud por imagen (issue #18, "Matcheo"). Comparte la base de datos con el Backend Principal; **no gestiona migraciones** (eso es responsabilidad de Prisma, ver `../backend/README.md`). Solo expone modelos SQLAlchemy de las tablas que necesita leer/escribir (`reports`, `report_embeddings`, `report_matches`).
+Servicio de inferencia de imágenes (issue #18, "Matcheo"): detecta la mascota y genera su embedding. **No tiene base de datos ni credenciales de base** (ADR-0029): no persiste nada. El Backend Principal guarda los embeddings, busca los matches y notifica (ver `../backend/README.md`).
 
 ## Variables de entorno
 
@@ -12,17 +12,14 @@ cp .env.example .env
 
 | Variable | Obligatoria | Para qué |
 |---|---|---|
-| `DATABASE_URL` | sí | Misma base que el Backend Principal. Puerto `5433` en el host, ver `../docker/ENV_VARS.md` |
 | `INTERNAL_API_KEY` | **sí** | Clave compartida con el Backend Principal. **Mismo valor que en `../backend/.env`** |
-| `NODE_BACKEND_URL` | no | URL del Backend Principal, para avisarle cuando se persiste un match y dispare las notificaciones |
 | `ALLOW_INSECURE_INTERNAL` | no | Escotilla solo para desarrollo local, ver abajo |
-| `SQL_ECHO` | no | Loguea todo el SQL de SQLAlchemy |
 
 ### `INTERNAL_API_KEY` y por qué el servicio falla cerrado
 
-`POST /reports/{report_id}/embedding` se llama servicio a servicio, sin usuario logueado, así que no hay JWT: se autentica con una clave compartida que viaja en el header `X-Internal-Key`. **Tiene que ser el mismo valor que `INTERNAL_API_KEY` en `../backend/.env`**; si no coincide, el Backend IA responde `401` y los reportes con imagen se quedan en `pending`.
+Los endpoints `/images/*` se llaman servicio a servicio, sin usuario logueado, así que no hay JWT: se autentica con una clave compartida que viaja en el header `X-Internal-Key`. **Tiene que ser el mismo valor que `INTERNAL_API_KEY` en `../backend/.env`**; si no coincide, el Backend IA responde `401` y los reportes con imagen se quedan en `pending`.
 
-Si la variable no está configurada, el endpoint **rechaza todo con `401`**. Es deliberado: este endpoint descarga imágenes, corre dos modelos de ML y escribe en `report_embeddings` / `report_matches`, así que una configuración ausente tiene que dejarlo cerrado. La versión anterior hacía lo contrario —retornaba sin validar cuando la clave estaba vacía— y eso dejó el endpoint público en todos los entornos (issue #106).
+Si la variable no está configurada, los endpoints **rechazan todo con `401`**. Es deliberado: descargan imágenes y corren dos modelos de ML, así que una configuración ausente tiene que dejarlos cerrados. La versión anterior hacía lo contrario —retornaba sin validar cuando la clave estaba vacía— y eso dejó el endpoint público en todos los entornos (issue #106).
 
 Para desarrollo local, si necesitás levantarlo sin configurar la clave, hay que pedirlo a mano:
 
@@ -43,57 +40,40 @@ pip install -r requirements.txt
 
 ## Levantar el servicio
 
-Requiere que la base de datos esté arriba y con las migraciones de `backend/` aplicadas primero.
+No necesita base de datos.
 
 ```bash
 uvicorn app.main:app --reload  # http://localhost:8000
+curl http://localhost:8000/health  # {"status": "ok"}
 ```
 
-## Verificar la conexión
+## Endpoints
+
+Todos menos `/health` exigen `X-Internal-Key`. Ninguno persiste nada.
 
 ```bash
-curl http://localhost:8000/health/db
+POST /images/analyze     { "image_url": "https://..." }
+→ 200  { "has_animal": bool, "low_quality": bool }   screening al subir la foto (#212)
+→ 422  la imagen no se pudo descargar o decodificar
+
+POST /images/embedding   { "image_url": "https://..." }
+→ 200  { "has_animal": true,  "embedding": [768 floats] }   se detectó una mascota
+→ 200  { "has_animal": false, "embedding": null }           no hay mascota
+→ 422  la imagen no se pudo descargar o decodificar
 ```
 
-Devuelve `{"status": "ok"}` si la conexión funciona y la extensión `pgvector` está activa.
+`/images/embedding` lo usa el Backend Principal para la moderación y el matching de cada reporte con foto (`triggerEmbeddingGeneration`) y para los reportes similares al cargar uno nuevo (`embedImage`, #211). El 200 sin mascota es un veredicto (el reporte se rechaza); el 422 no lo es (el reporte queda `pending`).
 
-## Generación de embeddings y matching (issue #18)
+Internamente (`app/services/image_analysis_service.py`):
 
-El Backend Principal llama a este endpoint de forma fire-and-forget al crear un reporte con imagen (ver `../backend/README.md`, variable `AI_SERVICE_URL`):
+1. Descarga la imagen (máximo 10 MB, timeout de 10 s) y corre **YOLOv8n** (`app/ml/pipeline.py`) para detectar y recortar el animal (cualquier clase animal de COCO: `bird`, `cat`, `dog`, `horse`, etc.).
+2. Genera el embedding con **DINOv2 ViT-B/14** (`vit_base_patch14_dinov2.lvd142m` vía `timm`, entrada a 224px), normalizado (norma L2 = 1). La inferencia corre en un thread (`asyncio.to_thread`) para no bloquear el event loop.
 
-```bash
-POST /reports/{report_id}/embedding
-{ "image_url": "https://..." }
-
-→ 201  se detectó una mascota, se guardó el embedding y se calcularon matches
-→ 422  no se detectó una mascota en la imagen (sin más efecto)
-```
-
-Internamente (`app/services/embedding_service.py` + `app/services/matching_service.py`), en la misma request:
-
-1. Descarga la imagen y corre **YOLOv8n** (`app/ml/pipeline.py`) para detectar y recortar el animal (cualquier clase animal de COCO: `bird`, `cat`, `dog`, `horse`, etc.).
-2. Genera el embedding con **DINOv2 ViT-B/14** (`vit_base_patch14_dinov2.lvd142m` vía `timm`, entrada a 224px) y lo guarda en `report_embeddings` (`vector(768)`). La inferencia corre en un thread (`asyncio.to_thread`) para no bloquear el event loop.
-3. Busca candidatos por similitud coseno (pgvector) entre reportes de tipo opuesto (lost↔found), dentro de un radio y una ventana de tiempo, publicados, **los más parecidos** (top K), y guarda en `report_matches` los que superen `MATCH_THRESHOLD`. Los que además superen `NOTIFY_THRESHOLD` disparan la notificación a los dueños (ver `NODE_BACKEND_URL`). Los umbrales están documentados en `matching_service.py` y calibrados con un benchmark propio (FPR 3% / 0.3%).
-
-Los parámetros se leen de variables de entorno (`app/config.py`); sin definirlas valen:
-
-| Variable | Valor por defecto | Significado |
-| --- | --- | --- |
-| `MATCH_THRESHOLD` | `0.45` | similitud mínima para guardar un match |
-| `NOTIFY_THRESHOLD` | `0.63` | similitud mínima para notificar |
-| `MATCH_RADIUS_METERS` | `5000` | radio de búsqueda |
-| `MATCH_WINDOW_DAYS` | `90` | antigüedad máxima de los candidatos |
-| `MATCH_TOP_K` | `5` | cantidad de candidatos evaluados |
-
-La similitud se calcula con `1 - (a <=> b)`: **`<=>` es distancia coseno**, y es el único operador que puede usar el índice HNSW (creado con `vector_cosine_ops`). No cambiarlo por `<->` (distancia L2): aun con embeddings normalizados `1 - L2` no es la similitud coseno y el umbral deja de tener sentido — dos fotos de la misma mascota con coseno 0.87 dan L2 0.51, o sea 0.49 de "similitud", y no matchearían nunca.
+La búsqueda de matches, sus parámetros (`MATCH_THRESHOLD`, `NOTIFY_THRESHOLD`, etc.) y las notificaciones viven en el Backend Principal (`../backend/src/services/report-matching.service.ts` y `../backend/src/config/matching.ts`, ver `../backend/README.md`).
 
 Modelo y umbrales dependen del checkpoint exacto: no cambiar el modelo de embeddings ni YOLO sin volver a validar contra un set etiquetado, porque cambian la dimensión del vector y la escala de los porcentajes.
 
-**Límites conocidos:**
-
-- Perros de la misma raza pueden puntuar por encima de otra foto del mismo perro (en la validación, ~0.52–0.62 contra ~0.39–0.47). Es un límite del modelo con estos umbrales, no un bug.
-- Con `LIMIT 5` los matches visibles dependen del orden de carga: un reporte con más de 5 candidatos sobre el umbral solo guarda los 5 mejores; el resto aparece cuando se recalcula desde el otro lado (por ejemplo con el script de re-embedding).
-- `NODE_BACKEND_URL` vacío desactiva las notificaciones de match sin avisar, y la respuesta HTTP del Backend Principal no se verifica (una `INTERNAL_API_KEY` distinta devuelve 401 y se ignora).
+**Límite conocido:** perros de la misma raza pueden puntuar por encima de otra foto del mismo perro (en la validación, ~0.52–0.62 contra ~0.39–0.47). Es un límite del modelo con estos umbrales, no un bug.
 
 **No implementado todavía:** cola Redis (hoy es síncrono dentro de la request).
 
@@ -110,9 +90,9 @@ cd backend-ia && pip install -r requirements.txt
 # 2. migrar la base (borra los embeddings)
 cd ../backend && npx prisma migrate deploy
 
-# 3. regenerar embeddings y matches con el modelo nuevo
-cd ../backend-ia && python -m scripts.reembed_reports        # solo publicados
-python -m scripts.reembed_reports --all                      # todos los que tienen imagen
+# 3. con el Backend IA levantado, regenerar embeddings y matches con el modelo nuevo
+npm run reembed:reports               # solo publicados
+npm run reembed:reports -- --all      # todos los que tienen imagen
 ```
 
 - El primer arranque descarga los pesos de DINOv2 (necesita internet).
@@ -124,4 +104,4 @@ python -m scripts.reembed_reports --all                      # todos los que tie
 python -m pytest
 ```
 
-Corre contra la misma base de datos de desarrollo (real, sin mocks de DB); los modelos YOLO/DINOv2 se mockean en los tests para no depender de pesos descargados ni de inferencia real (ver `tests/conftest.py`).
+No necesita base de datos; los modelos YOLO/DINOv2 se mockean en los tests para no depender de pesos descargados ni de inferencia real (ver `tests/conftest.py`).
