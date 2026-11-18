@@ -96,6 +96,12 @@ export interface GeoBounds {
 export type GeoMapFilters = Pick<ListReportsQuery, 'type' | 'zone' | 'dateFrom' | 'dateTo'>
 
 // posible duplicado sugerido al crear un reporte (#211)
+export interface InactivityWarningDTO {
+  pending: boolean
+  warnedAt: string | null
+  day: 30 | 37 | null
+}
+
 export interface SimilarReportDTO {
   id: number
   title: string

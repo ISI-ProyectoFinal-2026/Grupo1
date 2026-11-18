@@ -167,6 +167,40 @@ export async function notifyMatchConfirmed(data: NotifyMatchConfirmedInput): Pro
   });
 }
 
+// avisos de inactividad (#264): requieren acción del dueño, se envían aunque haya desactivado notifyStatusChange
+export async function notifyInactivityWarning(reportId: number, day: 30 | 37): Promise<Notification | null> {
+  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true, title: true } });
+  if (!report || (await isAuthorSuspended(report.userId))) {
+    return null;
+  }
+  const closing = day === 37 ? " Si no respondés, lo cerraremos mañana." : "";
+  return prisma.notification.create({
+    data: {
+      userId: report.userId,
+      type: "inactivity_warning",
+      title: "¿Querés seguir mostrando tu reporte?",
+      message: `"${report.title}" lleva ${day} días sin actividad (aviso ${day === 30 ? 1 : 2} de 2). Podés marcarlo como resuelto o seguir mostrándolo.${closing}`,
+      reportId,
+    },
+  });
+}
+
+export async function notifyInactivityClosed(reportId: number): Promise<Notification | null> {
+  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true, title: true } });
+  if (!report || (await isAuthorSuspended(report.userId))) {
+    return null;
+  }
+  return prisma.notification.create({
+    data: {
+      userId: report.userId,
+      type: "inactivity_closed",
+      title: "Cerramos tu reporte por inactividad",
+      message: `"${report.title}" se cerró por falta de actividad y dejó de mostrarse en el listado.`,
+      reportId,
+    },
+  });
+}
+
 export type ModerationVerdict = "published" | "rejected";
 
 // avisos por denuncias (#218): auto_hidden (umbral), hidden_by_flag (moderador oculta), restored, hide_confirmed

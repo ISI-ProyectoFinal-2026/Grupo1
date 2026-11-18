@@ -23,6 +23,7 @@ import PendingBanner from "@/components/reports/PendingBanner";
 import MatchCard from "@/components/reports/MatchCard";
 import ImageUploader from "@/components/reports/ImageUploader";
 import ReportPhotoGallery from "@/components/reports/ReportPhotoGallery";
+import InactivityWarningBanner from "@/components/reports/InactivityWarningBanner";
 import CloseReportButton from "@/components/reports/CloseReportButton";
 import DeleteReportButton from "@/components/reports/DeleteReportButton";
 import ReportFlagReasonForm from "@/components/reports/ReportFlagReasonForm";
@@ -443,6 +444,8 @@ export default function ReportDetailPage() {
                   ))}
               </div>
             )}
+
+            {isOwner && <InactivityWarningBanner report={report} />}
 
             {canClose && (
               <CloseReportButton

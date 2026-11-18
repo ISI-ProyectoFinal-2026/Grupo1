@@ -2,6 +2,7 @@ import { Chat, Message, Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { isAuthorSuspended } from "./account-sanctions/visibility";
+import { touchActivity } from "./report-inactivity.service";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -110,7 +111,18 @@ export async function createMessage(
   senderId: number,
   data: CreateMessageInput
 ): Promise<Message> {
-  return prisma.message.create({
+  const message = await prisma.message.create({
     data: { chatId, senderId, content: data.content ?? null, imageUrl: data.imageUrl ?? null },
   });
+  // solo el mensaje del dueño cuenta como actividad del reporte (#264); un fallo no deshace el envío
+  try {
+    const chat = await prisma.chat.findUnique({
+      where: { id: chatId },
+      select: { reportId: true, report: { select: { userId: true } } },
+    });
+    if (chat?.reportId && chat.report?.userId === senderId) await touchActivity([chat.reportId]);
+  } catch (error) {
+    console.error(`[chats] no se pudo registrar la actividad del chat ${chatId}:`, error);
+  }
+  return message;
 }

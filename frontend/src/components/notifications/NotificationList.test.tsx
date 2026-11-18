@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
+import { createQueryWrapper } from '@/test/query-wrapper'
 import NotificationList from '@/components/notifications/NotificationList'
 import type { NotificationDTO } from '@/types/notification.types'
 
@@ -152,6 +153,65 @@ describe('NotificationList', () => {
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))
 
     expect(onDelete).toHaveBeenCalledWith(9)
+  })
+
+  it('ofrece las acciones en un aviso de inactividad con reporte', () => {
+    const { Wrapper } = createQueryWrapper()
+    renderConRouter(
+      <Wrapper>
+        <NotificationList
+          notifications={[notificacion({ type: 'inactivity_warning', reportId: 5 })]}
+          onMarkRead={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    expect(screen.getByRole('button', { name: 'Caso resuelto' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Seguir mostrando' })).toBeInTheDocument()
+  })
+
+  it('no ofrece las acciones en un aviso de inactividad ya leido', () => {
+    const { Wrapper } = createQueryWrapper()
+    renderConRouter(
+      <Wrapper>
+        <NotificationList
+          notifications={[notificacion({ type: 'inactivity_warning', reportId: 5, isRead: true })]}
+          onMarkRead={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    expect(screen.queryByRole('button', { name: 'Seguir mostrando' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Caso resuelto' })).not.toBeInTheDocument()
+  })
+
+  it('no ofrece las acciones en un aviso de inactividad sin reporte', () => {
+    render(
+      <NotificationList
+        notifications={[notificacion({ type: 'inactivity_warning', reportId: null })]}
+        onMarkRead={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByRole('button', { name: 'Seguir mostrando' })).not.toBeInTheDocument()
+  })
+
+  it('el cierre por inactividad se muestra como una notificacion comun', () => {
+    renderConRouter(
+      <NotificationList
+        notifications={[
+          notificacion({ type: 'inactivity_closed', title: 'Cerramos tu reporte', reportId: 5 }),
+        ]}
+        onMarkRead={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Cerramos tu reporte')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Seguir mostrando' })).not.toBeInTheDocument()
   })
 
   describe('enlace al reporte mencionado (#222)', () => {

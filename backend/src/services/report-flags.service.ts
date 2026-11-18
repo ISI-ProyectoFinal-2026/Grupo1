@@ -7,6 +7,7 @@ import {
   ModerationAction,
 } from "../validators/report-flags.validator";
 import * as notificationsService from "./notifications.service";
+import { activityReset, markWarningsRead } from "./report-inactivity.service";
 import { getReportFlagThreshold } from "../config/report-flags";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
@@ -215,11 +216,14 @@ export async function moderate(reportId: number, action: ModerationAction): Prom
     await closeFlags(ReportFlagStatus.dismissed);
     await tx.report.update({
       where: { id: reportId },
-      data: { flagCycle: { increment: 1 }, ...(action === "restore" ? { status: "published" } : {}) },
+      data: { flagCycle: { increment: 1 }, ...(action === "restore" ? { status: "published", ...activityReset() } : {}) },
     });
     return "published" as const;
   });
 
+  if (action === "restore") {
+    await markWarningsRead([reportId]);
+  }
   if (action !== "dismiss") {
     await notifyOwner(reportId, ACTION_NOTICE[action]);
   }

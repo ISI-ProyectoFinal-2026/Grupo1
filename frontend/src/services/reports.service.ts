@@ -1,6 +1,7 @@
 import { api } from "./api";
 import type {
   ReportDTO,
+  InactivityWarningDTO,
   CreateReportInput,
   UpdateReportInput,
   ListReportsQuery,
@@ -42,6 +43,16 @@ export async function deleteReport(id: number): Promise<void> {
 
 export async function closeReport(id: number): Promise<ReportDTO> {
   const { data } = await api.post<ReportDTO>(`/reports/${id}/close`);
+  return data;
+}
+
+export async function keepReportActive(id: number): Promise<ReportDTO> {
+  const { data } = await api.post<ReportDTO>(`/reports/${id}/keep-active`);
+  return data;
+}
+
+export async function getInactivityWarning(id: number): Promise<InactivityWarningDTO> {
+  const { data } = await api.get<InactivityWarningDTO>(`/reports/${id}/inactivity-warning`);
   return data;
 }
 
