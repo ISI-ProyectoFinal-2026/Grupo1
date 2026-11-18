@@ -96,7 +96,7 @@ function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: N
           >
             {renderBody(notification)}
             {notification.type === 'inactivity_warning' && notification.reportId !== null && (
-              <InactivityWarningActions reportId={notification.reportId} />
+              <InactivityWarningActions reportId={notification.reportId} isRead={notification.isRead} />
             )}
             <div className='mt-1 flex flex-wrap items-center gap-x-1'>
               <time className='mr-auto text-xs text-ink-muted' dateTime={notification.createdAt}>

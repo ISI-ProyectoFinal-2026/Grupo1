@@ -171,6 +171,22 @@ describe('NotificationList', () => {
     expect(screen.getByRole('button', { name: 'Seguir mostrando' })).toBeInTheDocument()
   })
 
+  it('no ofrece las acciones en un aviso de inactividad ya leido', () => {
+    const { Wrapper } = createQueryWrapper()
+    renderConRouter(
+      <Wrapper>
+        <NotificationList
+          notifications={[notificacion({ type: 'inactivity_warning', reportId: 5, isRead: true })]}
+          onMarkRead={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      </Wrapper>
+    )
+
+    expect(screen.queryByRole('button', { name: 'Seguir mostrando' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Caso resuelto' })).not.toBeInTheDocument()
+  })
+
   it('no ofrece las acciones en un aviso de inactividad sin reporte', () => {
     render(
       <NotificationList

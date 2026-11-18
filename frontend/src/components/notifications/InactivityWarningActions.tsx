@@ -3,20 +3,24 @@ import { useInactivityWarningActions } from '@/hooks/useInactivityWarningActions
 
 interface InactivityWarningActionsProps {
   reportId: number
+  isRead: boolean
 }
 
 const buttonClasses =
   'press inline-flex min-h-11 items-center rounded-control px-3 text-sm font-bold disabled:opacity-50'
 
-function InactivityWarningActions({ reportId }: InactivityWarningActionsProps) {
+function InactivityWarningActions({ reportId, isRead }: InactivityWarningActionsProps) {
   const { close, keep, isPending, done, succeeded, error } = useInactivityWarningActions(reportId)
 
   return (
     <div className='mt-2'>
-      {!done && (
+      {!done && !isRead && (
         <>
-          <p className='text-sm font-bold text-ink'>¿Querés seguir mostrando tu reporte?</p>
-          <div className='mt-1 flex flex-wrap gap-2'>
+          <div
+            role='group'
+            aria-label='¿Querés seguir mostrando tu reporte?'
+            className='mt-1 flex flex-wrap gap-2'
+          >
             <button
               type='button'
               onClick={close}

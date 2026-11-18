@@ -8,9 +8,9 @@ import type { ReportDTO } from '@/types/report.types'
 
 vi.mock('@/services/reports.service')
 
-function renderizar() {
+function renderizar(isRead = false) {
   const { Wrapper } = createQueryWrapper()
-  return render(<InactivityWarningActions reportId={5} />, { wrapper: Wrapper })
+  return render(<InactivityWarningActions reportId={5} isRead={isRead} />, { wrapper: Wrapper })
 }
 
 describe('InactivityWarningActions', () => {
@@ -19,9 +19,31 @@ describe('InactivityWarningActions', () => {
   it('muestra la pregunta y las dos acciones', () => {
     renderizar()
 
-    expect(screen.getByText('¿Querés seguir mostrando tu reporte?')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '¿Querés seguir mostrando tu reporte?' })).toBeInTheDocument()
+    expect(screen.queryByText('¿Querés seguir mostrando tu reporte?')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Caso resuelto' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Seguir mostrando' })).toBeEnabled()
+  })
+
+  it('no muestra botones si la notificacion ya esta leida', () => {
+    renderizar(true)
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('mantiene la confirmacion cuando la notificacion pasa a leida', async () => {
+    vi.mocked(reportsService.keepReportActive).mockResolvedValue({} as ReportDTO)
+    const { Wrapper } = createQueryWrapper()
+    const { rerender } = render(<InactivityWarningActions reportId={5} isRead={false} />, {
+      wrapper: Wrapper,
+    })
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Seguir mostrando' }))
+    await screen.findByRole('status')
+    rerender(<InactivityWarningActions reportId={5} isRead />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('Tu reporte sigue publicado.')
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('Seguir mostrando llama al servicio y confirma', async () => {
