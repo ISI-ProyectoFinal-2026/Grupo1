@@ -62,6 +62,7 @@ function NotificationBell() {
             notifications={notifications ?? []}
             onMarkRead={(id) => markRead.mutate(id)}
             onDelete={(id) => remove.mutate(id)}
+            onNavigate={() => setOpen(false)}
           />
         </div>
       )}

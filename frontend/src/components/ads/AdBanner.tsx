@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useFlagAd, useServedAdQuery } from "@/hooks/useServedAds";
 import { recordAdEvent } from "@/services/ads.service";
 import FlagReportForm from "@/components/reports/FlagReportForm";
+import { useAuthStore } from "@/stores/auth.store";
 import type { AdPlacement, ServedAd } from "@/types/ad.types";
 
 // impresión una vez por sesión, anuncio y ubicación (sin datos del usuario, ADR-0024)
@@ -51,6 +52,8 @@ function FlagAd({ adId }: { adId: number }) {
 
 function AdCardContent({ ad, placement }: { ad: ServedAd; placement: AdPlacement }) {
   const ref = useRef<HTMLElement>(null);
+  // denunciar exige sesión: el anuncio también se ve en páginas públicas (#187)
+  const hasSession = useAuthStore((state) => state.token !== null);
 
   useEffect(() => {
     const key = impressionKey(ad.id, placement);
@@ -84,7 +87,7 @@ function AdCardContent({ ad, placement }: { ad: ServedAd; placement: AdPlacement
         <span className="break-words text-sm text-ink">{ad.body}</span>
         <span className="text-sm font-bold text-ink-muted">{ad.business.name}</span>
       </Link>
-      {!ad.isOwn && <FlagAd adId={ad.id} />}
+      {hasSession && !ad.isOwn && <FlagAd adId={ad.id} />}
     </aside>
   );
 }

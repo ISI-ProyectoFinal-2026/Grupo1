@@ -28,7 +28,12 @@ function Sonda() {
 }
 
 function renderLogin(
-  state?: { registered?: boolean; emailVerified?: boolean; passwordReset?: boolean }
+  state?: {
+    registered?: boolean
+    emailVerified?: boolean
+    passwordReset?: boolean
+    from?: { pathname: string; search?: string; hash?: string }
+  }
 ) {
   return render(
     <MemoryRouter initialEntries={[{ pathname: '/login', state }]}>
@@ -36,6 +41,7 @@ function renderLogin(
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<div>Feed de reportes</div>} />
+        <Route path="/reports/:id" element={<div>Detalle del reporte</div>} />
         <Route path="/register" element={<div>Crear cuenta</div>} />
         <Route path="/forgot-password" element={<div>Recuperar contraseña</div>} />
       </Routes>
@@ -125,6 +131,29 @@ describe('Login', () => {
     expect(await screen.findByText('Feed de reportes')).toBeInTheDocument()
     expect(useAuthStore.getState().token).toBe('jwt-de-prueba')
     expect(useAuthStore.getState().user).toEqual(usuario)
+  })
+
+  // vuelve a la pagina desde la que se pidio el login (#187)
+  it('con un origen guardado vuelve a esa pagina tras el login', async () => {
+    vi.mocked(authService.login).mockResolvedValue({ token: 'jwt-de-prueba', user: usuario })
+    const user = userEvent.setup()
+    renderLogin({ from: { pathname: '/reports/5', search: '?vista=mapa' } })
+
+    await completarYEnviar(user)
+
+    expect(await screen.findByText('Detalle del reporte')).toBeInTheDocument()
+    expect(screen.getByTestId('ubicacion')).toHaveTextContent('/reports/5?vista=mapa')
+  })
+
+  it('ignora un origen externo y va al inicio', async () => {
+    vi.mocked(authService.login).mockResolvedValue({ token: 'jwt-de-prueba', user: usuario })
+    const user = userEvent.setup()
+    renderLogin({ from: { pathname: '//malicioso.test/robo' } })
+
+    await completarYEnviar(user)
+
+    expect(await screen.findByText('Feed de reportes')).toBeInTheDocument()
+    expect(screen.getByTestId('ubicacion')).toHaveTextContent(/^\/$/)
   })
 
   it('muestra el mensaje del backend y no guarda sesion si falla', async () => {
@@ -231,6 +260,18 @@ describe('Login con verificación en dos pasos', () => {
     })
     expect(useAuthStore.getState().token).toBe('jwt-final')
     expect(useAuthStore.getState().user?.twoFactorEnabled).toBe(true)
+  })
+
+  it('con el segundo paso tambien vuelve a la pagina de origen', async () => {
+    vi.mocked(twoFactorService.loginWithTwoFactor).mockResolvedValue({ token: 'jwt-final', user: usuario })
+    const user = userEvent.setup()
+    renderLogin({ from: { pathname: '/reports/5' } })
+    await llegarAlSegundoPaso(user)
+
+    await user.type(screen.getByLabelText('Código de verificación'), '123456')
+    await user.click(screen.getByRole('button', { name: 'Verificar' }))
+
+    expect(await screen.findByText('Detalle del reporte')).toBeInTheDocument()
   })
 
   it('saca los espacios de un codigo pegado con formato', async () => {

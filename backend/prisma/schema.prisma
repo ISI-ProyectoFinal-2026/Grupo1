@@ -395,6 +395,7 @@ model Chat {
   userB    User      @relation("ChatUserB", fields: [userBId], references: [id], onDelete: Cascade)
   report   Report?   @relation(fields: [reportId], references: [id])
   messages Message[]
+  notifications Notification[]
 
   // El chat es POR REPORTE: el mismo par de usuarios puede tener un chat por
   // cada reporte. El par se guarda normalizado (userAId = id menor, userBId =
@@ -427,11 +428,13 @@ model Notification {
   title     String?
   message   String?
   reportId  Int?     @map("report_id")
+  chatId    Int?     @map("chat_id") // solo en avisos de mensaje (#222)
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   report Report? @relation(fields: [reportId], references: [id])
+  chat   Chat?   @relation(fields: [chatId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("notifications")

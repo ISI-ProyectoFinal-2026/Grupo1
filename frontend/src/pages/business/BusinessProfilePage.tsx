@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useBusinessQuery, useContactBusinessMutation } from "@/hooks/useBusiness";
+import { useAuthStore } from "@/stores/auth.store";
 import type { BusinessCategory } from "@/types/business.types";
 import BusinessLocationMap from "@/components/maps/BusinessLocationMap";
 import { buttonClasses } from "@/components/ui/buttonClasses";
@@ -32,6 +33,8 @@ function BusinessProfilePage() {
   // El GET del perfil registra la visita (evento VIEW) del lado del backend.
   const { data: business, isLoading, isError } = useBusinessQuery(businessId);
   const contactMutation = useContactBusinessMutation();
+  // registrar el contacto exige sesión; el teléfono ya está a la vista (#187)
+  const hasSession = useAuthStore((state) => state.token !== null);
 
   const backLink = (
     <Link
@@ -124,26 +127,28 @@ function BusinessProfilePage() {
           </div>
         )}
 
-        <div className="mt-6 border-t border-line pt-6" aria-live="polite">
-          {contactMutation.isSuccess ? (
-            <p className="flex items-start gap-2 font-bold text-success-ink">
-              <CheckIcon className="mt-0.5 h-5 w-5 shrink-0" />
-              ¡Listo! Registramos tu interés. Podés comunicarte al {business.phone}.
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={() => contactMutation.mutate(business.id)}
-              disabled={contactMutation.isPending}
-              className={buttonClasses("primary", "lg", "w-full sm:w-auto")}
-            >
-              {contactMutation.isPending ? "Contactando..." : "Contactar"}
-            </button>
-          )}
-          {contactMutation.isError && (
-            <ErrorMessage message="No se pudo registrar el contacto, intentá de nuevo." className="mt-3" />
-          )}
-        </div>
+        {hasSession && (
+          <div className="mt-6 border-t border-line pt-6" aria-live="polite">
+            {contactMutation.isSuccess ? (
+              <p className="flex items-start gap-2 font-bold text-success-ink">
+                <CheckIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                ¡Listo! Registramos tu interés. Podés comunicarte al {business.phone}.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => contactMutation.mutate(business.id)}
+                disabled={contactMutation.isPending}
+                className={buttonClasses("primary", "lg", "w-full sm:w-auto")}
+              >
+                {contactMutation.isPending ? "Contactando..." : "Contactar"}
+              </button>
+            )}
+            {contactMutation.isError && (
+              <ErrorMessage message="No se pudo registrar el contacto, intentá de nuevo." className="mt-3" />
+            )}
+          </div>
+        )}
       </article>
     </div>
   );

@@ -1,9 +1,44 @@
+import type { ReactElement } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import NotificationList from '@/components/notifications/NotificationList'
 import type { NotificationDTO } from '@/types/notification.types'
+
+function DetalleFalso() {
+  const { id } = useParams()
+  return <p>Detalle del reporte {id}</p>
+}
+
+function ChatFalso() {
+  const { id } = useParams()
+  return <p>Chat {id}</p>
+}
+
+function renderConRouter(ui: ReactElement) {
+  return render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path='/' element={ui} />
+        <Route path='/reports/:id' element={<DetalleFalso />} />
+        <Route path='/chats/:id' element={<ChatFalso />} />
+      </Routes>
+    </MemoryRouter>
+  )
+}
+
+function coincidencia(overrides: Partial<NotificationDTO> = {}): NotificationDTO {
+  return notificacion({
+    id: 21,
+    type: 'match_suggested',
+    title: '¡Posible coincidencia encontrada!',
+    message: 'Encontramos una publicación que podría coincidir.',
+    reportId: 15,
+    ...overrides,
+  })
+}
 
 function notificacion(overrides: Partial<NotificationDTO> = {}): NotificationDTO {
   return {
@@ -13,6 +48,7 @@ function notificacion(overrides: Partial<NotificationDTO> = {}): NotificationDTO
     title: 'Nuevo mensaje',
     message: 'Tenes un mensaje nuevo',
     reportId: null,
+    chatId: null,
     isRead: false,
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,
@@ -121,13 +157,14 @@ describe('NotificationList', () => {
 
   it('ofrece las acciones en un aviso de inactividad con reporte', () => {
     const { Wrapper } = createQueryWrapper()
-    render(
-      <NotificationList
-        notifications={[notificacion({ type: 'inactivity_warning', reportId: 5 })]}
-        onMarkRead={vi.fn()}
-        onDelete={vi.fn()}
-      />,
-      { wrapper: Wrapper }
+    renderConRouter(
+      <Wrapper>
+        <NotificationList
+          notifications={[notificacion({ type: 'inactivity_warning', reportId: 5 })]}
+          onMarkRead={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      </Wrapper>
     )
 
     expect(screen.getByRole('button', { name: 'Caso resuelto' })).toBeInTheDocument()
@@ -147,7 +184,7 @@ describe('NotificationList', () => {
   })
 
   it('el cierre por inactividad se muestra como una notificacion comun', () => {
-    render(
+    renderConRouter(
       <NotificationList
         notifications={[
           notificacion({ type: 'inactivity_closed', title: 'Cerramos tu reporte', reportId: 5 }),
@@ -159,5 +196,136 @@ describe('NotificationList', () => {
 
     expect(screen.getByText('Cerramos tu reporte')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Seguir mostrando' })).not.toBeInTheDocument()
+  })
+
+  describe('enlace al reporte mencionado (#222)', () => {
+    it('una notificacion con reporte enlaza a su detalle', () => {
+      renderConRouter(
+        <NotificationList notifications={[coincidencia()]} onMarkRead={vi.fn()} onDelete={vi.fn()} />
+      )
+
+      expect(
+        screen.getByRole('link', { name: /Posible coincidencia encontrada/ })
+      ).toHaveAttribute('href', '/reports/15')
+    })
+
+    it('una notificacion sin reporte no es un enlace', () => {
+      render(
+        <NotificationList notifications={[notificacion()]} onMarkRead={vi.fn()} onDelete={vi.fn()} />
+      )
+
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getByText('Nuevo mensaje')).toBeInTheDocument()
+    })
+
+    it('al abrirla navega al reporte, la marca como leida y avisa la navegacion', async () => {
+      const user = userEvent.setup()
+      const onMarkRead = vi.fn()
+      const onNavigate = vi.fn()
+      renderConRouter(
+        <NotificationList
+          notifications={[coincidencia()]}
+          onMarkRead={onMarkRead}
+          onDelete={vi.fn()}
+          onNavigate={onNavigate}
+        />
+      )
+
+      await user.click(screen.getByRole('link', { name: /Posible coincidencia encontrada/ }))
+
+      expect(screen.getByText('Detalle del reporte 15')).toBeInTheDocument()
+      expect(onMarkRead).toHaveBeenCalledWith(21)
+      expect(onNavigate).toHaveBeenCalledTimes(1)
+    })
+
+    it('no vuelve a marcar como leida una ya leida', async () => {
+      const user = userEvent.setup()
+      const onMarkRead = vi.fn()
+      renderConRouter(
+        <NotificationList
+          notifications={[coincidencia({ isRead: true })]}
+          onMarkRead={onMarkRead}
+          onDelete={vi.fn()}
+        />
+      )
+
+      await user.click(screen.getByRole('link', { name: /Posible coincidencia encontrada/ }))
+
+      expect(screen.getByText('Detalle del reporte 15')).toBeInTheDocument()
+      expect(onMarkRead).not.toHaveBeenCalled()
+    })
+
+    it('se abre con el teclado', async () => {
+      const user = userEvent.setup()
+      renderConRouter(
+        <NotificationList notifications={[coincidencia()]} onMarkRead={vi.fn()} onDelete={vi.fn()} />
+      )
+
+      await user.tab()
+      expect(screen.getByRole('link', { name: /Posible coincidencia encontrada/ })).toHaveFocus()
+      await user.keyboard('{Enter}')
+
+      expect(screen.getByText('Detalle del reporte 15')).toBeInTheDocument()
+    })
+
+    it('un mensaje con chat enlaza al chat antes que al reporte', () => {
+      renderConRouter(
+        <NotificationList
+          notifications={[notificacion({ id: 33, reportId: 15, chatId: 8 })]}
+          onMarkRead={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      expect(screen.getByRole('link', { name: /Nuevo mensaje/ })).toHaveAttribute('href', '/chats/8')
+    })
+
+    it('al abrir un mensaje navega al chat, lo marca como leido y avisa la navegacion', async () => {
+      const user = userEvent.setup()
+      const onMarkRead = vi.fn()
+      const onNavigate = vi.fn()
+      renderConRouter(
+        <NotificationList
+          notifications={[notificacion({ id: 33, reportId: 15, chatId: 8 })]}
+          onMarkRead={onMarkRead}
+          onDelete={vi.fn()}
+          onNavigate={onNavigate}
+        />
+      )
+
+      await user.click(screen.getByRole('link', { name: /Nuevo mensaje/ }))
+
+      expect(screen.getByText('Chat 8')).toBeInTheDocument()
+      expect(onMarkRead).toHaveBeenCalledWith(33)
+      expect(onNavigate).toHaveBeenCalledTimes(1)
+    })
+
+    it('un mensaje anterior sin chat sigue enlazando al reporte', () => {
+      renderConRouter(
+        <NotificationList
+          notifications={[notificacion({ reportId: 15, chatId: null })]}
+          onMarkRead={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+
+      expect(screen.getByRole('link', { name: /Nuevo mensaje/ })).toHaveAttribute('href', '/reports/15')
+    })
+
+    it('marcar como leida y eliminar no navegan', async () => {
+      const user = userEvent.setup()
+      const onMarkRead = vi.fn()
+      const onDelete = vi.fn()
+      renderConRouter(
+        <NotificationList notifications={[coincidencia()]} onMarkRead={onMarkRead} onDelete={onDelete} />
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Marcar como leída' }))
+      await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+
+      expect(onMarkRead).toHaveBeenCalledWith(21)
+      expect(onDelete).toHaveBeenCalledWith(21)
+      expect(screen.queryByText(/Detalle del reporte/)).not.toBeInTheDocument()
+    })
   })
 })

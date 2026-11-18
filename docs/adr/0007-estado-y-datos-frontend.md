@@ -20,7 +20,7 @@ SWR ofrece menos soporte para mutaciones e invalidación; Redux o RTK Query agre
 
 ## Consecuencias
 
-- El token de sesión se persiste en localStorage por defecto, lo que lo expone ante un ataque XSS. Es deuda técnica: la migración a cookie httpOnly se evalúa según [ADR-0018](0018-criterio-evolucion-tecnologica.md) ([#215](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/215)).
+- El token de sesión se persiste en localStorage por defecto, lo que lo expone ante un ataque XSS. Es deuda técnica: la migración a cookie httpOnly se descartó para esta entrega ([ADR-0027](0027-jwt-en-localstorage-sin-cookie-httponly.md), [#215](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/215)).
 - Mitigaciones vigentes: validación de sesiones contra la base con `token_version` y limpieza de caché al cerrar sesión.
 
 ## Referencias

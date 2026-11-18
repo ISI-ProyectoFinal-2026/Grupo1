@@ -21,6 +21,7 @@ function notificacion(overrides: Partial<NotificationDTO> = {}): NotificationDTO
     title: 'Nuevo mensaje',
     message: 'Tenes un mensaje nuevo',
     reportId: null,
+    chatId: null,
     isRead: false,
     createdAt: '2026-09-01T10:00:00.000Z',
     ...overrides,

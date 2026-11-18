@@ -10,6 +10,7 @@ export interface NotificationDTO {
   title: string | null
   message: string | null
   reportId: number | null
+  chatId: number | null
   isRead: boolean
   createdAt: string
 }

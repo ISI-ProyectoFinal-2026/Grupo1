@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { router } from '@/router'
@@ -71,7 +71,7 @@ const usuario: AuthUser = {
   updatedAt: '2026-09-01T10:00:00.000Z',
 }
 
-function renderRuta(ruta: string) {
+function renderRuta(ruta: string | { pathname: string; state?: unknown }) {
   const memoria = createMemoryRouter(router.routes, { initialEntries: [ruta] })
   render(<RouterProvider router={memoria} />)
   return memoria
@@ -112,6 +112,71 @@ describe('router: rutas publicas', () => {
   })
 })
 
+// El feed, el detalle y el directorio de comercios son material de difusion:
+// se ven sin sesion (#187).
+describe('router: rutas publicas de difusion', () => {
+  const publicas = [
+    ['/reports', 'pagina feed'],
+    ['/reports/5', 'pagina detalle reporte'],
+    ['/businesses', 'pagina directorio comercios'],
+    ['/businesses/9', 'pagina perfil comercio'],
+  ]
+
+  it.each(publicas)('%s se renderiza sin sesion', (ruta, texto) => {
+    const memoria = renderRuta(ruta)
+
+    expect(screen.getByText(texto)).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe(ruta)
+  })
+
+  it.each(publicas)('%s tambien se renderiza con sesion', (ruta, texto) => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
+
+    renderRuta(ruta)
+
+    expect(screen.getByText(texto)).toBeInTheDocument()
+  })
+
+  it.each(['/reports/new', '/reports/mine'])(
+    '%s no se confunde con el detalle publico /reports/:id',
+    (ruta) => {
+      const memoria = renderRuta(ruta)
+
+      expect(memoria.state.location.pathname).toBe('/login')
+      expect(screen.queryByText('pagina detalle reporte')).not.toBeInTheDocument()
+    }
+  )
+})
+
+// el interceptor cierra la sesion ante un 401 sin recargar la pagina (#187)
+describe('router: sesion vencida', () => {
+  it.each([
+    ['/reports/5', 'pagina detalle reporte'],
+    ['/businesses/9', 'pagina perfil comercio'],
+  ])('%s se queda como pagina anonima', (ruta, texto) => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
+    const memoria = renderRuta(ruta)
+
+    act(() => useAuthStore.getState().logout())
+
+    expect(screen.getByText(texto)).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe(ruta)
+  })
+
+  it('una pagina protegida termina en el login recordando de donde venia', () => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
+    const memoria = renderRuta('/chats/3?mensaje=1#ultimo')
+
+    act(() => useAuthStore.getState().logout())
+
+    expect(screen.getByText('pagina login')).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe('/login')
+    expect(memoria.state.location.state).toEqual({
+      from: { pathname: '/chats/3', search: '?mensaje=1', hash: '#ultimo' },
+    })
+  })
+})
+
 describe('router: rutas solo para invitados', () => {
   // Con sesion, el login y el registro no tienen sentido: se vuelve al inicio
   // en vez de mostrar el formulario al lado de la barra lateral logueada.
@@ -121,6 +186,24 @@ describe('router: rutas solo para invitados', () => {
     const memoria = renderRuta(ruta)
 
     expect(screen.getByText('pagina home')).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe('/')
+  })
+
+  // al iniciar sesion, GuestOnlyRoute y el login van al mismo destino (#187)
+  it('/login con sesion vuelve a la pagina de origen guardada', () => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
+
+    const memoria = renderRuta({ pathname: '/login', state: { from: { pathname: '/reports/5' } } })
+
+    expect(screen.getByText('pagina detalle reporte')).toBeInTheDocument()
+    expect(memoria.state.location.pathname).toBe('/reports/5')
+  })
+
+  it('/login con sesion ignora un origen externo y va al inicio', () => {
+    useAuthStore.getState().setAuth('jwt-de-prueba', usuario)
+
+    const memoria = renderRuta({ pathname: '/login', state: { from: { pathname: '//malicioso.test' } } })
+
     expect(memoria.state.location.pathname).toBe('/')
   })
 
@@ -135,18 +218,16 @@ describe('router: rutas solo para invitados', () => {
 describe('router: rutas protegidas', () => {
   const protegidas = [
     '/',
-    '/reports',
     '/reports/new',
-    '/reports/5',
     '/reports/5/edit',
     '/reports/mine',
     '/chats',
     '/chats/3',
-    '/businesses',
     '/businesses/register',
     '/businesses/dashboard',
-    '/businesses/9',
+    '/businesses/plan',
     '/account/security',
+    '/account/notifications',
     '/pets',
     '/pets/new',
     '/pets/3/edit',
@@ -161,17 +242,13 @@ describe('router: rutas protegidas', () => {
 
   it.each([
     ['/', 'pagina home'],
-    ['/reports', 'pagina feed'],
     ['/reports/new', 'pagina crear reporte'],
-    ['/reports/5', 'pagina detalle reporte'],
     ['/reports/5/edit', 'pagina editar reporte'],
     ['/reports/mine', 'pagina mis reportes'],
     ['/chats', 'pagina chat'],
     ['/chats/3', 'pagina chat'],
-    ['/businesses', 'pagina directorio comercios'],
     ['/businesses/register', 'pagina alta comercio'],
     ['/businesses/dashboard', 'pagina panel comercio'],
-    ['/businesses/9', 'pagina perfil comercio'],
     ['/account/security', 'pagina seguridad'],
     ['/pets', 'pagina mis mascotas'],
     ['/pets/new', 'pagina alta mascota'],
@@ -183,6 +260,15 @@ describe('router: rutas protegidas', () => {
 
     expect(screen.getByText(texto)).toBeInTheDocument()
   })
+
+  it.each(['/businesses/register', '/businesses/dashboard', '/businesses/plan'])(
+    '%s sin sesion no cae en el perfil publico /businesses/:id',
+    (ruta) => {
+      renderRuta(ruta)
+
+      expect(screen.queryByText('pagina perfil comercio')).not.toBeInTheDocument()
+    }
+  )
 
   it('/businesses/dashboard no se confunde con el perfil /businesses/:id', () => {
     useAuthStore.getState().setAuth('jwt-de-prueba', usuario)

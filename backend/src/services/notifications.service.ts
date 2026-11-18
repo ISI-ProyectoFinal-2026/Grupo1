@@ -300,6 +300,7 @@ export async function notifyNewMessage(chat: Chat, message: Message): Promise<No
       title: "Nuevo mensaje",
       message: preview ? `Tenés un mensaje nuevo: "${preview}"` : "Tenés un mensaje nuevo.",
       reportId: chat.reportId,
+      chatId: chat.id, // abre el chat desde la notificación (#222)
     },
   });
 }
