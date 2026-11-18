@@ -9,6 +9,7 @@ import {
   findSimilarReports,
   getFlyer,
   getMatches,
+  getInactivityWarning,
   getReport,
   keepReportActive,
   listReports,
@@ -123,6 +124,16 @@ describe('reports.service escritura', () => {
 
     expect(api.post).toHaveBeenCalledWith('/reports/5/keep-active')
     expect(resultado.status).toBe('published')
+  })
+
+  it('consulta el aviso de inactividad contra GET /reports/:id/inactivity-warning', async () => {
+    const aviso = { pending: true, warnedAt: '2026-10-01T10:00:00.000Z', day: 30 as const }
+    vi.mocked(api.get).mockResolvedValue(respuesta(aviso))
+
+    const resultado = await getInactivityWarning(5)
+
+    expect(api.get).toHaveBeenCalledWith('/reports/5/inactivity-warning')
+    expect(resultado).toEqual(aviso)
   })
 
   it('edita el reporte contra PUT /reports/:id con los campos parciales', async () => {

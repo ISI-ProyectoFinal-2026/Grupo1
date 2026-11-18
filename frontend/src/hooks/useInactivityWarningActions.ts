@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { closeReport, keepReportActive } from '@/services/reports.service'
 import { getApiErrorStatus } from '@/services/api'
 import { reportDetailQueryKey } from '@/hooks/useReportDetailQuery'
+import { inactivityWarningQueryKey } from '@/hooks/useInactivityWarningQuery'
 import { myReportsQueryKey } from '@/hooks/useMyReportsQuery'
 
 const NOT_PUBLISHED_MESSAGE = 'Este reporte ya no está publicado.'
@@ -14,6 +15,7 @@ export function useInactivityWarningActions(reportId: number) {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['notifications'] })
     queryClient.invalidateQueries({ queryKey: reportDetailQueryKey(reportId) })
+    queryClient.invalidateQueries({ queryKey: inactivityWarningQueryKey(reportId) })
     queryClient.invalidateQueries({ queryKey: myReportsQueryKey })
   }
   const options = {
