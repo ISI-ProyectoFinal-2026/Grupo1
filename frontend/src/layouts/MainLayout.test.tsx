@@ -53,6 +53,40 @@ describe('MainLayout', () => {
     expect(await screen.findByRole('button', { name: 'Notificaciones' })).toBeInTheDocument()
   })
 
+  it('muestra el boton de ayuda de su rol con sesion iniciada', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout()
+
+    expect(await screen.findByRole('button', { name: 'Ayuda: Menú principal (Usuario)' })).toBeInTheDocument()
+  })
+
+  it.each(['/reports/5', '/reports/mine', '/chats/3', '/'])('en %s el boton de ayuda nunca se oculta', async (ruta) => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout(ruta)
+
+    const contenedor = (await screen.findByRole('button', { name: /^Ayuda:/ })).parentElement
+    expect(contenedor).not.toHaveClass('max-lg:hidden')
+  })
+
+  it('el boton de ayuda toma la seccion de la ruta', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout('/businesses')
+
+    expect(await screen.findByRole('button', { name: 'Ayuda: Comercios (Usuario)' })).toBeInTheDocument()
+  })
+
+  it('no muestra el boton de ayuda sin sesion', async () => {
+    useAuthStore.setState({ token: null, user: null })
+
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /^Ayuda/ })).not.toBeInTheDocument()
+  })
+
   it('no muestra el bell sin sesion', async () => {
     useAuthStore.setState({ token: null, user: null })
 

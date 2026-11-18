@@ -10,6 +10,7 @@ import { useDeleteReport } from "@/hooks/useDeleteReport";
 import { getFlyer, uploadCustomFlyer } from "@/services/reports.service";
 import { createChat } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
+import { useHelpBarOffset } from "@/hooks/useHelpBarOffset";
 import Button from "@/components/ui/Button";
 import { buttonClasses } from "@/components/ui/buttonClasses";
 import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
@@ -44,6 +45,7 @@ const sectionTitle = "font-display text-display-sm text-ink";
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const helpBarRef = useHelpBarOffset();
   // Aviso que deja la pantalla anterior (alta o edición del reporte).
   const flashMessage = (useLocation().state as { message?: string } | null)?.message;
 
@@ -415,6 +417,7 @@ export default function ReportDetailPage() {
 
         {hasActions && (
           <aside
+            ref={helpBarRef}
             aria-label="Acciones del reporte"
             className={cn(
               "sticky bottom-above-tabbar z-20 -mx-4 flex max-h-[60vh] flex-col gap-2 overflow-y-auto overscroll-contain border-t border-line bg-paper px-4 py-3 shadow-sheet sm:-mx-6 sm:px-6",
