@@ -1,4 +1,4 @@
-# ADR-0027: Cierre por inactividad con columna de actividad propia y tarea periódica en el backend
+# ADR-0028: Cierre por inactividad con columna de actividad propia y tarea periódica en el backend
 
 - **Estado:** Aceptada
 - **Responsables:** Franco Marín
