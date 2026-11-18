@@ -17,7 +17,7 @@ import ErrorMessage from "@/components/ui/ErrorMessage";
 import SuccessMessage from "@/components/ui/SuccessMessage";
 import { CalendarIcon, ChatIcon, ChevronLeftIcon, PawIcon, PinIcon } from "@/components/ui/icons";
 import EmailNotVerifiedNotice from "@/components/auth/EmailNotVerifiedNotice";
-import { getApiErrorCode } from "@/services/api";
+import { getApiErrorCode, getApiErrorStatus } from "@/services/api";
 import { EMAIL_NOT_VERIFIED } from "@/types/auth";
 import PendingBanner from "@/components/reports/PendingBanner";
 import MatchCard from "@/components/reports/MatchCard";
@@ -122,6 +122,23 @@ export default function ReportDetailPage() {
     );
   }
 
+  // 404: oculto, rechazado, eliminado o de un autor suspendido (#187)
+  if (getApiErrorStatus(error) === 404) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+        <div className="card p-5 sm:p-6">
+          <h1 className="font-display text-display-md">Este reporte ya no está disponible</h1>
+          <p className="mt-2 text-ink-muted">
+            Puede que lo hayan eliminado o que esté oculto. Seguí buscando en el resto de los reportes.
+          </p>
+        </div>
+        <Link to="/reports" className={buttonClasses("secondary", "md", "mt-4")}>
+          Volver a reportes
+        </Link>
+      </div>
+    );
+  }
+
   if (error || !report) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
@@ -157,6 +174,8 @@ export default function ReportDetailPage() {
   // denuncia la cuenta del autor, no la publicación (#267)
   const canReportAccount = currentUserId !== undefined && !isOwner;
   const hasActions = canContact || isOwner || canFlag || canReportAccount;
+  // las coincidencias exigen sesión en el backend (#175); el visitante no las ve (#187)
+  const canSeeMatches = currentUserId !== undefined;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-4 pt-2 sm:px-6 lg:py-6">
@@ -315,70 +334,77 @@ export default function ReportDetailPage() {
           )}
         </article>
 
-        <section className="min-w-0 lg:col-start-2 lg:row-start-2 lg:self-start" aria-labelledby="coincidencias">
+        <section
+          className="min-w-0 lg:col-start-2 lg:row-start-2 lg:self-start"
+          aria-labelledby={canSeeMatches ? "coincidencias" : undefined}
+        >
           {report.status === "pending" ? (
             <PendingBanner />
           ) : (
             <>
-              <h2 id="coincidencias" className={sectionTitle}>
-                Coincidencias sugeridas
-              </h2>
-              {offerClose && (
-                <div className="card mt-3 flex flex-col gap-3 border-signal p-4">
-                  <p className="text-ink">
-                    Confirmaste una coincidencia. Si ya resolviste el caso, podés cerrar tu reporte.
-                  </p>
-                  <CloseReportButton
-                    label="Cerrar mi reporte"
-                    onConfirm={closeReport.close}
-                    isPending={closeReport.isPending}
-                    error={closeReport.error}
-                  />
-                </div>
-              )}
-              <div className="mt-3">
-                {isLoadingMatches ? (
-                  <SkeletonGroup className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
-                    {[0, 1].map((key) => (
-                      <div key={key} className="card flex gap-3 p-3">
-                        <Skeleton className="h-[88px] w-[88px] shrink-0 rounded-[10px]" />
-                        <div className="flex flex-1 flex-col gap-2 py-1">
-                          <Skeleton className="h-4 w-3/4" />
-                          <Skeleton className="h-5 w-20 rounded-full" />
-                          <Skeleton className="mt-auto h-3.5 w-1/2" />
-                        </div>
+              {canSeeMatches && (
+                <>
+                  <h2 id="coincidencias" className={sectionTitle}>
+                    Coincidencias sugeridas
+                  </h2>
+                  {offerClose && (
+                    <div className="card mt-3 flex flex-col gap-3 border-signal p-4">
+                      <p className="text-ink">
+                        Confirmaste una coincidencia. Si ya resolviste el caso, podés cerrar tu reporte.
+                      </p>
+                      <CloseReportButton
+                        label="Cerrar mi reporte"
+                        onConfirm={closeReport.close}
+                        isPending={closeReport.isPending}
+                        error={closeReport.error}
+                      />
+                    </div>
+                  )}
+                  <div className="mt-3">
+                    {isLoadingMatches ? (
+                      <SkeletonGroup className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
+                        {[0, 1].map((key) => (
+                          <div key={key} className="card flex gap-3 p-3">
+                            <Skeleton className="h-[88px] w-[88px] shrink-0 rounded-[10px]" />
+                            <div className="flex flex-1 flex-col gap-2 py-1">
+                              <Skeleton className="h-4 w-3/4" />
+                              <Skeleton className="h-5 w-20 rounded-full" />
+                              <Skeleton className="mt-auto h-3.5 w-1/2" />
+                            </div>
+                          </div>
+                        ))}
+                      </SkeletonGroup>
+                    ) : matches && matches.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
+                        {matches.map((match, index) => (
+                          <div
+                            key={match.matchId}
+                            className="animate-rise"
+                            style={{ animationDelay: `${Math.min(index, 6) * 50}ms` }}
+                          >
+                            <MatchCard
+                              match={match}
+                              canManage={isOwner}
+                              onConfirm={matchActions.confirm}
+                              onReject={matchActions.reject}
+                              isBusy={matchActions.isBusy}
+                              error={matchActions.errorFor(match.matchId)}
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </SkeletonGroup>
-                ) : matches && matches.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
-                    {matches.map((match, index) => (
-                      <div
-                        key={match.matchId}
-                        className="animate-rise"
-                        style={{ animationDelay: `${Math.min(index, 6) * 50}ms` }}
-                      >
-                        <MatchCard
-                          match={match}
-                          canManage={isOwner}
-                          onConfirm={matchActions.confirm}
-                          onReject={matchActions.reject}
-                          isBusy={matchActions.isBusy}
-                          error={matchActions.errorFor(match.matchId)}
-                        />
-                      </div>
-                    ))}
+                    ) : (
+                      <p className="flex animate-fade items-center gap-3 rounded-card border border-dashed border-line bg-paper/60 p-4 text-sm text-ink-muted">
+                        <PawIcon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+                        No se encontraron coincidencias todavía
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <p className="flex animate-fade items-center gap-3 rounded-card border border-dashed border-line bg-paper/60 p-4 text-sm text-ink-muted">
-                    <PawIcon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
-                    No se encontraron coincidencias todavía
-                  </p>
-                )}
-              </div>
+                </>
+              )}
 
               {/* publicidad y comercios cerca de la ubicación del reporte (ADR-0024) */}
-              <div className="mt-6 flex flex-col gap-4">
+              <div className={cn("flex flex-col gap-4", canSeeMatches && "mt-6")}>
                 <NearbyBusinesses reportId={report.id} />
                 <AdBanner placement="report_detail" reportId={report.id} />
               </div>

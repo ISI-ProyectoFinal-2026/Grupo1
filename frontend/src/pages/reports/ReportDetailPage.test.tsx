@@ -299,3 +299,31 @@ describe('ReportDetailPage flyer propio', () => {
     expect(screen.queryByText('o subí tu propio flyer')).not.toBeInTheDocument()
   })
 })
+
+// getVisibleById responde 404 si el reporte ya no se puede ver (#187)
+describe('ReportDetailPage reporte no disponible', () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
+  it('con un 404 avisa que el reporte ya no está disponible y ofrece volver al feed', async () => {
+    vi.mocked(reportsService.getReport).mockRejectedValue(
+      Object.assign(new Error('Reporte no encontrado'), { status: 404 })
+    )
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Este reporte ya no está disponible' })).toBeInTheDocument()
+    expect(screen.queryByText('Error al cargar el reporte')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Volver a reportes' })).toHaveAttribute('href', '/reports')
+  })
+
+  it('otro error mantiene el mensaje genérico', async () => {
+    vi.mocked(reportsService.getReport).mockRejectedValue(
+      Object.assign(new Error('Error inesperado'), { status: 500 })
+    )
+    renderPage()
+
+    expect(await screen.findByText('Error al cargar el reporte')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Este reporte ya no está disponible' })).not.toBeInTheDocument()
+  })
+})

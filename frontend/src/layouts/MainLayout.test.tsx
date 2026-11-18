@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MainLayout from '@/layouts/MainLayout'
 import { createQueryWrapper } from '@/test/query-wrapper'
@@ -61,6 +61,89 @@ describe('MainLayout', () => {
     await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Notificaciones' })).not.toBeInTheDocument()
     expect(notificationsService.listNotifications).not.toHaveBeenCalled()
+  })
+
+  // un visitante que llega a un reporte publico tiene por donde entrar (#187)
+  it('sin sesion ofrece ingresar y crear cuenta, sin la navegacion de la cuenta', async () => {
+    useAuthStore.setState({ token: null, user: null })
+
+    renderLayout('/reports/5')
+
+    expect(await screen.findByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/login')
+    expect(screen.getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/register')
+    expect(screen.queryByRole('navigation', { name: 'Navegación principal' })).not.toBeInTheDocument()
+    expect(authService.getMe).not.toHaveBeenCalled()
+  })
+
+  // el login vuelve a la pagina publica desde la que se entro (#187)
+  it('Ingresar lleva al login recordando la pagina publica', async () => {
+    useAuthStore.setState({ token: null, user: null })
+    function SondaLogin() {
+      return <p data-testid='state-login'>{JSON.stringify(useLocation().state)}</p>
+    }
+    const { Wrapper } = createQueryWrapper()
+    render(
+      <Wrapper>
+        <MemoryRouter initialEntries={['/reports/5?vista=mapa#flyer']}>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route path='/reports/:id' element={<div>detalle</div>} />
+              <Route path='/login' element={<SondaLogin />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </Wrapper>
+    )
+
+    await userEvent.setup().click(await screen.findByRole('link', { name: 'Ingresar' }))
+
+    expect(JSON.parse(screen.getByTestId('state-login').textContent ?? 'null')).toEqual({
+      from: { pathname: '/reports/5', search: '?vista=mapa', hash: '#flyer' },
+    })
+  })
+
+  // volver a un link de email (token de un solo uso) despues del login no sirve
+  it('desde una pagina de link de email Ingresar no guarda el origen', async () => {
+    useAuthStore.setState({ token: null, user: null })
+    function SondaLogin() {
+      return <p data-testid='state-login'>{JSON.stringify(useLocation().state)}</p>
+    }
+    const { Wrapper } = createQueryWrapper()
+    render(
+      <Wrapper>
+        <MemoryRouter initialEntries={['/verify-email?token=abc']}>
+          <Routes>
+            <Route element={<MainLayout />}>
+              <Route path='/verify-email' element={<div>verificar</div>} />
+              <Route path='/login' element={<SondaLogin />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </Wrapper>
+    )
+
+    await userEvent.setup().click(await screen.findByRole('link', { name: 'Ingresar' }))
+
+    expect(screen.getByTestId('state-login')).toHaveTextContent('null')
+  })
+
+  it.each(['/login', '/register'])('en %s no repite los accesos de invitado', async (ruta) => {
+    useAuthStore.setState({ token: null, user: null })
+
+    renderLayout(ruta)
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: 'Ingresar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Crear cuenta' })).not.toBeInTheDocument()
+  })
+
+  it('con sesion no muestra los accesos de invitado', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout('/reports')
+
+    await screen.findByRole('button', { name: 'Notificaciones' })
+    expect(screen.queryByRole('link', { name: 'Ingresar' })).not.toBeInTheDocument()
   })
 
   it('ofrece el panel de moderacion a un moderador', async () => {

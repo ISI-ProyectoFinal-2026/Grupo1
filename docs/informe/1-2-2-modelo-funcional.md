@@ -25,7 +25,7 @@ Los diagramas describen el sistema tal como está implementado. Reemplazan a los
 
 | Actor | Quién es en el sistema | Fuente |
 |---|---|---|
-| Visitante anónimo | Persona sin sesión. Se registra, inicia sesión y recupera su cuenta. La API le permite leer reportes, flyers y comercios, pero la interfaz exige iniciar sesión ([#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187)) | `backend/src/routes/reports.routes.ts:19`, `:22`, `:40`; `backend/src/routes/businesses.routes.ts:15-16` |
+| Visitante anónimo | Persona sin sesión. Se registra, inicia sesión y recupera su cuenta. Además ve el feed, el detalle de los reportes, el flyer y los comercios ([#187](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/187)) | `backend/src/routes/reports.routes.ts:19`, `:22`, `:40`; `backend/src/routes/businesses.routes.ts:15-16`; `frontend/src/router.tsx:54-59` |
 | Usuario registrado | Cuenta con rol `usuario_regular` y el email todavía sin verificar. Consulta, denuncia, registra un comercio y recibe notificaciones | `backend/prisma/schema.prisma:18-24`, `:32` |
 | Usuario verificado | Especializa al usuario registrado: además publica reportes, sube imágenes, chatea y activa el 2FA | `backend/src/middlewares/auth.middleware.ts:110`; `backend/src/routes/reports.routes.ts:21`; `backend/src/routes/chats.routes.ts:8`, `:10`; `backend/src/routes/auth.routes.ts:35-36` |
 | Dueño | Actor conceptual que especializa al usuario verificado: perdió su mascota y publica un reporte de pérdida. En el sistema es la misma cuenta | `backend/src/validators/reports.validator.ts:12` |
@@ -64,7 +64,7 @@ flowchart LR
   CF[["Cloudflare R2"]]
   SMTP[["Servidor SMTP"]]
   OSM[["OpenStreetMap y Nominatim"]]
-  N1>"La API permite leer reportes, flyers y comercios sin sesión; la interfaz exige iniciar sesión, issue 187"]
+  N1>"Sin sesión ve el feed, el detalle de los reportes, el flyer y los comercios, issue 187"]
   VIS --- S1
   VIS -.- N1
   REG --- S2
@@ -326,8 +326,8 @@ Cada requerimiento funcional (RF) del PDD v1.0 se traza hasta el issue, el códi
 | RF-21 | Al hacer clic en un marcador, abrir el detalle | [#23](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/23) | `frontend/src/components/reports/MapView.tsx:89-94` | No identificada | Implementado |
 | RF-22 | Búsqueda por radio de cercanía | [#24](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/24), [#71](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/71) | `backend/src/services/geo.service.ts:11` | `backend/tests/geo/geo.routes.test.ts` | Parcial: solo API |
 | RF-23 | Generación automática del flyer | [#25](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/25) | `backend/src/services/flyer.service.ts:728` | `backend/tests/reports/flyer.service.test.ts` | Implementado: incluye el teléfono del autor solo si este lo autoriza |
-| RF-24 | Descarga del flyer como imagen | [#26](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/26) | `frontend/src/pages/reports/ReportDetailPage.tsx:243` | `backend/tests/reports/flyer.routes.test.ts` | Implementado |
-| RF-25 | Compartir en WhatsApp, Instagram y Facebook | [#26](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/26) | `frontend/src/pages/reports/ReportDetailPage.tsx:75-85` | No identificada | Parcial: menú de compartir del sistema, sin botón por red |
+| RF-24 | Descarga del flyer como imagen | [#26](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/26) | `frontend/src/pages/reports/ReportDetailPage.tsx:315-323` | `backend/tests/reports/flyer.routes.test.ts` | Implementado |
+| RF-25 | Compartir en WhatsApp, Instagram y Facebook | [#26](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/26) | `frontend/src/pages/reports/ReportDetailPage.tsx:93-103` | No identificada | Parcial: menú de compartir del sistema, sin botón por red |
 | RF-26 | [SHOULD] Flyer personalizado | [#36](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/36) | `backend/src/services/reports.service.ts:281` | `backend/tests/reports/flyer.routes.test.ts` | Parcial: se sube una imagen propia |
 | RF-27 | Validación y moderación automática de publicaciones | [#19](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/19) | `backend-ia/app/ml/pipeline.py:73`; `backend/src/services/matching.service.ts:149` | `backend/tests/e2e/ai-moderation.e2e.test.ts`, `backend-ia/tests/test_image_analysis_service.py` | Implementado: detecta si hay un animal |
 | RF-28 | Denuncia de publicaciones inapropiadas | [#20](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/20), [#183](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/183), [#186](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/186) | `backend/src/services/report-flags.service.ts:16`, `:67` | `backend/tests/e2e/flag-moderation.e2e.test.ts`, `frontend/e2e/f3-flag-moderation.spec.ts` | Implementado |

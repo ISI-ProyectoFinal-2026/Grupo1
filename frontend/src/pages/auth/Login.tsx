@@ -13,6 +13,7 @@ import { login } from "@/services/auth.service";
 import { loginWithTwoFactor, requestTwoFactorReset } from "@/services/two-factor.service";
 import { useAuthStore } from "@/stores/auth.store";
 import { isTwoFactorChallenge, TWO_FACTOR_CHALLENGE_INVALID, TWO_FACTOR_LOCKED } from "@/types/auth";
+import { postLoginPath } from "@/utils/redirect";
 import type { AuthUser, SuspensionDetails } from "@/types/auth";
 import {
   formatWaitMessage,
@@ -71,7 +72,8 @@ function Login() {
 
   function startSession(token: string, user: AuthUser) {
     useAuthStore.getState().setAuth(token, user);
-    navigate("/", { replace: true });
+    // vuelve a la página desde la que se pidió el login (#187)
+    navigate(postLoginPath(location.state), { replace: true });
   }
 
   function backToPassword(message: string | null) {
