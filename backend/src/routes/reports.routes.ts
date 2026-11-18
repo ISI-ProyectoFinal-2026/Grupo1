@@ -49,5 +49,6 @@ reportsRouter.put("/:id", requireAuth, reportsController.update);
 reportsRouter.put("/:id/flyer/custom", requireAuth, reportsController.setCustomFlyer);
 reportsRouter.delete("/:id", requireAuth, reportsController.remove);
 reportsRouter.post("/:id/close", requireAuth, reportsController.close);
+reportsRouter.get("/:id/inactivity-warning", requireAuth, reportsController.getInactivityWarning);
 reportsRouter.post("/:id/keep-active", requireAuth, reportsController.keepShowing);
 reportsRouter.post("/:id/flags", requireAuth, reportFlagsController.create);

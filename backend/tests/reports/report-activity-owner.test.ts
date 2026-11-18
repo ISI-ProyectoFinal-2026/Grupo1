@@ -2,6 +2,7 @@ import { prisma } from "../../src/db/client";
 import * as chatsService from "../../src/services/chats.service";
 import * as matchingService from "../../src/services/matching.service";
 import * as notificationsService from "../../src/services/notifications.service";
+import * as reportsService from "../../src/services/reports.service";
 import * as inactivityService from "../../src/services/report-inactivity.service";
 
 describe("solo el dueño reinicia la inactividad (#264)", () => {
@@ -65,6 +66,39 @@ describe("solo el dueño reinicia la inactividad (#264)", () => {
       await matchingService.rejectMatch(20, 1, 5);
 
       expect(touchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getInactivityWarning", () => {
+    const T30 = new Date("2026-03-01T00:00:00Z");
+    const T37 = new Date("2026-03-08T00:00:00Z");
+    const mockReport = (row: Record<string, unknown> | null) =>
+      jest.spyOn(prisma.report, "findUnique").mockResolvedValue(row as never);
+    const base = { userId: 5, status: "published", inactivityWarned30At: null, inactivityWarned37At: null };
+
+    test.each([
+      ["sin avisos", base, { pending: false, warnedAt: null, day: null }],
+      ["aviso 30", { ...base, inactivityWarned30At: T30 }, { pending: true, warnedAt: T30.toISOString(), day: 30 }],
+      [
+        "aviso 37",
+        { ...base, inactivityWarned30At: T30, inactivityWarned37At: T37 },
+        { pending: true, warnedAt: T37.toISOString(), day: 37 },
+      ],
+      ["resuelto con timestamps", { ...base, status: "resolved", inactivityWarned30At: T30 }, { pending: false, warnedAt: null, day: null }],
+      ["oculto con timestamps", { ...base, status: "hidden", inactivityWarned30At: T30 }, { pending: false, warnedAt: null, day: null }],
+    ])("dueño, %s", async (_name, row, expected) => {
+      mockReport(row);
+      expect(await reportsService.getInactivityWarning(1, 5)).toEqual(expected);
+    });
+
+    test("403 si no es el dueño", async () => {
+      mockReport({ ...base, inactivityWarned30At: T30 });
+      await expect(reportsService.getInactivityWarning(1, 6)).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    test("404 si no existe", async () => {
+      mockReport(null);
+      await expect(reportsService.getInactivityWarning(1, 5)).rejects.toMatchObject({ statusCode: 404 });
     });
   });
 });

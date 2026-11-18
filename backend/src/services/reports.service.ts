@@ -371,6 +371,31 @@ export async function close(id: number, userId: number): Promise<ReportDTO> {
   return getById(id);
 }
 
+export interface InactivityWarningDTO {
+  pending: boolean;
+  warnedAt: string | null;
+  day: 30 | 37 | null;
+}
+
+// aviso de inactividad pendiente, solo para el dueño (#264)
+export async function getInactivityWarning(id: number, userId: number): Promise<InactivityWarningDTO> {
+  const report = await prisma.report.findUnique({
+    where: { id },
+    select: { userId: true, status: true, inactivityWarned30At: true, inactivityWarned37At: true },
+  });
+  if (!report) {
+    throw new AppError(404, "Reporte no encontrado");
+  }
+  if (report.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para ver este aviso");
+  }
+  const warnedAt = report.inactivityWarned37At ?? report.inactivityWarned30At;
+  if (report.status !== "published" || !warnedAt) {
+    return { pending: false, warnedAt: null, day: null };
+  }
+  return { pending: true, warnedAt: warnedAt.toISOString(), day: report.inactivityWarned37At ? 37 : 30 };
+}
+
 // "Seguir mostrando" (#264): reinicia el contador de inactividad
 export async function keepShowing(id: number, userId: number): Promise<ReportDTO> {
   const report = await getById(id);

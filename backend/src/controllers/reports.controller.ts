@@ -61,6 +61,11 @@ export async function close(req: Request, res: Response): Promise<void> {
   res.status(200).json(report);
 }
 
+export async function getInactivityWarning(req: Request, res: Response): Promise<void> {
+  const { id } = reportIdParamSchema.parse(req.params);
+  res.status(200).json(await reportsService.getInactivityWarning(id, req.userId!));
+}
+
 export async function keepShowing(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
   const report = await reportsService.keepShowing(id, req.userId!);

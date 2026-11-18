@@ -88,6 +88,72 @@ describe("actividad y cierre por inactividad (#264)", () => {
     });
   });
 
+  describe("GET /api/reports/:id/inactivity-warning", () => {
+    const get = (id: number, token?: string) => {
+      const req = request(app).get(`/api/reports/${id}/inactivity-warning`);
+      return token ? req.set("Authorization", `Bearer ${token}`) : req;
+    };
+
+    test("dueño: pending true con day 37 si ambos avisos fueron enviados", async () => {
+      const id = await createReport(ownerId);
+
+      const res = await get(id, ownerToken);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ pending: true, warnedAt: OLD.toISOString(), day: 37 });
+    });
+
+    test("dueño: day 30 si solo está el primer aviso", async () => {
+      const id = await createReport(ownerId);
+      await prisma.report.update({ where: { id }, data: { inactivityWarned37At: null } });
+
+      expect((await get(id, ownerToken)).body).toEqual({ pending: true, warnedAt: OLD.toISOString(), day: 30 });
+    });
+
+    test("dueño: pending false si nunca fue avisado", async () => {
+      const id = await createReport(ownerId);
+      await prisma.report.update({ where: { id }, data: { inactivityWarned30At: null, inactivityWarned37At: null } });
+
+      expect((await get(id, ownerToken)).body).toEqual({ pending: false, warnedAt: null, day: null });
+    });
+
+    test("pending false tras keep-active y tras editar", async () => {
+      const kept = await createReport(ownerId);
+      await request(app).post(`/api/reports/${kept}/keep-active`).set("Authorization", `Bearer ${ownerToken}`);
+      expect((await get(kept, ownerToken)).body.pending).toBe(false);
+
+      const edited = await createReport(ownerId);
+      await reportsService.update(edited, ownerId, { title: "Editado" });
+      expect((await get(edited, ownerToken)).body.pending).toBe(false);
+    });
+
+    test.each(["resolved", "hidden"] as const)("pending false si el reporte está %s aunque queden timestamps", async (status) => {
+      const id = await createReport(ownerId);
+      await prisma.report.update({ where: { id }, data: { status } });
+
+      expect((await get(id, ownerToken)).body.pending).toBe(false);
+    });
+
+    test("403 a otro usuario, sin filtrar datos; sin sesión no accede; 404 si no existe", async () => {
+      const id = await createReport(ownerId);
+
+      const other = await get(id, otherToken);
+      expect(other.status).toBe(403);
+      expect(JSON.stringify(other.body)).not.toContain("warnedAt");
+      expect((await get(id)).status).toBe(401);
+      expect((await get(999999999, ownerToken)).status).toBe(404);
+    });
+
+    test("el detalle público no expone el aviso", async () => {
+      const id = await createReport(ownerId);
+
+      const res = await request(app).get(`/api/reports/${id}`);
+
+      expect(res.body).not.toHaveProperty("inactivityWarned30At");
+      expect(res.body).not.toHaveProperty("inactivityWarning");
+    });
+  });
+
   describe("avisos pendientes", () => {
     async function createWarning(reportId: number) {
       await prisma.notification.create({ data: { userId: ownerId, type: "inactivity_warning", reportId } });
