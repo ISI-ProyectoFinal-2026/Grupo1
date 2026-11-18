@@ -179,6 +179,12 @@ model Report {
   flagCycle       Int          @default(0) @map("flag_cycle")
   // última edición del autor; habilita re-denunciar tras restaurar
   contentEditedAt DateTime?    @map("content_edited_at")
+  // cierre por inactividad (#264): solo acciones del dueño o de los usuarios
+  lastActivityAt  DateTime     @default(now()) @map("last_activity_at")
+  inactivityWarned30At DateTime? @map("inactivity_warned_30_at")
+  inactivityWarned37At DateTime? @map("inactivity_warned_37_at")
+  closedReason    ReportClosedReason? @map("closed_reason")
+  closedAt        DateTime?    @map("closed_at")
 
   user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   pet    Pet?             @relation(fields: [petId], references: [id])
@@ -191,7 +197,15 @@ model Report {
 
   @@index([status])
   @@index([reportType])
+  @@index([status, lastActivityAt])
   @@map("reports")
+}
+
+enum ReportClosedReason {
+  manual
+  inactivity
+
+  @@map("report_closed_reason")
 }
 
 enum ReportFlagStatus {
@@ -409,7 +423,7 @@ model Message {
 model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int      @map("user_id")
-  type      String? // match_suggested | match_confirmed | message | report_status_change | nearby_report | role_change
+  type      String? // match_suggested | match_confirmed | message | report_status_change | nearby_report | role_change | inactivity_warning | inactivity_closed
   title     String?
   message   String?
   reportId  Int?     @map("report_id")
