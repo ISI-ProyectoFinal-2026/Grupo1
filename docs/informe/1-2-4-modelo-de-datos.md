@@ -25,7 +25,7 @@ El sistema usa una única base PostgreSQL 16 con las extensiones PostGIS y pgvec
 | `ReportMatch` | `report_matches` | Coincidencia sugerida entre un reporte perdido y uno encontrado, con puntaje de similitud y estado | único `(report_lost_id, report_found_id)`; índices `report_found_id` y `status` |
 | `Chat` | `chats` | Conversación entre dos usuarios por reporte; el par se guarda normalizado (id menor en `user_a_id`) | único `(user_a_id, user_b_id, report_id)`; `report_id` opcional |
 | `Message` | `messages` | Mensaje de texto y/o imagen dentro de un chat | FK a `chats` y `users` |
-| `Notification` | `notifications` | Aviso a un usuario (sugerencia de coincidencia, mensaje, cambio de estado) | índice `user_id` |
+| `Notification` | `notifications` | Aviso a un usuario (sugerencia de coincidencia, mensaje, cambio de estado) | índice `user_id`; `chat_id` opcional, solo en avisos de mensaje, pasa a nulo al borrar el chat |
 | `NotificationPreference` | `notification_preferences` | Preferencias de notificación por tipo, radio y tipo de reporte cercano, consentimiento y última ubicación `geometry(Point, 4326)` del usuario ([ADR-0022](../adr/0022-preferencias-notificacion-tabla-propia.md)) | PK `user_id`; índice GiST `location`; cascada con el usuario |
 | `AccountReport` | `account_reports` | Denuncia de una cuenta con gravedad (`mild`, `moderate`, `severe`), asociada a la sanción que originó | único parcial `(reported_user_id, reporter_id)` con `sanction_id` nulo; índice `(reported_user_id, sanction_id)` |
 | `AccountSanction` | `account_sanctions` | Sanción de cuenta: gravedad, tipo, estado, advertencia, motivo, denuncias que la dispararon, inicio y fin | único parcial `user_id` con estado `active` o `pending_review`; índices `(user_id, status)` y `(status, ends_at)` |
@@ -38,7 +38,7 @@ El sistema usa una única base PostgreSQL 16 con las extensiones PostGIS y pgvec
 | `AdFlag` | `ad_flags` | Denuncia de un usuario sobre un anuncio, con motivo y estado: pendiente, anuncio dado de baja (`removed`) o denuncia desestimada (`dismissed`) | único `(ad_id, user_id)`; índice `status`; cascada con el anuncio |
 | `BusinessEvent` | `business_events` | Registro de visitas y contactos al perfil de un comercio; `user_id` nulo para visitantes anónimos | índice `(business_id, type)`; cascada con el comercio |
 
-Fuente: `backend/prisma/schema.prisma`, líneas 26-647.
+Fuente: `backend/prisma/schema.prisma`, líneas 26-671.
 
 ## Relaciones
 
@@ -48,7 +48,7 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-647.
 - `Pet` se relaciona 1:N con `Report`, pero el reporte puede existir sin mascota.
 - `Report` se relaciona 1:N con `ReportFlag`, `Chat` y `Notification`, y 1:1 con `ReportEmbedding`.
 - `ReportMatch` une dos reportes: uno perdido (`report_lost_id`) y uno encontrado (`report_found_id`).
-- `Chat` une a dos usuarios (`user_a_id`, `user_b_id`) y, opcionalmente, a un reporte; contiene 1:N `Message`.
+- `Chat` une a dos usuarios (`user_a_id`, `user_b_id`) y, opcionalmente, a un reporte; contiene 1:N `Message` y se relaciona 1:N con `Notification` (avisos de mensaje).
 - `Business` se relaciona 1:N con `BusinessEvent`, `Subscription` y `Ad`; `Ad` se relaciona 1:N con `AdEvent` y `AdFlag`. `User` se relaciona además 1:N con `AdFlag`.
 
 ## Enumeraciones
@@ -122,5 +122,6 @@ El servicio de IA mapea con SQLAlchemy dos tablas del esquema ([`backend-ia/app/
 | `20261105000000_account_reports_and_sanctions` | Tablas `account_reports`, `account_sanctions` y `account_sanction_events`, sus enumeraciones e índices únicos parciales |
 | `20261110000000_cascade_user_deletion` | Borrado en cascada desde `users`; `actor_id` de `account_sanction_events` y `role_change_audits` pasa a `SET NULL` |
 | `20261110000000_report_extra_image_urls` | Columna `extra_image_urls` en `reports` |
+| `20261117000000_notification_chat_id` | Columna `chat_id` en `notifications`, con `SET NULL` al borrar el chat |
 
 Fuente: `backend/prisma/migrations/*/migration.sql`.

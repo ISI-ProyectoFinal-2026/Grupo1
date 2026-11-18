@@ -21,6 +21,12 @@ test('F2: the owner is notified of an AI match and confirms it from the report d
   await expect(page.getByText('¡Posible coincidencia encontrada!')).toBeVisible()
   await expect(page.getByText(/87% de similitud/)).toBeVisible()
 
+  // The notification links to the candidate report and is marked as read (#222).
+  await page.getByRole('link', { name: /Posible coincidencia encontrada/ }).click()
+  await expect(page).toHaveURL(new RegExp(`/reports/${found.id}$`))
+  await expect(page.getByRole('heading', { name: found.title })).toBeVisible()
+  await expect(page.getByLabel(/notificaciones sin leer/)).toHaveCount(0)
+
   await page.goto(`/reports/${lost.id}`)
   await expect(page.getByRole('heading', { name: lost.title })).toBeVisible()
   await expect(page.getByText(found.title)).toBeVisible()

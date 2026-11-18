@@ -419,6 +419,7 @@ CREATE TABLE notifications (
   title VARCHAR(255),
   message TEXT,
   report_id INT REFERENCES reports(id),
+  chat_id INT REFERENCES chats(id) ON DELETE SET NULL,  -- solo avisos de mensaje
   is_read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   FOREIGN KEY (user_id) REFERENCES users(id),

@@ -133,7 +133,18 @@ describe("notificaciones respetan las preferencias (#33)", () => {
     it("sin fila crea la notificación para el receptor", async () => {
       const { chat, message } = await sendMessage();
       const n = await notifyNewMessage(chat, message);
-      expect(n).toMatchObject({ userId: ownerB, type: "message" });
+      expect(n).toMatchObject({ userId: ownerB, type: "message", reportId: reportA, chatId });
+    });
+
+    it("si se borra el chat la notificación queda sin chat (#222)", async () => {
+      const [userAId, userBId] = ownerA < ownerB ? [ownerA, ownerB] : [ownerB, ownerA];
+      const tempChat = await prisma.chat.create({ data: { userAId, userBId, reportId: reportB } });
+      const message = await prisma.message.create({ data: { chatId: tempChat.id, senderId: ownerA, content: "Hola" } });
+      const n = await notifyNewMessage(tempChat, message);
+
+      await prisma.chat.delete({ where: { id: tempChat.id } });
+
+      await expect(prisma.notification.findUnique({ where: { id: n!.id } })).resolves.toMatchObject({ chatId: null });
     });
 
     it("con el flag activado crea la notificación", async () => {
