@@ -1,7 +1,7 @@
 # ADR-0026: Backup de la base y de las imágenes con un servicio Node en Docker
 
 - **Estado:** Aceptada
-- **Responsables:** dbeagus
+- **Responsables:** Agustín Díaz
 
 ## Decisión
 
