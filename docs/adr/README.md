@@ -42,6 +42,7 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0024](0024-modelo-monetizacion.md) | Modelo de monetización con un plan pago y publicidad segmentada por cercanía | Aceptada | Agustín Díaz | — | — |
 | [ADR-0025](0025-geocodificacion-inversa-proxy-backend.md) | Geocodificación inversa mediante un proxy en el backend con caché | Aceptada | Franco Marín | — | — |
 | [ADR-0026](0026-backup-servicio-node-docker.md) | Backup de la base y de las imágenes con un servicio Node en Docker | Aceptada | dbeagus | — | — |
+| [ADR-0027](0027-jwt-en-localstorage-sin-cookie-httponly.md) | Mantener el JWT en localStorage y no migrarlo a una cookie httpOnly en esta entrega | Aceptada | Equipo (Matías Alvarado, PM) | — | — |
 
 ## Pendientes
 
