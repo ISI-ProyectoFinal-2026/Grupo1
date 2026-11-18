@@ -19,9 +19,9 @@ El tiempo de inactividad de un reporte se mide con una columna propia, `lastActi
 
 ## Consecuencias
 
-- Cada acción del dueño que cuenta como actividad debe actualizar `lastActivityAt` de forma explícita, y se agrega una migración; los mensajes del otro usuario y las confirmaciones de la otra parte no reinician el contador.
+- Cada acción del dueño que cuenta como actividad debe actualizar `lastActivityAt` de forma explícita, y se agrega una migración en la que todos los reportes existentes parten de la fecha de la migración; los mensajes del otro usuario y las confirmaciones de la otra parte no reinician el contador. Restaurar un reporte oculto también lo reinicia, para que el tiempo oculto no cuente en contra del dueño.
 - La tarea corre en cada instancia del backend sin bloqueo entre instancias, por lo que los avisos y el cierre se reclaman con escrituras condicionales para no duplicarse.
-- Los reportes ocultos no se cierran automáticamente: el cierre solo es válido para reportes publicados.
+- Los reportes ocultos y los de autores con una sanción vigente no se procesan: el cierre solo es válido para reportes publicados y los avisos no llegarían a un autor suspendido.
 
 ## Referencias
 
