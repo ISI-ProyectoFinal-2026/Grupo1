@@ -20,9 +20,11 @@ module.exports = {
   collectCoverageFrom: [
     "src/**/*.ts",
     // Entrypoints, no lógica: index.ts solo hace listen() y check-connection.ts
-    // es un script de CLI (`npm run db:check`). No hay nada que testear acá.
+    // y reembed-reports.ts son scripts de CLI (`npm run db:check`,
+    // `npm run reembed:reports`). No hay nada que testear acá.
     "!src/index.ts",
     "!src/db/check-connection.ts",
+    "!src/db/reembed-reports.ts",
   ],
   coverageDirectory: "coverage",
   // Criterio de aceptacion de #42. Con esto `npm run test:coverage` falla si

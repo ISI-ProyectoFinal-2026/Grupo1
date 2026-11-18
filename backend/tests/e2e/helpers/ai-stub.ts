@@ -4,12 +4,14 @@
  * por URL:
  * - `POST /images/analyze`: screening sincrónico (matching.service#analyzeImage).
  *   200 + `{ has_animal }` es veredicto; cualquier otra cosa es "unavailable".
- * - `POST /reports/:id/embedding`: moderación asíncrona
- *   (matching.service#triggerEmbeddingGeneration). 201 -> published,
- *   422 -> rejected, 5xx/red -> reintentos con delays de 1s/5s/30s.
+ * - `POST /images/embedding`: moderación asíncrona y matching
+ *   (matching.service#triggerEmbeddingGeneration) y reportes similares
+ *   (matching.service#embedImage). 200 + `{ has_animal: true, embedding }` ->
+ *   published, 200 + `{ has_animal: false }` -> rejected, 5xx/red ->
+ *   reintentos con delays de 1s/5s/30s.
  *
  * Ojo con los 5xx o `networkError` en embedding: disparan esos reintentos con
- * setTimeout reales y dejan la suite esperando. Para el camino feliz, 201.
+ * setTimeout reales y dejan la suite esperando. Para el camino feliz, el default.
  */
 export type AiEndpoint = "analyze" | "embedding";
 
@@ -36,15 +38,28 @@ export interface AiStub {
   restore(): void;
 }
 
+// vector unitario poco común: no se parece a los embeddings reales de la base compartida
+export const E2E_EMBEDDING = Array.from({ length: 768 }, (_, i) => (i === 767 ? 1 : 0));
+
+export const PET_EMBEDDING_RESPONSE: AiStubResponse = {
+  status: 200,
+  body: { has_animal: true, embedding: E2E_EMBEDDING },
+};
+
+export const NO_PET_EMBEDDING_RESPONSE: AiStubResponse = {
+  status: 200,
+  body: { has_animal: false, embedding: null },
+};
+
 const DEFAULT_RESPONSES: Record<AiEndpoint, AiStubResponse> = {
   analyze: { status: 200, body: { has_animal: true } },
-  embedding: { status: 201, body: {} },
+  embedding: PET_EMBEDDING_RESPONSE,
 };
 
 function classify(url: string): AiEndpoint | undefined {
   const { pathname } = new URL(url);
   if (pathname.endsWith("/images/analyze")) return "analyze";
-  if (/\/reports\/\d+\/embedding$/.test(pathname)) return "embedding";
+  if (pathname.endsWith("/images/embedding")) return "embedding";
   return undefined;
 }
 

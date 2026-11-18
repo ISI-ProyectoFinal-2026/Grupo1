@@ -2,16 +2,15 @@ import request from "supertest";
 import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 import { createE2EContext, E2EUser } from "./helpers/factories";
-import { installAiStub, AiStub } from "./helpers/ai-stub";
+import { installAiStub, AiStub, PET_EMBEDDING_RESPONSE } from "./helpers/ai-stub";
 import { waitFor, waitForReportStatus } from "./helpers/wait-for";
 
 /**
  * Journey B1 (issue #39): ciclo de vida completo de un reporte encadenando
  * llamadas HTTP reales contra la app. Lo único que se simula es el Backend IA:
- * - el screening y la moderación se responden con un stub sobre `fetch`;
- * - el matching lo hace el Backend IA en Python (Node nunca crea matches), así
- *   que se inserta el `reportMatch` con Prisma y se dispara la notificación por
- *   el mismo endpoint interno que usa backend-ia.
+ * el screening y el embedding se responden con un stub sobre `fetch`. El
+ * matching y su notificación los hace este backend (ADR-0029): ambos reportes
+ * reciben el mismo embedding, así que matchean con similitud 1.
  */
 describe("E2E: ciclo de vida de un reporte (B1 camino feliz)", () => {
   const R2_PUBLIC_URL = "https://pub-e2e.r2.dev";
@@ -34,7 +33,7 @@ describe("E2E: ciclo de vida de un reporte (B1 camino feliz)", () => {
     process.env.AI_SERVICE_URL = "http://ai-e2e.test";
     process.env.INTERNAL_API_KEY = "e2e-internal-key";
 
-    ai = installAiStub({ analyze: { status: 200, body: { has_animal: true } }, embedding: { status: 201 } });
+    ai = installAiStub({ analyze: { status: 200, body: { has_animal: true } }, embedding: PET_EMBEDDING_RESPONSE });
 
     owner = await ctx.registerAndLogin("owner");
     finder = await ctx.registerAndLogin("finder");
@@ -72,8 +71,11 @@ describe("E2E: ciclo de vida de un reporte (B1 camino feliz)", () => {
     const report = await waitForReportStatus(app, lostReportId, "published", owner.token);
 
     expect(report.publishedAt).not.toBeNull();
-    expect(ai.callsTo("embedding").map((call) => call.url)).toContain(
-      `http://ai-e2e.test/reports/${lostReportId}/embedding`
+    expect(ai.callsTo("embedding")).toContainEqual(
+      expect.objectContaining({
+        url: "http://ai-e2e.test/images/embedding",
+        body: { image_url: `${R2_PUBLIC_URL}/pets/e2e-lost.jpg` },
+      })
     );
   });
 
@@ -109,26 +111,21 @@ describe("E2E: ciclo de vida de un reporte (B1 camino feliz)", () => {
     await waitForReportStatus(app, foundReportId, "published", finder.token);
   });
 
-  test("el Backend IA registra el match y el endpoint interno notifica al dueño", async () => {
-    // Atajo permitido: el match lo persiste backend-ia (matching_service.py).
-    const match = await prisma.reportMatch.create({
-      data: { reportLostId: lostReportId, reportFoundId: foundReportId, similarityScore: 0.93 },
+  test("el backend registra el match y notifica al dueño", async () => {
+    const match = await prisma.reportMatch.findUniqueOrThrow({
+      where: { reportLostId_reportFoundId: { reportLostId: lostReportId, reportFoundId: foundReportId } },
     });
+    expect(match.similarityScore).toBeCloseTo(1, 4);
     matchId = match.id;
 
-    const internal = await request(app)
-      .post("/api/notifications/internal/match")
-      .set("X-Internal-Key", process.env.INTERNAL_API_KEY!)
-      .send({ lostReportId, foundReportId, similarityScore: 0.93 });
-    expect(internal.status).toBe(201);
-
-    const res = await request(app).get("/api/notifications").set(auth(owner));
-    expect(res.status).toBe(200);
-    const matchNotification = res.body.find(
-      (n: { type: string; reportId: number }) => n.type === "match_suggested" && n.reportId === foundReportId
-    );
-    expect(matchNotification).toBeDefined();
-    expect(matchNotification.message).toContain("93% de similitud");
+    const matchNotification = await waitFor(async () => {
+      const res = await request(app).get("/api/notifications").set(auth(owner));
+      expect(res.status).toBe(200);
+      return res.body.find(
+        (n: { type: string; reportId: number }) => n.type === "match_suggested" && n.reportId === foundReportId
+      );
+    });
+    expect(matchNotification.message).toContain("100% de similitud");
   });
 
   test("el dueño ve la coincidencia sugerida en su reporte", async () => {

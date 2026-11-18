@@ -53,7 +53,7 @@ interface CreateForMatchInput {
  * Idempotente por par (userId, reportId): el par identifica unívocamente "el
  * otro reporte de este match para este usuario", así que si ya existe una
  * notificación de match para ese par no se crea otra y se devuelve la
- * existente. El upsert del Backend IA (matching_service.py) puede reenviar el
+ * existente. El upsert del matching (report-matching.service.ts) puede reenviar el
  * mismo match mientras siga "pending" —y la reconciliación puede reprocesar un
  * reporte—, así que sin este guard el usuario recibiría el mismo aviso repetido.
  */
@@ -114,8 +114,8 @@ interface NotifyMatchInput {
 /**
  * Resuelve los dueños de los dos reportes involucrados en un match (uno de
  * tipo "lost" y otro "found") y crea las notificaciones correspondientes.
- * Usado por el endpoint interno que dispara el Backend IA al persistir un
- * match (ver matching_service.py, find_and_store_matches).
+ * Lo llama el matching al persistir un match (ver report-matching.service.ts,
+ * findAndStoreMatches).
  */
 export async function notifyMatch(data: NotifyMatchInput): Promise<Notification[]> {
   const [lostReport, foundReport] = await Promise.all([
