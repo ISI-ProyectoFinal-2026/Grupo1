@@ -23,6 +23,9 @@ export const R2_PUBLIC_URL = process.env.E2E_R2_PUBLIC_URL ?? 'https://pub-e2e.r
 export const E2E_IMAGE_URL = `${R2_PUBLIC_URL}/pets/e2e-photo.jpg`
 // The AI stub answers low_quality: true for this one (blurry-photo warning, #212).
 export const E2E_LOW_QUALITY_IMAGE_URL = `${R2_PUBLIC_URL}/pets/e2e-low-quality.jpg`
+// The AI stub answers a pet embedding for these two, 0.87 cosine apart (F2 match).
+export const E2E_MATCH_LOST_IMAGE_URL = `${R2_PUBLIC_URL}/pets/e2e-match-lost.jpg`
+export const E2E_MATCH_FOUND_IMAGE_URL = `${R2_PUBLIC_URL}/pets/e2e-match-found.jpg`
 
 // Local default = docker-compose.yml (host port 5433). The backend is started
 // with this same DATABASE_URL, overriding whatever backend/.env says.

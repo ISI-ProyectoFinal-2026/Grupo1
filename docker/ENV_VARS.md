@@ -13,7 +13,7 @@ POSTGRES_DB=patitas
 POSTGRES_PORT=5433
 ```
 
-El backend principal y el backend IA arman su propio `DATABASE_URL` a partir de estos mismos valores (ver `backend/.env.example` y `backend-ia/.env.example`).
+El backend principal arma su `DATABASE_URL` a partir de estos mismos valores (ver `backend/.env.example`). El backend IA no se conecta a la base (ADR-0029).
 
 ---
 
@@ -26,18 +26,18 @@ El backend principal y el backend IA arman su propio `DATABASE_URL` a partir de 
 INTERNAL_API_KEY=dev-internal-key
 ```
 
-Existe porque hay dos endpoints que se llaman servicio a servicio, sin usuario logueado de por medio, y por lo tanto sin JWT que valga:
+Existe porque el backend llama al Backend IA servicio a servicio, sin usuario logueado de por medio, y por lo tanto sin JWT que valga. Va en una sola dirección (el Backend IA no llama de vuelta al backend):
 
 | Dirección | Endpoint | Qué pasa si falta o no coincide |
 |---|---|---|
-| Node → Backend IA | `POST /reports/{id}/embedding` | El Backend IA responde `401`. El reporte con imagen **se queda en `pending`**: no se publica, no genera embedding y no matchea |
-| Backend IA → Node | `POST /api/notifications/internal/match` | El Backend Principal responde `401`. El match se guarda igual, pero **nadie recibe la notificación** |
+| Node → Backend IA | `POST /images/embedding` | El Backend IA responde `401`. El reporte con imagen **se queda en `pending`**: no se publica, no genera embedding y no matchea |
+| Node → Backend IA | `POST /images/analyze` | El Backend IA responde `401`. El screening al subir la foto queda sin veredicto y el reporte sigue por la moderación asíncrona |
 
 En desarrollo local podés poner cualquier string, mientras sea el mismo de los dos lados. En un entorno desplegado usá un valor generado al azar y no lo commitees.
 
-### Los dos lados fallan cerrado
+### El Backend IA falla cerrado
 
-Si la variable no está configurada, **los dos servicios rechazan con `401`**. Es a propósito: `POST /reports/{id}/embedding` dispara inferencia de ML y escribe en la base, así que una configuración ausente tiene que dejarlo cerrado y no abierto (ver issue #106, donde una guarda que retornaba sin validar dejó el endpoint público durante semanas).
+Si la variable no está configurada, **el Backend IA rechaza con `401`**. Es a propósito: sus endpoints descargan imágenes y disparan inferencia de ML, así que una configuración ausente tiene que dejarlos cerrados y no abiertos (ver issue #106, donde una guarda que retornaba sin validar dejó el endpoint público durante semanas).
 
 Para desarrollo local, si necesitás levantar el Backend IA sin configurar la clave, existe una escotilla que hay que pedir **explícitamente**:
 
@@ -46,7 +46,7 @@ Para desarrollo local, si necesitás levantar el Backend IA sin configurar la cl
 ALLOW_INSECURE_INTERNAL=true
 ```
 
-Con eso el endpoint atiende sin autenticar y el servicio loguea un warning en cada arranque. La diferencia con el comportamiento anterior es cuál es el default: antes, *no configurar nada* abría la puerta; ahora hay que escribir esa línea a mano.
+Con eso los endpoints atienden sin autenticar y el servicio loguea un warning en cada arranque. La diferencia con el comportamiento anterior es cuál es el default: antes, *no configurar nada* abría la puerta; ahora hay que escribir esa línea a mano.
 
 
 ---

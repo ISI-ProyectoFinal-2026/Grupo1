@@ -26,7 +26,7 @@ export interface SimilarReportDTO {
 /**
  * Posibles duplicados del reporte que se está creando: mismo tipo, cerca y
  * recientes. Con foto se ordena por similitud coseno (`<=>`, ver
- * matching_service.py); sin foto o si la IA no responde, por cercanía.
+ * report-matching.service.ts); sin foto o si la IA no responde, por cercanía.
  */
 export async function findSimilarReports(input: SimilarReportsInput, viewerId: number): Promise<SimilarReportDTO[]> {
   const embedding = input.imageUrl ? await matchingService.embedImage(input.imageUrl) : null;

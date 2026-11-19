@@ -3,7 +3,7 @@ import { app } from "../../src/app";
 import { prisma } from "../../src/db/client";
 import { NO_ANIMAL_DETECTED_MESSAGE } from "../../src/constants/moderation";
 import { createE2EContext, E2EUser } from "./helpers/factories";
-import { installAiStub, AiStub } from "./helpers/ai-stub";
+import { installAiStub, AiStub, NO_PET_EMBEDDING_RESPONSE, PET_EMBEDDING_RESPONSE } from "./helpers/ai-stub";
 import { waitFor, waitForReportStatus } from "./helpers/wait-for";
 
 /**
@@ -45,7 +45,7 @@ describe("E2E: moderación de imágenes con el Backend IA (B2-B4)", () => {
   beforeEach(() => {
     // Cada journey arranca con el Backend IA sano y sin llamadas previas.
     ai.respond("analyze", { status: 200, body: { has_animal: true } });
-    ai.respond("embedding", { status: 201 });
+    ai.respond("embedding", PET_EMBEDDING_RESPONSE);
     ai.calls.length = 0;
   });
 
@@ -56,11 +56,11 @@ describe("E2E: moderación de imágenes con el Backend IA (B2-B4)", () => {
     await prisma.$disconnect();
   });
 
-  describe("B2: el Backend IA no detecta mascota al generar el embedding (422)", () => {
+  describe("B2: el Backend IA no detecta mascota al generar el embedding", () => {
     let reportId: number;
 
     test("el reporte se crea pending y termina rejected", async () => {
-      ai.respond("embedding", { status: 422, body: { detail: "no pet detected" } });
+      ai.respond("embedding", NO_PET_EMBEDDING_RESPONSE);
 
       const res = await postReport(owner, "Gato perdido en Caballito", "e2e-b2.jpg");
       expect(res.status).toBe(201);
@@ -129,7 +129,7 @@ describe("E2E: moderación de imágenes con el Backend IA (B2-B4)", () => {
     let consoleError: jest.SpyInstance;
 
     beforeEach(() => {
-      // Los reintentos de matching.service esperan 1s y 5s con setTimeout: se
+      // Los reintentos de matching.service esperan 1s, 5s y 30s con setTimeout: se
       // falsean solo los timers (no nextTick/setImmediate, que usan Prisma y
       // supertest) para recorrerlos sin esperar de verdad.
       jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
@@ -150,10 +150,10 @@ describe("E2E: moderación de imágenes con el Backend IA (B2-B4)", () => {
       const reportId = res.body.id;
       ctx.trackReport(reportId);
 
-      // Recorre todos los reintentos (1s + 5s) hasta que el servicio se rinde.
+      // Recorre todos los reintentos (1s + 5s + 30s) hasta que el servicio se rinde.
       await jest.advanceTimersByTimeAsync(40_000);
 
-      expect(ai.callsTo("embedding")).toHaveLength(3);
+      expect(ai.callsTo("embedding")).toHaveLength(4);
       expect(consoleError.mock.calls.some(([message]) => finalLog.test(String(message)))).toBe(true);
 
       const stored = await prisma.report.findUniqueOrThrow({ where: { id: reportId } });
@@ -168,7 +168,7 @@ describe("E2E: moderación de imágenes con el Backend IA (B2-B4)", () => {
       ai.respond("analyze", { status: 0, networkError: true });
       ai.respond("embedding", { status: 0, networkError: true });
 
-      await expectStaysPendingAfterRetries("Perro perdido sin IA (red)", "e2e-b4-red.jpg", /tras 3 intentos/);
+      await expectStaysPendingAfterRetries("Perro perdido sin IA (red)", "e2e-b4-red.jpg", /tras 4 intentos/);
     });
 
     test("con 500: POST 201 y el reporte queda pending tras agotar los reintentos", async () => {

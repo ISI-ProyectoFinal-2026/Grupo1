@@ -3,7 +3,7 @@
  * test goes through the browser, everything else is arranged here.
  */
 import { publishReport } from './db.ts'
-import { BACKEND_URL, E2E_IMAGE_URL, INTERNAL_API_KEY } from './env.ts'
+import { BACKEND_URL, E2E_IMAGE_URL } from './env.ts'
 import { totpNow } from './totp.ts'
 
 export interface ApiUser {
@@ -110,6 +110,7 @@ export function getMe(token: string): Promise<{ status: number; body: unknown }>
 interface NewReport {
   reportType: 'lost' | 'found'
   title: string
+  imageUrl?: string
   description?: string
   location?: { lat: number; lng: number }
 }
@@ -162,16 +163,30 @@ export function listReportFlags(token: string): Promise<{ status: number; body: 
   return call('GET', '/report-flags/reports', { token })
 }
 
-/** What backend-ia calls after persisting a match (matching_service.py). */
-export function notifyMatch(lostReportId: number, foundReportId: number, similarityScore: number): Promise<unknown> {
-  return expectStatus(
+/**
+ * Creates a report and waits until the backend's AI pipeline (against the stub)
+ * stores its embedding, runs the matching and publishes it.
+ */
+export async function createReportPublishedByAi(
+  token: string,
+  report: NewReport & { imageUrl: string },
+  timeoutMs = 15_000,
+): Promise<ApiReport> {
+  const created = await expectStatus(
     201,
-    'internal match notification',
-    call('POST', '/notifications/internal/match', {
-      headers: { 'X-Internal-Key': INTERNAL_API_KEY },
-      body: { lostReportId, foundReportId, similarityScore },
+    'create report',
+    call<ApiReport>('POST', '/reports', {
+      token,
+      body: { location: DEFAULT_LOCATION, locationAddress: 'Buenos Aires', ...report },
     }),
   )
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const { body } = await getReport(token, created.id)
+    if ((body as { status?: string }).status === 'published') return { ...created, status: 'published' }
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }
+  throw new Error(`report ${created.id} was not published by the AI pipeline within ${timeoutMs}ms`)
 }
 
 interface ApiBusiness {

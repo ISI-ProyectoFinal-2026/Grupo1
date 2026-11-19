@@ -22,7 +22,7 @@ describe("matching.service embedImage", () => {
   }
 
   test("pide el embedding a AI_SERVICE_URL/images/embedding con la clave interna y un timeout", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, { embedding: vector }));
+    fetchMock.mockResolvedValue(jsonResponse(200, { has_animal: true, embedding: vector }));
 
     await embedImage("https://cdn.example.com/dog.jpg");
 
@@ -40,7 +40,7 @@ describe("matching.service embedImage", () => {
   });
 
   test("devuelve el vector de 768 dimensiones", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, { embedding: vector }));
+    fetchMock.mockResolvedValue(jsonResponse(200, { has_animal: true, embedding: vector }));
 
     await expect(embedImage("https://cdn.example.com/dog.jpg")).resolves.toEqual(vector);
   });
@@ -67,6 +67,14 @@ describe("matching.service embedImage", () => {
     await expect(embedImage("https://cdn.example.com/dog.jpg")).resolves.toBeNull();
   });
 
+  test("devuelve null sin loguear error si no hay mascota en la imagen", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValue(jsonResponse(200, { has_animal: false, embedding: null }));
+
+    await expect(embedImage("https://cdn.example.com/landscape.jpg")).resolves.toBeNull();
+    expect(error).not.toHaveBeenCalled();
+  });
+
   test.each([422, 401, 500])("devuelve null si el Backend IA responde %i", async (status) => {
     jest.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockResolvedValue(jsonResponse(status, { detail: "error" }));
@@ -75,9 +83,10 @@ describe("matching.service embedImage", () => {
   });
 
   test.each([
-    ["sin embedding", {}],
-    ["dimensión incorrecta", { embedding: [0.1, 0.2] }],
-    ["valores no numéricos", { embedding: Array(768).fill("x") }],
+    ["sin has_animal", { embedding: Array(768).fill(0.1) }],
+    ["con mascota y sin embedding", { has_animal: true }],
+    ["dimensión incorrecta", { has_animal: true, embedding: [0.1, 0.2] }],
+    ["valores no numéricos", { has_animal: true, embedding: Array(768).fill("x") }],
   ])("devuelve null si el cuerpo es inválido (%s)", async (_case, body) => {
     jest.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockResolvedValue(jsonResponse(200, body));

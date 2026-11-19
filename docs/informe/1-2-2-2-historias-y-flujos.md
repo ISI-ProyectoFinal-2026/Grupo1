@@ -18,7 +18,7 @@ Esta sección explica cómo funciona el sistema de punta a punta. Para cada mód
 
 ## Visión general del funcionamiento
 
-El navegador ejecuta una SPA en React que habla con una API Express bajo `/api` y, para el chat, con un servidor Socket.io montado en el mismo proceso HTTP (`backend/src/index.ts:15-16`). Las imágenes no pasan por la API: el navegador las sube directo a Cloudflare R2 con una URL prefirmada. La API delega el análisis de imágenes al Backend IA (FastAPI), que escribe los embeddings y las coincidencias en la misma base y avisa a la API cuando encuentra una coincidencia. No existe cola de trabajos: la cola Redis descrita en [`ARQUITECTURA.md`](../ARQUITECTURA.md) §4 no está implementada ([#177](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/177)).
+El navegador ejecuta una SPA en React que habla con una API Express bajo `/api` y, para el chat, con un servidor Socket.io montado en el mismo proceso HTTP (`backend/src/index.ts:15-16`). Las imágenes no pasan por la API: el navegador las sube directo a Cloudflare R2 con una URL prefirmada. La API delega el análisis de imágenes al Backend IA (FastAPI), que solo infiere y no accede a la base: la API guarda los embeddings, busca las coincidencias y notifica ([ADR-0029](../adr/0029-backend-unico-acceso-base-de-datos.md)). No existe cola de trabajos: la cola Redis descrita en [`ARQUITECTURA.md`](../ARQUITECTURA.md) §4 no está implementada ([#177](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/177)).
 
 ```mermaid
 flowchart LR
@@ -44,11 +44,9 @@ flowchart LR
   API -->|"mails de cuenta"| SMTP
   API -->|"geocodificación inversa con caché, ADR-0025"| NOM
   IA -->|"descarga la imagen"| R2
-  IA -->|"embeddings y coincidencias"| DB
-  IA -->|"X-Internal-Key: aviso de coincidencia"| API
 ```
 
-Figura 1.2.2-1. Componentes del sistema y cómo se comunican. Fuente: `backend/src/app.ts:34-57`, `backend/src/index.ts:15-16`, `backend/src/services/storage.service.ts:63`, `backend/src/services/matching.service.ts:102`, `backend/src/services/matching.service.ts:166`, `backend-ia/app/services/matching_service.py:59-88`, `backend/src/services/reverse-geocode.service.ts:3-13`, `frontend/src/components/maps/OsmTileLayer.tsx:4-10`.
+Figura 1.2.2-1. Componentes del sistema y cómo se comunican. Fuente: `backend/src/app.ts:34-57`, `backend/src/index.ts:15-16`, `backend/src/services/storage.service.ts:63`, `backend/src/services/matching.service.ts:111`, `backend/src/services/matching.service.ts:196`, `backend/src/services/report-matching.service.ts:42-108`, `backend/src/services/reverse-geocode.service.ts:3-13`, `frontend/src/components/maps/OsmTileLayer.tsx:4-10`.
 
 El rol del usuario se lee de la base en cada request y no viaja en el JWT (`backend/src/middlewares/auth.middleware.ts:78-102`, `backend/src/utils/jwt.ts:11-15`). "Comercio" no es un rol: es un perfil `Business` vinculado 1:1 a un usuario (`backend/prisma/schema.prisma:513-515`).
 
@@ -192,7 +190,7 @@ stateDiagram-v2
   resolved --> [*]
 ```
 
-Figura 1.2.2-3. Estados de un reporte (`ReportStatus`). Fuente: `backend/prisma/schema.prisma:144-151`, `backend/src/validators/reports.validator.ts:41`, `backend/src/services/reports.service.ts:169`, `:231-247`, `:277-293`, `backend/src/services/matching.service.ts:72-99`, `backend/src/services/report-flags.service.ts:89`.
+Figura 1.2.2-3. Estados de un reporte (`ReportStatus`). Fuente: `backend/prisma/schema.prisma:144-151`, `backend/src/validators/reports.validator.ts:41`, `backend/src/services/reports.service.ts:169`, `:231-247`, `:277-293`, `backend/src/services/matching.service.ts:67-94`, `backend/src/services/report-flags.service.ts:89`.
 
 ### Reglas de negocio
 
@@ -234,25 +232,25 @@ Tabla 1.2.2-5. Reglas del módulo de reportes. Fuente: archivos de la columna Fu
 | [#19](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/19) | Como sistema quiero validar y moderar publicaciones automáticamente para mantener contenido relevante | Cerrado | Parcial: detecta imágenes sin animal y las rechaza; no hay vía de moderación manual para los reportes que quedan `pending` |
 | [#34](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/34) | Como usuario quiero ver un listado de coincidencias con % de similitud para evaluar matches | Cerrado | Implementada (`frontend/src/components/reports/MatchCard.tsx:76-78`) |
 | [#66](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/66) | Como usuario quiero ver el detalle de un reporte y los matches sugeridos por la IA para identificar si es mi mascota | Cerrado | Implementada (`frontend/src/pages/reports/ReportDetailPage.tsx:345-404`) |
-| [#181](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/181) | Como dueño de un reporte quiero confirmar o rechazar una coincidencia sugerida por la IA | Cerrado | Implementada (`backend/src/services/matching.service.ts:369-410`) |
-| [#217](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/217) | Ajustar los parámetros del matching con evidencia (ventana de 90 días, umbral calibrado) | Abierto | Parcial: ventana de 90 días y parámetros configurables (`backend-ia/app/config.py:20-25`, commit `024ce49`); los umbrales siguen marcados como provisionales (`backend-ia/app/services/matching_service.py:38-39`) |
-| [#221](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/221) | Confirmar una coincidencia debería avisar a la otra parte y ofrecer el cierre del reporte | Cerrado | Implementada en [PR #301](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/301) (`backend/src/services/matching.service.ts:405-426`, `backend/src/services/notifications.service.ts:151-168`, `frontend/src/pages/reports/ReportDetailPage.tsx:170-171`) |
+| [#181](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/181) | Como dueño de un reporte quiero confirmar o rechazar una coincidencia sugerida por la IA | Cerrado | Implementada (`backend/src/services/matching.service.ts:418-459`) |
+| [#217](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/217) | Ajustar los parámetros del matching con evidencia (ventana de 90 días, umbral calibrado) | Abierto | Parcial: ventana de 90 días y parámetros configurables (`backend/src/config/matching.ts:10-16`, commit `024ce49`); los umbrales siguen marcados como provisionales ([ADR-0014](../adr/0014-parametros-matching.md)) |
+| [#221](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/221) | Confirmar una coincidencia debería avisar a la otra parte y ofrecer el cierre del reporte | Cerrado | Implementada en [PR #301](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/301) (`backend/src/services/matching.service.ts:454-475`, `backend/src/services/notifications.service.ts:151-168`, `frontend/src/pages/reports/ReportDetailPage.tsx:170-171`) |
 
 Tabla 1.2.2-6. Historias del módulo de IA y matching. Fuente: `gh issue list` (comando al inicio de la sección).
 
 ### Flujo punta a punta
 
-1. **Control temprano (síncrono).** Al subir cada foto, `MultiImageUploader` llama a `POST /api/uploads/analyze` (`frontend/src/components/common/MultiImageUploader.tsx:42-47`, `frontend/src/lib/screen-image.ts:13-23`, `backend/src/routes/uploads.routes.ts:29`). `analyzeImage` llama a `POST /images/analyze` del Backend IA con la cabecera `X-Internal-Key` y un tiempo máximo de 15 s, sin reintentos (`backend/src/services/matching.service.ts:151-196`). El Backend IA descarga la imagen y, en una sola pasada de YOLO, `detect_and_crop` busca la mascota (`backend-ia/app/main.py:131-146`, `backend-ia/app/services/image_analysis_service.py:63-88`). Responde `has_animal` y `low_quality`: este último es verdadero si el recorte de la mascota tiene una nitidez menor que 10 (`backend-ia/app/ml/quality.py:11-32`, ver ADR-0023). Cualquier respuesta distinta de un 200 válido se trata como "no disponible" y no bloquea al usuario.
+1. **Control temprano (síncrono).** Al subir cada foto, `MultiImageUploader` llama a `POST /api/uploads/analyze` (`frontend/src/components/common/MultiImageUploader.tsx:42-47`, `frontend/src/lib/screen-image.ts:13-23`, `backend/src/routes/uploads.routes.ts:29`). `analyzeImage` llama a `POST /images/analyze` del Backend IA con la cabecera `X-Internal-Key` y un tiempo máximo de 15 s, sin reintentos (`backend/src/services/matching.service.ts:181-226`). El Backend IA descarga la imagen y, en una sola pasada de YOLO, `detect_and_crop` busca la mascota (`backend-ia/app/main.py:92-107`, `backend-ia/app/services/image_analysis_service.py:63-88`). Responde `has_animal` y `low_quality`: este último es verdadero si el recorte de la mascota tiene una nitidez menor que 10 (`backend-ia/app/ml/quality.py:11-32`, ver ADR-0023). Cualquier respuesta distinta de un 200 válido se trata como "no disponible" y no bloquea al usuario.
 2. **Qué ve el usuario al subir la foto.** Sin animal, el formulario muestra el rechazo y no agrega la foto. Con una foto borrosa o movida, la agrega y muestra el aviso "La foto parece borrosa o movida. Probá subir una foto más nítida para que sea más fácil reconocer a tu mascota.", que no bloquea el envío (`backend/src/controllers/uploads.controller.ts:18-34`, `frontend/src/components/common/MultiImageUploader.tsx:106-112`; issue #212).
 3. **Segundo control y alta.** Al crear o editar el reporte, `assertImagesHaveAnimals` vuelve a analizar la foto principal y las extra nuevas y responde 422 solo si alguna no tiene animal; una foto de baja calidad se acepta (`backend/src/services/image-screening.service.ts:7-15`, `backend/src/services/reports.service.ts:156`, `:245`). El mismo control se aplica a las fotos de las mascotas (`backend/src/services/pets.service.ts:16`, `:51`). El reporte se guarda `pending`.
-4. **Disparo de la moderación.** `triggerEmbeddingGeneration` envía `POST /reports/:id/embedding` al Backend IA con la foto principal, sin bloquear la respuesta al usuario (`backend/src/services/reports.service.ts:146-152`, `backend/src/services/matching.service.ts:101-148`). Ante una falla de red o un 5xx hace hasta 3 intentos, con esperas de 1 s y 5 s (`:35`, `:47-70`).
-5. **Embedding.** `process_report_image` descarga la imagen y `detect_and_crop` elige la mascota principal: la detección de mayor confianza entre las clases de animales de COCO que ocupan al menos el 25% del área del animal más grande (`backend-ia/app/services/embedding_service.py:24-43`, `backend-ia/app/ml/pipeline.py:75-100`). Si no hay animal, responde 422. Si lo hay, DINOv2 ViT-B/14 genera un vector de 768 dimensiones normalizado sobre el recorte llevado a un cuadrado (`backend-ia/app/ml/pipeline.py:115-137`, ver ADR-0021) y lo guarda con upsert en `report_embeddings` (`backend-ia/app/services/embedding_service.py:45-51`).
-6. **Matching.** En la misma request, `find_and_store_matches` busca hasta 5 reportes `published` del tipo opuesto, a menos de 5 km y creados en los últimos 90 días, cuyos autores no tienen una suspensión vigente, ordenados por distancia coseno; si el autor del reporte procesado está suspendido, no busca candidatos (`backend-ia/app/services/matching_service.py:46-51`, `:97-155`; parámetros en `backend-ia/app/config.py:20-25`). Guarda en `report_matches` los que alcanzan una similitud de 0,45, sin pisar los ya decididos, y solo por los que alcanzan 0,63 llama a `POST /api/notifications/internal/match` de la API (`backend-ia/app/services/matching_service.py:157-185`, `:59-88`).
-7. **Veredicto.** El Backend IA responde 201 (o 422 en el paso 5). `applyModerationVerdict` pasa el reporte a `published` (con `published_at`) o a `rejected`, solo si sigue `pending` con la misma imagen, y crea una notificación `report_status_change`. Si se publica, también avisa a los usuarios cercanos (`backend/src/services/matching.service.ts:72-99`, `:121-125`).
+4. **Disparo de la moderación.** `triggerEmbeddingGeneration` envía `POST /images/embedding` al Backend IA con la foto principal, sin bloquear la respuesta al usuario (`backend/src/services/reports.service.ts:146-152`, `backend/src/services/matching.service.ts:108-158`). Ante una falla de red o un 5xx hace hasta 4 intentos, con esperas de 1 s, 5 s y 30 s (`:30`, `:42-65`).
+5. **Embedding.** El Backend IA descarga la imagen y `detect_and_crop` elige la mascota principal: la detección de mayor confianza entre las clases de animales de COCO que ocupan al menos el 25% del área del animal más grande (`backend-ia/app/services/image_analysis_service.py:72-75`, `:91-97`, `backend-ia/app/ml/pipeline.py:75-100`). Si no hay animal, responde 200 con `has_animal: false`; si no puede descargar o decodificar la imagen, 422. Si lo hay, DINOv2 ViT-B/14 genera un vector de 768 dimensiones normalizado sobre el recorte llevado a un cuadrado (`backend-ia/app/ml/pipeline.py:115-137`, ver ADR-0021) y lo devuelve sin persistirlo: el Backend IA no accede a la base (`backend-ia/app/main.py:110-130`, [ADR-0029](../adr/0029-backend-unico-acceso-base-de-datos.md)). La API lo guarda con upsert en `report_embeddings`, solo si el reporte sigue mostrando esa imagen (`backend/src/services/report-matching.service.ts:13-23`, `backend/src/services/matching.service.ts:96-106`).
+6. **Matching.** A continuación, la API ejecuta `findAndStoreMatches`, que busca hasta 5 reportes `published` del tipo opuesto, a menos de 5 km y creados en los últimos 90 días, cuyos autores no tienen una suspensión vigente, ordenados por distancia coseno; si el autor del reporte procesado está suspendido, no busca candidatos (`backend/src/services/report-matching.service.ts:42-70`; parámetros en `backend/src/config/matching.ts:10-16`). Guarda en `report_matches` los que alcanzan una similitud de 0,45, sin pisar los ya decididos, y solo por los que alcanzan 0,63 llama a `notifyMatch` (`backend/src/services/report-matching.service.ts:72-108`). Si el matching falla, se registra el error y el reporte se publica igual (`backend/src/services/matching.service.ts:98-104`).
+7. **Veredicto.** Con la respuesta 200 del paso 5 (con o sin mascota). `applyModerationVerdict` pasa el reporte a `published` (con `published_at`) o a `rejected`, solo si sigue `pending` con la misma imagen, y crea una notificación `report_status_change`. Si se publica, también avisa a los usuarios cercanos (`backend/src/services/matching.service.ts:67-94`, `:122-134`).
 8. **Qué ve el usuario después.** La consulta del detalle se repite cada 3 s mientras el reporte está `pending` (`frontend/src/hooks/useReportDetailQuery.ts:4`, `:13`); al cambiar el estado aparece la sección "Coincidencias sugeridas" (`frontend/src/pages/reports/ReportDetailPage.tsx:345-404`).
-9. **Listado de coincidencias.** `GET /api/reports/:id/matches` (cualquier usuario con sesión, `backend/src/routes/reports.routes.ts:36`) llega a `listMatches` (`backend/src/services/matching.service.ts:338-359`): datos del otro reporte y porcentaje de similitud, sin las rechazadas y solo con reportes `published` o `resolved`, de mayor a menor (`:353-354`, [PR #301](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/301)).
-10. **Decisión.** El autor confirma o rechaza con `POST /api/reports/:id/matches/:matchId/confirm` o `/reject` (`backend/src/routes/reports.routes.ts:38-39`). `decideMatch` exige ser el autor (403) y que la coincidencia involucre al reporte (404), y pasa de `pending` a `confirmed` (con `confirmed_at`) o `rejected`; una segunda decisión responde 409 (`backend/src/services/matching.service.ts:369-410`). Al confirmar, avisa al autor del otro reporte con una notificación `match_confirmed`; si el aviso falla, la decisión se mantiene (`:405-407`, `:413-426`, `backend/src/services/notifications.service.ts:151-168`). Con una coincidencia confirmada, el detalle le ofrece al autor cerrar su reporte publicado (`frontend/src/pages/reports/ReportDetailPage.tsx:170-171`, [PR #301](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/301)).
-11. **Reconciliación.** Al arrancar y cada 5 min, la API reenvía al Backend IA hasta 10 reportes `pending` con foto actualizados entre 2 min y 24 h antes (`backend/src/services/matching.service.ts:262-319`, `backend/src/index.ts:23`).
+9. **Listado de coincidencias.** `GET /api/reports/:id/matches` (cualquier usuario con sesión, `backend/src/routes/reports.routes.ts:36`) llega a `listMatches` (`backend/src/services/matching.service.ts:387-408`): datos del otro reporte y porcentaje de similitud, sin las rechazadas y solo con reportes `published` o `resolved`, de mayor a menor (`:402-403`, [PR #301](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/301)).
+10. **Decisión.** El autor confirma o rechaza con `POST /api/reports/:id/matches/:matchId/confirm` o `/reject` (`backend/src/routes/reports.routes.ts:38-39`). `decideMatch` exige ser el autor (403) y que la coincidencia involucre al reporte (404), y pasa de `pending` a `confirmed` (con `confirmed_at`) o `rejected`; una segunda decisión responde 409 (`backend/src/services/matching.service.ts:418-459`). Al confirmar, avisa al autor del otro reporte con una notificación `match_confirmed`; si el aviso falla, la decisión se mantiene (`:454-456`, `:462-475`, `backend/src/services/notifications.service.ts:151-168`). Con una coincidencia confirmada, el detalle le ofrece al autor cerrar su reporte publicado (`frontend/src/pages/reports/ReportDetailPage.tsx:170-171`, [PR #301](https://github.com/ISI-ProyectoFinal-2026/Grupo1/pull/301)).
+11. **Reconciliación.** Al arrancar y cada 5 min, la API reenvía al Backend IA hasta 10 reportes `pending` con foto actualizados entre 2 min y 24 h antes (`backend/src/services/matching.service.ts:311-368`, `backend/src/index.ts:23`).
 
 ```mermaid
 sequenceDiagram
@@ -278,19 +276,18 @@ sequenceDiagram
   Note over A: 422 solo si no hay animal. La baja calidad no bloquea
   A->>DB: INSERT reports pending con ubicación PostGIS
   A-->>F: 201 reporte pending
-  A-)IA: POST /reports/:id/embedding sin esperar
+  A-)IA: POST /images/embedding sin esperar
   IA->>R2: Descarga la imagen
   alt YOLO no detecta un animal
-    IA-->>A: 422
+    IA-->>A: 200 has_animal false
     A->>DB: Reporte rejected y notificación report_status_change
   else YOLO detecta un animal
-    IA->>DB: UPSERT report_embeddings con DINOv2 de 768 dimensiones
-    IA->>DB: Busca candidatos y UPSERT report_matches con similitud de al menos 0,45
+    IA-->>A: 200 embedding DINOv2 de 768 dimensiones
+    A->>DB: UPSERT report_embeddings
+    A->>DB: Busca candidatos y UPSERT report_matches con similitud de al menos 0,45
     opt Similitud de al menos 0,63
-      IA->>A: POST /api/notifications/internal/match
       A->>DB: INSERT notifications match_suggested
     end
-    IA-->>A: 201
     A->>DB: Reporte published, notificación report_status_change y avisos de zona
   end
   F->>A: GET /api/reports/:id cada 3 s mientras está pending
@@ -300,11 +297,11 @@ sequenceDiagram
   A-->>F: 200 decisión
 ```
 
-Figura 1.2.2-4. Publicación de un reporte con foto, moderación, matching, notificación y decisión. Fuente: `frontend/src/components/common/MultiImageUploader.tsx:42-120`, `backend/src/controllers/uploads.controller.ts:18-34`, `backend/src/services/reports.service.ts:146-198`, `backend/src/services/matching.service.ts:72-196`, `backend-ia/app/services/image_analysis_service.py:63-88`, `backend-ia/app/services/embedding_service.py:24-61`, `backend-ia/app/services/matching_service.py:59-185`.
+Figura 1.2.2-4. Publicación de un reporte con foto, moderación, matching, notificación y decisión. Fuente: `frontend/src/components/common/MultiImageUploader.tsx:42-120`, `backend/src/controllers/uploads.controller.ts:18-34`, `backend/src/services/reports.service.ts:146-198`, `backend/src/services/matching.service.ts:67-226`, `backend-ia/app/services/image_analysis_service.py:63-88`, `backend-ia/app/main.py:110-130`, `backend/src/services/report-matching.service.ts:13-108`.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> pending : el Backend IA guarda la coincidencia
+  [*] --> pending : la API guarda la coincidencia
   pending --> pending : un nuevo cálculo actualiza el puntaje
   pending --> confirmed : el autor de uno de los reportes confirma
   pending --> rejected : el autor de uno de los reportes rechaza
@@ -312,7 +309,7 @@ stateDiagram-v2
   rejected --> [*]
 ```
 
-Figura 1.2.2-5. Estados de una coincidencia (`MatchStatus`). Fuente: `backend/prisma/schema.prisma:326-332`, `backend-ia/app/services/matching_service.py:166-178`, `backend/src/services/matching.service.ts:368-413`.
+Figura 1.2.2-5. Estados de una coincidencia (`MatchStatus`). Fuente: `backend/prisma/schema.prisma:326-332`, `backend/src/services/report-matching.service.ts:79-88`, `backend/src/services/matching.service.ts:417-462`.
 
 ### Reglas de negocio
 
@@ -322,27 +319,27 @@ Figura 1.2.2-5. Estados de una coincidencia (`MatchStatus`). Fuente: `backend/pr
 | Clases aceptadas | Las 10 clases de animales de COCO: bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe | `backend-ia/app/ml/pipeline.py:49-60` |
 | Mascota principal | Detección de mayor confianza entre las que ocupan al menos el 25% del área del animal más grande | `backend-ia/app/ml/pipeline.py:39`, `:75-100` |
 | Embedding | 768 dimensiones, norma L2 = 1, sobre el recorte llevado a un cuadrado de 224 px ([ADR-0021](../adr/0021-modelo-embeddings-dinov2.md)) | `backend-ia/app/ml/pipeline.py:28`, `:35`, `:115-137` |
-| Umbrales de similitud | Coseno ≥ 0,45 registra la coincidencia; ≥ 0,63 además notifica ([ADR-0021](../adr/0021-modelo-embeddings-dinov2.md); ajuste pendiente en [#217](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/217)) | `backend-ia/app/config.py:21-22`, `backend-ia/app/services/matching_service.py:158`, `:181` |
-| Candidatos | `published`, tipo opuesto, a menos de 5 km, creados en los últimos 90 días, autor sin suspensión vigente, máximo 5 | `backend-ia/app/services/matching_service.py:115-141`, `backend-ia/app/config.py:20-25` |
-| Control temprano | Tiempo máximo 15 s, sin reintentos | `backend/src/services/matching.service.ts:156` |
+| Umbrales de similitud | Coseno ≥ 0,45 registra la coincidencia; ≥ 0,63 además notifica ([ADR-0021](../adr/0021-modelo-embeddings-dinov2.md); ajuste pendiente en [#217](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/217)) | `backend/src/config/matching.ts:11-12`, `backend/src/services/report-matching.service.ts:74`, `:91` |
+| Candidatos | `published`, tipo opuesto, a menos de 5 km, creados en los últimos 90 días, autor sin suspensión vigente, máximo 5 | `backend/src/services/report-matching.service.ts:58-70`, `backend/src/config/matching.ts:10-16` |
+| Control temprano | Tiempo máximo 15 s, sin reintentos | `backend/src/services/matching.service.ts:186` |
 | Calidad de la foto | Nitidez del recorte (varianza del laplaciano a 512 px) menor que 10: aviso que no bloquea la publicación ([ADR-0023](../adr/0023-aviso-calidad-imagen.md)) | `backend-ia/app/ml/quality.py:11-32`, `backend/src/services/image-screening.service.ts:7-11` |
-| Reintentos del embedding | Hasta 3 intentos ante falla de red o 5xx, con esperas de 1 s y 5 s | `backend/src/services/matching.service.ts:35`, `:47-70` |
-| Reconciliación | Cada 5 min; reportes `pending` actualizados entre 2 min y 24 h antes; 10 por pasada | `backend/src/services/matching.service.ts:262-267` |
+| Reintentos del embedding | Hasta 4 intentos ante falla de red o 5xx, con esperas de 1 s, 5 s y 30 s ([#266](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/266)) | `backend/src/services/matching.service.ts:30`, `:42-65` |
+| Reconciliación | Cada 5 min; reportes `pending` actualizados entre 2 min y 24 h antes; 10 por pasada | `backend/src/services/matching.service.ts:311-316` |
 | Quién ve y quién decide | Ve cualquier usuario con sesión; decide solo el autor del reporte | `backend/src/routes/reports.routes.ts:36-39` |
 
 Tabla 1.2.2-7. Reglas del módulo de IA y matching. Fuente: archivos de la columna Fuente.
 
 ### Qué pasa si algo falla
 
-- **Sin `AI_SERVICE_URL`.** No hay moderación ni reconciliación y los reportes con foto quedan `pending` indefinidamente ([#220](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/220), `backend/src/services/matching.service.ts:102-104`, `:274`). Al arrancar, la API registra una advertencia si falta la variable (`backend/src/index.ts:8`, `:11`).
-- **Backend IA caído.** Agotados los intentos, el reporte queda `pending` y la reconciliación lo reintenta durante 24 h; después queda `pending` sin aviso al usuario (`backend/src/services/matching.service.ts:142-148`, `:262-263`).
-- **Clave interna distinta.** Un 401 deja el reporte `pending` y registra un error que nombra `INTERNAL_API_KEY` (`backend/src/services/matching.service.ts:126-135`).
-- **Falla el matching.** El embedding queda guardado y el reporte se publica igual, sin coincidencias (`backend-ia/app/services/embedding_service.py:53-59`).
-- **Falla el aviso a la API.** La coincidencia queda guardada sin notificación (`backend-ia/app/services/matching_service.py:83-88`).
+- **Sin `AI_SERVICE_URL`.** No hay moderación ni reconciliación y los reportes con foto quedan `pending` indefinidamente ([#220](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/220), `backend/src/services/matching.service.ts:111-113`, `:323`). Al arrancar, la API registra una advertencia si falta la variable (`backend/src/index.ts:8`, `:11`).
+- **Backend IA caído.** Agotados los intentos, el reporte queda `pending` y la reconciliación lo reintenta durante 24 h; después queda `pending` sin aviso al usuario (`backend/src/services/matching.service.ts:152-157`, `:311-312`).
+- **Clave interna distinta.** Un 401 deja el reporte `pending` y registra un error que nombra `INTERNAL_API_KEY` (`backend/src/services/matching.service.ts:135-144`).
+- **Falla el matching.** El embedding queda guardado y el reporte se publica igual, sin coincidencias (`backend/src/services/matching.service.ts:98-104`).
+- **Falla el aviso de coincidencia.** La coincidencia queda guardada sin notificación y el matching sigue con los demás candidatos (`backend/src/services/report-matching.service.ts:98-108`).
 
 ### Limitaciones conocidas
 
-- Los umbrales del matching son provisionales ([#217](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/217), `backend-ia/app/services/matching_service.py:38-39`).
+- Los umbrales del matching son provisionales ([#217](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/217), [ADR-0014](../adr/0014-parametros-matching.md)).
 - El procesamiento no usa una cola: si el proceso se reinicia, depende de la reconciliación ([#177](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/177)).
 - La moderación asíncrona y el embedding usan solo la foto principal; las fotos extra pasan únicamente por el control temprano (`backend/src/services/reports.service.ts:156`, `:196`).
 
@@ -368,10 +365,10 @@ Tabla 1.2.2-8. Historias del módulo de notificaciones. Fuente: `gh issue list` 
    - Con el consentimiento aceptado, `useLocationSync` envía la ubicación del navegador una vez por carga de página y el backend guarda solo la última, con su fecha (`frontend/src/hooks/useLocationSync.ts`, `backend/src/services/notification-preferences.service.ts:102`). Si el usuario revoca el consentimiento, se borra la ubicación y se desactiva el aviso de zona (`backend/src/services/notification-preferences.service.ts:76`).
    - En `/account/notifications`, enlazada desde el menú "Más", el usuario activa o desactiva cada tipo de aviso y, para el de zona, elige radio y tipo de reporte (`frontend/src/pages/account/NotificationSettingsPage.tsx`). Los endpoints son `GET` y `PUT /api/notification-preferences`, `PUT .../location-consent` y `PUT .../location`, todos con JWT y limitados a las preferencias del propio usuario (`backend/src/routes/notification-preferences.routes.ts:7-10`).
 2. **Generación.** Toda notificación es una fila en `notifications` con un `type` de texto (`backend/prisma/schema.prisma:391`). Antes de crearla se consulta la preferencia del destinatario y, si ese tipo está desactivado, no se crea; la acción que la origina no cambia (`backend/src/services/notification-preferences.service.ts:56`). Hay cinco orígenes:
-   - `match_suggested`: el Backend IA llama a `POST /api/notifications/internal/match`, protegido con `X-Internal-Key` (`backend/src/routes/notifications.routes.ts:14`). `notifyMatch` y `createForMatch` crean una notificación por autor, apuntando al otro reporte, y no repiten una existente para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:60-144`).
+   - `match_suggested`: el matching de la API llama a `notifyMatch` por cada coincidencia que alcanza el umbral de notificación (`backend/src/services/report-matching.service.ts:91-108`). `notifyMatch` y `createForMatch` crean una notificación por autor, apuntando al otro reporte, y no repiten una existente para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:60-144`).
    - `report_status_change`: al aplicar el veredicto de la IA ("Tu reporte fue publicado" o "Tu reporte no fue publicado") o cuando un moderador acepta una denuncia ("Tu reporte fue ocultado") (`backend/src/services/notifications.service.ts:146-190`).
    - `message`: por cada mensaje de chat, para el receptor, con una vista previa (`backend/src/services/notifications.service.ts:209-227`).
-   - `nearby_report`: cuando un reporte pasa a `published`, `applyModerationVerdict` llama a `createForNearbyReport` (`backend/src/services/matching.service.ts:93-98`). Avisa a los usuarios que no son el autor, tienen el aviso de zona activado, aceptaron compartir su ubicación, coincide el tipo de reporte elegido y su última ubicación está dentro del radio (consulta PostGIS `ST_DWithin`); no repite el aviso para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:237-276`).
+   - `nearby_report`: cuando un reporte pasa a `published`, `applyModerationVerdict` llama a `createForNearbyReport` (`backend/src/services/matching.service.ts:88-93`). Avisa a los usuarios que no son el autor, tienen el aviso de zona activado, aceptaron compartir su ubicación, coincide el tipo de reporte elegido y su última ubicación está dentro del radio (consulta PostGIS `ST_DWithin`); no repite el aviso para el mismo usuario y reporte (`backend/src/services/notifications.service.ts:237-276`).
    - `role_change`: cuando un `admin` cambia el rol de un usuario; no consulta las preferencias (`backend/src/services/admin-users.service.ts:116-124`).
 3. **Visualización.** La campana del encabezado (`frontend/src/layouts/MainLayout.tsx:179`) consulta `GET /api/notifications` cada 30 s (`frontend/src/hooks/useNotificationsQuery.ts:12`, `:23`), que devuelve las del usuario de la más nueva a la más vieja (`backend/src/services/notifications.service.ts:7-12`).
 4. **Gestión.** `PUT /api/notifications/:id/read` marca como leída y `DELETE /api/notifications/:id` borra; solo el destinatario (403 para otro usuario) (`backend/src/services/notifications.service.ts:14-36`).
@@ -393,9 +390,8 @@ Tabla 1.2.2-9. Reglas del módulo de notificaciones. Fuente: archivos de la colu
 
 ### Qué pasa si algo falla
 
-- Un error al crear la notificación no hace fallar la acción que la origina, tampoco el aviso de zona al publicar un reporte (`backend/src/services/matching.service.ts:87-98`, `backend/src/sockets/chat.socket.ts:102-107`).
+- Un error al crear la notificación no hace fallar la acción que la origina, tampoco el aviso de zona al publicar un reporte (`backend/src/services/matching.service.ts:82-93`, `backend/src/sockets/chat.socket.ts:102-107`).
 - Si el navegador deniega la geolocalización, el consentimiento queda registrado, no se guarda ubicación y no se muestra ningún error (`frontend/src/hooks/useLocationSync.ts`).
-- Sin `NODE_BACKEND_URL` en el Backend IA, las coincidencias se guardan sin notificación (`backend-ia/app/services/matching_service.py:66-70`).
 
 ### Limitaciones conocidas
 
@@ -607,7 +603,7 @@ Tabla 1.2.2-16. Historias del módulo de mapa. Fuente: `gh issue list` (comando 
 2. **Mapa.** En `/reports`, el botón "Mapa" muestra `MapView` (react-leaflet) con teselas de OpenStreetMap, centrado en la zona del piloto (San Rafael, Mendoza) con zoom 13 (`frontend/src/lib/map.ts:1-4`, `frontend/src/components/reports/MapView.tsx:64-66`). Pide `GET /api/geo/map` con el área visible y los mismos filtros que la lista, 300 ms después del último movimiento del mapa (`frontend/src/pages/reports/FeedPage.tsx:25-26`, `:54-60`, `frontend/src/services/geo.service.ts:13-27`); los reportes sin ubicación no se dibujan.
 3. **Marcador.** Cada reporte es un pin rojo (perdido) o azul (encontrado); su ventana muestra foto, título, descripción y un enlace a `/reports/:id` (`frontend/src/components/reports/MapView.tsx:67-98`, `frontend/src/components/reports/reportPinIcon.ts:5-9`).
 4. **Detalle.** El detalle de un reporte muestra un mapa con su ubicación (`frontend/src/pages/reports/ReportDetailPage.tsx:250-258`).
-5. **Uso en el matching.** El Backend IA compara solo reportes a menos de 5 km con `ST_DWithin` sobre `geography` (`backend-ia/app/services/matching_service.py:137`).
+5. **Uso en el matching.** La API compara solo reportes a menos de 5 km con `ST_DWithin` sobre `geography` (`backend/src/services/report-matching.service.ts:65`).
 6. **Endpoints.** `GET /api/geo/map` (rectángulo visible) lo usa el mapa del feed; `GET /api/geo/nearby` (radio en km) existe, pero el frontend no lo llama; `GET /api/geo/reverse` es el proxy de geocodificación inversa (`backend/src/routes/geo.routes.ts:7-9`, `backend/src/services/geo.service.ts:41-55`).
 
 ### Reglas de negocio

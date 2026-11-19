@@ -158,14 +158,13 @@ export async function getTwoFactorState(email: string): Promise<TwoFactorState> 
   }
 }
 
-/** Same row backend-ia writes when it finds a candidate (matching_service.py). */
-export async function seedMatch(lostReportId: number, foundReportId: number, similarityScore: number): Promise<number> {
+/** Match the backend's matching stored for this pair (report-matching.service.ts). */
+export async function getMatchId(lostReportId: number, foundReportId: number): Promise<number | undefined> {
   const { rows } = await db().query<{ id: number }>(
-    `INSERT INTO report_matches (report_lost_id, report_found_id, similarity_score, status)
-     VALUES ($1, $2, $3, 'pending') RETURNING id`,
-    [lostReportId, foundReportId, similarityScore],
+    'SELECT id FROM report_matches WHERE report_lost_id = $1 AND report_found_id = $2',
+    [lostReportId, foundReportId],
   )
-  return rows[0].id
+  return rows[0]?.id
 }
 
 export async function getMatchStatus(matchId: number): Promise<string | undefined> {

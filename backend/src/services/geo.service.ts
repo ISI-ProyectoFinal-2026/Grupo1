@@ -34,7 +34,7 @@ async function queryReports(spatial: Prisma.Sql, filters: GeoFilterInput): Promi
 
 /**
  * Reportes publicados dentro de `radiusKm` de (lat, lng). Usa ST_DWithin
- * con cast a geography (igual que matching_service.py) porque `location`
+ * con cast a geography (igual que report-matching.service.ts) porque `location`
  * es geometry en grados WGS84: sin el cast, el radio se interpretaría en
  * grados en vez de metros.
  */
