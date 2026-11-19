@@ -58,7 +58,7 @@ describe('MainLayout', () => {
 
     renderLayout()
 
-    expect(await screen.findByRole('button', { name: 'Ayuda: Menú principal (Usuario)' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Ayuda' })).toBeInTheDocument()
   })
 
   it.each(['/reports/5', '/reports/mine', '/chats/3', '/'])('en %s el boton de ayuda nunca se oculta', async (ruta) => {
@@ -66,7 +66,7 @@ describe('MainLayout', () => {
 
     renderLayout(ruta)
 
-    const contenedor = (await screen.findByRole('button', { name: /^Ayuda:/ })).parentElement
+    const contenedor = (await screen.findByRole('button', { name: 'Ayuda' })).parentElement
     expect(contenedor).not.toHaveClass('max-lg:hidden')
   })
 
@@ -75,7 +75,9 @@ describe('MainLayout', () => {
 
     renderLayout('/businesses')
 
-    expect(await screen.findByRole('button', { name: 'Ayuda: Comercios (Usuario)' })).toBeInTheDocument()
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Ayuda' }))
+
+    expect(screen.getByRole('dialog', { name: 'Ayuda: Comercios (Usuario)' })).toBeInTheDocument()
   })
 
   it('no muestra el boton de ayuda sin sesion', async () => {
@@ -84,7 +86,7 @@ describe('MainLayout', () => {
     renderLayout()
 
     await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: /^Ayuda/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ayuda' })).not.toBeInTheDocument()
   })
 
   it('no muestra el bell sin sesion', async () => {

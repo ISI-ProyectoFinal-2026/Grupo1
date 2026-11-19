@@ -133,7 +133,7 @@ function RoleHelp({ raised = false }: { raised?: boolean }) {
         ref={buttonRef}
         type='button'
         data-role={role}
-        aria-label={name}
+        aria-label='Ayuda'
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((previous) => !previous)}

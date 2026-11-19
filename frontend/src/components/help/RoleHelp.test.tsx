@@ -49,7 +49,7 @@ describe('RoleHelp', () => {
 
   it('no se muestra sin sesión', () => {
     renderHelp()
-    expect(screen.queryByRole('button', { name: /Ayuda/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ayuda' })).not.toBeInTheDocument()
   })
 
   it.each(ROLES)('en el menú principal para %s muestra solo su ayuda', async (role) => {
@@ -57,11 +57,11 @@ describe('RoleHelp', () => {
     const user = userEvent.setup()
     renderHelp('/')
 
-    const button = screen.getByRole('button', { name: `Ayuda: Menú principal (${ROLE_LABELS[role]})` })
+    const button = screen.getByRole('button', { name: 'Ayuda' })
     expect(button).toHaveAttribute('data-role', role)
     await user.click(button)
 
-    const dialog = screen.getByRole('dialog')
+    const dialog = screen.getByRole('dialog', { name: `Ayuda: Menú principal (${ROLE_LABELS[role]})` })
     expect(within(dialog).getByRole('heading', { name: 'Menú principal' })).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Qué podés hacer' })).toBeInTheDocument()
     expect(within(dialog).getByRole('heading', { name: 'Cómo' })).toBeInTheDocument()
@@ -82,7 +82,7 @@ describe('RoleHelp', () => {
     const user = userEvent.setup()
     renderHelp('/chats/3')
 
-    await user.click(screen.getByRole('button', { name: 'Ayuda: Chats (Moderador)' }))
+    await user.click(screen.getByRole('button', { name: 'Ayuda' }))
 
     const dialog = screen.getByRole('dialog', { name: 'Ayuda: Chats (Moderador)' })
     expect(within(dialog).getByRole('heading', { name: 'Chats' })).toBeInTheDocument()
@@ -95,7 +95,7 @@ describe('RoleHelp', () => {
     const user = userEvent.setup()
     renderHelp('/reports/8')
 
-    await user.click(screen.getByRole('button', { name: /^Ayuda: Reporte/ }))
+    await user.click(screen.getByRole('button', { name: 'Ayuda' }))
 
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getAllByText('Si el reporte es tuyo').length).toBeGreaterThan(0)
@@ -107,21 +107,29 @@ describe('RoleHelp', () => {
     const user = userEvent.setup()
     renderHelp('/reports', <Link to='/pets'>ir</Link>)
 
-    await user.click(screen.getByRole('button', { name: 'Ayuda: Reportes (Usuario)' }))
+    await user.click(screen.getByRole('button', { name: 'Ayuda' }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'ir' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Ayuda: Mis mascotas (Usuario)' }))
+    await user.click(screen.getByRole('button', { name: 'Ayuda' }))
     expect(within(screen.getByRole('dialog')).getByRole('heading', { name: 'Mis mascotas' })).toBeInTheDocument()
+  })
+
+  it('el botón tiene un nombre fijo que no cambia con la ruta ni el rol', () => {
+    login('moderador')
+    renderHelp('/reports/new')
+    const button = screen.getByRole('button', { name: 'Ayuda' })
+    expect(button).toHaveAccessibleName('Ayuda')
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 
   it('abre y cierra con el botón, actualizando aria-expanded', async () => {
     login('moderador')
     const user = userEvent.setup()
     renderHelp('/')
-    const button = screen.getByRole('button', { name: 'Ayuda: Menú principal (Moderador)' })
+    const button = screen.getByRole('button', { name: 'Ayuda' })
 
     expect(button).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -137,7 +145,7 @@ describe('RoleHelp', () => {
     login('admin')
     const user = userEvent.setup()
     renderHelp('/')
-    const button = screen.getByRole('button', { name: 'Ayuda: Menú principal (Administrador)' })
+    const button = screen.getByRole('button', { name: 'Ayuda' })
     await user.click(button)
 
     await user.keyboard('{Escape}')
@@ -150,7 +158,7 @@ describe('RoleHelp', () => {
     login('usuario_regular')
     const user = userEvent.setup()
     renderHelp('/')
-    const button = screen.getByRole('button', { name: /^Ayuda:/ })
+    const button = screen.getByRole('button', { name: 'Ayuda' })
     await user.click(button)
 
     await user.click(screen.getByRole('button', { name: 'Cerrar ayuda' }))
@@ -163,7 +171,7 @@ describe('RoleHelp', () => {
     login('usuario_regular')
     const user = userEvent.setup()
     renderHelp('/', <p>afuera</p>)
-    await user.click(screen.getByRole('button', { name: /^Ayuda:/ }))
+    await user.click(screen.getByRole('button', { name: 'Ayuda' }))
 
     await user.click(screen.getByRole('dialog'))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -175,7 +183,7 @@ describe('RoleHelp', () => {
   it('no se oculta en mobile y sube sobre la barra de acciones', () => {
     login('usuario_regular')
     renderHelp('/reports/5')
-    const contenedor = screen.getByRole('button', { name: /^Ayuda:/ }).parentElement
+    const contenedor = screen.getByRole('button', { name: 'Ayuda' }).parentElement
     expect(contenedor).not.toHaveClass('max-lg:hidden')
     expect(contenedor?.className).toContain('var(--help-bar-h')
   })
@@ -183,7 +191,7 @@ describe('RoleHelp', () => {
   it('en el chat se sube sobre el campo de mensaje', () => {
     login('usuario_regular')
     renderHelp('/chats/1', undefined, { raised: true })
-    expect(screen.getByRole('button', { name: /^Ayuda:/ }).parentElement?.className).toContain(
+    expect(screen.getByRole('button', { name: 'Ayuda' }).parentElement?.className).toContain(
       'max-lg:bottom-[calc(var(--tabbar-h)+var(--safe-bottom)+5rem)]'
     )
   })
