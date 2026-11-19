@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import LocationConsentModal from "@/components/account/LocationConsentModal";
 import UnverifiedEmailBanner from "@/components/auth/UnverifiedEmailBanner";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import RoleHelp from "@/components/help/RoleHelp";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useIsModerator } from "@/hooks/useIsModerator";
@@ -380,6 +381,9 @@ function MainLayout() {
         <UnverifiedEmailBanner />
         <Outlet />
       </main>
+      <RoleHelp
+        raised={pathname === "/chats" || pathname.startsWith("/chats/")}
+      />
       <LocationConsentModal />
     </div>
   );
