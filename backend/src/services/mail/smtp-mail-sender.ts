@@ -28,6 +28,11 @@ export class SmtpMailSender implements MailSender {
     });
   }
 
+  // conexión y autenticación sin enviar nada (preflight)
+  async verify(): Promise<void> {
+    await this.transporter.verify();
+  }
+
   async send(message: MailMessage): Promise<void> {
     await this.transporter.sendMail({ from: this.config.from, ...message });
   }
