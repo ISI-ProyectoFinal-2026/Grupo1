@@ -1,11 +1,13 @@
 import { api } from "@/services/api";
 import type {
+  AccountDeleteInput,
   AuthUser,
   LoginInput,
   LoginResponse,
   MessageResponse,
   RegisterInput,
   ResetPasswordInput,
+  UpdateProfileInput,
 } from "@/types/auth";
 
 // Una cuenta con 2FA recibe un desafío en vez de la sesión: ver `isTwoFactorChallenge`.
@@ -37,4 +39,17 @@ export function forgotPassword(email: string): Promise<MessageResponse> {
 
 export function resetPassword(input: ResetPasswordInput): Promise<MessageResponse> {
   return api.post<MessageResponse>("/auth/reset-password", input).then((res) => res.data);
+}
+
+export function updateProfile(input: UpdateProfileInput): Promise<AuthUser> {
+  return api.patch<AuthUser>("/auth/me", input).then((res) => res.data);
+}
+
+// el backend responde un adjunto JSON: se pide como Blob para descargarlo
+export function exportAccount(): Promise<Blob> {
+  return api.get<Blob>("/auth/me/export", { responseType: "blob" }).then((res) => res.data);
+}
+
+export function deleteAccount(input: AccountDeleteInput): Promise<void> {
+  return api.delete("/auth/me", { data: input }).then(() => undefined);
 }

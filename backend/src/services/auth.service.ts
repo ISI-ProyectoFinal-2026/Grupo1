@@ -6,6 +6,7 @@ import { frontendLink } from "../utils/frontend-link";
 import { signAccessToken } from "../utils/jwt";
 import { PublicUser, toPublicUser } from "../utils/public-user";
 import { LoginInput, RegisterInput, ResetPasswordInput } from "../validators/auth.validator";
+import { UpdateProfileInput } from "../validators/profile.validator";
 import { assertNotSuspended } from "./account-sanctions.service";
 import { consumeAuthToken, issueAuthToken, latestAuthTokenCreatedAt } from "./auth-tokens.service";
 import { assertMailConfigured } from "./mail";
@@ -102,6 +103,15 @@ export async function getMe(userId: number) {
   if (!user) {
     throw new AppError(404, "Usuario no encontrado");
   }
+  return toPublicUser(user);
+}
+
+// perfil propio (#366): solo nombre y teléfono; un campo ausente no se toca
+export async function updateProfile(userId: number, input: UpdateProfileInput) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { fullName: input.fullName, phone: input.phone },
+  });
   return toPublicUser(user);
 }
 

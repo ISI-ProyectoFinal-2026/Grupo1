@@ -29,6 +29,7 @@ export type SectionId =
   | 'pets'
   | 'pet-new'
   | 'pet-edit'
+  | 'account'
   | 'security'
   | 'notification-settings'
   | 'moderation'
@@ -53,7 +54,7 @@ const HOME_CAN = [
   'Chatear con otras personas desde "Chats".',
   'Publicar una mascota perdida o encontrada con el botón destacado "Reportar".',
   'Explorar veterinarias, refugios y pet shops en "Comercios".',
-  'Entrar a "Más" para "Mis mascotas", "Mis reportes", "Mi comercio", "Notificaciones", tu email ("Seguridad de la cuenta") y "Cerrar sesión".',
+  'Entrar a "Más" para "Mis mascotas", "Mis reportes", "Mi comercio", "Mi cuenta", "Notificaciones", tu email ("Seguridad de la cuenta") y "Cerrar sesión".',
   'Ver tus avisos en la campana "Notificaciones" del encabezado.',
 ]
 const HOME_STEPS = [
@@ -318,6 +319,23 @@ export const SECTION_HELP: Record<SectionId, SectionDef> = {
     can: [g(['Actualizar los datos de tu mascota (solo podés editar las tuyas).'])],
     steps: [g(['Modificá lo que necesites.', 'Tocá "Guardar cambios".'])],
   },
+  account: {
+    title: 'Mi cuenta',
+    can: [
+      g([
+        'Cargar o corregir tu "Nombre" y tu "Teléfono". El teléfono es opcional y aparece en el flyer de un reporte solo si marcás "Mostrar mi teléfono en el flyer" al crearlo.',
+        'Descargar una copia de tus datos en un archivo JSON con "Descargar mis datos" (hasta 5 veces por hora).',
+        'Eliminar tu cuenta con "Eliminar mi cuenta". Es definitivo: se borran tus mascotas, reportes, chats y, si tenés, tu comercio.',
+        'No podés eliminarla con una sanción vigente o en revisión, con un comercio con plan Premium vigente ni si sos el único administrador.',
+      ]),
+    ],
+    steps: [
+      g([
+        'Para editar tus datos, modificá los campos y tocá "Guardar cambios".',
+        'Para eliminar la cuenta, tocá "Eliminar mi cuenta", ingresá tu contraseña (y un código si tenés la verificación en dos pasos) y tocá "Eliminar definitivamente".',
+      ]),
+    ],
+  },
   security: {
     title: 'Seguridad de la cuenta',
     can: [
@@ -440,6 +458,7 @@ export const SECTION_ROUTES: { pattern: string; id: SectionId }[] = [
   { pattern: '/pets/new', id: 'pet-new' },
   { pattern: '/pets/:id/edit', id: 'pet-edit' },
   { pattern: '/pets', id: 'pets' },
+  { pattern: '/account/profile', id: 'account' },
   { pattern: '/account/security', id: 'security' },
   { pattern: '/account/notifications', id: 'notification-settings' },
   { pattern: '/moderation', id: 'moderation' },

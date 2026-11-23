@@ -353,6 +353,28 @@ describe('MainLayout', () => {
     expect(enlace).not.toHaveAttribute('aria-current')
   })
 
+  it('ofrece Mi cuenta arriba de las notificaciones', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout()
+
+    const enlace = await screen.findByRole('link', { name: 'Mi cuenta' })
+    expect(enlace).toHaveAttribute('href', '/account/profile')
+    const notificaciones = screen.getByRole('link', { name: 'Notificaciones' })
+    expect(enlace.compareDocumentPosition(notificaciones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(enlace).not.toHaveAttribute('aria-current')
+  })
+
+  it('marca Mi cuenta como activa en su ruta', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout('/account/profile')
+
+    expect(await screen.findByRole('link', { name: 'Mi cuenta' })).toHaveAttribute('aria-current', 'page')
+  })
+
   it('marca Notificaciones como activa en su ruta', async () => {
     useAuthStore.setState({ token: 'token', user: usuario })
     vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))

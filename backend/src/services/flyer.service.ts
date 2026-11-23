@@ -689,7 +689,7 @@ function versionedFlyerUrl(publicUrl: string, version: string, degradedAt?: stri
  * se corrige sola.
  */
 // mascota vinculada y teléfono del autor (solo si lo autorizó)
-async function loadFlyerDetails(report: ReportDTO): Promise<FlyerDetails> {
+export async function loadFlyerDetails(report: ReportDTO): Promise<FlyerDetails> {
   const [pet, user] = await Promise.all([
     report.petId !== null
       ? prisma.pet.findUnique({ where: { id: report.petId }, select: { name: true, breed: true, color: true } })

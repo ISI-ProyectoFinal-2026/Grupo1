@@ -27,6 +27,7 @@ describe('resolveSectionHelp', () => {
     ['/pets', 'pets'],
     ['/pets/new', 'pet-new'],
     ['/pets/4/edit', 'pet-edit'],
+    ['/account/profile', 'account'],
     ['/account/security', 'security'],
     ['/account/notifications', 'notification-settings'],
     ['/ruta-que-no-existe', 'home'],

@@ -2,19 +2,22 @@ import type { AxiosResponse } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/services/api'
 import {
+  deleteAccount,
+  exportAccount,
   forgotPassword,
   getMe,
   login,
   register,
   resendVerification,
   resetPassword,
+  updateProfile,
   verifyEmail,
 } from '@/services/auth.service'
 import { isTwoFactorChallenge } from '@/types/auth'
 import type { AuthResponse, AuthUser, TwoFactorChallenge } from '@/types/auth'
 
 vi.mock('@/services/api', () => ({
-  api: { get: vi.fn(), post: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
 }))
 
 function respuesta<T>(data: T): AxiosResponse<T> {
@@ -166,5 +169,38 @@ describe('auth.service', () => {
     )
 
     await expect(verifyEmail('viejo')).rejects.toThrow('El enlace es inválido o expiró')
+  })
+
+  it('manda nombre y telefono a PATCH /auth/me y devuelve el usuario', async () => {
+    const actualizado = { ...usuario, phone: '11 5555-5555' }
+    vi.mocked(api.patch).mockResolvedValue(respuesta(actualizado))
+
+    const resultado = await updateProfile({ fullName: 'Franco Marin', phone: '11 5555-5555' })
+
+    expect(api.patch).toHaveBeenCalledWith('/auth/me', {
+      fullName: 'Franco Marin',
+      phone: '11 5555-5555',
+    })
+    expect(resultado).toEqual(actualizado)
+  })
+
+  it('pide la exportacion como Blob a GET /auth/me/export', async () => {
+    const archivo = new Blob(['{}'], { type: 'application/json' })
+    vi.mocked(api.get).mockResolvedValue(respuesta(archivo))
+
+    const resultado = await exportAccount()
+
+    expect(api.get).toHaveBeenCalledWith('/auth/me/export', { responseType: 'blob' })
+    expect(resultado).toBe(archivo)
+  })
+
+  it('manda la reautenticacion en el body de DELETE /auth/me', async () => {
+    vi.mocked(api.delete).mockResolvedValue(respuesta(undefined))
+
+    await deleteAccount({ password: 'secreta123', code: '123456' })
+
+    expect(api.delete).toHaveBeenCalledWith('/auth/me', {
+      data: { password: 'secreta123', code: '123456' },
+    })
   })
 })
