@@ -1,6 +1,6 @@
 # ADR-0030: Baja voluntaria de cuenta y exportación de datos
 
-- **Estado:** Pendiente
+- **Estado:** Aceptada
 - **Responsables:** Equipo (Matías Alvarado, PM)
 
 ## Decisión
@@ -10,12 +10,14 @@ El usuario puede editar su nombre y teléfono, descargar sus datos en JSON y eli
 ## Motivo
 
 - Ninguna ruta permitía cargar el teléfono, por lo que el flyer nunca podía mostrarlo (RF-23), y el titular de los datos no tenía forma de obtener una copia de ellos ni de eliminar su cuenta: la única eliminación era la sanción de un administrador.
-- La conservación de las denuncias responde a la pregunta del issue de si se conservan para la moderación.
-- El motivo de cada una de las cuatro decisiones: Pendiente de entrevista.
+- (1) Si el usuario decide darse de baja, su actividad en la aplicación deja de existir y no es necesario que sus reportes sigan: la baja es completa, con todas sus consecuencias.
+- (2) Un plan Premium vigente es un pago en curso: se espera a su vencimiento para que el usuario aproveche lo que pagó, y recién entonces puede darse de baja.
+- (3) Una denuncia se refiere a otra cuenta: borrarla dejaría sin evidencia una moderación en curso o una sanción ya aplicada.
+- (4) En Argentina el teléfono se escribe de muchas formas: aceptar las habituales evita rechazar números válidos, y el flyer lo muestra tal como el usuario lo reconoce.
 
 ## Alternativas
 
-Anonimizar los reportes y los chats en lugar de borrarlos: descartada; motivo: Pendiente de entrevista.
+Anonimizar los reportes y los chats en lugar de borrarlos: descartada, porque la baja es completa y, sin actividad del usuario en la aplicación, no es necesario que sus reportes sigan.
 
 ## Consecuencias
 
