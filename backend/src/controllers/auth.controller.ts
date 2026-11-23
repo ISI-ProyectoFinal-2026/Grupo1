@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import * as accountDeletionService from "../services/account-deletion.service";
+import * as accountExportService from "../services/account-export.service";
 import * as authService from "../services/auth.service";
 import { assertMailConfigured } from "../services/mail";
 import {
@@ -8,6 +10,7 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
 } from "../validators/auth.validator";
+import { accountDeleteSchema, updateProfileSchema } from "../validators/profile.validator";
 
 const FORGOT_PASSWORD_MESSAGE = "Si el email está registrado, te enviamos un enlace para restablecer tu contraseña";
 
@@ -26,6 +29,25 @@ export async function login(req: Request, res: Response): Promise<void> {
 export async function me(req: Request, res: Response): Promise<void> {
   const user = await authService.getMe(req.userId!);
   res.status(200).json(user);
+}
+
+export async function updateMe(req: Request, res: Response): Promise<void> {
+  const data = updateProfileSchema.parse(req.body);
+  const user = await authService.updateProfile(req.userId!, data);
+  res.status(200).json(user);
+}
+
+export async function exportMe(req: Request, res: Response): Promise<void> {
+  const data = await accountExportService.exportAccountData(req.userId!);
+  res.set("Cache-Control", "no-store");
+  res.attachment("patitas-mis-datos.json");
+  res.status(200).json(data);
+}
+
+export async function deleteMe(req: Request, res: Response): Promise<void> {
+  const data = accountDeleteSchema.parse(req.body);
+  await accountDeletionService.deleteOwnAccount(req.userId!, data);
+  res.status(204).end();
 }
 
 export async function verifyEmail(req: Request, res: Response): Promise<void> {

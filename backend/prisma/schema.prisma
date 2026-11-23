@@ -275,13 +275,14 @@ enum AccountReportSeverity {
 model AccountReport {
   id             Int                   @id @default(autoincrement())
   reportedUserId Int                   @map("reported_user_id")
-  reporterId     Int                   @map("reporter_id")
+  // null = la cuenta del denunciante se eliminó (#366); la denuncia queda para moderación
+  reporterId     Int?                  @map("reporter_id")
   severity       AccountReportSeverity
   sanctionId     Int?                  @map("sanction_id")
   createdAt      DateTime              @default(now()) @map("created_at")
 
   reportedUser User             @relation("AccountReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
-  reporter     User             @relation("AccountReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporter     User?            @relation("AccountReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
   sanction     AccountSanction? @relation(fields: [sanctionId], references: [id], onDelete: Cascade)
 
   // una denuncia por persona y ciclo: índice único parcial (sanction_id IS NULL) en SQL crudo
