@@ -8,8 +8,8 @@ module.exports = {
   // src/app.ts, porque app.ts exige JWT_SECRET y Jest no lee el .env por su
   // cuenta. En CI las variables ya vienen del workflow y dotenv no las pisa
   // (no sobreescribe lo que ya está en process.env), así que el comportamiento
-  // del pipeline no cambia.
-  setupFiles: ["dotenv/config"],
+  // del pipeline no cambia. Además descarta el SMTP del .env local (#366).
+  setupFiles: ["<rootDir>/tests/setup-env.ts"],
   transform: {
     "^.+\.ts$": ["ts-jest", { isolatedModules: true }],
   },
