@@ -49,15 +49,17 @@ function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   // Los avisos viajan en el state de la navegación de la página anterior
-  // (Register, VerifyEmailPage, ResetPasswordPage), no en la URL.
+  // (Register, VerifyEmailPage, ResetPasswordPage, AccountPage), no en la URL.
   const flash = location.state as {
     registered?: boolean;
     emailVerified?: boolean;
     passwordReset?: boolean;
+    accountDeleted?: boolean;
   } | null;
   const registered = Boolean(flash?.registered);
   const emailVerified = Boolean(flash?.emailVerified);
   const passwordReset = Boolean(flash?.passwordReset);
+  const accountDeleted = Boolean(flash?.accountDeleted);
 
   const [step, setStep] = useState<Step>({ kind: "password" });
   const [email, setEmail] = useState("");
@@ -258,6 +260,8 @@ function Login() {
       {passwordReset && (
         <SuccessNotice>Tu contraseña se actualizó, iniciá sesión con la nueva</SuccessNotice>
       )}
+
+      {accountDeleted && <SuccessNotice>Tu cuenta fue eliminada</SuccessNotice>}
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">

@@ -150,6 +150,7 @@ function MainLayout() {
     pathname === "/moderation" ||
     pathname === "/admin/users" ||
     pathname === "/admin/sanctions" ||
+    pathname === "/account/profile" ||
     pathname === "/account/security" ||
     pathname === "/account/notifications";
 
@@ -343,6 +344,15 @@ function MainLayout() {
             )}
 
             <div className="mt-2 flex flex-col border-t border-line pt-3">
+              <Link
+                to="/account/profile"
+                onClick={closeMore}
+                aria-current={pathname === "/account/profile" ? "page" : undefined}
+                className={moreLinkClasses(pathname === "/account/profile")}
+              >
+                <UserIcon className="h-5 w-5" />
+                Mi cuenta
+              </Link>
               <Link
                 to="/account/notifications"
                 onClick={closeMore}

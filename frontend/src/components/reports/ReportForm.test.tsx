@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -778,6 +778,16 @@ describe('ReportForm: telefono en el flyer (#259)', () => {
 
     await waitFor(() => expect(createReport).toHaveBeenCalled())
     expect(vi.mocked(createReport).mock.calls[0][0].showPhoneOnFlyer).toBe(true)
+  })
+
+  it('ofrece la casilla apenas el usuario carga su telefono desde Mi cuenta (#366)', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario(null) })
+    renderForm()
+    expect(screen.queryByLabelText(/Mostrar mi teléfono en el flyer/)).not.toBeInTheDocument()
+
+    act(() => useAuthStore.getState().setUser(usuario('11 5555-5555')))
+
+    expect(await screen.findByLabelText(/Mostrar mi teléfono en el flyer/)).not.toBeChecked()
   })
 
   it('precarga el consentimiento guardado', () => {

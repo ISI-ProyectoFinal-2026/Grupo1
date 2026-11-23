@@ -31,6 +31,7 @@ vi.mock('@/pages/auth/TwoFactorResetCancelPage', () => ({
   default: () => <div>pagina cancelar reinicio 2fa</div>,
 }))
 vi.mock('@/pages/account/SecurityPage', () => ({ default: () => <div>pagina seguridad</div> }))
+vi.mock('@/pages/account/AccountPage', () => ({ default: () => <div>pagina mi cuenta</div> }))
 vi.mock('@/pages/account/NotificationSettingsPage', () => ({
   default: () => <div>pagina notificaciones</div>,
 }))
@@ -226,6 +227,7 @@ describe('router: rutas protegidas', () => {
     '/businesses/register',
     '/businesses/dashboard',
     '/businesses/plan',
+    '/account/profile',
     '/account/security',
     '/account/notifications',
     '/pets',
@@ -249,6 +251,7 @@ describe('router: rutas protegidas', () => {
     ['/chats/3', 'pagina chat'],
     ['/businesses/register', 'pagina alta comercio'],
     ['/businesses/dashboard', 'pagina panel comercio'],
+    ['/account/profile', 'pagina mi cuenta'],
     ['/account/security', 'pagina seguridad'],
     ['/pets', 'pagina mis mascotas'],
     ['/pets/new', 'pagina alta mascota'],
