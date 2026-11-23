@@ -95,7 +95,7 @@ npm run reembed:reports               # solo publicados
 npm run reembed:reports -- --all      # todos los que tienen imagen
 ```
 
-- El primer arranque descarga los pesos de DINOv2 (necesita internet).
+- Fuera de Docker, el primer arranque descarga los pesos de YOLOv8n y DINOv2 (necesita internet). La imagen de Docker (`Dockerfile`) los descarga durante el build y arranca con `HF_HUB_OFFLINE=1`, sin red.
 - Si actualizás el código sin migrar, los inserts fallan: la columna sigue en 512 dimensiones y el vector nuevo tiene 768.
 - Borrá los matches `pending` viejos antes del paso 3 si querés descartar los calculados con el modelo anterior: el upsert no elimina los que ahora quedan bajo el umbral.
 ## Tests

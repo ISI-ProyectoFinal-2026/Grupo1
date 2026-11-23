@@ -1,6 +1,6 @@
 # Variables de entorno — docker-compose (Postgres)
 
-`docker-compose.yml` ya trae valores por defecto (`patitas`/`patitas`/`patitas`, puerto host `5433`), así que `docker compose up -d` funciona sin configuración extra para desarrollo local.
+`docker-compose.yml` ya trae valores por defecto (`patitas`/`patitas`/`patitas`, puerto host `5433`), así que `docker compose up -d postgres` funciona sin configuración extra para desarrollo local. El stack completo (`docker compose up -d`) necesita además `backend/.env` (al menos `JWT_SECRET`).
 
 **Por qué 5433 y no 5432**: si ya tenés un PostgreSQL nativo corriendo en Windows/Mac/Linux escuchando en `5432`, el contenedor no puede publicar ahí (o peor, tus clientes se conectan silenciosamente al Postgres equivocado). Usamos `5433` como puerto de host por defecto para evitar ese choque; dentro del contenedor sigue siendo `5432`.
 
@@ -14,6 +14,20 @@ POSTGRES_PORT=5433
 ```
 
 El backend principal arma su `DATABASE_URL` a partir de estos mismos valores (ver `backend/.env.example`). El backend IA no se conecta a la base (ADR-0029).
+
+### Servicios `backend`, `backend-ia` y `frontend`
+
+Cada servicio lee su propio `.env` (`backend/.env`, `backend-ia/.env`) y Compose pisa los valores que cambian dentro de la red: `DATABASE_URL` (`postgres:5432`), `AI_SERVICE_URL` (`http://backend-ia:8000`), `PORT`, `FRONTEND_URL`, `TRUST_PROXY=1` (el nginx del frontend es el proxy) e `INTERNAL_API_KEY`. Variables opcionales del `.env` de la raíz:
+
+```
+BACKEND_PORT=3001        # puerto del backend en el host
+BACKEND_IA_PORT=8000     # puerto del Backend IA en el host
+FRONTEND_PORT=5173       # puerto del frontend en el host (también arma FRONTEND_URL)
+INTERNAL_API_KEY=dev-internal-key   # se inyecta igual en backend y backend-ia
+VITE_SOCKET_URL=         # build arg del frontend; vacío = ruta relativa
+```
+
+Dentro de Compose, `INTERNAL_API_KEY` sale de este archivo y no de `backend/.env` ni de `backend-ia/.env`: así los dos servicios siempre reciben el mismo valor.
 
 ---
 
