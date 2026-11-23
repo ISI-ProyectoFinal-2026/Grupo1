@@ -448,7 +448,7 @@ La fuente de verdad es `backend/prisma/schema.prisma`; el detalle de columnas es
 | `role_change_audits` | `20261104000000_add_role_change_audits` |
 | `account_reports`, `account_sanctions`, `account_sanction_events` | `20261105000000_account_reports_and_sanctions` |
 
-Desde `20261110000000_cascade_user_deletion`, eliminar un usuario borra en cascada sus datos; el actor de `account_sanction_events` y `role_change_audits` pasa a nulo.
+Desde `20261110000000_cascade_user_deletion`, eliminar un usuario borra en cascada sus datos; el actor de `account_sanction_events` y `role_change_audits` pasa a nulo. Desde `20261123000000_account_report_reporter_set_null`, también pasa a nulo el autor (`reporter_id`) de las denuncias de cuentas que hizo el usuario ([ADR-0030](adr/0030-baja-voluntaria-y-exportacion-de-datos.md)).
 
 ---
 
@@ -465,6 +465,9 @@ POST /api/auth/2fa/reset/request     { twoFactorToken, password } → manda el m
 POST /api/auth/2fa/reset/confirm     { token } → arranca la espera de 72 h, { message, resetEffectiveAt }
 POST /api/auth/2fa/reset/cancel      { token } → cancela el reinicio, sin sesión
 GET  /api/auth/me                    (requiere sesión)
+PATCH /api/auth/me                  { fullName?, phone? } (requiere sesión; 20 por usuario cada 15 min; otro campo → 400; phone "" lo borra)
+GET  /api/auth/me/export             (requiere sesión; 5 por usuario por hora) → descarga JSON de los datos propios
+DELETE /api/auth/me                 { password, code? } (requiere sesión; code si el 2FA está activo; 409 ACCOUNT_SANCTION_OPEN | LAST_ADMIN | ACTIVE_PREMIUM_BUSINESS)
 POST /api/auth/verify-email          { token }
 POST /api/auth/verify-email/resend   (requiere sesión; 409 si ya está verificado)
 POST /api/auth/forgot-password       { email } → siempre 200 con el mismo mensaje
