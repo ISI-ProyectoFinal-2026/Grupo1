@@ -21,8 +21,12 @@ Nunca se siembra contra otra base: el seed aborta si el nombre no contiene `perf
 
 ```bash
 node perf/seed/seed.mjs                              # humo: 20 usuarios, 200 reportes
-node perf/seed/seed.mjs --users=2000 --reports=10000 # volumen propuesto en el issue
+node perf/seed/seed.mjs --users=2000 --reports=1000  # baseline 1x
+node perf/seed/seed.mjs --users=2000 --reports=10000 # volumen 10x (escenario T6)
 ```
+
+- El volumen es una decisión del equipo, documentada como supuesto: baseline 1x = 1000 reportes y 2000 usuarios; 10x = 10000 reportes.
+- Una corrida previa a 10x saturó el backend a 100 VUs (`GET /api/reports` sin paginar); sus resultados se conservan como `load.v10x.*`.
 
 - Determinístico (`--seed=42` por defecto), idempotente (borra antes las filas `perf-user-*`).
 - Usuarios verificados `perf-user-N@example.com`, contraseña `Patitas123`.
@@ -37,7 +41,9 @@ node perf/seed/seed.mjs --users=2000 --reports=10000 # volumen propuesto en el i
 node perf/scripts/start-env.mjs
 ```
 
-Levanta el stub de IA (`frontend/e2e/support/ai-stub-server.ts`, puerto 8765) y el backend con
+Levanta el stub de IA (`frontend/e2e/support/ai-stub-server.ts`, puerto 8765) y el backend compilado
+(`node dist/index.js`; `PERF_BACKEND=dist` es el default y corre `npm run build` si `dist` falta o está desactualizado).
+`PERF_BACKEND=ts-node` ejecuta con ts-node, que distorsiona los resultados (compilación y overhead en runtime): no usarlo para medir. El backend corre con
 `NODE_ENV=test` (los rate limiters solo se saltean así; sin eso se mediría 429), `DATABASE_URL` de la base perf,
 `R2_PUBLIC_URL=https://pub-e2e.r2.dev` y `AI_SERVICE_URL` apuntando al stub. Ctrl+C detiene ambos.
 

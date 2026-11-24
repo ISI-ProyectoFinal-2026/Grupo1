@@ -1,6 +1,6 @@
 // levanta el stub de IA y el backend para corridas de performance (Ctrl+C los detiene)
-import { spawn } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -49,8 +49,39 @@ process.on('SIGTERM', () => {
 })
 
 const backendDir = resolve(root, 'backend')
+
+// mtime más reciente bajo un directorio
+function newestMtime(dir) {
+  let max = 0
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = resolve(dir, e.name)
+    max = Math.max(max, e.isDirectory() ? newestMtime(p) : statSync(p).mtimeMs)
+  }
+  return max
+}
+
+// PERF_BACKEND=dist (default) usa el build compilado; PERF_BACKEND=ts-node lo distorsiona
+const mode = process.env.PERF_BACKEND ?? 'dist'
+let backendArgs
+if (mode === 'ts-node') {
+  console.warn('[start-env] ts-node distorce los resultados; usar solo para depurar')
+  backendArgs = [resolve(backendDir, 'node_modules', 'ts-node', 'dist', 'bin.js'), 'src/index.ts']
+} else {
+  const entry = resolve(backendDir, 'dist', 'index.js')
+  const stale = !existsSync(entry) || statSync(entry).mtimeMs < newestMtime(resolve(backendDir, 'src'))
+  if (stale) {
+    console.log('[start-env] compilando backend (npm run build)')
+    const build = spawnSync('npm', ['run', 'build'], { cwd: backendDir, stdio: 'inherit', shell: true })
+    if (build.status !== 0) {
+      console.error('[start-env] falló npm run build')
+      process.exit(1)
+    }
+  }
+  backendArgs = [entry]
+}
+
 run('ai-stub', process.execPath, [resolve(root, 'frontend', 'e2e', 'support', 'ai-stub-server.ts')], root)
-run('backend', process.execPath, [resolve(backendDir, 'node_modules', 'ts-node', 'dist', 'bin.js'), 'src/index.ts'], backendDir)
+run('backend', process.execPath, backendArgs, backendDir)
 
 // PID del backend para el muestreo de recursos
 mkdirSync(resolve(root, 'perf', 'results'), { recursive: true })
