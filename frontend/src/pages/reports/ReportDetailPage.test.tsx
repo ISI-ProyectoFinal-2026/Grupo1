@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryWrapper } from '@/test/query-wrapper'
 import { useAuthStore } from '@/stores/auth.store'
 import * as reportsService from '@/services/reports.service'
+import { getPresignedUrl, uploadToR2 } from '@/services/uploads.service'
 import ReportDetailPage from '@/pages/reports/ReportDetailPage'
 import { PIN_COLORS } from '@/components/reports/reportPinIcon'
 import type { MatchDTO, ReportDTO } from '@/types/report.types'
@@ -12,6 +13,10 @@ import type { AuthUser } from '@/types/auth'
 
 vi.mock('@/services/reports.service')
 vi.mock('@/services/chats.service')
+vi.mock('@/services/uploads.service', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/services/uploads.service')>()
+  return { ...original, getPresignedUrl: vi.fn(), uploadToR2: vi.fn() }
+})
 vi.mock('react-leaflet', () => import('@/test/react-leaflet-mock'))
 
 // publicidad (#30): sin anuncios ni comercios cercanos salvo que el test los pida
@@ -297,6 +302,30 @@ describe('ReportDetailPage flyer propio', () => {
 
     expect(await screen.findByText('Flyer para compartir')).toBeInTheDocument()
     expect(screen.queryByText('o subí tu propio flyer')).not.toBeInTheDocument()
+  })
+
+  // #311: el flyer propio pasa por la IA y no se sube a un reporte oculto
+  it.each([
+    [422, 'Su publicación no se puede subir debido a que no se detectan animales. Posible SPAM'],
+    [409, 'Un reporte oculto por denuncias no se puede editar'],
+  ])('con un %i muestra el mensaje del backend y no muestra el flyer', async (status, message) => {
+    useAuthStore.setState({ token: 'token', user: usuario(DUENO_ID) })
+    vi.mocked(getPresignedUrl).mockResolvedValue({
+      uploadUrl: 'https://r2/upload',
+      publicUrl: 'https://cdn/flyer.png',
+      key: 'flyers/flyer.png',
+    })
+    vi.mocked(uploadToR2).mockResolvedValue(undefined)
+    vi.mocked(reportsService.uploadCustomFlyer).mockRejectedValue(Object.assign(new Error(message), { status }))
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByText('o subí tu propio flyer')
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    await user.upload(input, new File(['x'], 'flyer.png', { type: 'image/png' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(screen.queryByAltText('Flyer del reporte')).not.toBeInTheDocument()
   })
 })
 

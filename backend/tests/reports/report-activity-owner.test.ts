@@ -49,7 +49,7 @@ describe("solo el dueño reinicia la inactividad (#264)", () => {
 
   describe("confirmMatch", () => {
     beforeEach(() => {
-      jest.spyOn(prisma.report, "findUnique").mockResolvedValue({ userId: 5 } as never);
+      jest.spyOn(prisma.report, "findUnique").mockResolvedValue({ userId: 5, status: "published" } as never);
       jest.spyOn(prisma.reportMatch, "findUnique").mockResolvedValue({ reportLostId: 10, reportFoundId: 20 } as never);
       jest.spyOn(prisma.reportMatch, "updateMany").mockResolvedValue({ count: 1 } as never);
       jest.spyOn(notificationsService, "notifyMatchConfirmed").mockResolvedValue(null);

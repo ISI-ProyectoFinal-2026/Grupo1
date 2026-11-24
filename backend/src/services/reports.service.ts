@@ -183,11 +183,21 @@ function triggerModeration(reportId: number, imageUrl: string): void {
   }
 }
 
+// solo la mascota propia (#310); si no existe sigue el P2003
+async function assertPetOwnedBy(db: Prisma.TransactionClient, petId: number | null | undefined, userId: number): Promise<void> {
+  if (petId == null) return;
+  const pet = await db.pet.findUnique({ where: { id: petId }, select: { userId: true } });
+  if (pet && pet.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para vincular una mascota de otro usuario");
+  }
+}
+
 export async function create(data: CreateReportInput & { userId: number }): Promise<ReportDTO> {
   const extraImageUrls = data.extraImageUrls ?? [];
   await assertImagesHaveAnimals([data.imageUrl, ...extraImageUrls]);
 
   const reportId = await prisma.$transaction(async (tx) => {
+    await assertPetOwnedBy(tx, data.petId, data.userId);
     let created;
     try {
       created = await tx.report.create({
@@ -324,6 +334,7 @@ export async function update(id: number, userId: number, data: UpdateReportInput
 
   await prisma.$transaction(async (tx) => {
     await assertEditableLocked(tx, id, photosChanged);
+    await assertPetOwnedBy(tx, data.petId, existing.userId);
     try {
       await tx.report.update({ where: { id }, data: updateData });
     } catch (error) {
@@ -415,7 +426,15 @@ export async function setCustomFlyer(id: number, userId: number, flyerUrl: strin
   if (report.userId !== userId) {
     throw new AppError(403, "No tenés permiso para modificar el flyer de este reporte");
   }
-  await prisma.report.update({ where: { id }, data: { customFlyerUrl: flyerUrl } });
+  if (report.status === "hidden") {
+    throw new AppError(409, HIDDEN_EDIT_MESSAGE);
+  }
+  // IA fuera del lock; el oculto se revalida bajo lock
+  await assertImagesHaveAnimals([flyerUrl]);
+  await prisma.$transaction(async (tx) => {
+    await assertEditableLocked(tx, id, false);
+    await tx.report.update({ where: { id }, data: { customFlyerUrl: flyerUrl } });
+  });
   return getById(id);
 }
 

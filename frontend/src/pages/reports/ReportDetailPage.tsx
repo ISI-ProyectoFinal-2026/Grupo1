@@ -72,8 +72,14 @@ export default function ReportDetailPage() {
     try {
       await uploadCustomFlyer(Number(id), publicUrl);
       setFlyerUrl(publicUrl);
-    } catch {
-      setCustomFlyerError("No se pudo guardar el flyer, intentá de nuevo.");
+    } catch (err) {
+      // 422 sin animal y 409 oculto traen un mensaje para el usuario (#311)
+      const status = getApiErrorStatus(err);
+      setCustomFlyerError(
+        (status === 422 || status === 409) && err instanceof Error
+          ? err.message
+          : "No se pudo guardar el flyer, intentá de nuevo.",
+      );
     }
   };
 

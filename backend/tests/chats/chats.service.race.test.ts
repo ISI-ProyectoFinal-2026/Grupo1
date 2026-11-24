@@ -37,7 +37,7 @@ function uniqueViolation(): Prisma.PrismaClientKnownRequestError {
 describe("chats.service createChat() — carrera con P2002", () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    reportFindUnique.mockResolvedValue({ userId: AUTHOR_ID });
+    reportFindUnique.mockResolvedValue({ userId: AUTHOR_ID, status: "published" });
   });
 
   test("si el create choca (P2002) y la relectura no encuentra ganador, lanza AppError 409", async () => {
