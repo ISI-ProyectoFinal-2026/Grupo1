@@ -10,7 +10,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 1000;
 const REQUEST_TIMEOUT_MS = 5000;
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse";
-const DEFAULT_USER_AGENT = "Patitas/1.0 (UTN FRSR - Proyecto Final)";
+export const DEFAULT_USER_AGENT = "Patitas/1.0 (UTN FRSR - Proyecto Final)";
 
 interface ReverseGeocoderOptions {
   fetchFn?: typeof fetch;

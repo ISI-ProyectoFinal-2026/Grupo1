@@ -18,6 +18,75 @@ services:
       timeout: 5s
       retries: 10
 
+  # Backend IA: pesos de YOLO y DINOv2 incluidos en la imagen, arranca sin red
+  backend-ia:
+    build: ./backend-ia
+    container_name: patitas-backend-ia
+    restart: unless-stopped
+    env_file:
+      - path: ./backend-ia/.env
+        required: false
+    environment:
+      # misma clave que el backend
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+    ports:
+      - "${BACKEND_IA_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
+
+  # Backend principal: aplica las migraciones al arrancar
+  backend:
+    build: ./backend
+    container_name: patitas-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend-ia:
+        condition: service_healthy
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-patitas}:${POSTGRES_PASSWORD:-patitas}@postgres:5432/${POSTGRES_DB:-patitas}
+      PORT: 3001
+      AI_SERVICE_URL: http://backend-ia:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      FRONTEND_URL: http://localhost:${FRONTEND_PORT:-5173}
+      # nginx del frontend hace de proxy
+      TRUST_PROXY: 1
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+  # Frontend: build estático servido por nginx, proxea /api y /socket.io al backend
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-}
+    container_name: patitas-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
   # Backup diario de la base y de las imágenes (docs/BACKUP.md).
   # Perfil propio: solo arranca con `docker compose --profile backup up -d`.
   backup:
