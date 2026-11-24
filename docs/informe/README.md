@@ -22,7 +22,7 @@ Evidencia: **R** repositorio, **I** entrevista, **N** no disponible todavía.
 | 1.2.4 Modelo de datos | `1-2-4-modelo-de-datos.md` | A | R |
 | 1.3.1 Programación y documentación | `1-3-1-programacion-y-documentacion.md` | A | R, ADR |
 | 1.3.2, 1.3.4, 1.3.5 Capacitación, manuales, implementación | — | B | I |
-| 1.3.3 Pruebas (1.3.3.5 `No disponible`, #40) | `1-3-3-pruebas.md` | A | R |
+| 1.3.3 Pruebas | `1-3-3-pruebas.md` | A | R |
 | 2.1 Actividades e hitos | — | B | R + I |
 | 2.2.1 Equipo de trabajo | `2-2-1-equipo-de-trabajo.md` | A | R |
 | 2.2.2.1-2.2.2.3 Comunicación, avance, devoluciones | `2-2-2-comunicacion-y-decisiones.md` | B | I |
@@ -141,3 +141,24 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 1.2.2-23 | Tabla | Requerimientos funcionales del PDD con su trazabilidad | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `docs/pdd/PDD v1.0.docx`, `gh issue list`, código y pruebas citados |
 | Tabla 1.2.2-24 | Tabla | Requerimientos funcionales agregados durante el desarrollo | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | issues, código y pruebas citados |
 | Tabla 1.2.2-25 | Tabla | Requerimientos no funcionales del PDD | 1.2.2.1.1 ([`1-2-2-modelo-funcional.md`](1-2-2-modelo-funcional.md)) | `gh run view 40526775901 --log`, archivos citados |
+| Tabla 1.3-1 | Tabla | Objetivos de performance (SLO-1 a SLO-6) | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-2 | Tabla | Escenarios ejecutados frente a lo propuesto en el issue | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-3 | Tabla | SLO frente a lo medido en el escalón de 200 VUs | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-4 | Tabla | Carga: resultados por paso de VUs | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-5 | Tabla | Punto de quiebre: resultados por escalón | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-6 | Tabla | Estrés: resultados por nivel | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-7 | Tabla | Picos: tasa y p95 por tramo | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-8 | Tabla | Volumen: 1x frente a 10x | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-9 | Tabla | Resistencia: veredictos y recursos | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-10 | Tabla | Escalabilidad: capacidad de 1, 2 y 4 instancias | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-11 | Tabla | Lighthouse CI: puntajes por ruta | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-12 | Tabla | Recursos muestreados por escenario | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-13 | Tabla | Recomendaciones como issues candidatos | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Figura 1.3-1 | Figura | Carga: p95 por endpoint según el paso de VUs | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-1-carga-p95.png`; `perf/scripts/make-report-figures.py` |
+| Figura 1.3-2 | Figura | Punto de quiebre: curva de saturación | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-2-punto-de-quiebre.png`; `perf/scripts/make-report-figures.py` |
+| Figura 1.3-3 | Figura | Estrés: latencia y error por nivel | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-3-estres.png`; `perf/scripts/make-report-figures.py` |
+| Figura 1.3-4 | Figura | Picos: p95 en el tiempo | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-4-picos.png`; `perf/scripts/make-report-figures.py` |
+| Figura 1.3-5 | Figura | Volumen: 1x frente a 10x | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-5-volumen.png`; `perf/scripts/make-report-figures.py` |
+| Figura 1.3-6 | Figura | Resistencia: recursos y p95 por tercio | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-6-resistencia.png`; `perf/scripts/make-report-figures.py` |
+| Figura 1.3-7 | Figura | Escalabilidad: p95 por escalón en cada corrida | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-7-escalabilidad.png`; `perf/scripts/make-report-figures.py` |
+| Figura 1.3-8 | Figura | Lighthouse: puntajes por ruta | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-8-lighthouse.png`; `perf/scripts/make-report-figures.py` |
