@@ -1,5 +1,6 @@
 // levanta el stub de IA y el backend para corridas de performance (Ctrl+C los detiene)
 import { spawn } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -50,6 +51,10 @@ process.on('SIGTERM', () => {
 const backendDir = resolve(root, 'backend')
 run('ai-stub', process.execPath, [resolve(root, 'frontend', 'e2e', 'support', 'ai-stub-server.ts')], root)
 run('backend', process.execPath, [resolve(backendDir, 'node_modules', 'ts-node', 'dist', 'bin.js'), 'src/index.ts'], backendDir)
+
+// PID del backend para el muestreo de recursos
+mkdirSync(resolve(root, 'perf', 'results'), { recursive: true })
+writeFileSync(resolve(root, 'perf', 'results', 'backend.pid'), String(children[1].pid))
 
 // espera a que el backend responda
 const deadline = Date.now() + 120_000

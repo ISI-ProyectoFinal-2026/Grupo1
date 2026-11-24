@@ -53,6 +53,22 @@ K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/smoke.html k6 run per
 2 VUs, 1 min, todos los flujos salvo flyer (requiere R2) y chat (Socket.IO). Pasa con 0 checks fallidos y `http_req_failed` = 0.
 El polling tras crear un reporte está acotado a 3 intentos.
 
+## 5. Carga (T2)
+
+```bash
+node perf/scripts/sample-resources.mjs --out=perf/results/load.resources.csv --duration=500 &   # opcional, ver abajo
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/load.html k6 run -e PERF_SCALE=0.25 perf/load.js
+```
+
+- Modelo cerrado `ramping-vus`: 0→100 (2 min), meseta 5 min; →200 (2 min), meseta 10 min; →500 (3 min), meseta 5 min; →0 (2 min). Total 29 min con `PERF_SCALE=1` (default).
+- `PERF_SCALE` multiplica todas las duraciones. Con `PERF_SCALE=0.25` (corrida reducida): 30 s → 100 VUs, meseta 75 s, 30 s → 200, meseta 150 s, 45 s → 500, meseta 75 s, 30 s → 0 (435 s en total).
+- Mezcla efectiva (flyer 8 % y chat 7 % omitidos: flyer requiere R2 y chat es Socket.IO; los pesos se re-normalizan sobre el 85 % restante): visitante feed+detalle ×2-3 55/85 = 64,7 %, login+mine+matches 15/85 = 17,6 %, login+crear reporte (+3 polls) 10/85 = 11,8 %, login+me 5/85 = 5,9 %.
+- Think time 3-8 s (`THINK_MIN` / `THINK_MAX`). Un usuario distinto por VU (hace falta `--users` ≥ VUs máximos; 500 VUs → seed con 2000 usuarios).
+- Cada request lleva el tag `step` (`100`, `200`, `500` o `ramp`, según el tiempo transcurrido). Los thresholds de SLO-1/3/4 se aplican solo a `step:200`; SLO-5 (Apdex) se evalúa en el resumen sobre el mismo paso. 100 y 500 VUs son informativos.
+- `matching_duration` (SLO-2) queda "no medido" con el stub de IA (los reportes no salen de `pending`).
+- Cada iteración de login cuesta un bcrypt (CPU-bound): ~45 % de las iteraciones lo hacen, así que el login compite por CPU con el resto de la API.
+- Muestreo de recursos: `perf/scripts/sample-resources.mjs --out=<csv> [--interval=5] [--duration=SEG]` escribe CPU del backend (% de un núcleo), memoria, CPU total del sistema (Windows) y conexiones de Postgres (`pg_stat_activity`); lee el PID de `perf/results/backend.pid` (lo escribe `start-env.mjs`). Reutilizable por otros escenarios.
+
 ## Variables de k6 (`-e NOMBRE=valor`)
 
 | Variable | Default | Uso |
@@ -60,6 +76,7 @@ El polling tras crear un reporte está acotado a 3 intentos.
 | `BASE_URL` | `http://localhost:3001` | URL del backend |
 | `THINK_MIN` / `THINK_MAX` | 3 / 8 (smoke: 0,2 / 0,5) | think time en segundos |
 | `R2_PUBLIC_URL` | `https://pub-e2e.r2.dev` | origen de las imágenes |
+| `PERF_SCALE` | 1 | factor de duración de las etapas de `load.js` |
 
 ## Resultados
 

@@ -70,7 +70,7 @@ export function evaluateSlo(data) {
   ]
 }
 
-function sloTable(rows) {
+export function sloTable(rows) {
   const lines = ['| SLO | Criterio | Medido | Resultado |', '|---|---|---|---|']
   for (const r of rows) lines.push(`| ${r.id} | ${r.desc} | ${r.value} | ${r.ok === null ? 'no medido' : mark(r.ok)} |`)
   return lines.join('\n')
@@ -93,7 +93,7 @@ function collectChecks(group, out = []) {
   return out
 }
 
-function checksTable(data) {
+export function checksTable(data) {
   const lines = ['| Check | OK | Fallidos | % OK |', '|---|---|---|---|']
   for (const c of collectChecks(data.root_group ?? {})) {
     const total = c.passes + c.fails

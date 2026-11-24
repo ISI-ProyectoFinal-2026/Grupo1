@@ -3,7 +3,14 @@ import { check } from 'k6'
 import { APDEX_T_MS, BASE_URL } from './config.js'
 import { apdexSatisfied, apdexTolerating, apdexTotal } from './metrics.js'
 
+// hook opcional previo a cada request (ej. tag de paso en carga)
+let beforeRequest = null
+export function onBeforeRequest(fn) {
+  beforeRequest = fn
+}
+
 function params(name, token) {
+  if (beforeRequest) beforeRequest()
   const headers = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
   return { headers, tags: { name } }
