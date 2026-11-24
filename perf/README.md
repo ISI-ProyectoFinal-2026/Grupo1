@@ -174,6 +174,23 @@ node perf/scripts/compare-scalability.mjs                                       
 - **Limitación de la máquina:** 4 núcleos físicos / 8 lógicos (hyperthreading). k6, proxy, Postgres (contenedor en la VM de WSL2), Docker Desktop y el resto del sistema comparten los mismos núcleos que las instancias; el hilo lógico 2k+1 de cada instancia es hermano del 2k, donde corre k6. Con 4 instancias se ocupan los 4 núcleos físicos. La CPU del sistema en reposo (sin ninguna corrida) midió 20-46 % por aplicaciones ajenas (Discord, etc.).
 - **Resultados:** `perf/results/scalability.compare.{md,json}` (el json trae capacidad, ratios, CPU por instancia y curvas por escalón para gráficos). Las corridas no son reproducibles entre sí: la capacidad de 1 instancia dio 18-20 it/s (cumple hasta 18 o 20), < 16, >= 24 (sin fallo en la grilla) y < 18 en corridas distintas con la misma configuración. Las repeticiones se conservan en `perf/results/rep1/` y `perf/results/rep2-n1-censurado/`. Con CPU del sistema 80 % y la instancia al 64 % el escalón colapsa; con el sistema al 43 % la misma instancia llega a 83 % y sostiene 24 it/s. Hasta repetir en una máquina sin carga ajena, el criterio x1,6 no se puede dar por cumplido ni por incumplido.
 
+## 12. Lighthouse CI (T9)
+
+```bash
+node perf/scripts/start-env.mjs                                   # backend + stub (otra terminal)
+cd frontend && npm run build && npx vite preview --port 4173 --strictPort   # otra terminal
+CHROME_PATH=<ruta a chrome.exe> node perf/scripts/run-lighthouse.mjs        # mobile y desktop
+node perf/scripts/summarize-lighthouse.mjs
+```
+
+- Rutas: `/reports`, `/login` y `/reports/<id>` (el primer id de `perf/data/report-ids.json`, agregado por `run-lighthouse.mjs`). Las tres son públicas: no hace falta sesión.
+- Configs: `perf/lighthouserc.mobile.json` (default de Lighthouse) y `perf/lighthouserc.desktop.json` (`settings.preset: "desktop"`). 3 corridas por URL; `upload.target: "filesystem"` en `perf/results/lighthouse/<mobile|desktop>`.
+- Umbrales propuestos (a calibrar con el baseline): `categories:performance` >= 0,80 y `categories:accessibility` >= 0,90, sobre la mediana. Las métricas (FCP, LCP, TBT, CLS, TTI) solo se recolectan, sin umbral.
+- `run-lighthouse.mjs` ejecuta `collect`, `assert` y `upload` por separado: si `assert` falla, igual se generan los artefactos y el proceso sale con código 2.
+- Se usa `npx @lhci/cli@0.15.1` (versión fija; no es dependencia del repo). Necesita Chrome/Chromium: `CHROME_PATH` o el de Playwright (`%LOCALAPPDATA%/ms-playwright/chromium-*/chrome-win64/chrome.exe`).
+- El frontend llega a la API por el proxy de `vite preview` (`vite.config.ts`: `/api` y `/socket.io` hacia `localhost:3001`), no por `VITE_API_URL`; el backend debe estar en el puerto 3001.
+- Salidas: `*.report.json`, `*.report.html` y `manifest.json` por form factor, `summary.md` y `summary.json` (mediana por ruta y form factor: performance, accesibilidad, FCP, LCP, TBT, CLS, TTI, peso total, requests JS, auditorías de accesibilidad fallidas).
+
 ## Variables de k6 (`-e NOMBRE=valor`)
 
 | Variable | Default | Uso |
