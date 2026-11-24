@@ -23,7 +23,7 @@ describe("migración 20261110000000_cascade_user_deletion", () => {
       SELECT c.conrelid::regclass::text AS table, a.attname AS column, c.confdeltype::text AS rule
       FROM pg_constraint c
       JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
-      WHERE c.contype = 'f'`;
+      WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace`;
 
     expect(fks.filter((fk) => fk.rule === "r" || fk.rule === "a")).toEqual([]);
     const rule = (table: string, column: string) => fks.find((fk) => fk.table === table && fk.column === column)?.rule;
