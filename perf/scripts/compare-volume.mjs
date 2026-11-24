@@ -20,7 +20,7 @@ function extract(data) {
     out[n] = {
       p95Ms: d['p(95)'],
       errorPct: (values(data.metrics[`http_req_failed{name:${n},step:measure}`])?.rate ?? NaN) * 100,
-      bodyBytes: b?.count ? b.avg : undefined,
+      bodyBytes: typeof b?.avg === 'number' ? b.avg : undefined,
     }
   }
   const worst = Math.max(...Object.values(out).map((e) => e.p95Ms), 0)

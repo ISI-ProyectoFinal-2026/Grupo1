@@ -135,7 +135,7 @@ export function handleSummary(data) {
     if (!d || !(d.max > 0)) return null
     const failed = values(data.metrics[`http_req_failed{name:${n},step:${MEASURE}}`])?.rate
     const b = values(data.metrics[`${n}_body_bytes`])
-    return `| ${n} | ${fmt(d['p(50)'] ?? d.med, 1)} | ${fmt(d['p(95)'], 1)} | ${fmt(d['p(99)'], 1)} | ${fmt((failed ?? NaN) * 100, 2)}% | ${b?.count ? fmt(b.avg) : 'n/d'} |`
+    return `| ${n} | ${fmt(d['p(50)'] ?? d.med, 1)} | ${fmt(d['p(95)'], 1)} | ${fmt(d['p(99)'], 1)} | ${fmt((failed ?? NaN) * 100, 2)}% | ${typeof b?.avg === 'number' ? fmt(b.avg) : 'n/d'} |`
   }).filter(Boolean)
   const md = [
     `# Resumen volume ${LABEL}`,
