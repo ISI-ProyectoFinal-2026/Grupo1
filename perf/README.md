@@ -108,9 +108,35 @@ K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/spike.html k6 run -e 
 
 - Modelo abierto `ramping-arrival-rate`: base (`SPIKE_BASE_RATE`, default 2 it/s, 60 s × `PERF_SCALE`) → x10 (`SPIKE_FACTOR`) en 10 s → pico 120 s × `PERF_SCALE` → base en 10 s → recuperación 180 s × `PERF_SCALE`. Las rampas de 10 s no se escalan (`SPIKE_RAMP_S`). Con `PERF_SCALE=0,3333`: 20 s / 10 s / 40 s / 10 s / 60 s (140 s).
 - Flujo solo visitante (feed + detalle x2-3, sin login, sin bcrypt). El flyer se omite: requiere R2.
-- Base 2 it/s en lugar de los 10 it/s del issue: la capacidad medida en T5 es 4,5 it/s con mezcla 80/20 (con login/bcrypt), y 10 it/s base daría un pico de 100 it/s. La capacidad solo-visitante no está medida; `SPIKE_BASE_RATE` permite subirla.
+- Base 2 it/s en lugar de los 10 it/s del issue: la capacidad medida en T5 es 4,5 it/s con mezcla 80/20 (con login/bcrypt), y 10 it/s base daría un pico de 100 it/s. La capacidad solo-visitante no está medida; `SPIKE_BASE_RATE` permite subirla. Corrida con la base del issue (`-e SPIKE_BASE_RATE=10`, pico 100 it/s): el pico supera la capacidad solo-visitante (31,3 it/s medidos, 3223 `dropped_iterations` con 500 VUs); la corrida con base 2 se conserva como `spike.base2.*`.
 - Tags `step`: `base`, `spike` (incluye ambas rampas), `recovery_drain` (primeros 30 s, `SPIKE_DRAIN_S`), `recovery_steady`. Criterios: error < 5 % en `spike`; SLO-1 (p95 < 500 ms por endpoint) en `recovery_steady`.
 - Tiempo hasta recuperar: cada request lleva además el tag `win` (ventana de 5 s desde el arranque). `handleSummary` toma el p95 por ventana de los submétricos `{name,win}` y reporta la primera ventana posterior al fin del pico con p95 < 500 ms y la primera a partir de la cual todas cumplen. La serie completa queda en `spike.windows.json` y en `spike.slo.md`; los timestamps, en `spike.levels.json`.
+
+## 9. Volumen V (T6)
+
+```bash
+# 1x
+node perf/seed/seed.mjs --users=2000 --reports=1000
+node perf/scripts/start-env.mjs                      # en otra terminal
+node perf/scripts/sample-resources.mjs --out=perf/results/volume.1x.resources.csv --interval=3 --duration=400 &
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/volume.1x.html k6 run -e VOLUME_LABEL=1x perf/volume.js
+# 10x (detener y reiniciar start-env.mjs tras el seed)
+node perf/seed/seed.mjs --users=2000 --reports=10000
+node perf/scripts/sample-resources.mjs --out=perf/results/volume.10x.resources.csv --interval=3 --duration=400 &
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/volume.10x.html k6 run -e VOLUME_LABEL=10x perf/volume.js
+# comparación
+node perf/scripts/compare-volume.mjs
+```
+
+- Mismo nivel de carga con la base a 1x y 10x. Volúmenes: 1x = 1000 reportes / 2000 usuarios; 10x = 10000 reportes / 2000 usuarios. Es una decisión del equipo, documentada como supuesto.
+- Modelo abierto `constant-arrival-rate` a `VOLUME_RATE` (default 3 it/s). Se eligió ~2/3 de la capacidad medida en T5 (4,5 it/s con mezcla 80/20): un nivel por encima saturaría ambos volúmenes y la comparación mediría la saturación, no el efecto del volumen. Las iteraciones de usuario no incluyen creación, por lo que el costo por iteración es menor que en T5.
+- Duración: warm-up `60 s × PERF_SCALE` (tag `step=warmup`, no se evalúa) + medición `300 s × PERF_SCALE` (`step=measure`). `VOLUME_WARMUP_S` / `VOLUME_MEASURE_S` fijan los segundos. Los 400 s del sampler cubren `PERF_SCALE=1` (360 s + cierre).
+- Mezcla `VOLUME_VISITOR_WEIGHT` (default 70): 70 % visitante (feed + detalle ×2-3) y 30 % usuario (login + `GET /api/reports/mine` + `GET /api/notifications`, tag `name=notifications`). Think time 0,2-0,5 s. VUs: `VOLUME_PRE_VUS` 50 / `VOLUME_MAX_VUS` 300.
+- Tamaño de respuesta: `Trend` `feed_body_bytes`, `detail_body_bytes`, `mine_body_bytes`, `notifications_body_bytes` (`res.body.length`, solo fase medida).
+- El seed no genera notificaciones: `GET /api/notifications` devuelve lista vacía en ambos volúmenes (mide el costo de la consulta, no el tamaño de la respuesta).
+- Criterio: SLO-1 (p95 < 500 ms por endpoint, sin login) cumplido a 10x, y error < 1 % (SLO-3). Los thresholds de k6 se aplican solo a `step:measure`.
+- Salidas por corrida: `volume.<label>.summary.json`, `volume.<label>.slo.md`, `volume.<label>.html`. `compare-volume.mjs` genera `volume.compare.md` (tabla 1x vs 10x: p95, error %, bytes de respuesta, SLO-1) y `volume.compare.json` (series por endpoint para gráficos de barras: `p95Ms`, `errorPct`, `bodyBytes`).
+- Para comparar solo cambia el volumen de la base: backend, stub y parámetros de k6 deben ser idénticos entre ambas corridas.
 
 ## Variables de k6 (`-e NOMBRE=valor`)
 
@@ -119,7 +145,8 @@ K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/spike.html k6 run -e 
 | `BASE_URL` | `http://localhost:3001` | URL del backend |
 | `THINK_MIN` / `THINK_MAX` | 3 / 8 (smoke: 0,2 / 0,5) | think time en segundos |
 | `R2_PUBLIC_URL` | `https://pub-e2e.r2.dev` | origen de las imágenes |
-| `PERF_SCALE` | 1 | factor de duración de las etapas de `load.js` |
+| `PERF_SCALE` | 1 | factor de duración de las etapas de `load.js` y `volume.js` |
+| `VOLUME_LABEL` / `VOLUME_RATE` | 1x / 3 | etiqueta de la corrida (1x, 10x) y tasa de `volume.js` (it/s) |
 
 ## Resultados
 
