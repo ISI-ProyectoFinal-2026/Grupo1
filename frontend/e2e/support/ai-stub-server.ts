@@ -2,9 +2,10 @@
  * Minimal stand-in for backend-ia, started by playwright.config.ts as a
  * webServer. Runs with Node's built-in type stripping (no build step).
  *
- * - POST /images/analyze -> 200 { has_animal: true, low_quality } (synchronous
+ * - POST /images/analyze -> 200 { has_animal, low_quality } (synchronous
  *   screening). low_quality is true only for image URLs containing
- *   LOW_QUALITY_MARKER, so a spec can ask for the blurry-photo warning (#212).
+ *   LOW_QUALITY_MARKER, so a spec can ask for the blurry-photo warning (#212);
+ *   has_animal is false only for NO_ANIMAL_MARKER (custom flyer screening, #311).
  * - POST /images/embedding -> for the MATCH_IMAGES markers, 200 with a pet
  *   embedding (the backend stores it, runs the matching and publishes the
  *   report, F2). Anything else -> AI_STUB_EMBEDDING_STATUS (default 409).
@@ -24,6 +25,8 @@ const internalKey = process.env.INTERNAL_API_KEY ?? ''
 const embeddingStatus = Number(process.env.AI_STUB_EMBEDDING_STATUS ?? 409)
 // keep in sync with E2E_LOW_QUALITY_IMAGE_URL (env.ts)
 const LOW_QUALITY_MARKER = 'e2e-low-quality'
+// keep in sync with E2E_NO_ANIMAL_IMAGE_URL (env.ts)
+const NO_ANIMAL_MARKER = 'e2e-no-animal'
 
 // unit vectors 0.87 cosine apart; keep in sync with E2E_MATCH_*_IMAGE_URL (env.ts)
 const EMBEDDING_DIM = 768
@@ -61,7 +64,7 @@ const server = createServer((req, res) => {
     }
     if (req.method === 'POST' && path === '/images/analyze') {
       const imageUrl = String((JSON.parse(raw || '{}') as { image_url?: unknown }).image_url ?? '')
-      send(200, { has_animal: true, low_quality: imageUrl.includes(LOW_QUALITY_MARKER) })
+      send(200, { has_animal: !imageUrl.includes(NO_ANIMAL_MARKER), low_quality: imageUrl.includes(LOW_QUALITY_MARKER) })
       return
     }
     if (req.method === 'POST' && path === '/images/embedding') {

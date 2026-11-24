@@ -158,6 +158,30 @@ export async function getTwoFactorState(email: string): Promise<TwoFactorState> 
   }
 }
 
+type ReportStatus = 'pending' | 'published' | 'rejected' | 'resolved' | 'hidden'
+
+/** Moderation outcomes (AI rejection, hidden by flags) without going through them. */
+export async function setReportStatus(reportId: number, status: ReportStatus): Promise<void> {
+  await db().query('UPDATE reports SET status = $1::report_status WHERE id = $2', [status, reportId])
+}
+
+/** Seeds a pending AI match between two reports, as the matching would. */
+export async function insertMatch(lostReportId: number, foundReportId: number): Promise<number> {
+  const { rows } = await db().query<{ id: number }>(
+    'INSERT INTO report_matches (report_lost_id, report_found_id, similarity_score) VALUES ($1, $2, 0.9) RETURNING id',
+    [lostReportId, foundReportId],
+  )
+  return rows[0].id
+}
+
+export async function getCustomFlyerUrl(reportId: number): Promise<string | null> {
+  const { rows } = await db().query<{ custom_flyer_url: string | null }>(
+    'SELECT custom_flyer_url FROM reports WHERE id = $1',
+    [reportId],
+  )
+  return rows[0]?.custom_flyer_url ?? null
+}
+
 /** Match the backend's matching stored for this pair (report-matching.service.ts). */
 export async function getMatchId(lostReportId: number, foundReportId: number): Promise<number | undefined> {
   const { rows } = await db().query<{ id: number }>(
