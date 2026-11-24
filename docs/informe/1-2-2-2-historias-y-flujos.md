@@ -518,7 +518,7 @@ Tabla 1.2.2-13. Reglas del módulo de flyers. Fuente: archivos de la columna Fue
 ### Limitaciones conocidas
 
 - El flyer se genera en PNG, no en PDF ([#67](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/67)).
-- El flyer propio no pasa por el control de la IA.
+- El flyer propio pasa por el control de la IA, pero si el servicio de IA no está disponible se acepta sin control ([#311](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/311)).
 
 ## 1.2.2.2.7 Módulo de Moderación comunitaria (denuncias)
 

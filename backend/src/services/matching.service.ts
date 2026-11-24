@@ -422,12 +422,16 @@ async function decideMatch(
   userId: number,
   decision: MatchDecision
 ): Promise<MatchDecisionDTO> {
-  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true } });
+  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true, status: true } });
   if (!report) {
     throw new AppError(404, "Reporte no encontrado");
   }
   if (report.userId !== userId) {
     throw new AppError(403, "No tenés permiso para gestionar las coincidencias de este reporte");
+  }
+  // confirmar avisa a la otra parte: solo con el reporte propio público (#311)
+  if (decision === "confirmed" && report.status !== "published" && report.status !== "resolved") {
+    throw new AppError(409, "Solo se pueden confirmar coincidencias de reportes publicados");
   }
 
   const match = await prisma.reportMatch.findUnique({

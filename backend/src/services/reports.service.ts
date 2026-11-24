@@ -426,7 +426,15 @@ export async function setCustomFlyer(id: number, userId: number, flyerUrl: strin
   if (report.userId !== userId) {
     throw new AppError(403, "No tenés permiso para modificar el flyer de este reporte");
   }
-  await prisma.report.update({ where: { id }, data: { customFlyerUrl: flyerUrl } });
+  if (report.status === "hidden") {
+    throw new AppError(409, HIDDEN_EDIT_MESSAGE);
+  }
+  // IA fuera del lock; el oculto se revalida bajo lock
+  await assertImagesHaveAnimals([flyerUrl]);
+  await prisma.$transaction(async (tx) => {
+    await assertEditableLocked(tx, id, false);
+    await tx.report.update({ where: { id }, data: { customFlyerUrl: flyerUrl } });
+  });
   return getById(id);
 }
 

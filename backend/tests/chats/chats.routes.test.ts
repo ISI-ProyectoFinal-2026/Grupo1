@@ -36,7 +36,7 @@ describe("/api/chats", () => {
     outsiderToken = outsider.token;
 
     const report = await prisma.report.create({
-      data: { userId: userAId, reportType: "lost", title: "Perro perdido" },
+      data: { userId: userAId, reportType: "lost", status: "published", title: "Perro perdido" },
     });
     reportId = report.id;
 
