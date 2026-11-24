@@ -75,6 +75,20 @@ K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/load.html k6 run -e P
 - Cada iteración de login cuesta un bcrypt (CPU-bound): ~45 % de las iteraciones lo hacen, así que el login compite por CPU con el resto de la API.
 - Muestreo de recursos: `perf/scripts/sample-resources.mjs --out=<csv> [--interval=5] [--duration=SEG]` escribe CPU del backend (% de un núcleo), memoria, CPU total del sistema (Windows) y conexiones de Postgres (`pg_stat_activity`); lee el PID de `perf/results/backend.pid` (lo escribe `start-env.mjs`). Reutilizable por otros escenarios.
 
+## 6. Punto de quiebre B (T5)
+
+```bash
+node perf/scripts/sample-resources.mjs --out=perf/results/breakpoint.resources.csv --interval=3 --duration=420 &
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/breakpoint.html k6 run -e PERF_SCALE=0.375 -e BP_START_RATE=2 -e BP_RATE_STEP=0.5 -e BP_STEPS=8 perf/breakpoint.js
+```
+
+- Modelo abierto `ramping-arrival-rate`: sube la tasa de arribo (it/s) en escalones de `120 s × PERF_SCALE` (+1 s de rampa) hasta fallar SLO-1 o SLO-3. `BP_STEP_S` fija la duración del escalón en segundos.
+- Inicio y paso configurables: `BP_START_RATE` / `BP_RATE_STEP` / `BP_STEPS` (default 2 / 2 / 10). El issue propone 10 it/s con +10; en este entorno (1 backend Node, bcryptjs en JS puro) el primer escalón de 10 it/s ya está por encima de la capacidad medida, por eso el default parte bajo. k6 exige tasas enteras: internamente se usa `timeUnit: 10s`, lo que admite pasos de 0,1 it/s.
+- Mezcla `BP_VISITOR_WEIGHT` (default 80): 80 % visitante (feed + 2-3 detalles) y 20 % creación (login + crear, sin polling). Think time 0,2-0,5 s (`THINK_MIN`/`THINK_MAX`): en modelo abierto solo ocupa VUs, no define la carga.
+- VUs: `BP_PRE_VUS` 100 / `BP_MAX_VUS` 500. Si k6 no consigue VUs, descarta iteraciones y lo informa en `dropped_iterations` (el resumen lo reporta; no admite tag de escalón, por eso se cuenta aparte `bp_iterations_started{step}`).
+- Cada request lleva `step=s<N>`. Thresholds globales de SLO-1 (por endpoint, sin login) y SLO-3 con `abortOnFail` y `delayAbortEval: 30s`; al ser globales y acumulados, el corte llega tarde o no llega. El veredicto por escalón sale de la tabla de `handleSummary` (`breakpoint.slo.md`).
+- Capacidad = último escalón consecutivo desde el inicio que cumple SLO-1 y SLO-3. Con ~45 creaciones por escalón el p95 de `create` es ruidoso: un escalón aislado puede cumplir después de uno que falló.
+
 ## Variables de k6 (`-e NOMBRE=valor`)
 
 | Variable | Default | Uso |
