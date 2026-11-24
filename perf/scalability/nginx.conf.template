@@ -1,0 +1,23 @@
+# balanceador round-robin para escalabilidad C; run-scalability.mjs completa la lista de upstreams
+worker_processes auto;
+events { worker_connections 8192; }
+http {
+  access_log off;
+  error_log /dev/stderr warn;
+  upstream backend {
+__UPSTREAM__
+    keepalive 128;
+  }
+  server {
+    listen 8080;
+    location / {
+      proxy_pass http://backend;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      proxy_set_header Host $host;
+      proxy_buffering on;
+      proxy_buffers 16 64k;
+      proxy_busy_buffers_size 128k;
+    }
+  }
+}
