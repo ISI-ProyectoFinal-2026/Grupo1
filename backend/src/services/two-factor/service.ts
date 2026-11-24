@@ -2,6 +2,7 @@ import { AuthTokenType, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../db/client";
 import { AppError } from "../../errors/app-error";
+import { disconnectUserSockets } from "../../sockets/disconnect-user";
 import { signAccessToken } from "../../utils/jwt";
 import { toPublicUser } from "../../utils/public-user";
 import {
@@ -115,6 +116,8 @@ export async function loginWithSecondFactor(input: TwoFactorLoginInput) {
   );
 
   if (recoveryRemaining !== null) {
+    // desconectar sockets
+    disconnectUserSockets(user.id);
     await sendNotice(user.id, "código de recuperación", () =>
       mailService.sendTwoFactorRecoveryCodeUsed(user.email, recoveryRemaining)
     );
@@ -207,6 +210,8 @@ export async function enableTwoFactor(userId: number, input: TwoFactorCodeInput)
     }
   );
 
+  // desconectar sockets
+  disconnectUserSockets(userId);
   await sendNotice(userId, "activación", () => mailService.sendTwoFactorEnabled(user.email));
 
   return { token: signAccessToken(user), user: toPublicUser(user), recoveryCodes };
@@ -256,6 +261,8 @@ export async function disableTwoFactor(userId: number, input: TwoFactorDisableIn
     }
   );
 
+  // desconectar sockets
+  disconnectUserSockets(userId);
   await sendNotice(userId, "desactivación", () => mailService.sendTwoFactorDisabled(user.email));
 
   return { token: signAccessToken(user), user: toPublicUser(user) };
@@ -272,6 +279,9 @@ export async function regenerateRecoveryCodes(userId: number, input: TwoFactorCo
       return { user: bumped, recoveryCodes: await replaceRecoveryCodes(tx, userId) };
     }
   );
+
+  // desconectar sockets
+  disconnectUserSockets(userId);
 
   return { token: signAccessToken(user), user: toPublicUser(user), recoveryCodes };
 }

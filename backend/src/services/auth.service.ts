@@ -2,6 +2,7 @@ import { Prisma, User } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
+import { disconnectUserSockets } from "../sockets/disconnect-user";
 import { frontendLink } from "../utils/frontend-link";
 import { signAccessToken } from "../utils/jwt";
 import { PublicUser, toPublicUser } from "../utils/public-user";
@@ -167,7 +168,7 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
   // conexión tomada.
   const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
 
-  await prisma.$transaction(async (tx) => {
+  const userId = await prisma.$transaction(async (tx) => {
     const userId = await consumeAuthToken(tx, input.token, "password_reset");
     const now = new Date();
 
@@ -181,5 +182,9 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
       where: { userId, type: "password_reset", usedAt: null },
       data: { usedAt: now },
     });
+    return userId;
   });
+
+  // desconectar sockets
+  disconnectUserSockets(userId);
 }

@@ -2,6 +2,7 @@ import { Prisma, User } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../db/client";
 import { AppError } from "../../errors/app-error";
+import { disconnectUserSockets } from "../../sockets/disconnect-user";
 import { frontendLink } from "../../utils/frontend-link";
 import { TwoFactorResetRequestInput } from "../../validators/two-factor.validator";
 import {
@@ -167,6 +168,8 @@ export async function completeMaturedReset(userId: number): Promise<User> {
   });
 
   if (completedNow) {
+    // desconectar sockets
+    disconnectUserSockets(user.id);
     await sendNotice(user.id, "reinicio completado", () => mailService.sendTwoFactorResetCompleted(user.email));
   }
 
