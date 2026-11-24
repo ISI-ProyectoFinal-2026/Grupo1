@@ -11,6 +11,7 @@ const BASE_RATE = Number(__ENV.STRESS_BASE_RATE ?? 4.5) // it/s, capacidad soste
 const LEVEL_S = Math.max(10, Math.round(Number(__ENV.STRESS_LEVEL_S ?? 180 * SCALE)))
 const RECOVERY_S = Math.max(10, Math.round(Number(__ENV.STRESS_RECOVERY_S ?? 300 * SCALE)))
 const RAMP_S = Math.max(1, Math.round(Number(__ENV.STRESS_RAMP_S ?? 5)))
+const DRAIN_S = Math.min(RECOVERY_S - 1, Math.max(RAMP_S + 1, Math.round(Number(__ENV.STRESS_DRAIN_S ?? 30)))) // vaciado de cola tras la sobrecarga
 const VISITOR_WEIGHT = Number(__ENV.STRESS_VISITOR_WEIGHT ?? 80)
 const PRE_VUS = Number(__ENV.STRESS_PRE_VUS ?? 100)
 const MAX_VUS = Number(__ENV.STRESS_MAX_VUS ?? 500)
@@ -23,7 +24,8 @@ const LEVELS = [
   { tag: 'x1.5', factor: 1.5, holdS: LEVEL_S, overload: true },
   { tag: 'x2', factor: 2, holdS: LEVEL_S, overload: true },
   { tag: 'x3', factor: 3, holdS: LEVEL_S, overload: true },
-  { tag: 'recovery', factor: 1, holdS: RECOVERY_S, overload: false },
+  { tag: 'recovery_drain', factor: 1, holdS: DRAIN_S - RAMP_S, overload: false },
+  { tag: 'recovery_steady', factor: 1, holdS: RECOVERY_S - DRAIN_S, overload: false },
 ].map((l) => ({ ...l, rate: BASE_RATE * l.factor, windowS: RAMP_S + l.holdS }))
 
 // inicio (s desde el arranque) de cada nivel; la rampa pertenece al nivel que la sigue
@@ -143,7 +145,7 @@ export function handleSummary(data) {
   const aliveRate = values(data.metrics.stress_alive)?.rate
 
   const overload = rows.filter((r) => r.l.overload)
-  const recovery = rows[rows.length - 1]
+  const recovery = rows[rows.length - 1] // recovery_steady
   const critAlive = aliveRate === 1
   const critErr = overload.every((r) => r.errPct < ERROR_LIMIT)
   const critRecovery = recovery.slo1
@@ -175,7 +177,7 @@ export function handleSummary(data) {
     '|---|---|---|',
     `| El proceso no cae (GET /health tras la carga) | ${critAlive ? 'cumple' : 'NO cumple'} | stress_alive = ${fmt(aliveRate, 2)} |`,
     `| Error < ${ERROR_LIMIT * 100} % en sobrecarga (x1.5, x2, x3) | ${critErr ? 'cumple' : 'NO cumple'} | ${overload.map((r) => `${r.l.tag}: ${fmt(r.errPct * 100, 2)} %`).join('; ')} |`,
-    `| SLO-1 recuperado en recovery (p95 < ${SLO.p95Ms} ms por endpoint, sin login) | ${critRecovery ? 'cumple' : 'NO cumple'} | p95 máx. ${fmt(recovery.maxP95)} ms |`,
+    `| SLO-1 recuperado en recovery_steady (p95 < ${SLO.p95Ms} ms por endpoint, sin login) | ${critRecovery ? 'cumple' : 'NO cumple'} | p95 máx. ${fmt(recovery.maxP95)} ms |`,
     '',
     '## Por nivel',
     '',

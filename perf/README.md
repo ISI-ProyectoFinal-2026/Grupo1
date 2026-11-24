@@ -89,6 +89,29 @@ K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/breakpoint.html k6 ru
 - Cada request lleva `step=s<N>`. Thresholds globales de SLO-1 (por endpoint, sin login) y SLO-3 con `abortOnFail` y `delayAbortEval: 30s`; al ser globales y acumulados, el corte llega tarde o no llega. El veredicto por escalón sale de la tabla de `handleSummary` (`breakpoint.slo.md`).
 - Capacidad = último escalón consecutivo desde el inicio que cumple SLO-1 y SLO-3. Con ~45 creaciones por escalón el p95 de `create` es ruidoso: un escalón aislado puede cumplir después de uno que falló.
 
+## 7. Estrés S (T4)
+
+```bash
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/stress.html k6 run -e PERF_SCALE=0.3333 perf/stress.js
+```
+
+- Modelo abierto: base (4,5 it/s, capacidad medida en T5) → x1,5 → x2 → x3 → recuperación a la base. Mezcla 80/20 visitante/creación.
+- La recuperación se divide en `recovery_drain` (primeros `STRESS_DRAIN_S` = 30 s, vaciado de la cola acumulada) y `recovery_steady` (el resto). El criterio de SLO-1 recuperado se evalúa solo sobre `recovery_steady`: agregado, la recuperación quedaba dominada por el drenaje.
+- Salidas: `stress.summary.json`, `stress.levels.json` (tramos con timestamps), `stress.slo.md`.
+
+## 8. Picos P (T3)
+
+```bash
+node perf/scripts/sample-resources.mjs --out=perf/results/spike.resources.csv --interval=3 --duration=190 &
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/spike.html k6 run -e PERF_SCALE=0.3333 perf/spike.js
+```
+
+- Modelo abierto `ramping-arrival-rate`: base (`SPIKE_BASE_RATE`, default 2 it/s, 60 s × `PERF_SCALE`) → x10 (`SPIKE_FACTOR`) en 10 s → pico 120 s × `PERF_SCALE` → base en 10 s → recuperación 180 s × `PERF_SCALE`. Las rampas de 10 s no se escalan (`SPIKE_RAMP_S`). Con `PERF_SCALE=0,3333`: 20 s / 10 s / 40 s / 10 s / 60 s (140 s).
+- Flujo solo visitante (feed + detalle x2-3, sin login, sin bcrypt). El flyer se omite: requiere R2.
+- Base 2 it/s en lugar de los 10 it/s del issue: la capacidad medida en T5 es 4,5 it/s con mezcla 80/20 (con login/bcrypt), y 10 it/s base daría un pico de 100 it/s. La capacidad solo-visitante no está medida; `SPIKE_BASE_RATE` permite subirla.
+- Tags `step`: `base`, `spike` (incluye ambas rampas), `recovery_drain` (primeros 30 s, `SPIKE_DRAIN_S`), `recovery_steady`. Criterios: error < 5 % en `spike`; SLO-1 (p95 < 500 ms por endpoint) en `recovery_steady`.
+- Tiempo hasta recuperar: cada request lleva además el tag `win` (ventana de 5 s desde el arranque). `handleSummary` toma el p95 por ventana de los submétricos `{name,win}` y reporta la primera ventana posterior al fin del pico con p95 < 500 ms y la primera a partir de la cual todas cumplen. La serie completa queda en `spike.windows.json` y en `spike.slo.md`; los timestamps, en `spike.levels.json`.
+
 ## Variables de k6 (`-e NOMBRE=valor`)
 
 | Variable | Default | Uso |
