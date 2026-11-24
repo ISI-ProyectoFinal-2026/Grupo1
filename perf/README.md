@@ -138,6 +138,25 @@ node perf/scripts/compare-volume.mjs
 - Salidas por corrida: `volume.<label>.summary.json`, `volume.<label>.slo.md`, `volume.<label>.html`. `compare-volume.mjs` genera `volume.compare.md` (tabla 1x vs 10x: p95, error %, bytes de respuesta, SLO-1) y `volume.compare.json` (series por endpoint para gráficos de barras: `p95Ms`, `errorPct`, `bodyBytes`).
 - Para comparar solo cambia el volumen de la base: backend, stub y parámetros de k6 deben ser idénticos entre ambas corridas.
 
+## 10. Resistencia E (T7)
+
+```bash
+node perf/seed/seed.mjs --users=2000 --reports=1000
+node perf/scripts/start-env.mjs > perf/results/soak.env.log 2>&1 &     # el log permite medir su tamaño
+node perf/scripts/sample-resources.mjs --out=perf/results/soak.resources.csv --interval=10 --duration=2400 --db-size --log-file=perf/results/soak.env.log &
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/soak.html k6 run -e SOAK_MINUTES=35 -e SOAK_RAMP_MIN=2 perf/soak.js > perf/results/soak.out.txt 2>&1
+node perf/scripts/analyze-soak.mjs
+```
+
+- **El issue pide 4 h** (`SOAK_MINUTES=240`, rampas de 5 min, que son los defaults). La corrida del equipo es **reducida a 35 min**: rampa de subida 2 min, fase estable 31 min, rampa de bajada 2 min. Una fuga lenta puede no manifestarse en 31 min: el resultado es una cota inferior, no equivale a la prueba de 4 h.
+- Modelo abierto `ramping-arrival-rate` a `SOAK_RATE` (default 3,15 it/s = 70 % de los 4,5 it/s de T5), con `timeUnit: 100s` para admitir fracciones. VUs `SOAK_PRE_VUS` 150 / `SOAK_MAX_VUS` 500.
+- Mezcla de `load.js` sin flyer ni chat, pesos re-normalizados: visitante 55/85 (64,7 %), login+mine+matches 17,6 %, login+crear (+3 polls) 11,8 %, login+me 5,9 %. Think time 3-8 s. Es más pesada que la 80/20 de T5 (~45 % de iteraciones con login/bcrypt frente a 20 %): 70 % de la tasa de T5 no equivale a 70 % de la capacidad para esta mezcla.
+- Cada request lleva el tag `third`: `ramp` (rampas), `t1`/`t2`/`t3` (tercios de igual duración de la fase estable, por tiempo transcurrido desde `exec.scenario.startTime`). El criterio del issue "última hora <= 110 % de la primera" se evalúa como **p95 del tercio t3 <= 110 % del de t1**, por endpoint (sin login) y el peor; con 4 h equivaldría a tercios de 80 min, no a horas. Es un sustituto por la duración reducida.
+- Thresholds de SLO-1, SLO-3 y SLO-4 sobre toda la corrida (incluidas rampas), sin `abortOnFail`. SLO-2 no se mide (stub de IA).
+- Recursos: el sampler admite columnas opcionales `--db-size` (`db_size_mb`, `pg_database_size`) y `--log-file=<ruta>` (`log_size_kb`); sin esos flags el CSV no cambia. `analyze-soak.mjs` alinea el CSV con k6 mediante `SOAK_START_MS` (impreso en `setup()`), toma la fase estable, calcula la pendiente de mínimos cuadrados (por minuto) y las medias por tercio, y escribe `soak.analysis.md/json`. Criterio de "crecimiento sostenido" (RSS y conexiones pg): |t| > 3 de la pendiente y crecimiento proyectado sobre la fase estable > 10 % de la media de t1 (mismo 10 % que el criterio de p95) y > piso de ruido absoluto (10 MB, 2 conexiones). CPU, tamaño de la base y del log son informativos.
+- El soak crea reportes de forma continua (~11,8 % de las iteraciones): la base perf crece durante la corrida y se debe volver a sembrar después (el seed borra los reportes de los usuarios `perf-user-*`).
+- Salidas: `soak.summary.json`, `soak.meta.json`, `soak.slo.md`, `soak.html`, `soak.resources.csv`, `soak.analysis.md/json`.
+
 ## Variables de k6 (`-e NOMBRE=valor`)
 
 | Variable | Default | Uso |

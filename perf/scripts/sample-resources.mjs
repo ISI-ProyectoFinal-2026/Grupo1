@@ -1,7 +1,7 @@
 // muestrea CPU/memoria del backend y conexiones de Postgres a un CSV (Ctrl+C o --duration lo detiene)
-// uso: node perf/scripts/sample-resources.mjs --out=perf/results/load.resources.csv [--interval=5] [--duration=SEG] [--pid-file=...]
+// uso: node perf/scripts/sample-resources.mjs --out=perf/results/load.resources.csv [--interval=5] [--duration=SEG] [--pid-file=...] [--db-size] [--log-file=ruta]
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { cpus } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -32,7 +32,11 @@ function readProcess() {
 }
 
 mkdirSync(dirname(out), { recursive: true })
-writeFileSync(out, 'ts,elapsed_s,backend_cpu_pct_of_core,backend_rss_mb,system_cpu_pct,pg_connections,pg_active\n')
+// columnas opcionales (no cambian el CSV de los demás escenarios): --db-size y --log-file=<ruta>
+const withDbSize = process.argv.includes('--db-size')
+const logFile = arg('log-file', '')
+const extraCols = [...(withDbSize ? ['db_size_mb'] : []), ...(logFile ? ['log_size_kb'] : [])]
+writeFileSync(out, `ts,elapsed_s,backend_cpu_pct_of_core,backend_rss_mb,system_cpu_pct,pg_connections,pg_active${extraCols.map((c) => `,${c}`).join('')}\n`)
 
 let stop = false
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => (stop = true))
@@ -50,6 +54,11 @@ while (!stop) {
     const cpuPct = prev && p.cpu >= prev.cpu ? ((p.cpu - prev.cpu) / ((now - prev.at) / 1000)) * 100 : ''
     prev = { cpu: p.cpu, at: now }
     row = [new Date(now).toISOString(), ((now - t0) / 1000).toFixed(1), cpuPct === '' ? '' : cpuPct.toFixed(1), (p.mem / 1048576).toFixed(1), p.sys, rows[0].total, rows[0].active]
+    if (withDbSize) {
+      const r = await pg.query('SELECT pg_database_size(current_database()) AS b')
+      row.push((Number(r.rows[0].b) / 1048576).toFixed(2))
+    }
+    if (logFile) row.push(existsSync(resolve(root, logFile)) ? (statSync(resolve(root, logFile)).size / 1024).toFixed(1) : '')
   } catch (e) {
     console.error(`[sampler] ${e.message}`)
     break
