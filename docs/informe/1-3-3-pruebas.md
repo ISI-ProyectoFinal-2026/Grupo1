@@ -4,7 +4,7 @@ titulo: "Planificación, ejecución y documentación de pruebas"
 nivel: 3
 fase: A
 estado: borrador
-actualizado: 2026-11-24
+actualizado: 2026-11-25
 ---
 
 # 1.3.3 Planificación, ejecución y documentación de pruebas
@@ -42,7 +42,7 @@ La lógica se prueba a nivel de servicio en `backend/tests/` (por ejemplo [`matc
 
 ## 1.3.3.5 Pruebas de carga
 
-Las pruebas se ejecutaron el 2026-11-24 con k6, scripts versionados en [`perf/`](../../perf) y el commit `2eb4a9c` ([issue #40](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/40); herramientas en [ADR-0029](../adr/0029-herramientas-pruebas-de-performance.md), estado Pendiente). Las duraciones se redujeron respecto de las propuestas del issue (ver Tabla 1.3-2), el entorno fue una única máquina de desarrollo compartida con otras aplicaciones y varios resultados no se repitieron entre corridas. Por eso los valores son indicativos: no son la capacidad de un entorno de producción. Los resultados crudos están en `perf/results/` (ignorado por git); este apartado transcribe lo necesario.
+Las pruebas se ejecutaron el 2026-11-24 con k6, scripts versionados en [`perf/`](../../perf) y el commit `2eb4a9c` ([issue #40](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/40); herramientas en [ADR-0029](../adr/0029-herramientas-pruebas-de-performance.md), estado Pendiente). El escenario de matching (SLO-2) se ejecutó después, con el commit `6791491`. Las duraciones se redujeron respecto de las propuestas del issue (ver Tabla 1.3-2), el entorno fue una única máquina de desarrollo compartida con otras aplicaciones y varios resultados no se repitieron entre corridas. Por eso los valores son indicativos: no son la capacidad de un entorno de producción. Los resultados crudos están en `perf/results/` (ignorado por git); este apartado transcribe lo necesario.
 
 ### 1. Objetivos
 
@@ -69,30 +69,31 @@ Tabla 1.3-1. Objetivos de performance (SLO-1 a SLO-6). Fuente: issue #40, secci�
 | Estrés (S) | Abierto: base de 4,5 it/s (capacidad de B), x1,5, x2 y x3 (60 s cada nivel más 5 s de rampa) y recuperación a la base (25 s de vaciado y 70 s estables) | Niveles de 3 min y recuperación de 5 min |
 | Picos (P) | Abierto, solo visitante: base 20 s, x10 en 10 s, pico de 40 s, base en 10 s, recuperación de 60 s. Dos bases: 10 it/s (la del issue) y 2 it/s | Base de 10 it/s 1 min, pico de 2 min, recuperación de 3 min; incluye flyer |
 | Volumen (V) | Abierto, 3 it/s constantes, mezcla 70 % visitante y 30 % usuario (login, "mis reportes", notificaciones); 30 s de calentamiento y 150 s de medición con la base en 1x y 10x | Escalón de 200 VUs de L con la base en 1x y 10x |
+| Matching (M) | Abierto, `constant-arrival-rate` a 0,5 it/s durante 5 min (151 reportes) con el Backend IA real; polling cada 0,5 s hasta que el reporte sale de `pending` (tiempo máximo de 60 s) | No figura en el issue como escenario aparte (SLO-2: p95 < 5 s) |
 | Resistencia (E) | Abierto: 3,15 it/s (70 % de 4,5 it/s), rampas de 2 min y 31 min estables (35 min en total) | 4 h al 70 % del throughput de L, con sockets abiertos |
 | Escalabilidad (C) | 1, 2 y 4 instancias del backend, cada una fija a un hilo lógico, detrás de un balanceador propio en Node; solo visitante; escalones de 45 s; `connection_limit` de Prisma fijo en 10 por instancia | 1, 2 y 4 CPU en el contenedor, variando el pool de Prisma |
 | Lighthouse | `/login`, `/reports` y `/reports/:id`, móvil y escritorio, 3 corridas por ruta (mediana) | Igual |
 
-Tabla 1.3-2. Escenarios ejecutados frente a lo propuesto en el issue. Fuente: `perf/README.md` (secciones 4 a 12) y los encabezados de `perf/results/*.slo.md`, commit `2eb4a9c`.
+Tabla 1.3-2. Escenarios ejecutados frente a lo propuesto en el issue. Fuente: `perf/README.md` (secciones 4 a 12 y 14) y los encabezados de `perf/results/*.slo.md`, commits `2eb4a9c` y `6791491` (matching).
 
-**Entorno.** Una sola máquina de desarrollo (Windows, 4 núcleos físicos y 8 hilos lógicos) con k6, el backend compilado (`node dist/index.js`), el stub del servicio de IA y PostgreSQL en Docker compartiendo los mismos núcleos, más aplicaciones ajenas: la CPU del sistema en reposo, sin ninguna corrida, midió entre 20 % y 46 %. Memoria RAM y versión de k6: No disponible (no se registraron). El backend corre con `NODE_ENV=test` para saltear los limitadores de tasa (si no, se mediría 429). El servicio de IA es un stub: no calcula embeddings, por lo que ningún reporte salió de `pending`.
+**Entorno.** Una sola máquina de desarrollo (Windows, 4 núcleos físicos y 8 hilos lógicos) con k6, el backend compilado (`node dist/index.js`), el stub del servicio de IA y PostgreSQL en Docker compartiendo los mismos núcleos, más aplicaciones ajenas: la CPU del sistema en reposo, sin ninguna corrida, midió entre 20 % y 46 %. Memoria RAM y versión de k6: No disponible (no se registraron). El backend corre con `NODE_ENV=test` para saltear los limitadores de tasa (si no, se mediría 429). En los escenarios de carga el servicio de IA es un stub: no calcula embeddings, por lo que ningún reporte salió de `pending` y el matching no se ejercitó. Solo el escenario de matching usó el Backend IA real (ver el apartado correspondiente).
 
 **Datos.** Base `patitas_perf` sembrada con un script determinístico: 1x = 1000 reportes publicados y 2000 usuarios; 10x = 10 000 reportes. El volumen es un supuesto del equipo, pendiente de confirmación (el issue lo deja como decisión requerida). No se generan embeddings.
 
 ### 3. Resultados frente a los objetivos
 
-En el escalón de 200 VUs de la carga (L), el objetivo de referencia, ningún SLO medido se cumple. Los mismos SLO sí se cumplen con carga baja (smoke y primeros escalones del punto de quiebre). Hay capturas de Grafana de L, B y E (Figuras 1.3-9, 1.3-10 y 1.3-11).
+En el escalón de 200 VUs de la carga (L), el objetivo de referencia, ningún SLO medido en esa corrida se cumple. Los mismos SLO sí se cumplen con carga baja (smoke y primeros escalones del punto de quiebre). SLO-2 no forma parte de esa comparación: L usa el stub de IA y no ejercita el matching; se midió aparte, con el Backend IA real y a 0,5 it/s, y cumple con salvedades (apartado "Matching con el Backend IA real"). Hay capturas de Grafana de L, B y E (Figuras 1.3-9, 1.3-10 y 1.3-11).
 
 | SLO | Objetivo | Medido en L, 200 VUs | Resultado | Con carga baja |
 |---|---|---|---|---|
 | SLO-1 | p95 < 500 ms | 14 728 ms (peor endpoint: `create`); `feed` 3375 ms, `detail` 5366 ms | No cumple | Smoke: 258 ms (cumple) |
-| SLO-2 | p95 < 5 s | No medido: ningún reporte salió de `pending` (stub de IA) | No medido | No medido en ningún escenario |
+| SLO-2 | p95 < 5 s | No medido en L (el stub de IA no saca ningún reporte de `pending`); medido en el escenario dedicado con el Backend IA real: 2284 ms (Tabla 1.3-15) | Cumple, con salvedades | Escenario dedicado a 0,5 it/s: 2284 ms (cumple); salvedades en la Tabla 1.3-15 |
 | SLO-3 | error < 1 % | 1,07 % | No cumple | Smoke: 0,00 % (cumple) |
 | SLO-4 | p99 < 1000 ms | 17 565 ms (peor endpoint) | No cumple | Smoke: 413 ms (cumple) |
 | SLO-5 | Apdex ≥ 0,90 | 0,094 | No cumple | Smoke: 1,000 (cumple) |
 | SLO-6 | ≥ línea base | Línea base fijada en 4,5 it/s (14,4 req/s) | Medido | Escenario L: 28,0 req/s a 200 VUs sin cumplir SLO-1 |
 
-Tabla 1.3-3. SLO frente a lo medido en el escalón de 200 VUs. Fuente: `perf/results/load.slo.md`, `perf/results/smoke.slo.md` y `perf/results/breakpoint.slo.md` (commit `2eb4a9c`).
+Tabla 1.3-3. SLO frente a lo medido en el escalón de 200 VUs (SLO-2: escenario dedicado). Fuente: `perf/results/load.slo.md`, `perf/results/smoke.slo.md` y `perf/results/breakpoint.slo.md` (commit `2eb4a9c`); `perf/results/matching.slo.md` para SLO-2 (commit `6791491`).
 
 #### Carga (L)
 
@@ -312,6 +313,42 @@ Tabla 1.3-14. Resistencia: línea base frente a la repetición con observabilida
 
 En ambas corridas se cumplen SLO-1, SLO-3, SLO-4 y SLO-5. Con observabilidad, el criterio de degradación (p95 del tercio 3 ≤ 110 % del tercio 1) no se cumple en `me` (1,24, con 416 solicitudes en toda la corrida) y `mine` queda en el límite (1,10), mientras que en la línea base todos los endpoints cumplen. Ambas corridas coinciden en que el criterio de crecimiento sostenido del RSS no se cumple (escalón que se estabiliza); con observabilidad, el RSS de la segunda mitad tiene una pendiente de 0,41 MB/min (t = 3,8), cuyo crecimiento proyectado (8,5 MB) queda por debajo del piso de 10 MB del criterio.
 
+#### Matching con el Backend IA real (SLO-2)
+
+Los escenarios anteriores usan un stub de IA que nunca saca un reporte de `pending`, por lo que no ejercitan el matching. SLO-2 se midió aparte, con el escenario dedicado [`perf/matching.js`](../../perf/matching.js) (commit `6791491`, que lo incorpora; los resultados crudos de la corrida no están en git) y el Backend IA real: servicio FastAPI con YOLO y DINOv2, solo CPU (torch 2.13.0+cpu, timm 1.0.28, ultralytics 8.3.28). La corrida fue de 5 min a 0,5 it/s (modelo abierto): 151 reportes. Antes se hizo un smoke de 1 min (30 reportes publicados, p95 de unos 2,0 s) y el primer reporte en frío tardó 3,2 s en el POST.
+
+**Supuesto del equipo, pendiente de decisión:** "matching terminado" = el reporte sale de `pending`. `matching_duration` se mide desde la respuesta del POST hasta el primer GET que no devuelve `pending` (resolución de ±0,5 s por el polling de 0,5 s); `matching_duration_total` parte del inicio del POST. La diferencia de unos 0,8 s es el propio POST, que ejecuta el análisis de imagen (YOLO) antes de responder.
+
+| Medición | n | p50 | p90 | p95 | p99 | Máximo |
+|---|---|---|---|---|---|---|
+| `matching_duration`, reportes publicados (ms) | 151 | 1695 | 2174 | 2284 | 2340 | 2405 |
+| `matching_duration_total`, reportes publicados (ms) | 151 | 2513 | 3027 | 3065 | 3119 | 3141 |
+| `matching_duration` rechazados / por espera agotada | 0 / 0 | No disponible | No disponible | No disponible | No disponible | No disponible |
+| `matches_after_publish` (ms) | 151 | 11 | 14 | 15 | 20 | 23 |
+
+Tabla 1.3-15. Matching con el Backend IA real: latencias y resultados (5 min a 0,5 it/s). Fuente: `perf/results/matching.slo.md` y `matching.summary.json`, commit `6791491`; `perf/README.md`, sección 14.
+
+Resultado de SLO-2 (p95 < 5000 ms): 2284 ms, cumple. Resultados: 151 reportes publicados, 0 rechazados, 0 por tiempo de espera agotado (60 s); 0 creaciones fallidas y 0,00 % de `http_req_failed`; todos los checks aprobados.
+
+| Proceso | CPU: media / máximo (% de un núcleo) | Memoria RSS: media / máximo (MB) |
+|---|---|---|
+| Backend IA (Python, YOLO y DINOv2) | 313 / 425 | 881 / 901 |
+| Backend (Node) | 18 / 27 | 127 / 131 |
+| Sistema (CPU total, %) | 69 / 97 | No aplica |
+
+Tabla 1.3-16. Matching con el Backend IA real: recursos muestreados durante la corrida (70 muestras de todo el muestreo, incluidos los tramos en reposo). Fuente: muestreo con `perf/scripts/sample-resources.mjs` (`matching.resources.csv`), commit `6791491`; el muestreador tiene un defecto conocido de columnas con `--aux-pids` (`perf/README.md`, sección 14).
+
+El Backend IA registra solo el tiempo de YOLO (unos 128 ms de mediana y 228 ms de p95 en 364 inferencias); el tiempo del embedding de DINOv2 no se registra ni se midió por separado.
+
+Limitaciones de esta medición, que acompañan al resultado:
+
+- Una sola foto real de mascota en el repositorio (`backend-ia/tests/fixtures/dog.jpg`): todos los reportes la comparten (la URL cambia con `?v=`).
+- Los reportes sembrados no tienen embeddings: los candidatos del matching fueron solo los reportes creados durante la corrida (misma imagen, similitud máxima); la búsqueda de pgvector fue más liviana que con una tabla completa de embeddings.
+- El resultado `rejected` nunca se ejercitó.
+- Máquina de desarrollo compartida y bajo carga, con inferencia en CPU; sin repeticiones.
+- Las imágenes se sirvieron desde un servidor estático local (`R2_PUBLIC_URL` apuntando a localhost).
+- La tasa de 0,5 it/s es baja a propósito: esta medición no es de capacidad ni de comportamiento bajo concurrencia de matching.
+
 ### 4. Hallazgos
 
 1. **`GET /api/reports` sin paginar.** La respuesta pesa 571 942 bytes con 1000 reportes y 5 739 966 bytes con 10 000 (x10,04); el p95 pasó de 63,1 a 651,8 ms (x10,33) y SLO-1 dejó de cumplirse en `feed` (Tabla 1.3-8). Con la base en 10x, la carga L rindió 13,0 req/s a 100 VUs, frente a 25,5 req/s a 1x (Tabla 1.3-4 y `load.v10x.slo.md`).
@@ -336,7 +373,7 @@ En ambas corridas se cumplen SLO-1, SLO-3, SLO-4 y SLO-5. Con observabilidad, el
 | Volumen 10x | 75,3 y 112,4 | 87 | 7 (2) |
 | Resistencia | 33,8 y 56,8 | 87 | 8 (2) |
 
-Tabla 1.3-15. Recursos muestreados por escenario (la media incluye las muestras en reposo del inicio y el final; intervalo de 3 a 10 s). Fuente: `perf/results/*.resources.csv`, generado por `perf/scripts/sample-resources.mjs`, commit `2eb4a9c`.
+Tabla 1.3-17. Recursos muestreados por escenario (la media incluye las muestras en reposo del inicio y el final; intervalo de 3 a 10 s). Fuente: `perf/results/*.resources.csv`, generado por `perf/scripts/sample-resources.mjs`, commit `2eb4a9c`.
 
 - **El backend (proceso de Node) es lo primero que se acerca a un núcleo, no PostgreSQL ni la máquina.** En L el backend promedió 91,1 % de un núcleo (máximo 113,8 %) con la CPU del sistema en 59 % como máximo, y las conexiones activas a PostgreSQL promediaron 1,1 de 10 en el pool de Prisma (máximo 3): la base no estaba ocupada.
 - **El dato de CPU no identifica el hilo.** Los valores por encima de 100 % (hasta 161,1 %) indican que el proceso usó más de un núcleo (hilos del motor de Prisma, GC o serialización); la hipótesis del login con `bcryptjs` (hallazgo 2) no se puede confirmar con este muestreo.
@@ -356,19 +393,23 @@ Propuestas para el equipo; no se crearon issues ni se implementó nada. El issue
 | [BUG] | Investigar los 5 cortes de conexión en `POST /api/reports` | Hallazgo 4 |
 | [REFACTOR] | Dividir el bundle por ruta (vincular con el issue existente) | Hallazgo 6, Tabla 1.3-11 |
 | [BUG] | Corregir `definition-list`/`dlitem` en el detalle del reporte y el orden de encabezados en el feed | Tabla 1.3-11 |
-| [FEATURE] | Medir SLO-2 con el Backend IA real y definir el evento "matching terminado" (decisión del equipo) | Tabla 1.3-3 |
+| [FEATURE] | Confirmar el evento "matching terminado" (decisión del equipo) y repetir la medición de SLO-2 con fotos de mascota distintas, embeddings sembrados en la base y repeticiones | Tablas 1.3-15 y 1.3-16 |
+| [FEATURE] | Registrar en el Backend IA el tiempo del embedding (hoy solo se registra el de YOLO) | Tablas 1.3-15 y 1.3-16 |
+| [FEATURE] | Agregar una segunda foto real de mascota a `backend-ia/tests/fixtures/` | Tabla 1.3-15 |
+| [FEATURE] | Proteger el servicio de IA contra SSRF a hosts de loopback y privados (hoy el único filtro es la lista de permitidos `R2_PUBLIC_URL` del backend) | Tabla 1.3-15 |
+| [BUG] | Corregir el muestreador de recursos: `--aux-pids` sin `--pids` desplaza las columnas (documentado en `perf/README.md`, sección 14) | Tabla 1.3-16 |
 | [FEATURE] | Soporte de Socket.IO en k6 y entorno con R2 para cubrir chat y flyer | Sección 2 |
 | [FEATURE] | Repetir resistencia (4 h), picos con base de 10 it/s con un tope de VUs mayor y escalabilidad en una máquina sin carga ajena y con el generador aparte | Limitaciones |
 | [BUG] | Revisar por qué el RSS no baja tras el pico de 10 it/s (con muestreo hasta el final de la corrida) | Hallazgo 5 |
 
-Tabla 1.3-16. Recomendaciones propuestas como issues candidatos. Fuente: hallazgos 1 a 7 de este apartado; issue #40 (sección "Relacionadas").
+Tabla 1.3-18. Recomendaciones propuestas como issues candidatos. Fuente: hallazgos 1 a 7 de este apartado; issue #40 (sección "Relacionadas").
 
 ### Limitaciones
 
 - Reducción de duraciones (Tabla 1.3-2): la carga de 435 s en lugar de 29 min, la resistencia de 31 min estables en lugar de 4 h y el punto de quiebre en pasos de 0,5 it/s.
 - Una sola máquina compartida entre generador de carga, backend, base y aplicaciones ajenas; no se midió el límite de la máquina.
 - Cada escenario se corrió una vez (salvo las repeticiones de escalabilidad y estrés), no al menos dos veces con la mediana como pide el issue; hay variabilidad entre corridas.
-- SLO-2 no se midió; chat y flyer quedaron fuera.
+- SLO-2 no se midió en los escenarios de carga (el stub de IA nunca saca un reporte de `pending`); se midió aparte en el escenario dedicado de matching con el Backend IA real, con las salvedades de ese apartado (una sola imagen, sin embeddings sembrados, sin repeticiones, inferencia en CPU, evento "matching terminado" como supuesto del equipo). Chat y flyer quedaron fuera.
 - Observabilidad (ADR-0029): hay capturas de Grafana de la carga (L), la resistencia (E) y el punto de quiebre (B) (Figuras 1.3-9 a 1.3-11), por lo que se cumple el criterio de aceptación del issue de capturas de L, E y B. La resistencia con Grafana duró 35 min (31 estables), no 4 h. Esa corrida tuvo un tramo de unos 14 min sin muestras tras la rampa de bajada, de causa no verificada. La versión liviana no incluye cAdvisor, node-exporter ni postgres_exporter, y suma overhead medible (Tabla 1.3-12). No hubo corrida de control: la diferencia con la línea base no se puede atribuir a la observabilidad (Tablas 1.3-13 y 1.3-14).
 - El resumen de carga de la línea base (`load.summary.json`) fue sobrescrito por la corrida posterior con observabilidad (`perf/results/` no se versiona); solo se recuperó `load.slo.md` desde la salida estándar. Los números del informe y las Figuras 1.3-1 a 1.3-8 provienen de la línea base y se generaron antes de esa sobrescritura.
 - El volumen 10x y la mezcla de flujos son supuestos del equipo; el seed no genera embeddings ni notificaciones.
