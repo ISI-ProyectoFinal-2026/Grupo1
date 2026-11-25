@@ -1,8 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
+import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryWrapper } from '@/test/query-wrapper'
+import { reportDetailQueryKey } from '@/hooks/useReportDetailQuery'
 import { useAuthStore } from '@/stores/auth.store'
 import * as reportsService from '@/services/reports.service'
 import { getPresignedUrl, uploadToR2 } from '@/services/uploads.service'
@@ -326,6 +328,45 @@ describe('ReportDetailPage flyer propio', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(message)
     expect(screen.queryByAltText('Flyer del reporte')).not.toBeInTheDocument()
+  })
+})
+
+// navegar entre reportes con el destino en caché no reutiliza el estado del anterior
+describe('ReportDetailPage cambio de reporte', () => {
+  afterEach(() => {
+    useAuthStore.setState({ token: null, user: null })
+  })
+
+  it('al pasar a otro reporte en caché no muestra el flyer del anterior', async () => {
+    vi.clearAllMocks()
+    vi.mocked(reportsService.getReport).mockImplementation(async (id) =>
+      reporte({ id, title: `Reporte ${id}` })
+    )
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+    vi.mocked(reportsService.getFlyer).mockResolvedValue({ flyerUrl: 'https://cdn/flyer-5.png' })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+    client.setQueryData(reportDetailQueryKey(6), reporte({ id: 6, title: 'Reporte 6' }))
+    const { Wrapper } = createQueryWrapper(client)
+    const user = userEvent.setup()
+    render(
+      <Wrapper>
+        <MemoryRouter initialEntries={['/reports/5']}>
+          <Link to='/reports/6'>ir al reporte 6</Link>
+          <Routes>
+            <Route path='/reports/:id' element={<ReportDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </Wrapper>
+    )
+
+    await user.click(await screen.findByRole('button', { name: 'Generar flyer' }))
+    expect(await screen.findByAltText('Flyer del reporte')).toHaveAttribute('src', 'https://cdn/flyer-5.png')
+
+    await user.click(screen.getByRole('link', { name: 'ir al reporte 6' }))
+
+    expect(await screen.findByRole('heading', { name: 'Reporte 6' })).toBeInTheDocument()
+    expect(screen.queryByAltText('Flyer del reporte')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generar flyer' })).toBeInTheDocument()
   })
 })
 
