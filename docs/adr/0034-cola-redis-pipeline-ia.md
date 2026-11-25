@@ -12,7 +12,8 @@ Al crear un reporte, o al cambiar sus fotos, el backend encola un job en Redis c
 - La llamada directa fire-and-forget no tenía cola, ni reintentos persistentes, ni visibilidad de los fallos (issue #177).
 - Los jobs sobreviven a un reinicio del backend y cada intento fallido queda en el log.
 - La arquitectura objetivo del proyecto ya preveía una cola en Redis para este pipeline.
-- BullMQ 5 (con ioredis) cubre reintentos, backoff e idempotencia por `jobId` sin código propio; la línea 6 cambió de cliente de Redis.
+- BullMQ resuelve los reintentos, el backoff y la deduplicación de jobs (por `jobId`) sin escribir código propio para eso.
+- Se usa la versión 5 porque ya incluye ioredis, el cliente de Redis; desde la versión 6 el cliente no viene incluido y hay que instalarlo y configurarlo aparte.
 
 ## Alternativas
 
