@@ -11,12 +11,16 @@ jest.mock("bullmq", () => ({
   Queue: MockQueue,
   Worker: MockWorker,
 }));
+// conexiones creadas, para verificar que el productor las cierra
+const mockConnections: { disconnect: jest.Mock; quit: jest.Mock }[] = [];
 jest.mock("ioredis", () => ({
   Redis: class {
-    on() {}
-    async quit() {
-      return "OK";
+    disconnect = jest.fn();
+    quit = jest.fn().mockResolvedValue("OK");
+    constructor() {
+      mockConnections.push(this);
     }
+    on() {}
   },
 }));
 
@@ -50,6 +54,7 @@ describe("report-pipeline.service (#177)", () => {
 
   afterEach(async () => {
     await closeReportPipeline();
+    mockConnections.splice(0);
     process.env = { ...originalEnv };
     jest.restoreAllMocks();
     jest.clearAllMocks();
@@ -126,6 +131,54 @@ describe("report-pipeline.service (#177)", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  // scripts fuera del server: la conexión del productor no debe quedar viva
+  describe("cierre de la conexión del productor", () => {
+    beforeEach(() => {
+      process.env.REDIS_URL = "redis://localhost:6379";
+    });
+
+    test("se cierra después de encolar", async () => {
+      await enqueueReportPipeline(42, IMAGE_URL);
+
+      expect(mockAdd).toHaveBeenCalled();
+      expect(mockConnections).toHaveLength(1);
+      expect(mockConnections[0].disconnect).toHaveBeenCalled();
+    });
+
+    test("se cierra si Redis rechaza el job", async () => {
+      mockAdd.mockRejectedValue(new Error("Connection is closed"));
+      jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+      await enqueueReportPipeline(42, IMAGE_URL);
+
+      expect(mockConnections[0].disconnect).toHaveBeenCalled();
+    });
+
+    test("se cierra si Redis no responde a tiempo", async () => {
+      jest.useFakeTimers();
+      mockAdd.mockReturnValue(new Promise(() => undefined));
+      jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+      try {
+        const done = enqueueReportPipeline(42, IMAGE_URL);
+        await jest.advanceTimersByTimeAsync(ENQUEUE_TIMEOUT_MS);
+        await done;
+
+        expect(mockConnections[0].disconnect).toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    test("cada encolado usa su propia conexión", async () => {
+      await enqueueReportPipeline(42, IMAGE_URL);
+      await enqueueReportPipeline(43, IMAGE_URL);
+
+      expect(mockConnections).toHaveLength(2);
+      expect(mockConnections.every((connection) => connection.disconnect.mock.calls.length === 1)).toBe(true);
+    });
   });
 
   describe("idempotencia (jobId = reportId)", () => {

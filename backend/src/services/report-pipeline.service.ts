@@ -29,7 +29,6 @@ export const ENQUEUE_TIMEOUT_MS = 5_000;
 // estados en los que el job todavía no empezó y se puede reemplazar
 const REPLACEABLE_STATES = new Set(["waiting", "delayed", "prioritized", "waiting-children"]);
 
-let queue: Queue<ReportPipelineJobData> | null = null;
 let worker: Worker<ReportPipelineJobData> | null = null;
 const connections: Redis[] = [];
 
@@ -49,17 +48,8 @@ function createConnection(url: string, options: { forWorker: boolean }): Redis {
   connection.on("ready", () => {
     down = false;
   });
-  connections.push(connection);
+  if (options.forWorker) connections.push(connection);
   return connection;
-}
-
-function getQueue(url: string): Queue<ReportPipelineJobData> {
-  if (!queue) {
-    queue = new Queue<ReportPipelineJobData>(REPORT_PIPELINE_QUEUE, {
-      connection: createConnection(url, { forWorker: false }),
-    });
-  }
-  return queue;
 }
 
 // jobId = reportId: un reporte tiene a lo sumo un job vivo
@@ -84,8 +74,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-async function addJob(reportId: number, imageUrl: string, url: string): Promise<void> {
-  const q = getQueue(url);
+async function addJob(q: Queue<ReportPipelineJobData>, reportId: number, imageUrl: string): Promise<void> {
   const jobId = reportPipelineJobId(reportId);
   await replaceStaleJob(q, jobId, imageUrl);
   await q.add(REPORT_PIPELINE_QUEUE, { reportId, imageUrl }, { ...REPORT_PIPELINE_JOB_OPTIONS, jobId });
@@ -103,11 +92,16 @@ export async function enqueueReportPipeline(reportId: number, imageUrl: string):
   }
   if (!process.env.AI_SERVICE_URL) return;
 
+  // conexión por encolado: no deja el proceso vivo (scripts fuera del server)
+  const connection = createConnection(url, { forWorker: false });
+  const q = new Queue<ReportPipelineJobData>(REPORT_PIPELINE_QUEUE, { connection });
   try {
-    await withTimeout(addJob(reportId, imageUrl, url), ENQUEUE_TIMEOUT_MS);
+    await withTimeout(addJob(q, reportId, imageUrl), ENQUEUE_TIMEOUT_MS);
   } catch (error) {
     console.error(`[cola-ia] no se pudo encolar el report ${reportId}; se procesa en proceso:`, error);
     matchingService.triggerEmbeddingGeneration(reportId, imageUrl);
+  } finally {
+    connection.disconnect();
   }
 }
 
@@ -147,13 +141,11 @@ export function startReportPipelineWorker(): Worker<ReportPipelineJobData> | nul
   return worker;
 }
 
-// cierra cola, worker y conexiones (shutdown y tests)
+// cierra el worker y su conexión (shutdown y tests)
 export async function closeReportPipeline(): Promise<void> {
   const closing: Promise<unknown>[] = [];
   if (worker) closing.push(worker.close());
-  if (queue) closing.push(queue.close());
   worker = null;
-  queue = null;
   await Promise.allSettled(closing);
   await Promise.allSettled(connections.splice(0).map((connection) => connection.quit()));
 }
