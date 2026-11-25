@@ -203,6 +203,41 @@ describe("reportes ocultos por denuncias (#218)", () => {
       expect(report).toMatchObject({ title: "Oculto de prueba", status: "hidden", contentEditedAt: null });
     });
 
+    // cambio de estado concurrente justo antes de tomar el lock (#326)
+    function changeStatusBeforeLock(id: number, status: "resolved" | "pending") {
+      const original = prisma.$transaction.bind(prisma) as (...args: unknown[]) => Promise<unknown>;
+      jest.spyOn(prisma, "$transaction").mockImplementationOnce((async (...args: unknown[]) => {
+        await prisma.report.update({ where: { id }, data: { status } });
+        return original(...args);
+      }) as never);
+    }
+
+    test("si se cierra entre la lectura y el bloqueo, cambiar la foto responde 409 y sigue resolved (#326)", async () => {
+      const id = await createReport("published");
+      const trigger = jest.spyOn(matchingService, "triggerEmbeddingGeneration").mockResolvedValue(undefined);
+      changeStatusBeforeLock(id, "resolved");
+
+      await expect(
+        reportsService.update(id, ownerId, { imageUrl: "https://cdn.example.com/nueva.jpg" })
+      ).rejects.toMatchObject({ statusCode: 409 });
+
+      expect(trigger).not.toHaveBeenCalled();
+      const report = await prisma.report.findUniqueOrThrow({ where: { id } });
+      expect(report).toMatchObject({ status: "resolved", imageUrl: "https://cdn.example.com/a.jpg", contentEditedAt: null });
+    });
+
+    test("si pasa a pending entre la lectura y el bloqueo, cerrarlo responde 409 y sigue pending (#326)", async () => {
+      const id = await createReport("published");
+      changeStatusBeforeLock(id, "pending");
+
+      await expect(reportsService.update(id, ownerId, { status: "resolved" })).rejects.toMatchObject({
+        statusCode: 409,
+      });
+
+      const report = await prisma.report.findUniqueOrThrow({ where: { id } });
+      expect(report).toMatchObject({ status: "pending", closedReason: null, closedAt: null, contentEditedAt: null });
+    });
+
     test.each([
       ["la foto principal", { imageUrl: "https://cdn.example.com/nueva.jpg" }],
       ["las fotos extra", { extraImageUrls: ["https://cdn.example.com/extra.jpg"] }],

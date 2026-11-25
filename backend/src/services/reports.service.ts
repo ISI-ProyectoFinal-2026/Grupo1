@@ -271,9 +271,16 @@ async function assertNoPendingFlags(db: Prisma.TransactionClient, reportId: numb
   }
 }
 
-// revalida bajo el mismo lock que usan las denuncias
-async function assertEditableLocked(tx: Prisma.TransactionClient, reportId: number, photosChanged: boolean): Promise<void> {
-  const [row] = await tx.$queryRaw<{ status: string }[]>`
+const RESOLVED_PHOTO_MESSAGE = "No se puede cambiar la foto de un reporte resuelto";
+
+// revalida bajo el mismo lock que usan las denuncias (#326: el estado pudo cambiar)
+async function assertEditableLocked(
+  tx: Prisma.TransactionClient,
+  reportId: number,
+  photosChanged: boolean,
+  resolving = false
+): Promise<void> {
+  const [row] = await tx.$queryRaw<{ status: ReportStatus }[]>`
     SELECT status::text AS status FROM reports WHERE id = ${reportId} FOR UPDATE
   `;
   if (!row) {
@@ -282,7 +289,13 @@ async function assertEditableLocked(tx: Prisma.TransactionClient, reportId: numb
   if (row.status === "hidden") {
     throw new AppError(409, HIDDEN_EDIT_MESSAGE);
   }
+  if (resolving) {
+    assertCanResolve(row.status);
+  }
   if (photosChanged) {
+    if (row.status === "resolved") {
+      throw new AppError(409, RESOLVED_PHOTO_MESSAGE);
+    }
     await assertNoPendingFlags(tx, reportId);
   }
 }
@@ -316,7 +329,7 @@ export async function update(id: number, userId: number, data: UpdateReportInput
     // Re-moderating a closed report would publish it again, and "resolved"
     // sent along with the new photo would be overwritten by "pending".
     if (existing.status === "resolved" || data.status === "resolved") {
-      throw new AppError(409, "No se puede cambiar la foto de un reporte resuelto");
+      throw new AppError(409, RESOLVED_PHOTO_MESSAGE);
     }
     // antes de llamar a la IA; se revalida bajo lock
     await assertNoPendingFlags(prisma, id);
@@ -333,7 +346,7 @@ export async function update(id: number, userId: number, data: UpdateReportInput
   const updateData = photosChanged ? { ...editedData, status: "pending" as const, publishedAt: null } : editedData;
 
   await prisma.$transaction(async (tx) => {
-    await assertEditableLocked(tx, id, photosChanged);
+    await assertEditableLocked(tx, id, photosChanged, data.status === "resolved");
     await assertPetOwnedBy(tx, data.petId, existing.userId);
     try {
       await tx.report.update({ where: { id }, data: updateData });
