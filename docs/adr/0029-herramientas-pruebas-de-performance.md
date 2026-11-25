@@ -1,7 +1,7 @@
 # ADR-0029: Herramientas de las pruebas de performance con k6, Lighthouse CI y un muestreador propio
 
 - **Estado:** Pendiente
-- **Responsables:** Pendiente de entrevista
+- **Responsables:** Franco Marín
 
 ## Decisión
 
