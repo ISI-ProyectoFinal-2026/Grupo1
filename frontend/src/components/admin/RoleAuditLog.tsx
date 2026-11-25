@@ -4,17 +4,10 @@ import EmptyState from '@/components/ui/EmptyState'
 import ErrorMessage from '@/components/ui/ErrorMessage'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { useRoleAudit } from '@/hooks/useAdminUsers'
+import { formatDateTime } from '@/lib/format'
 import { ROLE_LABELS, type AuditPerson } from '@/types/admin.types'
 
 const PAGE_SIZE = 10
-
-const dateFormat = new Intl.DateTimeFormat('es-AR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-})
 
 const personLabel = (person: AuditPerson | null) =>
   person ? (person.fullName ?? person.email) : 'Cuenta eliminada'
@@ -71,7 +64,7 @@ function RoleAuditLog() {
               <tr key={entry.id} className='border-t border-line'>
                 <td className='tabular py-2 pr-4 text-ink-muted'>
                   <time dateTime={entry.createdAt}>
-                    {dateFormat.format(new Date(entry.createdAt))}
+                    {formatDateTime(entry.createdAt)}
                   </time>
                 </td>
                 <td className='py-2 pr-4'>{personLabel(entry.actor)}</td>

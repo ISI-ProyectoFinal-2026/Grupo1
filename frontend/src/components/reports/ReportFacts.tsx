@@ -1,5 +1,5 @@
 import { CalendarIcon, PinIcon } from '@/components/ui/icons'
-import { formatLongDay } from '@/lib/format'
+import { formatLongDate, formatLongDay } from '@/lib/format'
 import type { ReportDTO } from '@/types/report.types'
 
 interface ReportFactsProps {
@@ -7,14 +7,6 @@ interface ReportFactsProps {
     ReportDTO,
     'locationAddress' | 'location' | 'createdAt' | 'eventDate' | 'publishedAt'
   >
-}
-
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('es-AR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
 }
 
 // ubicación y fechas del reporte
@@ -40,12 +32,12 @@ export default function ReportFacts({ report }: ReportFactsProps) {
         <CalendarIcon className='mt-0.5 h-5 w-5 shrink-0 text-ink-muted' />
         <div>
           <dt className='text-sm text-ink-muted'>Fecha</dt>
-          <dd className='font-bold text-ink'>{formatDate(report.createdAt)}</dd>
+          <dd className='font-bold text-ink'>{formatLongDate(report.createdAt)}</dd>
           {report.eventDate && (
             <dd className='text-sm text-ink-muted'>Suceso: {formatLongDay(report.eventDate)}</dd>
           )}
           {report.publishedAt && (
-            <dd className='text-sm text-ink-muted'>Publicado: {formatDate(report.publishedAt)}</dd>
+            <dd className='text-sm text-ink-muted'>Publicado: {formatLongDate(report.publishedAt)}</dd>
           )}
         </div>
       </div>

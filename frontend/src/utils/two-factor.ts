@@ -1,3 +1,4 @@
+import { formatLongDateTime } from '@/lib/format'
 import { getApiErrorCode, getApiErrorDetails } from '@/services/api'
 import { TWO_FACTOR_LOCKED } from '@/types/auth'
 
@@ -31,8 +32,9 @@ export function formatWaitMessage(seconds: number): string {
   return `Probá de nuevo en ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`
 }
 
+// fecha en que se aplica el reinicio de 2FA
 export function formatResetDate(iso: string): string {
-  return new Date(iso).toLocaleString('es-AR', { dateStyle: 'long', timeStyle: 'short' })
+  return formatLongDateTime(iso)
 }
 
 /**
