@@ -14,12 +14,11 @@ function InactivityWarningBanner({ report }: InactivityWarningBannerProps) {
   const currentUserId = useAuthStore((state) => state.user?.id)
   const enabled = currentUserId === report.userId && report.status === 'published'
   const { data } = useInactivityWarningQuery(report.id, enabled)
-  const [shown, setShown] = useState(false)
+  const [acted, setActed] = useState(false)
 
   const pending = enabled && data?.pending === true
-  // sigue montado tras actuar para conservar la confirmación
-  if (pending && !shown) setShown(true)
-  if (!pending && !shown) return null
+  // sigue montado solo si se respondió desde acá, para conservar la confirmación (#332)
+  if (!pending && !acted) return null
 
   return (
     <div className='card flex flex-col gap-1 border-signal p-4'>
@@ -29,7 +28,7 @@ function InactivityWarningBanner({ report }: InactivityWarningBannerProps) {
           {data.day ? CLOSING_TEXT[data.day] : 'pronto'}.
         </p>
       )}
-      <InactivityWarningActions reportId={report.id} isRead={false} />
+      <InactivityWarningActions reportId={report.id} isRead={false} onAction={() => setActed(true)} />
     </div>
   )
 }
