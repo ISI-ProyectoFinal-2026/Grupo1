@@ -42,8 +42,10 @@ export async function createChat(
     throw new AppError(400, "No podés abrir un chat con vos mismo");
   }
 
-  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true } });
-  if (!report) {
+  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true, status: true } });
+  const isPublic = report?.status === "published" || report?.status === "resolved";
+  // no público (#180): 404 a terceros antes del 403; si apuntan al autor, el chat existente se resuelve abajo
+  if (!report || (!isPublic && userId !== report.userId && participantId !== report.userId)) {
     throw new AppError(404, "Reporte no encontrado");
   }
   // Sólo se puede contactar al autor del reporte. Evita enumerar usuarios y
@@ -62,7 +64,7 @@ export async function createChat(
   if (existing) {
     return { chat: existing, created: false };
   }
-  if (await isAuthorSuspended(report.userId)) {
+  if (!isPublic || (await isAuthorSuspended(report.userId))) {
     throw new AppError(404, "Reporte no encontrado");
   }
 

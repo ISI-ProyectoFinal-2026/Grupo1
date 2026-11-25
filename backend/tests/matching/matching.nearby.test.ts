@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../src/db/client";
 import { triggerEmbeddingGeneration } from "../../src/services/matching.service";
+import * as reportMatchingService from "../../src/services/report-matching.service";
 import { createTestUser } from "../helpers/users";
 
 describe("triggerEmbeddingGeneration: avisos de reportes cercanos (#33)", () => {
@@ -46,6 +47,8 @@ describe("triggerEmbeddingGeneration: avisos de reportes cercanos (#33)", () => 
     process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
     fetchMock = jest.fn();
     global.fetch = fetchMock;
+    // fuera de foco: el matching contra la base compartida podría avisar a terceros
+    jest.spyOn(reportMatchingService, "findAndStoreMatches").mockResolvedValue(0);
   });
 
   afterEach(async () => {
@@ -62,7 +65,10 @@ describe("triggerEmbeddingGeneration: avisos de reportes cercanos (#33)", () => 
   });
 
   test("al publicarse avisa a los usuarios cercanos", async () => {
-    fetchMock.mockResolvedValue({ status: 201 });
+    fetchMock.mockResolvedValue({
+      status: 200,
+      json: async () => ({ has_animal: true, embedding: Array<number>(768).fill(0.1) }),
+    });
     const report = await createPendingReport();
 
     await triggerEmbeddingGeneration(report.id, report.imageUrl);
@@ -73,7 +79,7 @@ describe("triggerEmbeddingGeneration: avisos de reportes cercanos (#33)", () => 
   });
 
   test("al rechazarse no avisa a nadie", async () => {
-    fetchMock.mockResolvedValue({ status: 422 });
+    fetchMock.mockResolvedValue({ status: 200, json: async () => ({ has_animal: false, embedding: null }) });
     const report = await createPendingReport();
 
     await triggerEmbeddingGeneration(report.id, report.imageUrl);

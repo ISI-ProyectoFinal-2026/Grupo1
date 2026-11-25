@@ -32,6 +32,8 @@ export interface SecondFactorOptions {
   allowRecovery: boolean;
   /** false: no mira el bloqueo ni cuenta fallos (confirmación del alta). */
   countFailures: boolean;
+  /** Corre al abrir la transacción, antes de bloquear la fila del usuario (orden de locks). */
+  beforeCheck?: (tx: Prisma.TransactionClient) => Promise<void>;
 }
 
 export function normalizeRecoveryCode(code: string): string {
@@ -186,6 +188,7 @@ export async function verifySecondFactor<T>(
 
   try {
     return await prisma.$transaction(async (tx) => {
+      await opts.beforeCheck?.(tx);
       const proof = await checkCode(tx, userId, secret, code, user.twoFactorLastStep, opts.allowRecovery);
       if (!proof) {
         throw new CodeMismatch();

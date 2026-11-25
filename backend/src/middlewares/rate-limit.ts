@@ -76,6 +76,34 @@ export const accountReportCreateLimiter = rateLimit({
   skip: () => process.env.NODE_ENV === "test",
 });
 
+// Exportación de datos propios (#366): arma el JSON con todas las tablas del
+// usuario, así que el cupo es por usuario y chico. Va después de requireAuth.
+export const ACCOUNT_EXPORT_RATE_LIMIT = 5;
+
+export const accountExportLimiter = rateLimit({
+  windowMs: 60 * 60_000,
+  max: ACCOUNT_EXPORT_RATE_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => `user:${req.userId}`,
+  message: { error: { message: "Límite de exportaciones alcanzado, esperá una hora" } },
+  skip: () => process.env.NODE_ENV === "test",
+});
+
+// Edición del perfil propio (#366): por usuario y separado del cupo por IP de
+// los endpoints que mandan mails. Va después de requireAuth.
+export const PROFILE_UPDATE_RATE_LIMIT = 20;
+
+export const profileUpdateLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  max: PROFILE_UPDATE_RATE_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => `user:${req.userId}`,
+  message: { error: { message: "Límite de ediciones del perfil alcanzado, esperá unos minutos" } },
+  skip: () => process.env.NODE_ENV === "test",
+});
+
 // Geocodificación inversa (#216): por IP, porque el endpoint es público. El
 // tope de 1 req/s hacia Nominatim es global y lo aplica el servicio; esto evita
 // que una sola IP llene la cola de espera.

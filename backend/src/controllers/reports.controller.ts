@@ -74,7 +74,7 @@ export async function keepShowing(req: Request, res: Response): Promise<void> {
 
 export async function getMatches(req: Request, res: Response): Promise<void> {
   const { id } = reportIdParamSchema.parse(req.params);
-  await reportsService.getById(id); // dispara 404 si no existe
+  await reportsService.getVisibleById(id, req.userId); // 404 si no existe o no es visible (#180)
   const matches = await matchingService.listMatches(id);
   res.status(200).json(matches);
 }

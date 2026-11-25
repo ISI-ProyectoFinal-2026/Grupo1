@@ -53,6 +53,42 @@ describe('MainLayout', () => {
     expect(await screen.findByRole('button', { name: 'Notificaciones' })).toBeInTheDocument()
   })
 
+  it('muestra el boton de ayuda de su rol con sesion iniciada', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout()
+
+    expect(await screen.findByRole('button', { name: 'Ayuda' })).toBeInTheDocument()
+  })
+
+  it.each(['/reports/5', '/reports/mine', '/chats/3', '/'])('en %s el boton de ayuda nunca se oculta', async (ruta) => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout(ruta)
+
+    const contenedor = (await screen.findByRole('button', { name: 'Ayuda' })).parentElement
+    expect(contenedor).not.toHaveClass('max-lg:hidden')
+  })
+
+  it('el boton de ayuda toma la seccion de la ruta', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+
+    renderLayout('/businesses')
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Ayuda' }))
+
+    expect(screen.getByRole('dialog', { name: 'Ayuda: Comercios (Usuario)' })).toBeInTheDocument()
+  })
+
+  it('no muestra el boton de ayuda sin sesion', async () => {
+    useAuthStore.setState({ token: null, user: null })
+
+    renderLayout()
+
+    await waitFor(() => expect(screen.getByText('PATITAS')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Ayuda' })).not.toBeInTheDocument()
+  })
+
   it('no muestra el bell sin sesion', async () => {
     useAuthStore.setState({ token: null, user: null })
 
@@ -315,6 +351,28 @@ describe('MainLayout', () => {
     const email = screen.getByRole('link', { name: /franco@patitas.test/ })
     expect(enlace.compareDocumentPosition(email) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(enlace).not.toHaveAttribute('aria-current')
+  })
+
+  it('ofrece Mi cuenta arriba de las notificaciones', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout()
+
+    const enlace = await screen.findByRole('link', { name: 'Mi cuenta' })
+    expect(enlace).toHaveAttribute('href', '/account/profile')
+    const notificaciones = screen.getByRole('link', { name: 'Notificaciones' })
+    expect(enlace.compareDocumentPosition(notificaciones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(enlace).not.toHaveAttribute('aria-current')
+  })
+
+  it('marca Mi cuenta como activa en su ruta', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.getMe).mockReturnValue(new Promise(() => {}))
+
+    renderLayout('/account/profile')
+
+    expect(await screen.findByRole('link', { name: 'Mi cuenta' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('marca Notificaciones como activa en su ruta', async () => {

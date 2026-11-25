@@ -31,7 +31,7 @@ EMBEDDING_DIM = 768
 # same (AUC 0.984 vs 0.985, mAP 0.910 vs 0.907) and the embedding runs 6x faster
 # on CPU (0.30s vs 1.8s): attention cost grows with the square of the patch
 # count (256 patches at 224px vs 1369 at 518px). Changing it shifts the
-# similarity scale: recalibrate the thresholds in matching_service.
+# similarity scale: recalibrate the thresholds in backend/src/config/matching.ts.
 DINO_INPUT_SIZE = 224
 
 # Detections smaller than this fraction of the biggest animal in the photo are

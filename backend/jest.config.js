@@ -8,8 +8,8 @@ module.exports = {
   // src/app.ts, porque app.ts exige JWT_SECRET y Jest no lee el .env por su
   // cuenta. En CI las variables ya vienen del workflow y dotenv no las pisa
   // (no sobreescribe lo que ya está en process.env), así que el comportamiento
-  // del pipeline no cambia.
-  setupFiles: ["dotenv/config"],
+  // del pipeline no cambia. Además descarta el SMTP del .env local (#366).
+  setupFiles: ["<rootDir>/tests/setup-env.ts"],
   transform: {
     "^.+\.ts$": ["ts-jest", { isolatedModules: true }],
   },
@@ -20,9 +20,12 @@ module.exports = {
   collectCoverageFrom: [
     "src/**/*.ts",
     // Entrypoints, no lógica: index.ts solo hace listen() y check-connection.ts
-    // es un script de CLI (`npm run db:check`). No hay nada que testear acá.
+    // y reembed-reports.ts son scripts de CLI (`npm run db:check`,
+    // `npm run reembed:reports`). No hay nada que testear acá.
     "!src/index.ts",
     "!src/db/check-connection.ts",
+    "!src/db/reembed-reports.ts",
+    "!src/scripts/preflight.ts",
   ],
   coverageDirectory: "coverage",
   // Criterio de aceptacion de #42. Con esto `npm run test:coverage` falla si

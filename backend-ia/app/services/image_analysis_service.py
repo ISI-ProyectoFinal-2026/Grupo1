@@ -70,7 +70,7 @@ def _decode_and_analyze(content: bytes) -> ImageAnalysis:
 
 
 def _decode_and_embed(content: bytes) -> list[float] | None:
-    # misma cadena que embedding_service: YOLO recorta y OpenCLIP embebe
+    # YOLO recorta y DINOv2 embebe
     crop = detect_and_crop(_decode(content))
     return None if crop is None else generate_embedding(crop)
 
@@ -89,7 +89,7 @@ async def analyze_image(image_url: str) -> ImageAnalysis:
 
 
 async def embed_image(image_url: str) -> list[float] | None:
-    """Return the OpenCLIP embedding of the pet in the image, or None if there is none.
+    """Return the DINOv2 embedding of the pet in the image, or None if there is none.
 
     Raises ImageUnavailableError like analyze_image.
     """

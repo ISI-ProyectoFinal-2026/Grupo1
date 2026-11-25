@@ -252,8 +252,8 @@ model ReportFlag {
 model ReportEmbedding {
   id        Int      @id @default(autoincrement())
   reportId  Int      @unique @map("report_id")
-  // DINOv2 ViT-B/14 output. Escrito por el Backend IA, consumido por el Backend
-  // Principal para el matching por similitud (distancia coseno de pgvector,
+  // DINOv2 ViT-B/14 output. Calculado por el Backend IA, escrito y usado por el
+  // Backend Principal para el matching por similitud (distancia coseno de pgvector,
   // operador `<=>`, que es el que usa el indice HNSW vector_cosine_ops).
   embedding Unsupported("vector(768)")
   createdAt DateTime @default(now()) @map("created_at")
@@ -275,13 +275,14 @@ enum AccountReportSeverity {
 model AccountReport {
   id             Int                   @id @default(autoincrement())
   reportedUserId Int                   @map("reported_user_id")
-  reporterId     Int                   @map("reporter_id")
+  // null = la cuenta del denunciante se eliminó (#366); la denuncia queda para moderación
+  reporterId     Int?                  @map("reporter_id")
   severity       AccountReportSeverity
   sanctionId     Int?                  @map("sanction_id")
   createdAt      DateTime              @default(now()) @map("created_at")
 
   reportedUser User             @relation("AccountReportReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
-  reporter     User             @relation("AccountReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporter     User?            @relation("AccountReportReporter", fields: [reporterId], references: [id], onDelete: SetNull)
   sanction     AccountSanction? @relation(fields: [sanctionId], references: [id], onDelete: Cascade)
 
   // una denuncia por persona y ciclo: índice único parcial (sanction_id IS NULL) en SQL crudo

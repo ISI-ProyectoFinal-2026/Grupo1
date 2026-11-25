@@ -45,21 +45,60 @@ Cada decisión técnica está registrada como ADR en [docs/adr/](docs/adr/README
 
 ## Puesta en marcha local
 
-### Requisitos
+### Demo con un solo comando (Docker)
+
+Requiere solo Docker. Antes del primer arranque, copiar los `.env.example` y completarlos (las credenciales de R2 van en `backend/.env`):
+
+```bash
+cp backend/.env.example backend/.env
+cp backend-ia/.env.example backend-ia/.env
+docker compose up -d   # postgres, backend-ia, backend y frontend, en ese orden y con healthcheck
+docker compose ps      # los cuatro servicios en estado healthy
+```
+
+| Servicio | URL en el host |
+|---|---|
+| Frontend (nginx, proxea `/api` y `/socket.io` al backend) | <http://localhost:5173> |
+| Backend principal | <http://localhost:3001> |
+| Backend IA | <http://localhost:8000> |
+
+- El backend aplica las migraciones pendientes (`prisma migrate deploy`) cada vez que arranca.
+- La imagen del Backend IA incluye los pesos de YOLOv8n y DINOv2: el servicio arranca sin red.
+- Dentro de Compose, `INTERNAL_API_KEY` es la misma para los dos backends (default `dev-internal-key`); `DATABASE_URL`, `AI_SERVICE_URL` y los puertos se fijan en `docker-compose.yml`. Variables opcionales: [docker/ENV_VARS.md](docker/ENV_VARS.md).
+
+Chequeo previo a la demo (R2, clave interna, Backend IA, teselas de OSM y SMTP, en menos de 30 s):
+
+```bash
+docker compose exec backend node dist/scripts/preflight.js
+```
+
+Termina con código distinto de 0 si algún chequeo falla. Fuera de Docker: `cd backend && npm run preflight`.
+
+**Dependencias de red de la demo:**
+
+| Recurso | Sin internet |
+|---|---|
+| Cloudflare R2 (fotos de los reportes) | La subida responde 503 y no se pueden crear reportes con foto |
+| Teselas de OpenStreetMap | El mapa queda gris; el resto del recorrido funciona |
+| Google Fonts | El frontend usa las fuentes del sistema |
+
+### Desarrollo sin Docker
+
+#### Requisitos
 
 - Docker (para PostgreSQL)
 - Node.js 24
 - Python 3.11
 
-### 1. Base de datos
+#### 1. Base de datos
 
 ```bash
-docker compose up -d   # PostgreSQL + PostGIS + pgvector en el puerto 5433
+docker compose up -d postgres   # solo PostgreSQL + PostGIS + pgvector, en el puerto 5433
 ```
 
 Variables opcionales de Compose: [docker/ENV_VARS.md](docker/ENV_VARS.md).
 
-### 2. Backend principal
+#### 2. Backend principal
 
 ```bash
 cd backend
@@ -71,7 +110,7 @@ npm run dev             # http://localhost:3001
 
 Las variables de entorno (base, R2, email, 2FA, `AI_SERVICE_URL`, `INTERNAL_API_KEY`) están en [backend/README.md](backend/README.md).
 
-### 3. Backend IA
+#### 3. Backend IA
 
 ```bash
 cd backend-ia
@@ -83,7 +122,7 @@ uvicorn app.main:app --reload   # http://localhost:8000
 
 Requiere las migraciones del backend principal aplicadas. Configuración en [backend-ia/README.md](backend-ia/README.md).
 
-### 4. Frontend
+#### 4. Frontend
 
 ```bash
 cd frontend
@@ -91,14 +130,14 @@ npm install
 npm run dev   # http://localhost:5173
 ```
 
-### Verificar que todo responde
+#### Verificar que todo responde
 
 | Endpoint | Qué indica |
 |---|---|
 | `GET :3001/health` | El backend responde; `ai` informa si `AI_SERVICE_URL` está configurada |
 | `GET :3001/health/db` | La base de datos responde |
 | `GET :3001/health/ai` | El Backend IA responde |
-| `GET :8000/health/db` | El Backend IA llega a la base y pgvector está activo |
+| `GET :8000/health` | El Backend IA responde (no usa base de datos) |
 
 ---
 
@@ -138,4 +177,4 @@ Cada integrante trabaja en su rama personal (`{nombre}/features`) y abre un PR c
 ---
 
 **Proyecto Final 2026 — Ingeniería en Sistemas de Información, UTN Facultad Regional San Rafael**
-Última actualización: 2026-11-03
+Última actualización: 2026-11-23

@@ -1,0 +1,11 @@
+.venv
+venv
+__pycache__
+.pytest_cache
+.atl
+tests
+benchmarks
+scripts
+*.pt
+.env
+.env.*

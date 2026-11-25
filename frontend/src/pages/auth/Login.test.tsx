@@ -32,6 +32,7 @@ function renderLogin(
     registered?: boolean
     emailVerified?: boolean
     passwordReset?: boolean
+    accountDeleted?: boolean
     from?: { pathname: string; search?: string; hash?: string }
   }
 ) {
@@ -112,6 +113,13 @@ describe('Login', () => {
     expect(
       screen.getByText('Tu contraseña se actualizó, iniciá sesión con la nueva')
     ).toBeInTheDocument()
+    expect(screen.queryByText('Tu email quedó verificado, iniciá sesión')).toBeNull()
+  })
+
+  it('avisa que la cuenta se elimino cuando viene de Mi cuenta', () => {
+    renderLogin({ accountDeleted: true })
+
+    expect(screen.getByText('Tu cuenta fue eliminada')).toBeInTheDocument()
     expect(screen.queryByText('Tu email quedó verificado, iniciá sesión')).toBeNull()
   })
 

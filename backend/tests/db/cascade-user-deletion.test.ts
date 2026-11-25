@@ -29,6 +29,9 @@ describe("migración 20261110000000_cascade_user_deletion", () => {
     const rule = (table: string, column: string) => fks.find((fk) => fk.table === table && fk.column === column)?.rule;
     expect(rule("role_change_audits", "actor_id")).toBe("n");
     expect(rule("account_sanction_events", "actor_id")).toBe("n");
+    // denuncias hechas por la cuenta eliminada se conservan sin autor (#366)
+    expect(rule("account_reports", "reporter_id")).toBe("n");
+    expect(rule("account_reports", "reported_user_id")).toBe("c");
     expect(rule("role_change_audits", "target_id")).toBe("c");
   });
 
@@ -62,7 +65,9 @@ describe("migración 20261110000000_cascade_user_deletion", () => {
         category: "VETERINARIA",
       },
     });
-    await prisma.accountReport.create({ data: { reporterId: target.id, reportedUserId: other.id, severity: "mild" } });
+    const madeReport = await prisma.accountReport.create({
+      data: { reporterId: target.id, reportedUserId: other.id, severity: "mild" },
+    });
     const sanction = await prisma.accountSanction.create({
       data: {
         userId: target.id,
@@ -118,5 +123,10 @@ describe("migración 20261110000000_cascade_user_deletion", () => {
     expect((await prisma.notification.findUniqueOrThrow({ where: { id: otherNotification.id } })).reportId).toBeNull();
     expect((await prisma.accountSanctionEvent.findUniqueOrThrow({ where: { id: keptEvent.id } })).actorId).toBeNull();
     expect((await prisma.roleChangeAudit.findUniqueOrThrow({ where: { id: keptAudit.id } })).actorId).toBeNull();
+    // la denuncia que hizo queda para moderación, sin autor (#366)
+    expect(await prisma.accountReport.findUniqueOrThrow({ where: { id: madeReport.id } })).toMatchObject({
+      reporterId: null,
+      reportedUserId: other.id,
+    });
   });
 });

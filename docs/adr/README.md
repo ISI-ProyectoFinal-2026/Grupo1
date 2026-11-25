@@ -41,10 +41,15 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0023](0023-aviso-calidad-imagen.md) | Aviso no bloqueante por foto borrosa o movida | Aceptada | Agustín Díaz | — | — |
 | [ADR-0024](0024-modelo-monetizacion.md) | Modelo de monetización con un plan pago y publicidad segmentada por cercanía | Aceptada | Agustín Díaz | — | — |
 | [ADR-0025](0025-geocodificacion-inversa-proxy-backend.md) | Geocodificación inversa mediante un proxy en el backend con caché | Aceptada | Franco Marín | — | — |
-| [ADR-0026](0026-backup-servicio-node-docker.md) | Backup de la base y de las imágenes con un servicio Node en Docker | Aceptada | dbeagus | — | — |
+| [ADR-0026](0026-backup-servicio-node-docker.md) | Backup de la base y de las imágenes con un servicio Node en Docker | Aceptada | Agustín Díaz | — | — |
 | [ADR-0027](0027-jwt-en-localstorage-sin-cookie-httponly.md) | Mantener el JWT en localStorage y no migrarlo a una cookie httpOnly en esta entrega | Aceptada | Equipo (Matías Alvarado, PM) | — | — |
 | [ADR-0028](0028-cierre-por-inactividad.md) | Cierre por inactividad con columna de actividad propia y tarea periódica en el backend | Aceptada | Franco Marín | — | — |
-| [ADR-0029](0029-herramientas-pruebas-de-performance.md) | Herramientas de las pruebas de performance con k6, Lighthouse CI y un muestreador propio | Aceptada | Franco Marín | — | — |
+| [ADR-0029](0029-backend-unico-acceso-base-de-datos.md) | El backend principal es el único servicio que accede a la base de datos | Aceptada | Agustín Díaz | — | — |
+| [ADR-0030](0030-baja-voluntaria-y-exportacion-de-datos.md) | Baja voluntaria de cuenta y exportación de datos | Aceptada | Equipo (Matías Alvarado, PM) | — | — |
+| [ADR-0031](0031-demo-local-docker-compose.md) | Demo local con Docker Compose y una imagen por servicio | Aceptada | Matías Alvarado | — | — |
+| [ADR-0032](0032-busqueda-exacta-matching.md) | Búsqueda exacta de candidatos en el matching por similitud | Aceptada | Gabriel Valdivieso | — | — |
+| [ADR-0034](0034-cola-redis-pipeline-ia.md) | Cola Redis con BullMQ para el pipeline IA de los reportes | Aceptada | Gabriel Valdivieso | — | — |
+| [ADR-0035](0035-herramientas-pruebas-de-performance.md) | Herramientas de las pruebas de performance con k6, Lighthouse CI y un muestreador propio | Aceptada | Franco Marín | — | — |
 
 ## Pendientes
 

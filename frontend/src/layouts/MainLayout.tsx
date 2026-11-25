@@ -5,6 +5,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import LocationConsentModal from "@/components/account/LocationConsentModal";
 import UnverifiedEmailBanner from "@/components/auth/UnverifiedEmailBanner";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import RoleHelp from "@/components/help/RoleHelp";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useIsModerator } from "@/hooks/useIsModerator";
@@ -149,6 +150,7 @@ function MainLayout() {
     pathname === "/moderation" ||
     pathname === "/admin/users" ||
     pathname === "/admin/sanctions" ||
+    pathname === "/account/profile" ||
     pathname === "/account/security" ||
     pathname === "/account/notifications";
 
@@ -343,6 +345,15 @@ function MainLayout() {
 
             <div className="mt-2 flex flex-col border-t border-line pt-3">
               <Link
+                to="/account/profile"
+                onClick={closeMore}
+                aria-current={pathname === "/account/profile" ? "page" : undefined}
+                className={moreLinkClasses(pathname === "/account/profile")}
+              >
+                <UserIcon className="h-5 w-5" />
+                Mi cuenta
+              </Link>
+              <Link
                 to="/account/notifications"
                 onClick={closeMore}
                 aria-current={pathname === "/account/notifications" ? "page" : undefined}
@@ -380,6 +391,9 @@ function MainLayout() {
         <UnverifiedEmailBanner />
         <Outlet />
       </main>
+      <RoleHelp
+        raised={pathname === "/chats" || pathname.startsWith("/chats/")}
+      />
       <LocationConsentModal />
     </div>
   );

@@ -98,6 +98,18 @@ export interface RecoveryCodesResponse extends AuthResponse {
   recoveryCodes: string[];
 }
 
+// PATCH /auth/me: null o "" borran el dato
+export interface UpdateProfileInput {
+  fullName?: string | null;
+  phone?: string | null;
+}
+
+// DELETE /auth/me: el código solo si la cuenta tiene 2FA
+export interface AccountDeleteInput {
+  password: string;
+  code?: string;
+}
+
 export const ACCOUNT_SUSPENDED = "ACCOUNT_SUSPENDED";
 
 export type SuspensionType = "temporary" | "provisional";
@@ -131,6 +143,12 @@ export interface ResetPasswordInput {
 export const EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED";
 export const TWO_FACTOR_LOCKED = "TWO_FACTOR_LOCKED";
 export const TWO_FACTOR_CHALLENGE_INVALID = "TWO_FACTOR_CHALLENGE_INVALID";
+export const INVALID_PASSWORD = "INVALID_PASSWORD";
+export const TWO_FACTOR_CODE_REQUIRED = "TWO_FACTOR_CODE_REQUIRED";
+export const INVALID_TWO_FACTOR_CODE = "INVALID_TWO_FACTOR_CODE";
+export const ACCOUNT_SANCTION_OPEN = "ACCOUNT_SANCTION_OPEN";
+export const LAST_ADMIN = "LAST_ADMIN";
+export const ACTIVE_PREMIUM_BUSINESS = "ACTIVE_PREMIUM_BUSINESS";
 
 export interface ApiErrorResponse {
   error: {

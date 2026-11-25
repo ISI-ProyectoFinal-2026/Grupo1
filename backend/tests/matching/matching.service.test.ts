@@ -6,13 +6,22 @@ import {
   rejectMatch,
 } from "../../src/services/matching.service";
 import * as notificationsService from "../../src/services/notifications.service";
+import * as reportMatchingService from "../../src/services/report-matching.service";
 import { prisma } from "../../src/db/client";
+
+// respuestas de POST /images/embedding del Backend IA
+const VECTOR = Array.from({ length: 768 }, (_, i) => i / 768);
+const petResponse = () => ({ status: 200, json: async () => ({ has_animal: true, embedding: VECTOR }) });
+const noPetResponse = () => ({ status: 200, json: async () => ({ has_animal: false, embedding: null }) });
 
 describe("matching.service", () => {
   const originalEnv = { ...process.env };
+  const IMAGE_URL = "https://pub-test.r2.dev/pets/foto.jpg";
   let fetchMock: jest.Mock;
   let updateManySpy: jest.SpyInstance;
   let notifySpy: jest.SpyInstance;
+  let saveEmbeddingSpy: jest.SpyInstance;
+  let findMatchesSpy: jest.SpyInstance;
 
   beforeEach(() => {
     // las imágenes tienen que venir del bucket R2 (#229)
@@ -23,6 +32,8 @@ describe("matching.service", () => {
     // Mockeados: el id 42 puede existir en la base de desarrollo compartida.
     updateManySpy = jest.spyOn(prisma.report, "updateMany").mockResolvedValue({ count: 1 });
     notifySpy = jest.spyOn(notificationsService, "createForStatusChange").mockResolvedValue(null);
+    saveEmbeddingSpy = jest.spyOn(reportMatchingService, "saveReportEmbedding").mockResolvedValue(true);
+    findMatchesSpy = jest.spyOn(reportMatchingService, "findAndStoreMatches").mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -35,63 +46,110 @@ describe("matching.service", () => {
   test("no llama a fetch si AI_SERVICE_URL no está configurada", () => {
     delete process.env.AI_SERVICE_URL;
 
-    triggerEmbeddingGeneration(1, "https://pub-test.r2.dev/pets/foto.jpg");
+    triggerEmbeddingGeneration(1, IMAGE_URL);
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test("hace POST a AI_SERVICE_URL/reports/:id/embedding con el body correcto", async () => {
+  test("hace POST a AI_SERVICE_URL/images/embedding con el body correcto", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     // Valor propio del test: no depender de lo que traiga el .env local
     // (afterEach restaura el entorno original).
     process.env.INTERNAL_API_KEY = "clave-interna-test";
-    fetchMock.mockResolvedValue({ status: 201 });
+    fetchMock.mockResolvedValue(petResponse());
 
-    triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
+    await triggerEmbeddingGeneration(42, IMAGE_URL);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/reports/42/embedding", {
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/images/embedding", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Internal-Key": "clave-interna-test" },
-      body: JSON.stringify({ image_url: "https://pub-test.r2.dev/pets/foto.jpg" }),
+      body: JSON.stringify({ image_url: IMAGE_URL }),
     });
-
-    // deja que la resolución interna del fetch procese antes de que termine el test
-    await new Promise((resolve) => setImmediate(resolve));
   });
 
-  test("fetch resuelve con status 201 (mascota detectada) -> publica el reporte solo si sigue pending", async () => {
+  test("mascota detectada: guarda el embedding, busca matches y publica el reporte solo si sigue pending", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
-    fetchMock.mockResolvedValue({ status: 201 });
+    fetchMock.mockResolvedValue(petResponse());
 
-    await triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
+    await triggerEmbeddingGeneration(42, IMAGE_URL);
 
+    expect(saveEmbeddingSpy).toHaveBeenCalledWith(42, IMAGE_URL, VECTOR);
+    expect(findMatchesSpy).toHaveBeenCalledWith(42);
     // publishedAt se sella recien acá, no en la creación del reporte.
     expect(updateManySpy).toHaveBeenCalledWith({
-      where: { id: 42, status: "pending", imageUrl: "https://pub-test.r2.dev/pets/foto.jpg" },
+      where: { id: 42, status: "pending", imageUrl: IMAGE_URL },
       data: { status: "published", publishedAt: expect.any(Date) },
     });
+    expect(saveEmbeddingSpy.mock.invocationCallOrder[0]).toBeLessThan(findMatchesSpy.mock.invocationCallOrder[0]);
+    expect(findMatchesSpy.mock.invocationCallOrder[0]).toBeLessThan(updateManySpy.mock.invocationCallOrder[0]);
   });
 
-  test("fetch resuelve con status 422 (sin mascota detectada) -> rechaza el reporte solo si sigue pending", async () => {
+  test("sin mascota (has_animal false): rechaza el reporte solo si sigue pending, sin guardar embedding", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
-    fetchMock.mockResolvedValue({ status: 422 });
+    fetchMock.mockResolvedValue(noPetResponse());
 
-    await triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
+    await triggerEmbeddingGeneration(42, IMAGE_URL);
 
     expect(updateManySpy).toHaveBeenCalledWith({
-      where: { id: 42, status: "pending", imageUrl: "https://pub-test.r2.dev/pets/foto.jpg" },
+      where: { id: 42, status: "pending", imageUrl: IMAGE_URL },
       data: { status: "rejected" },
     });
+    expect(saveEmbeddingSpy).not.toHaveBeenCalled();
+    expect(findMatchesSpy).not.toHaveBeenCalled();
+  });
+
+  test("422 (imagen no disponible) no es un veredicto: no reintenta ni toca el status", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValue({ status: 422 });
+
+    await triggerEmbeddingGeneration(42, IMAGE_URL);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(updateManySpy).not.toHaveBeenCalled();
+  });
+
+  test("un 200 con cuerpo inválido es inconcluso: deja el reporte en pending", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValue({ status: 200, json: async () => ({ has_animal: true, embedding: [0.1] }) });
+
+    await triggerEmbeddingGeneration(42, IMAGE_URL);
+
+    expect(saveEmbeddingSpy).not.toHaveBeenCalled();
+    expect(updateManySpy).not.toHaveBeenCalled();
+  });
+
+  test("si falla la búsqueda de matches se loguea y el reporte se publica igual", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue(petResponse());
+    const matchingError = new Error("matching search down");
+    findMatchesSpy.mockRejectedValue(matchingError);
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(triggerEmbeddingGeneration(42, IMAGE_URL)).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("fallo al buscar matches"), matchingError);
+    expect(updateManySpy.mock.calls[0][0].data.status).toBe("published");
+  });
+
+  test("si el reporte ya no muestra la imagen analizada no busca matches", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    fetchMock.mockResolvedValue(petResponse());
+    saveEmbeddingSpy.mockResolvedValue(false);
+
+    await triggerEmbeddingGeneration(42, IMAGE_URL);
+
+    expect(findMatchesSpy).not.toHaveBeenCalled();
   });
 
   // If the owner swaps the photo while a verdict is in flight, the verdict for
   // the old photo must not decide the new one (PR #195 review).
   test("a verdict for a photo the report no longer shows changes nothing", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
-    fetchMock.mockResolvedValue({ status: 201 });
+    fetchMock.mockResolvedValue(noPetResponse());
     updateManySpy.mockResolvedValue({ count: 0 });
-    const notifySpy = jest.spyOn(notificationsService, "createForStatusChange");
 
     await triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto-vieja.jpg");
 
@@ -103,12 +161,12 @@ describe("matching.service", () => {
 
   test("si falla el aviso al dueño se loguea y el pipeline termina igual", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
-    fetchMock.mockResolvedValue({ status: 201 });
+    fetchMock.mockResolvedValue(petResponse());
     const notifyError = new Error("db caída");
     notifySpy.mockRejectedValue(notifyError);
     const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
-    await expect(triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg")).resolves.toBeUndefined();
+    await expect(triggerEmbeddingGeneration(42, IMAGE_URL)).resolves.toBeUndefined();
 
     expect(updateManySpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("no se pudo avisar"), notifyError);
@@ -116,12 +174,12 @@ describe("matching.service", () => {
     expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining("queda en pending"), expect.anything());
   });
 
-  test("un 5xx es transitorio: reintenta y publica si un intento posterior responde 201", async () => {
+  test("un 5xx es transitorio: reintenta y publica si un intento posterior detecta la mascota", async () => {
     jest.useFakeTimers();
     process.env.AI_SERVICE_URL = "http://localhost:8000";
-    fetchMock.mockResolvedValueOnce({ status: 503 }).mockResolvedValueOnce({ status: 201 });
+    fetchMock.mockResolvedValueOnce({ status: 503 }).mockResolvedValueOnce(petResponse());
 
-    triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
+    triggerEmbeddingGeneration(42, IMAGE_URL);
     await jest.runAllTimersAsync();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -130,11 +188,12 @@ describe("matching.service", () => {
     jest.useRealTimers();
   });
 
-  test("un 4xx distinto de 422 no es un veredicto de moderación: no reintenta ni toca el status", async () => {
+  test("otro 4xx no es un veredicto de moderación: no reintenta ni toca el status", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
+    jest.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockResolvedValue({ status: 400 });
 
-    expect(() => triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg")).not.toThrow();
+    expect(() => triggerEmbeddingGeneration(42, IMAGE_URL)).not.toThrow();
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -143,43 +202,65 @@ describe("matching.service", () => {
 
   test("un 401 del Backend IA (auth interna mal configurada) deja el reporte en pending", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockResolvedValue({ status: 401 });
 
-    triggerEmbeddingGeneration(42, "https://pub-test.r2.dev/pets/foto.jpg");
-    await new Promise((resolve) => setImmediate(resolve));
+    await triggerEmbeddingGeneration(42, IMAGE_URL);
 
     // Un 401 es un problema de configuracion (INTERNAL_API_KEY que no coincide
     // entre los dos servicios), no un veredicto de moderacion: no se publica ni
     // se rechaza el reporte, y no se reintenta porque reintentar no lo arregla.
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(updateManySpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("INTERNAL_API_KEY"));
   });
 
-  test("agotar los reintentos por falla de red deja el reporte en pending, no lo rechaza", async () => {
+  // #266: los tres delays se esperan de verdad (intento inicial + 3 reintentos)
+  test("ante fallas de red reintenta tras 1 s, 5 s y 30 s y deja el reporte en pending", async () => {
     jest.useFakeTimers();
     process.env.AI_SERVICE_URL = "http://localhost:8000";
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockRejectedValue(new Error("network down"));
 
-    expect(() => triggerEmbeddingGeneration(1, "https://pub-test.r2.dev/pets/foto.jpg")).not.toThrow();
+    const done = triggerEmbeddingGeneration(1, IMAGE_URL);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    // avanza todos los timers de retry (1s + 5s) y espera que las promesas se resuelvan
+    await jest.advanceTimersByTimeAsync(999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await jest.advanceTimersByTimeAsync(4_999);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await jest.advanceTimersByTimeAsync(29_999);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
     await jest.runAllTimersAsync();
-
+    await done;
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     // Una caída del Backend IA no es un veredicto de moderación: rechazar acá
     // descartaría reportes legítimos de forma permanente y silenciosa.
     expect(updateManySpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("tras 4 intentos"), expect.any(Error));
     jest.useRealTimers();
   });
 
   test("agotar los reintentos por 5xx deja el reporte en pending", async () => {
     jest.useFakeTimers();
     process.env.AI_SERVICE_URL = "http://localhost:8000";
+    jest.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockResolvedValue({ status: 502 });
 
-    triggerEmbeddingGeneration(1, "https://pub-test.r2.dev/pets/foto.jpg");
+    triggerEmbeddingGeneration(1, IMAGE_URL);
     await jest.runAllTimersAsync();
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(updateManySpy).not.toHaveBeenCalled();
     jest.useRealTimers();
   });
@@ -236,8 +317,12 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
     await prisma.$disconnect();
   });
 
-  test("201: publica el reporte, sella publishedAt y avisa una vez al dueño", async () => {
-    fetchMock.mockResolvedValue({ status: 201 });
+  const storedEmbeddings = (reportId: number) => prisma.$queryRaw<{ report_id: number }[]>`
+    SELECT report_id FROM report_embeddings WHERE report_id = ${reportId}
+  `;
+
+  test("con mascota: guarda el embedding, publica el reporte, sella publishedAt y avisa una vez al dueño", async () => {
+    fetchMock.mockResolvedValue(petResponse());
     const report = await createReport();
 
     await triggerEmbeddingGeneration(report.id, report.imageUrl);
@@ -248,10 +333,24 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
     const notifications = await ownerStatusNotifications();
     expect(notifications).toHaveLength(1);
     expect(notifications[0]).toMatchObject({ reportId: report.id, title: "Tu reporte fue publicado" });
+    await expect(storedEmbeddings(report.id)).resolves.toHaveLength(1);
   });
 
-  test("422: rechaza el reporte y avisa una vez al dueño", async () => {
-    fetchMock.mockResolvedValue({ status: 422 });
+  test("si falla la búsqueda de matches el embedding queda guardado y el reporte se publica", async () => {
+    fetchMock.mockResolvedValue(petResponse());
+    jest.spyOn(reportMatchingService, "findAndStoreMatches").mockRejectedValue(new Error("matching search down"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const report = await createReport();
+
+    await triggerEmbeddingGeneration(report.id, report.imageUrl);
+
+    const stored = await prisma.report.findUniqueOrThrow({ where: { id: report.id } });
+    expect(stored.status).toBe("published");
+    await expect(storedEmbeddings(report.id)).resolves.toHaveLength(1);
+  });
+
+  test("sin mascota: rechaza el reporte, no guarda embedding y avisa una vez al dueño", async () => {
+    fetchMock.mockResolvedValue(noPetResponse());
     const report = await createReport();
 
     await triggerEmbeddingGeneration(report.id, report.imageUrl);
@@ -262,10 +361,23 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
     const notifications = await ownerStatusNotifications();
     expect(notifications).toHaveLength(1);
     expect(notifications[0]).toMatchObject({ reportId: report.id, title: "Tu reporte no fue publicado" });
+    await expect(storedEmbeddings(report.id)).resolves.toHaveLength(0);
+  });
+
+  test("422 (imagen no disponible): el reporte queda pending y no se avisa", async () => {
+    fetchMock.mockResolvedValue({ status: 422 });
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const report = await createReport();
+
+    await triggerEmbeddingGeneration(report.id, report.imageUrl);
+
+    const stored = await prisma.report.findUniqueOrThrow({ where: { id: report.id } });
+    expect(stored.status).toBe("pending");
+    await expect(ownerStatusNotifications()).resolves.toHaveLength(0);
   });
 
   test("procesar el mismo reporte dos veces (reintento o reconciliación) avisa una sola vez", async () => {
-    fetchMock.mockResolvedValue({ status: 201 });
+    fetchMock.mockResolvedValue(petResponse());
     const report = await createReport();
 
     await triggerEmbeddingGeneration(report.id, report.imageUrl);
@@ -275,7 +387,7 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
   });
 
   test("dos procesamientos concurrentes del mismo reporte avisan una sola vez", async () => {
-    fetchMock.mockResolvedValue({ status: 201 });
+    fetchMock.mockResolvedValue(petResponse());
     const report = await createReport();
 
     await Promise.all([
@@ -287,7 +399,7 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
   });
 
   test("un veredicto tardío no pisa un reporte que ya salió de pending ni avisa", async () => {
-    fetchMock.mockResolvedValue({ status: 201 });
+    fetchMock.mockResolvedValue(petResponse());
     const report = await createReport("resolved");
 
     await triggerEmbeddingGeneration(report.id, report.imageUrl);
@@ -299,6 +411,7 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
 
   test("401: el reporte queda pending y no se avisa", async () => {
     fetchMock.mockResolvedValue({ status: 401 });
+    jest.spyOn(console, "error").mockImplementation(() => {});
     const report = await createReport();
 
     await triggerEmbeddingGeneration(report.id, report.imageUrl);
@@ -310,6 +423,7 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
 
   test("5xx en todos los intentos: el reporte queda pending y no se avisa", async () => {
     fetchMock.mockResolvedValue({ status: 503 });
+    jest.spyOn(console, "error").mockImplementation(() => {});
     const report = await createReport();
 
     // Timers falsos solo para saltear los delays de reintento; Prisma no corre en ese tramo.
@@ -319,7 +433,7 @@ describe("triggerEmbeddingGeneration: veredicto de moderación y aviso al dueño
     await done;
     jest.useRealTimers();
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     const stored = await prisma.report.findUniqueOrThrow({ where: { id: report.id } });
     expect(stored.status).toBe("pending");
     await expect(ownerStatusNotifications()).resolves.toHaveLength(0);
@@ -524,8 +638,11 @@ describe("matching.service reconcilePendingReports", () => {
   const HORA = 60 * MINUTO;
   const DIA = 24 * HORA;
 
-  const embeddingUrl = (id: number) => `http://localhost:8000/reports/${id}/embedding`;
-  const calledUrls = () => fetchMock.mock.calls.map((call) => call[0] as string);
+  // URLs únicas por corrida: todos los reportes van al mismo endpoint y se distinguen por la imagen
+  const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+  const image = (name: string) => `https://pub-test.r2.dev/pets/${name}-${stamp}.jpg`;
+  const calledImages = () =>
+    fetchMock.mock.calls.map((call) => JSON.parse((call[1] as RequestInit).body as string).image_url as string);
 
   beforeAll(async () => {
     const user = await prisma.user.create({
@@ -545,7 +662,7 @@ describe("matching.service reconcilePendingReports", () => {
         data: {
           ...base,
           title: "Atascado",
-          imageUrl: "https://pub-test.r2.dev/pets/atascado.jpg",
+          imageUrl: image("atascado"),
           createdAt: new Date(Date.now() - 23 * HORA),
           // Prisma completa @updatedAt con now() si no se lo pasa explícito.
           updatedAt: new Date(Date.now() - 23 * HORA),
@@ -557,7 +674,7 @@ describe("matching.service reconcilePendingReports", () => {
     // reencolarlo ahora duplicaría la inferencia.
     recienCreadoId = (
       await prisma.report.create({
-        data: { ...base, title: "Recién creado", imageUrl: "https://pub-test.r2.dev/pets/nuevo.jpg" },
+        data: { ...base, title: "Recién creado", imageUrl: image("nuevo") },
       })
     ).id;
 
@@ -567,7 +684,7 @@ describe("matching.service reconcilePendingReports", () => {
         data: {
           ...base,
           title: "Demasiado viejo",
-          imageUrl: "https://pub-test.r2.dev/pets/viejo.jpg",
+          imageUrl: image("viejo"),
           createdAt: new Date(Date.now() - 3 * DIA),
           updatedAt: new Date(Date.now() - 3 * DIA),
         },
@@ -596,7 +713,7 @@ describe("matching.service reconcilePendingReports", () => {
         data: {
           ...base,
           title: "Editado recién",
-          imageUrl: "https://pub-test.r2.dev/pets/editado.jpg",
+          imageUrl: image("editado"),
           createdAt: new Date(Date.now() - 3 * DIA),
           updatedAt: new Date(Date.now() - 22 * HORA),
         },
@@ -626,12 +743,13 @@ describe("matching.service reconcilePendingReports", () => {
   });
 
   beforeEach(() => {
-    fetchMock = jest.fn().mockResolvedValue({ status: 201 });
+    // veredicto "sin mascota": no guarda embeddings y el updateMany mockeado no cambia nada
+    fetchMock = jest.fn().mockResolvedValue(noPetResponse());
     // test double: no necesita implementar el tipo completo de fetch
     global.fetch = fetchMock;
     // OBLIGATORIO: reconcilePendingReports() barre toda la tabla `reports`, no
-    // solo las filas que siembra este test. Sin este mock, un fetch que
-    // responde 201 publicaría de verdad cualquier reporte pending que la base
+    // solo las filas que siembra este test. Sin este mock, un fetch con
+    // veredicto publicaría de verdad cualquier reporte pending que la base
     // de desarrollo compartida tenga acumulado (y avisaría a sus dueños). Con
     // count 0 no cambia ningún estado ni se crea ninguna notificación. No
     // des-mockear dentro de un test.
@@ -661,20 +779,31 @@ describe("matching.service reconcilePendingReports", () => {
     // atascados, así que se afirma sobre los reportes sembrados acá y no
     // sobre el total reencolado.
     expect(reencolados).toBeGreaterThanOrEqual(1);
-    expect(calledUrls()).toContain(embeddingUrl(stuckId));
-    expect(calledUrls()).toContain(embeddingUrl(editadoRecienId));
+    expect(calledImages()).toContain(image("atascado"));
+    expect(calledImages()).toContain(image("editado"));
     expect(fetchMock).toHaveBeenCalledWith(
-      embeddingUrl(stuckId),
+      "http://localhost:8000/images/embedding",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ image_url: "https://pub-test.r2.dev/pets/atascado.jpg" }),
+        body: JSON.stringify({ image_url: image("atascado") }),
       })
     );
 
     // Dentro del grace period, fuera de la ventana, o sin imagen: no se tocan.
-    expect(calledUrls()).not.toContain(embeddingUrl(recienCreadoId));
-    expect(calledUrls()).not.toContain(embeddingUrl(demasiadoViejoId));
-    expect(calledUrls()).not.toContain(embeddingUrl(sinImagenId));
+    expect(calledImages()).not.toContain(image("nuevo"));
+    expect(calledImages()).not.toContain(image("viejo"));
+    expect(calledImages().every(Boolean)).toBe(true);
+  });
+
+  test("reencola por el dispatcher recibido (la cola Redis, #177) en vez de llamar al Backend IA", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    const dispatch = jest.fn().mockResolvedValue(undefined);
+
+    await reconcilePendingReports(dispatch);
+
+    expect(dispatch).toHaveBeenCalledWith(stuckId, image("atascado"));
+    expect(dispatch).not.toHaveBeenCalledWith(recienCreadoId, expect.anything());
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   test("no reencola un reporte guardado con una URL fuera del bucket", async () => {
@@ -684,7 +813,7 @@ describe("matching.service reconcilePendingReports", () => {
     await reconcilePendingReports();
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(calledUrls()).not.toContain(embeddingUrl(externoId));
+    expect(calledImages()).not.toContain("https://evil.com/externo.jpg");
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(`report ${externoId}`));
   });
 
@@ -700,7 +829,7 @@ describe("matching.service reconcilePendingReports", () => {
       await reconcilePendingReports();
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(calledUrls()).not.toContain(embeddingUrl(stuckId));
+      expect(calledImages()).not.toContain(image("atascado"));
     } finally {
       await prisma.$executeRaw`UPDATE reports SET status = 'pending'::report_status WHERE id = ${stuckId}`;
     }
@@ -717,7 +846,7 @@ describe("triggerEmbeddingGeneration con URLs guardadas fuera del bucket R2", ()
   beforeEach(() => {
     process.env.R2_PUBLIC_URL = "https://pub-test.r2.dev";
     process.env.AI_SERVICE_URL = "http://localhost:8000";
-    fetchMock = jest.fn().mockResolvedValue({ status: 201 });
+    fetchMock = jest.fn().mockResolvedValue(noPetResponse());
     // test double: no necesita implementar el tipo completo de fetch
     global.fetch = fetchMock;
     updateManySpy = jest.spyOn(prisma.report, "updateMany").mockResolvedValue({ count: 1 });
@@ -747,7 +876,7 @@ describe("triggerEmbeddingGeneration con URLs guardadas fuera del bucket R2", ()
     await triggerEmbeddingGeneration(42, "HTTPS://PUB-TEST.r2.dev/pets/foto.jpg");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/reports/42/embedding",
+      "http://localhost:8000/images/embedding",
       expect.objectContaining({ body: JSON.stringify({ image_url: "https://pub-test.r2.dev/pets/foto.jpg" }) })
     );
     expect(updateManySpy).toHaveBeenCalledWith(

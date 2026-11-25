@@ -136,12 +136,12 @@ describe("chats.service", () => {
 
     beforeAll(async () => {
       const report = await prisma.report.create({
-        data: { userId: userAId, reportType: "lost", title: "Perro perdido" },
+        data: { userId: userAId, reportType: "lost", status: "published", title: "Perro perdido" },
       });
       reportId = report.id;
 
       const otherReport = await prisma.report.create({
-        data: { userId: userAId, reportType: "found", title: "Gato encontrado" },
+        data: { userId: userAId, reportType: "found", status: "published", title: "Gato encontrado" },
       });
       otherReportId = otherReport.id;
     });

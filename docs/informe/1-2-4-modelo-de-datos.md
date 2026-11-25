@@ -80,13 +80,13 @@ Fuente: `backend/prisma/schema.prisma`, líneas 26-671.
 ## Tipos geoespaciales y vectoriales
 
 - **Ubicación.** `reports.location` es `geometry(Point, 4326)`. Prisma no lo soporta de forma nativa, por lo que se declara `Unsupported` (`schema.prisma:168`); `notification_preferences.location` usa el mismo tipo (`schema.prisma:452`) y se consulta con SQL crudo ([ADR-0004](../adr/0004-prisma-5-orm.md)).
-- **Embedding.** `report_embeddings.embedding` es `vector(768)`, también `Unsupported` (`schema.prisma:223`). La migración inicial lo creó con 1536 dimensiones y `20260813000000_fix_report_embedding_dimension` lo cambió a 512 antes de que existieran filas ([ADR-0013](../adr/0013-dimension-embedding-512.md)). `20261014000000_dinov2_embedding_dimension` lo cambió a 768 y vació la tabla, porque los embeddings de OpenCLIP no son comparables con los de DINOv2 ([ADR-0021](../adr/0021-modelo-embeddings-dinov2.md)); se regeneran con `backend-ia/scripts/reembed_reports.py`.
+- **Embedding.** `report_embeddings.embedding` es `vector(768)`, también `Unsupported` (`schema.prisma:223`). La migración inicial lo creó con 1536 dimensiones y `20260813000000_fix_report_embedding_dimension` lo cambió a 512 antes de que existieran filas ([ADR-0013](../adr/0013-dimension-embedding-512.md)). `20261014000000_dinov2_embedding_dimension` lo cambió a 768 y vació la tabla, porque los embeddings de OpenCLIP no son comparables con los de DINOv2 ([ADR-0021](../adr/0021-modelo-embeddings-dinov2.md)); se regeneran con `npm run reembed:reports` (`backend/src/db/reembed-reports.ts`).
 - **Índices.** El índice GiST sobre `reports.location` y el índice HNSW (`vector_cosine_ops`) sobre `report_embeddings.embedding` existen solo en las migraciones SQL (`20260809000000_init`, líneas 132 y 138; el HNSW se recrea en `20260813000000_fix_report_embedding_dimension`, línea 7, y en `20261014000000_dinov2_embedding_dimension`, línea 11). `schema.prisma` no los declara.
 - **Extensiones.** `postgis` y `vector` se crean en `20260809000000_init` (líneas 2 y 5) y figuran en `schema.prisma:15`.
 
 ## Subconjunto usado por el backend de IA
 
-El servicio de IA mapea con SQLAlchemy dos tablas del esquema ([`backend-ia/app/models.py`](../../backend-ia/app/models.py), líneas 18-38): `reports` (cinco columnas: `id`, `report_type`, `status`, `image_url`, `created_at`) y `report_embeddings` (`id`, `report_id`, `embedding` de 768 dimensiones, `created_at`). No genera migraciones. La sincronización entre ambos mapeos no se verifica de forma automática (issue [#213](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/213)).
+El servicio de IA no accede a la base ([ADR-0029](../adr/0029-backend-unico-acceso-base-de-datos.md)): devuelve el embedding y la API lo escribe en `report_embeddings` con SQL crudo, porque Prisma no modela `vector` (`backend/src/services/report-matching.service.ts:14-23`). Con un solo servicio con acceso a la base no hay un segundo mapeo del esquema que sincronizar (issue [#213](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/213)).
 
 ## Evolución del esquema
 

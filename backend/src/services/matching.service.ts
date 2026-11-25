@@ -3,36 +3,32 @@ import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { visibleAuthorSql } from "./account-sanctions/visibility";
 import * as notificationsService from "./notifications.service";
+import * as reportMatchingService from "./report-matching.service";
 import { normalizeR2PublicUrl } from "./storage.service";
 import { touchActivity } from "./report-inactivity.service";
 
 /**
- * Dispara la generación de embedding en el Backend IA para un reporte
- * recién creado. Fire-and-forget: no se espera la inferencia de ML, la
- * creación del reporte nunca queda bloqueada ni falla por esto.
+ * Moderación y matching de un reporte con imagen (ADR-0029): el Backend IA
+ * solo infiere (`POST /images/embedding`) y este backend persiste el embedding,
+ * busca los matches y resuelve el reporte. Asíncrono: la creación del
+ * reporte nunca queda bloqueada ni falla por esto. Con REDIS_URL el pipeline
+ * corre en el worker de la cola (report-pipeline.service.ts, #177).
  *
- * Nota: el body usa `image_url` (snake_case) porque así lo espera el
- * endpoint `POST /reports/{report_id}/embedding` del Backend IA
- * (Pydantic model `EmbeddingRequest.image_url`, ver backend-ia/app/main.py).
+ * Moderación de contenido (POC, issue #19): solo un 200 bien formado es un
+ * veredicto. Con mascota -> published (tras guardar el embedding y buscar
+ * matches); sin mascota (`has_animal: false`) -> rejected.
  *
- * Moderación de contenido (POC, issue #19): el Backend IA responde 201
- * cuando detectó una mascota y generó el embedding, y 422 cuando no
- * detectó ninguna mascota en la imagen (contenido irrelevante). Solo
- * esos dos códigos son un veredicto de moderación y resuelven el reporte
- * fuera de "pending": 201 -> published, 422 -> rejected.
- *
- * Cualquier otro resultado (otro status HTTP, o el fetch rechazando por
- * falla de red) es INCONCLUSO: se loguea y el reporte queda "pending"
- * para revisión manual, sin lanzar ni generar un unhandled rejection.
- * Rechazar ante una caída del Backend IA descartaría reportes legítimos
- * de forma permanente y silenciosa (issue #125).
+ * Cualquier otro resultado (422 por imagen no disponible, otro status, cuerpo
+ * inválido o falla de red) es INCONCLUSO: se loguea y el reporte queda
+ * "pending" para revisión manual, sin lanzar ni generar un unhandled rejection.
+ * Rechazar ante una caída del Backend IA descartaría reportes legítimos de
+ * forma permanente y silenciosa (issue #125).
  *
  * La actualización se hace acá con Prisma directo (no llamando de vuelta
  * a reports.service.ts) porque reports.service.ts ya importa este módulo;
- * llamar en sentido inverso crearía una dependencia circular. Este archivo
- * ya lee `reports` directamente vía SQL crudo en listMatches, así que una
- * escritura directa con Prisma acá es consistente con el layering existente.
+ * llamar en sentido inverso crearía una dependencia circular.
  */
+// delays entre intentos: intento inicial + un reintento por delay (#266)
 const RETRY_DELAYS_MS = [1_000, 5_000, 30_000];
 
 /**
@@ -49,7 +45,7 @@ async function fetchWithRetry(url: string, options: RequestInit): Promise<Respon
   let lastError: unknown;
   let lastResponse: Response | undefined;
 
-  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     try {
       const response = await fetch(url, options);
       if (response.status < 500) {
@@ -59,7 +55,7 @@ async function fetchWithRetry(url: string, options: RequestInit): Promise<Respon
     } catch (err) {
       lastError = err;
     }
-    if (attempt < RETRY_DELAYS_MS.length - 1) {
+    if (attempt < RETRY_DELAYS_MS.length) {
       await new Promise((res) => setTimeout(res, RETRY_DELAYS_MS[attempt]));
     }
   }
@@ -99,53 +95,113 @@ async function applyModerationVerdict(
   }
 }
 
-// Devuelve la promesa (nunca rechaza) para poder esperarla; los callers la ignoran.
-export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): Promise<void> {
-  const baseUrl = process.env.AI_SERVICE_URL;
-  if (!baseUrl) return Promise.resolve();
+// Guarda el embedding y busca matches antes de publicar; el matching es best-effort.
+async function publishWithEmbedding(reportId: number, imageUrl: string, embedding: number[]): Promise<void> {
+  if (await reportMatchingService.saveReportEmbedding(reportId, imageUrl, embedding)) {
+    try {
+      await reportMatchingService.findAndStoreMatches(reportId);
+    } catch (error) {
+      console.error(`[matching] fallo al buscar matches para report ${reportId}:`, error);
+    }
+  }
+  await applyModerationVerdict(reportId, imageUrl, "published");
+}
 
+// Resuelve el veredicto de un 200 o loguea por qué el reporte queda en pending.
+async function handleEmbeddingResponse(reportId: number, imageUrl: string, response: Response): Promise<void> {
+  if (response.status === 200) {
+    const result = parseImageEmbedding(await response.json());
+    if (!result) {
+      console.error(
+        `[matching] respuesta inválida del Backend IA para report ${reportId}; queda en pending para revisión manual`
+      );
+    } else if (result.hasAnimal) {
+      await publishWithEmbedding(reportId, imageUrl, result.embedding);
+    } else {
+      await applyModerationVerdict(reportId, imageUrl, "rejected");
+    }
+  } else if (response.status === 401) {
+    // Se distingue del resto de los status inconclusos porque no es una
+    // falla transitoria: reintentar no lo arregla nunca, hay que tocar
+    // configuración. Sin este mensaje, el único síntoma visible es que
+    // todos los reportes con imagen se quedan en pending sin explicación.
+    console.error(
+      `[matching] el Backend IA rechazó la autenticación interna (401) para report ${reportId}: ` +
+        `INTERNAL_API_KEY no coincide entre backend/.env y backend-ia/.env, o falta en alguno de los dos. ` +
+        `El reporte queda en pending hasta que se corrija la configuración (ver backend-ia/README.md)`
+    );
+  } else {
+    // 422: el Backend IA no pudo descargar o decodificar la imagen
+    console.error(
+      `[matching] respuesta inconclusa del Backend IA para report ${reportId} (status ${response.status}); queda en pending para revisión manual`
+    );
+  }
+}
+
+// URL del bucket R2 a mandar al Backend IA; null si no corresponde llamarlo
+function embeddingImageUrl(reportId: number, imageUrl: string): string | null {
   // filas previas a #229 pueden tener una URL externa: no se le manda a la IA
   const r2ImageUrl = normalizeR2PublicUrl(imageUrl);
   if (!r2ImageUrl) {
     console.warn(`[matching] report ${reportId} tiene una imagen fuera del bucket R2; no se envía al Backend IA y queda sin cambios`);
-    return Promise.resolve();
   }
+  return r2ImageUrl;
+}
 
-  return fetchWithRetry(`${baseUrl}/reports/${reportId}/embedding`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Internal-Key": process.env.INTERNAL_API_KEY ?? "",
-    },
-    body: JSON.stringify({ image_url: r2ImageUrl }),
-  })
-    .then(async (response) => {
-      if (response.status === 201) {
-        await applyModerationVerdict(reportId, imageUrl, "published");
-      } else if (response.status === 422) {
-        await applyModerationVerdict(reportId, imageUrl, "rejected");
-      } else if (response.status === 401) {
-        // Se distingue del resto de los status inconclusos porque no es una
-        // falla transitoria: reintentar no lo arregla nunca, hay que tocar
-        // configuración. Sin este mensaje, el único síntoma visible es que
-        // todos los reportes con imagen se quedan en pending sin explicación.
-        console.error(
-          `[matching] el Backend IA rechazó la autenticación interna (401) para report ${reportId}: ` +
-            `INTERNAL_API_KEY no coincide entre backend/.env y backend-ia/.env, o falta en alguno de los dos. ` +
-            `El reporte queda en pending hasta que se corrija la configuración (ver backend-ia/README.md)`
-        );
-      } else {
-        console.error(
-          `[matching] respuesta inconclusa del Backend IA para report ${reportId} (status ${response.status}); queda en pending para revisión manual`
-        );
-      }
-    })
+// Pipeline en proceso (sin REDIS_URL): reintentos en memoria y nunca rechaza.
+// Sin timeout: es trabajo de fondo, el Backend IA acota su propia descarga y el
+// veredicto es idempotente si la reconciliación lo vuelve a disparar.
+export function triggerEmbeddingGeneration(reportId: number, imageUrl: string): Promise<void> {
+  const baseUrl = process.env.AI_SERVICE_URL;
+  if (!baseUrl) return Promise.resolve();
+
+  const r2ImageUrl = embeddingImageUrl(reportId, imageUrl);
+  if (!r2ImageUrl) return Promise.resolve();
+
+  return fetchWithRetry(`${baseUrl}/images/embedding`, requestImageEmbedding(r2ImageUrl))
+    .then((response) => handleEmbeddingResponse(reportId, imageUrl, response))
     .catch((error) => {
       console.error(
-        `[matching] fallo al generar embedding para report ${reportId} tras ${RETRY_DELAYS_MS.length} intentos; queda en pending para revisión manual:`,
+        `[matching] fallo al generar embedding para report ${reportId} tras ${RETRY_DELAYS_MS.length + 1} intentos; queda en pending para revisión manual:`,
         error
       );
     });
+}
+
+// Pipeline del worker de la cola (#177): un solo intento; rechaza ante una
+// falla de red o un 5xx para que BullMQ reintente con backoff.
+export async function processReportPipeline(reportId: number, imageUrl: string): Promise<void> {
+  const baseUrl = process.env.AI_SERVICE_URL;
+  if (!baseUrl) return;
+
+  const r2ImageUrl = embeddingImageUrl(reportId, imageUrl);
+  if (!r2ImageUrl) return;
+
+  const response = await fetch(`${baseUrl}/images/embedding`, requestImageEmbedding(r2ImageUrl));
+  if (response.status >= 500) {
+    throw new Error(`Backend IA respondió ${response.status} para report ${reportId}`);
+  }
+  await handleEmbeddingResponse(reportId, imageUrl, response);
+}
+
+export type ReembedOutcome = "saved" | "no_animal" | "failed";
+
+// Regenera el embedding de un reporte existente (cambio de modelo): no toca su
+// estado ni busca matches, eso queda para una segunda pasada (reembed-reports).
+export async function regenerateReportEmbedding(reportId: number, imageUrl: string): Promise<ReembedOutcome> {
+  const baseUrl = process.env.AI_SERVICE_URL;
+  const r2ImageUrl = normalizeR2PublicUrl(imageUrl);
+  if (!baseUrl || !r2ImageUrl) return "failed";
+
+  const response = await fetchWithRetry(`${baseUrl}/images/embedding`, requestImageEmbedding(r2ImageUrl));
+  if (response.status !== 200) {
+    console.error(`[matching] re-embedding inconcluso para report ${reportId} (status ${response.status})`);
+    return "failed";
+  }
+  const result = parseImageEmbedding(await response.json());
+  if (!result) return "failed";
+  if (!result.hasAnimal) return "no_animal";
+  return (await reportMatchingService.saveReportEmbedding(reportId, imageUrl, result.embedding)) ? "saved" : "failed";
 }
 
 // "animal_low_quality": blurry or moved photo (#212), only a warning for the user.
@@ -202,39 +258,58 @@ const EMBEDDING_DIMENSIONS = 768;
 // Cubre la inferencia (≈0,68 s, ADR-0005) más la descarga desde R2.
 export const EMBED_TIMEOUT_MS = 5_000;
 
+// Body of 200 /images/embedding: no pet -> has_animal false; null if malformed.
+type ImageEmbedding = { hasAnimal: true; embedding: number[] } | { hasAnimal: false };
+
+function parseImageEmbedding(body: unknown): ImageEmbedding | null {
+  const { has_animal: hasAnimal, embedding } = (body ?? {}) as { has_animal?: unknown; embedding?: unknown };
+  if (hasAnimal === false) return { hasAnimal: false };
+  if (
+    hasAnimal !== true ||
+    !Array.isArray(embedding) ||
+    embedding.length !== EMBEDDING_DIMENSIONS ||
+    !embedding.every((value) => typeof value === "number" && Number.isFinite(value))
+  ) {
+    return null;
+  }
+  return { hasAnimal: true, embedding: embedding as number[] };
+}
+
+function requestImageEmbedding(imageUrl: string, signal?: AbortSignal): RequestInit {
+  return {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Internal-Key": process.env.INTERNAL_API_KEY ?? "",
+    },
+    body: JSON.stringify({ image_url: imageUrl }),
+    ...(signal ? { signal } : {}),
+  };
+}
+
 /**
  * Embedding of an uploaded image that has no report yet (#211). Never throws:
- * null means "rank without image similarity".
+ * null means "rank without image similarity" (also when there is no pet).
  */
 export async function embedImage(imageUrl: string): Promise<number[] | null> {
   const baseUrl = process.env.AI_SERVICE_URL;
   if (!baseUrl) return null;
 
   try {
-    const response = await fetch(`${baseUrl}/images/embedding`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Internal-Key": process.env.INTERNAL_API_KEY ?? "",
-      },
-      body: JSON.stringify({ image_url: imageUrl }),
-      signal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
-    });
+    const response = await fetch(
+      `${baseUrl}/images/embedding`,
+      requestImageEmbedding(imageUrl, AbortSignal.timeout(EMBED_TIMEOUT_MS))
+    );
     if (response.status !== 200) {
       console.error(`[matching] image embedding inconclusive (status ${response.status}) for ${imageUrl}`);
       return null;
     }
-    const body = (await response.json()) as { embedding?: unknown };
-    const { embedding } = body;
-    if (
-      !Array.isArray(embedding) ||
-      embedding.length !== EMBEDDING_DIMENSIONS ||
-      !embedding.every((value) => typeof value === "number" && Number.isFinite(value))
-    ) {
+    const result = parseImageEmbedding(await response.json());
+    if (!result) {
       console.error(`[matching] image embedding returned a malformed body for ${imageUrl}`);
       return null;
     }
-    return embedding as number[];
+    return result.hasAnimal ? result.embedding : null;
   } catch (error) {
     console.error(`[matching] image embedding failed for ${imageUrl}:`, error);
     return null;
@@ -242,10 +317,10 @@ export async function embedImage(imageUrl: string): Promise<number[] | null> {
 }
 
 /**
- * Los reintentos de `triggerEmbeddingGeneration` viven en memoria y se agotan
- * en ~36s. Si el Backend IA estuvo caído más que eso —o si el proceso de Node
- * se reinició con la llamada en vuelo— el reporte queda en "pending" y nadie
- * vuelve a mirarlo nunca: no se publica, no genera embedding y no puede
+ * Sin cola, los reintentos de `triggerEmbeddingGeneration` viven en memoria y
+ * se agotan en ~36s; con cola, los de BullMQ también se agotan. Si el Backend
+ * IA estuvo caído más que eso —o si el proceso de Node se reinició con la
+ * llamada en vuelo— el reporte queda en "pending" y nadie volvería a mirarlo: no se publica, no genera embedding y no puede
  * matchear. Esta reconciliación periódica es la red de contención para eso.
  *
  * La ventana se mide desde `updatedAt`, no desde `createdAt`: un reporte entra
@@ -267,11 +342,16 @@ const RECONCILE_INTERVAL_MS = 5 * 60 * 1000;
 // que disparar toda la cola de una encolaría requests que expiran esperando.
 const RECONCILE_BATCH_SIZE = 10;
 
+// encola en Redis o, sin cola, dispara el pipeline en proceso
+export type ReportPipelineDispatch = (reportId: number, imageUrl: string) => Promise<void>;
+
 /**
  * Vuelve a disparar la generación de embedding para los reportes atascados en
  * "pending". Devuelve cuántos se reencolaron.
  */
-export async function reconcilePendingReports(): Promise<number> {
+export async function reconcilePendingReports(
+  dispatch: ReportPipelineDispatch = triggerEmbeddingGeneration
+): Promise<number> {
   if (!process.env.AI_SERVICE_URL) return 0;
 
   const now = Date.now();
@@ -292,7 +372,9 @@ export async function reconcilePendingReports(): Promise<number> {
   for (const report of stuck) {
     // imageUrl no puede ser null acá por el filtro de la query, pero Prisma no
     // estrecha el tipo a partir de un `not: null` en el where.
-    triggerEmbeddingGeneration(report.id, report.imageUrl as string);
+    dispatch(report.id, report.imageUrl as string).catch((error) => {
+      console.error(`[matching] no se pudo reencolar el report ${report.id}:`, error);
+    });
   }
 
   if (stuck.length > 0) {
@@ -306,9 +388,11 @@ export async function reconcilePendingReports(): Promise<number> {
  * (ver src/index.ts). El timer es `unref`ado para que no mantenga vivo el
  * proceso por sí solo (importante para los tests y para un shutdown limpio).
  */
-export function startPendingReportsReconciliation(): NodeJS.Timeout {
+export function startPendingReportsReconciliation(
+  dispatch: ReportPipelineDispatch = triggerEmbeddingGeneration
+): NodeJS.Timeout {
   const run = () => {
-    reconcilePendingReports().catch((error) => {
+    reconcilePendingReports(dispatch).catch((error) => {
       console.error("[matching] fallo la reconciliación de reportes pending:", error);
     });
   };
@@ -331,8 +415,8 @@ export interface MatchDTO {
 }
 
 /**
- * Lista los matches sugeridos (generados por el Backend IA, ver
- * matching_service.py) donde `reportId` participa, sea como lost o found.
+ * Lista los matches sugeridos (generados por findAndStoreMatches, ver
+ * report-matching.service.ts) donde `reportId` participa, sea como lost o found.
  * Devuelve los datos básicos del OTRO reporte de cada match, ordenados por
  * similaridad descendente. Los descartados no se sugieren más a ninguna parte.
  */
@@ -373,12 +457,16 @@ async function decideMatch(
   userId: number,
   decision: MatchDecision
 ): Promise<MatchDecisionDTO> {
-  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true } });
+  const report = await prisma.report.findUnique({ where: { id: reportId }, select: { userId: true, status: true } });
   if (!report) {
     throw new AppError(404, "Reporte no encontrado");
   }
   if (report.userId !== userId) {
     throw new AppError(403, "No tenés permiso para gestionar las coincidencias de este reporte");
+  }
+  // confirmar avisa a la otra parte: solo con el reporte propio público (#311)
+  if (decision === "confirmed" && report.status !== "published" && report.status !== "resolved") {
+    throw new AppError(409, "Solo se pueden confirmar coincidencias de reportes publicados");
   }
 
   const match = await prisma.reportMatch.findUnique({

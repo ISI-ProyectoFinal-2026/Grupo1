@@ -27,8 +27,8 @@ const REQUIRED_R2_VARS = [
  * server para que el resto de la API siga levantando en entornos de desarrollo
  * donde todavía no se configuró el bucket.
  */
-function assertR2Configured(): void {
-  const missing = REQUIRED_R2_VARS.filter((name) => !process.env[name]);
+export function assertR2Configured(env: NodeJS.ProcessEnv = process.env): void {
+  const missing = REQUIRED_R2_VARS.filter((name) => !env[name]);
   if (missing.length > 0) {
     throw new AppError(
       503,
@@ -38,13 +38,13 @@ function assertR2Configured(): void {
   }
 }
 
-function getS3Client(): S3Client {
+export function getS3Client(env: NodeJS.ProcessEnv = process.env): S3Client {
   return new S3Client({
-    endpoint: process.env.R2_ENDPOINT,
+    endpoint: env.R2_ENDPOINT,
     region: "auto",
     credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID as string,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY as string,
+      accessKeyId: env.R2_ACCESS_KEY_ID as string,
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY as string,
     },
   });
 }

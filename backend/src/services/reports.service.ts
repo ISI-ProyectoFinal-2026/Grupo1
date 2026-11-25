@@ -1,7 +1,7 @@
 import { Prisma, ReportType, ReportStatus, ReportFlagReason } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
-import * as matchingService from "./matching.service";
+import * as reportPipelineService from "./report-pipeline.service";
 import { assertImagesHaveAnimals } from "./image-screening.service";
 import { isAuthorSuspended, visibleAuthorSql } from "./account-sanctions/visibility";
 import { activityReset, markWarningsRead } from "./report-inactivity.service";
@@ -172,14 +172,20 @@ export async function getVisibleById(id: number, viewerId?: number): Promise<Rep
   throw new AppError(404, "Reporte no encontrado");
 }
 
-// Fire-and-forget: no se espera la inferencia de ML. Se envuelve en try/catch
-// además del .catch() interno del servicio para que ni siquiera un error
-// síncrono al disparar la llamada haga fallar la operación sobre el reporte.
+// Encola el pipeline IA (#177) sin esperarlo: un fallo al encolar no hace
+// fallar la operación sobre el reporte, que queda en pending.
 function triggerModeration(reportId: number, imageUrl: string): void {
-  try {
-    matchingService.triggerEmbeddingGeneration(reportId, imageUrl);
-  } catch (error) {
-    console.error(`[matching] fallo al disparar la generación de embedding para report ${reportId}:`, error);
+  reportPipelineService.enqueueReportPipeline(reportId, imageUrl).catch((error) => {
+    console.error(`[matching] fallo al encolar el pipeline IA para report ${reportId}:`, error);
+  });
+}
+
+// solo la mascota propia (#310); si no existe sigue el P2003
+async function assertPetOwnedBy(db: Prisma.TransactionClient, petId: number | null | undefined, userId: number): Promise<void> {
+  if (petId == null) return;
+  const pet = await db.pet.findUnique({ where: { id: petId }, select: { userId: true } });
+  if (pet && pet.userId !== userId) {
+    throw new AppError(403, "No tenés permiso para vincular una mascota de otro usuario");
   }
 }
 
@@ -188,6 +194,7 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
   await assertImagesHaveAnimals([data.imageUrl, ...extraImageUrls]);
 
   const reportId = await prisma.$transaction(async (tx) => {
+    await assertPetOwnedBy(tx, data.petId, data.userId);
     let created;
     try {
       created = await tx.report.create({
@@ -197,7 +204,7 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
           reportType: data.reportType,
           // Moderación de contenido (issue #19): la foto es obligatoria, así que
           // el reporte queda "pending" hasta que el Backend IA confirme
-          // (vía triggerEmbeddingGeneration) que detectó una mascota.
+          // (vía la cola del pipeline IA) que detectó una mascota.
           status: "pending",
           title: data.title,
           description: data.description ?? null,
@@ -261,9 +268,16 @@ async function assertNoPendingFlags(db: Prisma.TransactionClient, reportId: numb
   }
 }
 
-// revalida bajo el mismo lock que usan las denuncias
-async function assertEditableLocked(tx: Prisma.TransactionClient, reportId: number, photosChanged: boolean): Promise<void> {
-  const [row] = await tx.$queryRaw<{ status: string }[]>`
+const RESOLVED_PHOTO_MESSAGE = "No se puede cambiar la foto de un reporte resuelto";
+
+// revalida bajo el mismo lock que usan las denuncias (#326: el estado pudo cambiar)
+async function assertEditableLocked(
+  tx: Prisma.TransactionClient,
+  reportId: number,
+  photosChanged: boolean,
+  resolving = false
+): Promise<void> {
+  const [row] = await tx.$queryRaw<{ status: ReportStatus }[]>`
     SELECT status::text AS status FROM reports WHERE id = ${reportId} FOR UPDATE
   `;
   if (!row) {
@@ -272,7 +286,13 @@ async function assertEditableLocked(tx: Prisma.TransactionClient, reportId: numb
   if (row.status === "hidden") {
     throw new AppError(409, HIDDEN_EDIT_MESSAGE);
   }
+  if (resolving) {
+    assertCanResolve(row.status);
+  }
   if (photosChanged) {
+    if (row.status === "resolved") {
+      throw new AppError(409, RESOLVED_PHOTO_MESSAGE);
+    }
     await assertNoPendingFlags(tx, reportId);
   }
 }
@@ -306,7 +326,7 @@ export async function update(id: number, userId: number, data: UpdateReportInput
     // Re-moderating a closed report would publish it again, and "resolved"
     // sent along with the new photo would be overwritten by "pending".
     if (existing.status === "resolved" || data.status === "resolved") {
-      throw new AppError(409, "No se puede cambiar la foto de un reporte resuelto");
+      throw new AppError(409, RESOLVED_PHOTO_MESSAGE);
     }
     // antes de llamar a la IA; se revalida bajo lock
     await assertNoPendingFlags(prisma, id);
@@ -323,7 +343,8 @@ export async function update(id: number, userId: number, data: UpdateReportInput
   const updateData = photosChanged ? { ...editedData, status: "pending" as const, publishedAt: null } : editedData;
 
   await prisma.$transaction(async (tx) => {
-    await assertEditableLocked(tx, id, photosChanged);
+    await assertEditableLocked(tx, id, photosChanged, data.status === "resolved");
+    await assertPetOwnedBy(tx, data.petId, existing.userId);
     try {
       await tx.report.update({ where: { id }, data: updateData });
     } catch (error) {
@@ -415,7 +436,15 @@ export async function setCustomFlyer(id: number, userId: number, flyerUrl: strin
   if (report.userId !== userId) {
     throw new AppError(403, "No tenés permiso para modificar el flyer de este reporte");
   }
-  await prisma.report.update({ where: { id }, data: { customFlyerUrl: flyerUrl } });
+  if (report.status === "hidden") {
+    throw new AppError(409, HIDDEN_EDIT_MESSAGE);
+  }
+  // IA fuera del lock; el oculto se revalida bajo lock
+  await assertImagesHaveAnimals([flyerUrl]);
+  await prisma.$transaction(async (tx) => {
+    await assertEditableLocked(tx, id, false);
+    await tx.report.update({ where: { id }, data: { customFlyerUrl: flyerUrl } });
+  });
   return getById(id);
 }
 

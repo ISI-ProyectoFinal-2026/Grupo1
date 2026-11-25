@@ -8,6 +8,7 @@ import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import TwoFactorResetConfirmPage from "./pages/auth/TwoFactorResetConfirmPage";
 import TwoFactorResetCancelPage from "./pages/auth/TwoFactorResetCancelPage";
+import AccountPage from "./pages/account/AccountPage";
 import SecurityPage from "./pages/account/SecurityPage";
 import NotificationSettingsPage from "./pages/account/NotificationSettingsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
           { path: "reports/:id/edit", element: <EditReportPage /> },
           { path: "chats", element: <ChatPage /> },
           { path: "chats/:id", element: <ChatPage /> },
+          { path: "account/profile", element: <AccountPage /> },
           { path: "account/security", element: <SecurityPage /> },
           { path: "account/notifications", element: <NotificationSettingsPage /> },
           { path: "businesses/register", element: <BusinessRegisterPage /> },

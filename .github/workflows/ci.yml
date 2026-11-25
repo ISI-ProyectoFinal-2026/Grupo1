@@ -195,37 +195,9 @@ jobs:
     name: Backend IA (Python)
     runs-on: ubuntu-latest
 
+    # Servicio de inferencia sin base de datos (ADR-0029): no necesita Postgres.
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build and start PostgreSQL
-        run: |
-          docker build -t patitas-postgres ./docker/postgres
-          docker run -d \
-            --name postgres \
-            -e POSTGRES_USER=patitas \
-            -e POSTGRES_PASSWORD=patitas \
-            -e POSTGRES_DB=patitas \
-            -p 5432:5432 \
-            patitas-postgres
-          until docker exec postgres pg_isready -U patitas; do sleep 2; done
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-
-      - name: Install Node.js dependencies
-        working-directory: backend
-        run: npm ci --legacy-peer-deps
-
-      - name: Run migrations
-        working-directory: backend
-        env:
-          DATABASE_URL: postgresql://patitas:patitas@localhost:5432/patitas
-        run: npx prisma migrate deploy
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -240,6 +212,4 @@ jobs:
 
       - name: Run tests
         working-directory: backend-ia
-        env:
-          DATABASE_URL: postgresql+asyncpg://patitas:patitas@localhost:5432/patitas
         run: python -m pytest tests/ -v --cov=app --cov-report=term-missing
