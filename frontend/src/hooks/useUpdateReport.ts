@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { updateReport } from '@/services/reports.service'
 import { reportDetailQueryKey } from '@/hooks/useReportDetailQuery'
 import { reportMatchesQueryKey } from '@/hooks/useReportMatchesQuery'
+import { invalidateInactivityWarnings } from '@/hooks/useInactivityWarningQuery'
 import type { UpdateReportInput } from '@/types/report.types'
 
 export function useUpdateReport(reportId: number) {
@@ -14,6 +15,7 @@ export function useUpdateReport(reportId: number) {
       // matches computed from the old photo are stale.
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       queryClient.invalidateQueries({ queryKey: reportMatchesQueryKey(reportId) })
+      invalidateInactivityWarnings(queryClient, reportId)
     },
   })
 

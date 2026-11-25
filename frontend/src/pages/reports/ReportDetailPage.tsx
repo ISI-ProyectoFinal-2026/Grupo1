@@ -32,7 +32,13 @@ import { REPORT_STATUS_LABELS } from "@/lib/report-status";
 
 const sectionTitle = "font-display text-display-sm text-ink";
 
+// remonta el detalle al cambiar de reporte para no arrastrar estado del anterior
 export default function ReportDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  return <ReportDetail key={id} />;
+}
+
+function ReportDetail() {
   const { id } = useParams<{ id: string }>();
   const helpBarRef = useHelpBarOffset();
   // Aviso que deja la pantalla anterior (alta o edición del reporte).

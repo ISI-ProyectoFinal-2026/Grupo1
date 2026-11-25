@@ -35,7 +35,14 @@ vi.mock('@/pages/account/AccountPage', () => ({ default: () => <div>pagina mi cu
 vi.mock('@/pages/account/NotificationSettingsPage', () => ({
   default: () => <div>pagina notificaciones</div>,
 }))
-vi.mock('@/pages/reports/FeedPage', () => ({ default: () => <div>pagina feed</div> }))
+// el feed puede lanzar en el render para probar el errorElement (#329)
+const paginas = vi.hoisted(() => ({ feedExplota: false }))
+vi.mock('@/pages/reports/FeedPage', () => ({
+  default: () => {
+    if (paginas.feedExplota) throw new Error('fallo al renderizar el feed')
+    return <div>pagina feed</div>
+  },
+}))
 vi.mock('@/pages/reports/CreateReportPage', () => ({ default: () => <div>pagina crear reporte</div> }))
 vi.mock('@/pages/reports/ReportDetailPage', () => ({ default: () => <div>pagina detalle reporte</div> }))
 vi.mock('@/pages/reports/EditReportPage', () => ({ default: () => <div>pagina editar reporte</div> }))
@@ -350,5 +357,22 @@ describe('router: rutas desconocidas', () => {
     renderRuta('/no-existe')
 
     expect(screen.getByRole('heading', { name: 'Página no encontrada' })).toBeInTheDocument()
+  })
+})
+
+describe('router: errores de render (#329)', () => {
+  afterEach(() => {
+    paginas.feedExplota = false
+    vi.restoreAllMocks()
+  })
+
+  it('una página que lanza en el render muestra el error inesperado, no el 404', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    paginas.feedExplota = true
+
+    renderRuta('/reports')
+
+    expect(screen.getByRole('heading', { name: 'Algo salió mal' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Página no encontrada' })).not.toBeInTheDocument()
   })
 })
