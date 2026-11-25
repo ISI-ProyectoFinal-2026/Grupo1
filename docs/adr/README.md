@@ -47,6 +47,7 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0029](0029-backend-unico-acceso-base-de-datos.md) | El backend principal es el único servicio que accede a la base de datos | Aceptada | Agustín Díaz | — | — |
 | [ADR-0030](0030-baja-voluntaria-y-exportacion-de-datos.md) | Baja voluntaria de cuenta y exportación de datos | Aceptada | Equipo (Matías Alvarado, PM) | — | — |
 | [ADR-0031](0031-demo-local-docker-compose.md) | Demo local con Docker Compose y una imagen por servicio | Aceptada | Matías Alvarado | — | — |
+| [ADR-0032](0032-busqueda-exacta-matching.md) | Búsqueda exacta de candidatos en el matching por similitud | Aceptada | Gabriel Valdivieso | — | — |
 
 ## Pendientes
 
