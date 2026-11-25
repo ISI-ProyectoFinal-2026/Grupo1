@@ -211,6 +211,40 @@ docker compose -f perf/observability/docker-compose.yml down       # sin -v: se 
 - `node perf/observability/capture.mjs --from=<ms> --to=<ms> --out=<png>` captura el dashboard combinado con Chromium de Playwright.
 - Limitación: el overhead de Docker Desktop se midió durante las corridas (ver el informe) y los contenedores comparten núcleos con k6 y el backend. Las corridas con observabilidad no son comparables 1:1 con las de baseline. Solo local.
 
+## 14. Matching SLO-2 con el Backend IA real
+
+```bash
+python -m venv perf/.venv-ia                                  # ignorado por git (su propio .gitignore)
+perf/.venv-ia/Scripts/python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.13.0 torchvision==0.28.0
+perf/.venv-ia/Scripts/python -m pip install -r backend-ia/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+node perf/seed/seed.mjs --users=2000 --reports=1000
+# imágenes: servidor estático con /pets/dog.jpg (copia de backend-ia/tests/fixtures/dog.jpg), puerto 8780
+cd <dir con pets/dog.jpg> && python -m http.server 8780 --bind 127.0.0.1
+# Backend IA (desde un directorio vacío: YOLO descarga yolov8n.pt en el cwd; el primer arranque baja los pesos de DINOv2)
+DATABASE_URL=postgresql+asyncpg://patitas:patitas@localhost:5433/patitas_perf INTERNAL_API_KEY=perf-internal-key \
+  perf/.venv-ia/Scripts/python -m uvicorn app.main:app --app-dir backend-ia --port 8000
+# backend (en vez de start-env.mjs, que levanta el stub); escribir su PID en perf/results/backend.pid
+cd backend && NODE_ENV=test DATABASE_URL=postgresql://patitas:patitas@localhost:5433/patitas_perf JWT_SECRET=perf-jwt-secret-not-for-production \
+  R2_PUBLIC_URL=http://localhost:8780/pets INTERNAL_API_KEY=perf-internal-key AI_SERVICE_URL=http://localhost:8000 node dist/index.js
+node perf/scripts/sample-resources.mjs --out=perf/results/matching.resources.csv --interval=3 --duration=345 --aux-pids=<PID del Backend IA> &
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/matching.html k6 run perf/matching.js
+```
+
+- Flujo: login, `POST /api/reports` con una imagen del servidor estático y polling de `GET /api/reports/:id` cada 0,5 s hasta que el estado deje de ser `pending` (máximo `MATCH_TIMEOUT` = 60 s). Después consulta `GET /api/reports/:id/matches` (`matches_after_publish`).
+- **Supuesto (decisión pendiente del equipo):** "matching terminado" = el reporte sale de `pending` (`published` o `rejected`). No exige que existan filas en `report_matches`.
+- Métricas (ms), con tag `outcome` (`published`, `rejected`, `timeout`): `matching_duration` (desde la respuesta del POST hasta el primer GET no `pending`) y `matching_duration_total` (desde el inicio del POST). La resolución es de ±0,5 s por el polling. El threshold de SLO-2 (p95 < 5000 ms) se aplica solo a `outcome:published`.
+- Modelo abierto `constant-arrival-rate` a `MATCH_RATE` (default 0,5 it/s, `MATCH_DURATION_S` = 300): baja a propósito para no encolar artificialmente la inferencia en CPU de un único proceso. Otras variables: `MATCH_POLL_S`, `MATCH_PRE_VUS`, `MATCH_MAX_VUS`, `MATCH_IMAGES` (nombres separados por coma), `MATCH_IMAGE_BASE`.
+- El `POST /api/reports` es síncrono con el Backend IA (`/images/analyze`, YOLO) y recién después dispara el embedding; por eso `matching_duration_total` incluye ese tiempo y `matching_duration` no.
+- Salidas: `matching.summary.json`, `matching.slo.md`, `matching.html`, `matching.resources.csv`.
+
+Limitaciones:
+
+- Inferencia en CPU (torch CPU) en una máquina de desarrollo compartida (k6, backend, Postgres en Docker y el Backend IA comparten núcleos); no representa un servidor de producción.
+- Solo existe una foto real de mascota en el repo (`backend-ia/tests/fixtures/dog.jpg`): todos los reportes comparten la imagen (la URL lleva `?v=` distinto). `landscape.jpg` no sirve: el backend responde 422 en la creación (sin animal) y nunca llega a `rejected`, por lo que el outcome `rejected` no se ejercita.
+- Los reportes del seed no tienen embeddings: los candidatos de matching son solo los creados durante la corrida (misma imagen, similitud máxima). Con embeddings en los 1000 reportes la búsqueda pgvector sería más costosa.
+- Tras la corrida la base queda con reportes y embeddings nuevos: volver a sembrar.
+- El sampler con `--aux-pids` sin `--pids` desplaza las columnas: las métricas del proceso auxiliar quedan en las columnas 10 y 11 (sin encabezado) y las columnas `aux1_*` repiten las del backend.
+
 ## Variables de k6 (`-e NOMBRE=valor`)
 
 | Variable | Default | Uso |
