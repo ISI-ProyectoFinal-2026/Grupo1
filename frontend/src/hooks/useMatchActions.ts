@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { confirmMatch, rejectMatch } from '@/services/reports.service'
 import { reportMatchesQueryKey } from '@/hooks/useReportMatchesQuery'
+import { invalidateInactivityWarnings } from '@/hooks/useInactivityWarningQuery'
+import { myReportsQueryKey } from '@/hooks/useMyReportsQuery'
 
 export function useMatchActions(reportId: number) {
   const queryClient = useQueryClient()
@@ -13,6 +15,12 @@ export function useMatchActions(reportId: number) {
 
   const confirm = useMutation({
     mutationFn: (matchId: number) => confirmMatch(reportId, matchId),
+    // confirmar cuenta como actividad del reporte
+    onSuccess: () => {
+      invalidateInactivityWarnings(queryClient, reportId)
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: myReportsQueryKey })
+    },
     onSettled: refreshMatches,
   })
   const reject = useMutation({

@@ -5,6 +5,7 @@ import * as reportsService from '@/services/reports.service'
 import { useUpdateReport } from '@/hooks/useUpdateReport'
 import { reportDetailQueryKey } from '@/hooks/useReportDetailQuery'
 import { reportMatchesQueryKey } from '@/hooks/useReportMatchesQuery'
+import { inactivityWarningQueryKey } from '@/hooks/useInactivityWarningQuery'
 import type { ReportDTO } from '@/types/report.types'
 
 vi.mock('@/services/reports.service')
@@ -68,6 +69,21 @@ describe('useUpdateReport', () => {
 
     expect(invalidar).toHaveBeenCalledWith({ queryKey: ['reports'] })
     expect(invalidar).toHaveBeenCalledWith({ queryKey: reportMatchesQueryKey(5) })
+  })
+
+  // editar cuenta como actividad: el backend marca leídos los avisos (#332)
+  it('invalida las notificaciones y el aviso de inactividad del reporte', async () => {
+    vi.mocked(reportsService.updateReport).mockResolvedValue(reporte())
+    const { Wrapper, client } = createQueryWrapper()
+    const invalidar = vi.spyOn(client, 'invalidateQueries')
+    const { result } = renderHook(() => useUpdateReport(5), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.update({ title: 'Otro titulo' })
+    })
+
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: ['notifications'] })
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: inactivityWarningQueryKey(5) })
   })
 
   it('propaga el error de la API para que el formulario lo muestre', async () => {

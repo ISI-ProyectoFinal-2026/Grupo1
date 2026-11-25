@@ -4,6 +4,8 @@ import { createQueryWrapper } from '@/test/query-wrapper'
 import * as reportsService from '@/services/reports.service'
 import { useMatchActions } from '@/hooks/useMatchActions'
 import { useReportMatchesQuery } from '@/hooks/useReportMatchesQuery'
+import { inactivityWarningQueryKey } from '@/hooks/useInactivityWarningQuery'
+import { myReportsQueryKey } from '@/hooks/useMyReportsQuery'
 import { useAuthStore } from '@/stores/auth.store'
 import type { MatchDecisionDTO, MatchDTO } from '@/types/report.types'
 
@@ -69,6 +71,40 @@ describe('useMatchActions', () => {
 
     await waitFor(() => expect(result.current.lista.data?.[0].status).toBe('confirmed'))
     expect(reportsService.confirmMatch).toHaveBeenCalledWith(5, 9)
+  })
+
+  // confirmar cuenta como actividad: el backend marca leídos los avisos (#332)
+  it('confirmar invalida notificaciones, aviso de inactividad, feed y mis reportes', async () => {
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+    vi.mocked(reportsService.confirmMatch).mockResolvedValue({
+      matchId: 9,
+      status: 'confirmed',
+      confirmedAt: '2026-09-27T12:00:00.000Z',
+    })
+    const { Wrapper, client } = createQueryWrapper()
+    const invalidar = vi.spyOn(client, 'invalidateQueries')
+    const { result } = renderHook(() => useMatchActions(5), { wrapper: Wrapper })
+
+    act(() => result.current.confirm(9))
+
+    await waitFor(() => expect(invalidar).toHaveBeenCalledWith({ queryKey: ['notifications'] }))
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: inactivityWarningQueryKey(5) })
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: ['reports'] })
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: myReportsQueryKey })
+  })
+
+  it('descartar no invalida las notificaciones', async () => {
+    vi.mocked(reportsService.getMatches).mockResolvedValue([])
+    vi.mocked(reportsService.rejectMatch).mockResolvedValue({ matchId: 9, status: 'rejected', confirmedAt: null })
+    const { Wrapper, client } = createQueryWrapper()
+    const invalidar = vi.spyOn(client, 'invalidateQueries')
+    const { result } = renderHook(() => useMatchActions(5), { wrapper: Wrapper })
+
+    act(() => result.current.reject(9))
+
+    await waitFor(() => expect(result.current.isBusy).toBe(false))
+    await waitFor(() => expect(reportsService.rejectMatch).toHaveBeenCalled())
+    expect(invalidar).not.toHaveBeenCalledWith({ queryKey: ['notifications'] })
   })
 
   it('descartar llama al servicio y refresca las coincidencias del reporte', async () => {
