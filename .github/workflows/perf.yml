@@ -75,6 +75,11 @@ jobs:
         working-directory: backend
         run: npm run build
 
+      # el seed resuelve pg desde frontend/node_modules
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --legacy-peer-deps
+
       - name: Seed performance database
         run: node perf/seed/seed.mjs --users=2000 --reports=1000
 
@@ -108,9 +113,7 @@ jobs:
       - name: Build frontend
         if: ${{ inputs.run_lighthouse }}
         working-directory: frontend
-        run: |
-          npm ci --legacy-peer-deps
-          npm run build
+        run: npm run build
 
       # vite preview proxea /api al backend en 3001; los umbrales viven en los lighthouserc.
       # run-lighthouse.mjs usa perf/data/report-ids.json (lo genera el seed) para /reports/:id
