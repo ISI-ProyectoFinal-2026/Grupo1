@@ -213,6 +213,8 @@ docker compose -f perf/observability/docker-compose.yml down       # sin -v: se 
 
 ## 14. Matching SLO-2 con el Backend IA real
 
+> Receta y resultado validados antes de integrar los cambios de `main` que mueven el pipeline de IA a una cola Redis (ADR-0034) y quitan el acceso a la base del Backend IA (ADR-0029). Con esa arquitectura hacen falta Redis y el worker del backend, y el Backend IA ya no usa `DATABASE_URL`: la receta de abajo no se revalidó.
+
 ```bash
 python -m venv perf/.venv-ia                                  # ignorado por git (su propio .gitignore)
 perf/.venv-ia/Scripts/python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.13.0 torchvision==0.28.0

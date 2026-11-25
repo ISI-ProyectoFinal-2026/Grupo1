@@ -343,7 +343,7 @@ El Backend IA registra solo el tiempo de YOLO (unos 128 ms de mediana y 228 ms d
 Limitaciones de esta medición, que acompañan al resultado:
 
 - Una sola foto real de mascota en el repositorio (`backend-ia/tests/fixtures/dog.jpg`): todos los reportes la comparten (la URL cambia con `?v=`).
-- Los reportes sembrados no tienen embeddings: los candidatos del matching fueron solo los reportes creados durante la corrida (misma imagen, similitud máxima); la búsqueda de pgvector fue más liviana que con una tabla completa de embeddings.
+- Los reportes sembrados no tienen embeddings: los candidatos del matching fueron solo los reportes creados durante la corrida (misma imagen, similitud máxima); la búsqueda de pgvector fue más liviana que con una tabla completa de embeddings. La medición se hizo antes de integrar los cambios de `main` que mueven el pipeline de IA a una cola Redis ([ADR-0034](../adr/0034-cola-redis-pipeline-ia.md)) y quitan el acceso a la base del Backend IA ([ADR-0029](../adr/0029-backend-unico-acceso-base-de-datos.md)); la receta y el resultado no se revalidaron con esa arquitectura.
 - El resultado `rejected` nunca se ejercitó.
 - Máquina de desarrollo compartida y bajo carga, con inferencia en CPU; sin repeticiones.
 - Las imágenes se sirvieron desde un servidor estático local (`R2_PUBLIC_URL` apuntando a localhost).
