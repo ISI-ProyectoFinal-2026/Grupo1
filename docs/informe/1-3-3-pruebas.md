@@ -42,7 +42,7 @@ La lógica se prueba a nivel de servicio en `backend/tests/` (por ejemplo [`matc
 
 ## 1.3.3.5 Pruebas de carga
 
-Las pruebas se ejecutaron el 2026-11-24 con k6, scripts versionados en [`perf/`](../../perf) y el commit `2eb4a9c` ([issue #40](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/40); herramientas en [ADR-0029](../adr/0029-herramientas-pruebas-de-performance.md), estado Pendiente). El escenario de matching (SLO-2) se ejecutó después, con el commit `6791491`. Las duraciones se redujeron respecto de las propuestas del issue (ver Tabla 1.3-2), el entorno fue una única máquina de desarrollo compartida con otras aplicaciones y varios resultados no se repitieron entre corridas. Por eso los valores son indicativos: no son la capacidad de un entorno de producción. Los resultados crudos están en `perf/results/` (ignorado por git); este apartado transcribe lo necesario.
+Las pruebas se ejecutaron el 2026-11-24 con k6, scripts versionados en [`perf/`](../../perf) y el commit `2eb4a9c` ([issue #40](https://github.com/ISI-ProyectoFinal-2026/Grupo1/issues/40); herramientas en [ADR-0029](../adr/0029-herramientas-pruebas-de-performance.md), estado Aceptada). El escenario de matching (SLO-2) se ejecutó después, con el commit `6791491`. Las duraciones se redujeron respecto de las propuestas del issue (ver Tabla 1.3-2), el entorno fue una única máquina de desarrollo compartida con otras aplicaciones y varios resultados no se repitieron entre corridas. Por eso los valores son indicativos: no son la capacidad de un entorno de producción. Los resultados crudos están en `perf/results/` (ignorado por git); este apartado transcribe lo necesario.
 
 ### 1. Objetivos
 

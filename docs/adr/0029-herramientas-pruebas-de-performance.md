@@ -1,6 +1,6 @@
 # ADR-0029: Herramientas de las pruebas de performance con k6, Lighthouse CI y un muestreador propio
 
-- **Estado:** Pendiente
+- **Estado:** Aceptada
 - **Responsables:** Franco Marín
 
 ## Decisión
@@ -9,13 +9,13 @@ Las pruebas de carga se escriben con k6 y exportan el dashboard web de k6 como H
 
 ## Motivo
 
-- La tarea original nombra k6 como herramienta de carga.
-- Hecho medido: el overhead de Docker Desktop (`com.docker.backend`) llegó a ~79 % de un núcleo con nginx en contenedor, y 9,7 % de media (máximo 58,7 %) durante la carga con Prometheus y Grafana. Pendiente de entrevista: si esa fue la razón del equipo para la versión liviana (sin cAdvisor, node-exporter ni postgres_exporter).
-- Pendiente de entrevista: el motivo de elegir Lighthouse CI, el muestreador de recursos propio y el balanceador propio.
+- k6: la tarea original lo nombra como herramienta de carga. Lighthouse CI: el issue lo propone para medir el frontend, y su subida al sistema de archivos evita publicar el reporte en una URL pública.
+- Versión liviana de Prometheus y Grafana (sin cAdvisor, node-exporter ni postgres_exporter) y balanceador propio en Node: el overhead de Docker Desktop (`com.docker.backend`) llegó a ~79 % de un núcleo con nginx en contenedor y distorsionaba las mediciones; con Prometheus y Grafana livianos promedió 9,7 % (máximo 58,7 %) durante la carga.
+- Muestreador de recursos propio: sin exportadores, hacía falta una fuente de CPU, memoria y conexiones a PostgreSQL.
 
 ## Alternativas
 
-- InfluxDB en lugar de Prometheus: propuesta del issue, no implementada. Pendiente de entrevista: si se descartó o queda para una entrega futura.
+- InfluxDB en lugar de Prometheus: propuesta del issue, descartada.
 - Balanceador nginx en Docker para la escalabilidad: probado y descartado por el overhead de Docker Desktop medido (`com.docker.backend` en ~79 % de un núcleo); se usó un balanceador propio en Node.
 - Stack completo de exportadores (cAdvisor, node-exporter, postgres_exporter): propuesto por el issue y descartado al elegir la versión liviana, por el mismo overhead de Docker.
 
