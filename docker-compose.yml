@@ -18,6 +18,22 @@ services:
       timeout: 5s
       retries: 10
 
+  # Cola del pipeline IA de los reportes (#177); AOF para no perder jobs al reiniciar
+  redis:
+    image: redis:7-alpine
+    container_name: patitas-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   # Backend IA: pesos de YOLO y DINOv2 incluidos en la imagen, arranca sin red
   backend-ia:
     build: ./backend-ia
@@ -46,6 +62,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       backend-ia:
         condition: service_healthy
     env_file:
@@ -55,6 +73,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-patitas}:${POSTGRES_PASSWORD:-patitas}@postgres:5432/${POSTGRES_DB:-patitas}
       PORT: 3001
       AI_SERVICE_URL: http://backend-ia:8000
+      REDIS_URL: redis://redis:6379
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
       FRONTEND_URL: http://localhost:${FRONTEND_PORT:-5173}
       # nginx del frontend hace de proxy
@@ -109,3 +128,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
