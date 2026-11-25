@@ -11,7 +11,7 @@ import MobileTabBar from "@/components/navigation/MobileTabBar";
 import MoreSheet from "@/components/navigation/MoreSheet";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { buttonClasses } from "@/components/ui/buttonClasses";
-import { toRedirectFrom } from "@/utils/redirect";
+import { toRedirectFrom } from "@/lib/redirect";
 import { useLocationSync } from "@/hooks/useLocationSync";
 import { cn } from "@/lib/cn";
 import { isAuthFormPath, isPublicBrowsePath } from "@/layouts/navItems";

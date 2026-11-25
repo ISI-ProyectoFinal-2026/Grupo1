@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getPasswordErrors } from '@/utils/password-rules'
+import { getPasswordErrors } from '@/lib/password-rules'
 
 describe('getPasswordErrors', () => {
   it('no devuelve errores para una contraseña que cumple las cuatro reglas', () => {

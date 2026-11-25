@@ -16,8 +16,8 @@ import { useTwoFactorStatus } from "@/hooks/useTwoFactorStatus";
 import { getApiErrorCode, getApiErrorStatus } from "@/services/api";
 import { useAuthStore } from "@/stores/auth.store";
 import type { TwoFactorSetup } from "@/types/auth";
-import { isEmailUnverified } from "@/utils/email-verification";
-import { getSecondFactorErrorMessage, normalizeSecondFactorCode } from "@/utils/two-factor";
+import { isEmailUnverified } from "@/lib/email-verification";
+import { getSecondFactorErrorMessage, normalizeSecondFactorCode } from "@/lib/two-factor";
 
 const STATE_CONFLICT_STATUS = 409;
 

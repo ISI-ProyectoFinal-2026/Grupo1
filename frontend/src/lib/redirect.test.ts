@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getSafeRedirect, postLoginPath } from '@/utils/redirect'
+import { getSafeRedirect, postLoginPath } from '@/lib/redirect'
 
 describe('getSafeRedirect', () => {
   it('arma la ruta interna con search y hash', () => {

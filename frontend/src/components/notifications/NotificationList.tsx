@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import InactivityWarningActions from '@/components/notifications/InactivityWarningActions'
 import { BellIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
+import { formatShortDateTime } from '@/lib/format'
 import type { NotificationDTO } from '@/types/notification.types'
 
 const NOTIFICATIONS_PAGE_SIZE = 5
@@ -12,17 +13,6 @@ interface NotificationListProps {
   onMarkRead: (id: number) => void
   onDelete: (id: number) => void
   onNavigate?: () => void
-}
-
-const dateFormat = new Intl.DateTimeFormat('es-AR', {
-  day: '2-digit',
-  month: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-})
-
-function formatDate(value: string) {
-  return dateFormat.format(new Date(value))
 }
 
 const actionClasses =
@@ -100,7 +90,7 @@ function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: N
             )}
             <div className='mt-1 flex flex-wrap items-center gap-x-1'>
               <time className='mr-auto text-xs text-ink-muted' dateTime={notification.createdAt}>
-                {formatDate(notification.createdAt)}
+                {formatShortDateTime(notification.createdAt)}
               </time>
               {!notification.isRead && (
                 <button

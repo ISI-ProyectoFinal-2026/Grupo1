@@ -2,8 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import Button from '@/components/ui/Button'
 import ErrorMessage from '@/components/ui/ErrorMessage'
-import { normalizeSecondFactorCode } from '@/utils/two-factor'
-import type { SecondFactorMode } from '@/utils/two-factor'
+import { normalizeSecondFactorCode } from '@/lib/two-factor'
+import type { SecondFactorMode } from '@/lib/two-factor'
 import type { AccountDeleteInput } from '@/types/auth'
 
 interface DeleteAccountDialogProps {

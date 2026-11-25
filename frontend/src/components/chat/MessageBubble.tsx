@@ -1,15 +1,9 @@
+import { formatTime } from '@/lib/format'
 import type { MessageDTO } from '@/types/chat.types'
 
 interface MessageBubbleProps {
   message: MessageDTO
   isOwn: boolean
-}
-
-function formatTime(dateString: string): string {
-  return new Date(dateString).toLocaleTimeString('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function MessageBubble({ message, isOwn }: MessageBubbleProps) {

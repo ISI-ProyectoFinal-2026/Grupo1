@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import EmptyState from '@/components/ui/EmptyState'
 import { buttonClasses } from '@/components/ui/buttonClasses'
+import { formatShortDateTime } from '@/lib/format'
 import type { AdFlagDTO } from '@/types/ad.types'
 
 interface AdFlagListProps {
@@ -9,13 +10,6 @@ interface AdFlagListProps {
   // dar de baja cierra las demás denuncias del anuncio: se bloquean todas mientras tanto
   isResolving: boolean
 }
-
-const dateFormat = new Intl.DateTimeFormat('es-AR', {
-  day: '2-digit',
-  month: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-})
 
 // denuncias de anuncios: el moderador da de baja el anuncio o desestima (ADR-0024)
 function AdFlagList({ flags, onResolve, isResolving }: AdFlagListProps) {
@@ -49,7 +43,7 @@ function AdFlagList({ flags, onResolve, isResolving }: AdFlagListProps) {
 
           <div className='flex flex-wrap items-center justify-between gap-3'>
             <time className='text-sm text-ink-muted' dateTime={flag.createdAt}>
-              {dateFormat.format(new Date(flag.createdAt))}
+              {formatShortDateTime(flag.createdAt)}
             </time>
             <div className='flex gap-2'>
               <button

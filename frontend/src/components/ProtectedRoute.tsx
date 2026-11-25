@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/auth.store";
-import { toRedirectFrom } from "@/utils/redirect";
+import { toRedirectFrom } from "@/lib/redirect";
 
 function ProtectedRoute() {
   const token = useAuthStore((state) => state.token);

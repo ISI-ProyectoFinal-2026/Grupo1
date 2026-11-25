@@ -12,7 +12,7 @@ import { useUrlToken } from "@/hooks/useUrlToken";
 import { useVerifyEmail } from "@/hooks/useVerifyEmail";
 import { getMe } from "@/services/auth.service";
 import { useAuthStore } from "@/stores/auth.store";
-import { isEmailUnverified } from "@/utils/email-verification";
+import { isEmailUnverified } from "@/lib/email-verification";
 
 type Phase = "verifying" | "verified" | "invalid";
 

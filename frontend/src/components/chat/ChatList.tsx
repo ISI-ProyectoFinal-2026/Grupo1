@@ -3,6 +3,7 @@ import ErrorMessage from '@/components/ui/ErrorMessage'
 import { Skeleton, SkeletonGroup } from '@/components/ui/Skeleton'
 import { UserIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
+import { formatShortDate } from '@/lib/format'
 import { SniffingDog } from '@/components/ui/canine'
 import type { ChatDTO } from '@/types/chat.types'
 
@@ -12,10 +13,6 @@ interface ChatListProps {
   activeChatId: number | undefined
   isLoading: boolean
   error: string | null
-}
-
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('es-AR', { month: 'short', day: 'numeric' })
 }
 
 function ChatList({ chats, currentUserId, activeChatId, isLoading, error }: ChatListProps) {
@@ -75,7 +72,7 @@ function ChatList({ chats, currentUserId, activeChatId, isLoading, error }: Chat
                 </p>
               </div>
               <time dateTime={chat.createdAt} className='shrink-0 self-start text-sm text-ink-muted'>
-                {formatDate(chat.createdAt)}
+                {formatShortDate(chat.createdAt)}
               </time>
             </Link>
           </li>
