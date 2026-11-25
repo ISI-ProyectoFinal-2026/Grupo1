@@ -1,7 +1,7 @@
 import { Prisma, ReportType, ReportStatus, ReportFlagReason } from "@prisma/client";
 import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
-import * as matchingService from "./matching.service";
+import * as reportPipelineService from "./report-pipeline.service";
 import { assertImagesHaveAnimals } from "./image-screening.service";
 import { isAuthorSuspended, visibleAuthorSql } from "./account-sanctions/visibility";
 import { activityReset, markWarningsRead } from "./report-inactivity.service";
@@ -172,15 +172,12 @@ export async function getVisibleById(id: number, viewerId?: number): Promise<Rep
   throw new AppError(404, "Reporte no encontrado");
 }
 
-// Fire-and-forget: no se espera la inferencia de ML. Se envuelve en try/catch
-// además del .catch() interno del servicio para que ni siquiera un error
-// síncrono al disparar la llamada haga fallar la operación sobre el reporte.
+// Encola el pipeline IA (#177) sin esperarlo: un fallo al encolar no hace
+// fallar la operación sobre el reporte, que queda en pending.
 function triggerModeration(reportId: number, imageUrl: string): void {
-  try {
-    matchingService.triggerEmbeddingGeneration(reportId, imageUrl);
-  } catch (error) {
-    console.error(`[matching] fallo al disparar la generación de embedding para report ${reportId}:`, error);
-  }
+  reportPipelineService.enqueueReportPipeline(reportId, imageUrl).catch((error) => {
+    console.error(`[matching] fallo al encolar el pipeline IA para report ${reportId}:`, error);
+  });
 }
 
 // solo la mascota propia (#310); si no existe sigue el P2003
@@ -207,7 +204,7 @@ export async function create(data: CreateReportInput & { userId: number }): Prom
           reportType: data.reportType,
           // Moderación de contenido (issue #19): la foto es obligatoria, así que
           // el reporte queda "pending" hasta que el Backend IA confirme
-          // (vía triggerEmbeddingGeneration) que detectó una mascota.
+          // (vía la cola del pipeline IA) que detectó una mascota.
           status: "pending",
           title: data.title,
           description: data.description ?? null,

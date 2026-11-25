@@ -258,7 +258,7 @@ No se tocó el frontend: `ReportDetailPage` ya hace polling cada 3s mientras el 
 
 ## 11. Fuera de alcance / trabajo pendiente
 
-- **Cola de procesamiento (Redis)**: hoy la inferencia es síncrona dentro de la request del Backend IA. Con un solo worker de uvicorn, varias imágenes concurrentes se serializan. Ya estaba anotado como pendiente en `backend-ia/README.md`.
+- **Cola de procesamiento (Redis)**: implementada en el Backend Principal (#177, ver `backend/README.md`); la inferencia sigue siendo síncrona dentro de la request del Backend IA y el worker procesa de a un job.
 - **Confirmar / rechazar un match desde el frontend**: `GET /api/reports/:id/matches` es de solo lectura; `report_matches.status` se queda en `pending`.
 - **Notificaciones de match**: ver hallazgo 2.5.
 - **Auth interna fail-closed en el Backend IA**: ver hallazgo 2.4.

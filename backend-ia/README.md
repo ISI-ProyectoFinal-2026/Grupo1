@@ -75,7 +75,7 @@ Modelo y umbrales dependen del checkpoint exacto: no cambiar el modelo de embedd
 
 **Límite conocido:** perros de la misma raza pueden puntuar por encima de otra foto del mismo perro (en la validación, ~0.52–0.62 contra ~0.39–0.47). Es un límite del modelo con estos umbrales, no un bug.
 
-**No implementado todavía:** cola Redis (hoy es síncrono dentro de la request).
+**Cola Redis:** la maneja el Backend Principal (BullMQ, #177): su worker llama a `/images/embedding`, que sigue siendo síncrono dentro de la request.
 
 ## Cambiar de modelo de embeddings (migración a DINOv2)
 
