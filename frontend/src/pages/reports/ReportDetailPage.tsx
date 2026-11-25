@@ -1,35 +1,26 @@
-import { useState } from "react";
-import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useReportDetailQuery } from "@/hooks/useReportDetailQuery";
 import { useReportMatchesQuery } from "@/hooks/useReportMatchesQuery";
-import { useMatchActions } from "@/hooks/useMatchActions";
 import { useCloseReport } from "@/hooks/useCloseReport";
 import { useFlagReport } from "@/hooks/useFlagReport";
-import { useDeleteReport } from "@/hooks/useDeleteReport";
-import { getFlyer, uploadCustomFlyer } from "@/services/reports.service";
-import { createChat } from "@/services/chats.service";
 import { useAuthStore } from "@/stores/auth.store";
 import { useHelpBarOffset } from "@/hooks/useHelpBarOffset";
-import Button from "@/components/ui/Button";
 import { buttonClasses } from "@/components/ui/buttonClasses";
-import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import SuccessMessage from "@/components/ui/SuccessMessage";
-import { CalendarIcon, ChatIcon, ChevronLeftIcon, PawIcon, PinIcon } from "@/components/ui/icons";
-import EmailNotVerifiedNotice from "@/components/auth/EmailNotVerifiedNotice";
-import { getApiErrorCode, getApiErrorStatus } from "@/services/api";
-import { EMAIL_NOT_VERIFIED } from "@/types/auth";
+import { ChevronLeftIcon } from "@/components/ui/icons";
+import { getApiErrorStatus } from "@/services/api";
 import PendingBanner from "@/components/reports/PendingBanner";
-import MatchCard from "@/components/reports/MatchCard";
-import ImageUploader from "@/components/reports/ImageUploader";
 import ReportPhotoGallery from "@/components/reports/ReportPhotoGallery";
-import InactivityWarningBanner from "@/components/reports/InactivityWarningBanner";
-import CloseReportButton from "@/components/reports/CloseReportButton";
-import DeleteReportButton from "@/components/reports/DeleteReportButton";
 import ReportFlagReasonForm from "@/components/reports/ReportFlagReasonForm";
 import HiddenReportNotice from "@/components/reports/HiddenReportNotice";
 import ReportAccountForm from "@/components/reports/ReportAccountForm";
+import ReportFlyerSection from "@/components/reports/ReportFlyerSection";
+import ReportMatchesList from "@/components/reports/ReportMatchesList";
+import ReportOwnerActions from "@/components/reports/ReportOwnerActions";
+import ContactOwnerPanel from "@/components/reports/ContactOwnerPanel";
+import ReportDetailSkeleton from "@/components/reports/ReportDetailSkeleton";
+import ReportFacts from "@/components/reports/ReportFacts";
 import LocationMap from "@/components/maps/LocationMap";
 import AdBanner from "@/components/ads/AdBanner";
 import NearbyBusinesses from "@/components/business/NearbyBusinesses";
@@ -37,14 +28,12 @@ import { cn } from "@/lib/cn";
 import { DogFace } from "@/components/ui/canine";
 import { tagTone } from "@/lib/tag-tone";
 import ReportTypeBadge from "@/components/reports/ReportTypeBadge";
-import { formatLongDay } from "@/lib/format";
 import { REPORT_STATUS_LABELS } from "@/lib/report-status";
 
 const sectionTitle = "font-display text-display-sm text-ink";
 
 export default function ReportDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const helpBarRef = useHelpBarOffset();
   // Aviso que deja la pantalla anterior (alta o edición del reporte).
   const flashMessage = (useLocation().state as { message?: string } | null)?.message;
@@ -54,82 +43,11 @@ export default function ReportDetailPage() {
     id ? Number(id) : undefined,
     report?.status,
   );
-  const matchActions = useMatchActions(Number(id));
   const closeReport = useCloseReport(Number(id));
   const flagReport = useFlagReport(Number(id));
-  const deleteReport = useDeleteReport(Number(id), () =>
-    navigate("/reports", { replace: true, state: { message: "Reporte eliminado" } }),
-  );
-  const [flyerUrl, setFlyerUrl] = useState<string | null>(null);
-  const [customFlyerError, setCustomFlyerError] = useState<string | null>(null);
-  const flyerMutation = useMutation({
-    mutationFn: () => getFlyer(Number(id)),
-    onSuccess: (data) => setFlyerUrl(data.flyerUrl),
-  });
-
-  const handleCustomFlyerUpload = async (publicUrl: string) => {
-    setCustomFlyerError(null);
-    try {
-      await uploadCustomFlyer(Number(id), publicUrl);
-      setFlyerUrl(publicUrl);
-    } catch (err) {
-      // 422 sin animal y 409 oculto traen un mensaje para el usuario (#311)
-      const status = getApiErrorStatus(err);
-      setCustomFlyerError(
-        (status === 422 || status === 409) && err instanceof Error
-          ? err.message
-          : "No se pudo guardar el flyer, intentá de nuevo.",
-      );
-    }
-  };
-
   const currentUserId = useAuthStore((state) => state.user?.id);
 
-  // Punto de entrada al chat. Sin esto no hay forma de iniciar una conversación
-  // desde la app: ChatList sólo muestra chats que ya existen en la base.
-  // El chat es por reporte y POST /api/chats es idempotente: si ya existe el
-  // chat de ESTE reporte con el autor, el backend responde 200 con ese mismo
-  // chat. Por eso no hay fallback: cualquier error es un error real y se
-  // muestra, nunca se abre un chat de otro reporte.
-  const contactMutation = useMutation({
-    mutationFn: async (ownerId: number) => {
-      const chat = await createChat({ reportId: Number(id), participantId: ownerId });
-      return chat.id;
-    },
-    onSuccess: (chatId) => navigate(`/chats/${chatId}`),
-  });
-
-  const shareFlyer = async (url: string) => {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: report?.title, url });
-        return;
-      } catch {
-        // el usuario canceló el share nativo, no hace falta avisar nada
-      }
-    }
-    await navigator.clipboard.writeText(url);
-  };
-
-  if (isLoading) {
-    // Mismo esqueleto que el detalle: la foto y el título no saltan al cargar.
-    return (
-      <SkeletonGroup className="mx-auto max-w-6xl animate-fade px-4 pb-4 pt-2 sm:px-6 lg:py-6">
-        <Skeleton className="h-11 w-24" />
-        <div className="mt-2 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] lg:gap-8">
-          <div>
-            <Skeleton className="-mx-4 aspect-[4/3] rounded-none sm:mx-0 sm:rounded-card" />
-            <Skeleton className="mt-5 h-9 w-3/4" />
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Skeleton className="h-12" />
-              <Skeleton className="h-12" />
-            </div>
-          </div>
-          <Skeleton className="hidden h-40 rounded-card lg:block" />
-        </div>
-      </SkeletonGroup>
-    );
-  }
+  if (isLoading) return <ReportDetailSkeleton />;
 
   // 404: oculto, rechazado, eliminado o de un autor suspendido (#187)
   if (getApiErrorStatus(error) === 404) {
@@ -159,15 +77,6 @@ export default function ReportDetailPage() {
     );
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-AR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
-  const displayFlyerUrl = flyerUrl ?? report.customFlyerUrl;
   const isOwner = currentUserId === report.userId;
   // Solo un reporte publicado se cierra o se denuncia: pending todavía está en
   // moderación automática y rejected ya fue ocultado por un moderador; cerrarlo
@@ -225,36 +134,7 @@ export default function ReportDetailPage() {
           <ReportTypeBadge reportType={report.reportType} className="mt-5" />
           <h1 className="mt-3 break-words font-display text-display-lg sm:text-display-xl">{report.title}</h1>
 
-          <dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="flex gap-3">
-              <PinIcon className="mt-0.5 h-5 w-5 shrink-0 text-ink-muted" />
-              <div className="min-w-0">
-                <dt className="text-sm text-ink-muted">Ubicación</dt>
-                <dd className="break-words font-bold text-ink">
-                  {report.locationAddress || "Ubicación desconocida"}
-                </dd>
-                {report.location && (
-                  <dd className="tabular text-sm text-ink-muted">
-                    {report.location.lat.toFixed(4)}, {report.location.lng.toFixed(4)}
-                  </dd>
-                )}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <CalendarIcon className="mt-0.5 h-5 w-5 shrink-0 text-ink-muted" />
-              <div>
-                <dt className="text-sm text-ink-muted">Fecha</dt>
-                <dd className="font-bold text-ink">{formatDate(report.createdAt)}</dd>
-                {report.eventDate && (
-                  <dd className="text-sm text-ink-muted">Suceso: {formatLongDay(report.eventDate)}</dd>
-                )}
-                {report.publishedAt && (
-                  <dd className="text-sm text-ink-muted">Publicado: {formatDate(report.publishedAt)}</dd>
-                )}
-              </div>
-            </div>
-          </dl>
+          <ReportFacts report={report} />
 
           {report.location && (
             <section aria-label="Mapa de la ubicación" className="mt-5">
@@ -284,62 +164,12 @@ export default function ReportDetailPage() {
           )}
 
           {report.status !== "pending" && (
-            <section className="card mt-6 p-4 sm:p-5">
-              <h2 className={sectionTitle}>Flyer para compartir</h2>
-              {!displayFlyerUrl ? (
-                <div className="mt-3 flex flex-col gap-3">
-                  <Button
-                    variant="secondary"
-                    isLoading={flyerMutation.isPending}
-                    onClick={() => flyerMutation.mutate()}
-                    className="w-full sm:w-auto sm:self-start"
-                  >
-                    Generar flyer
-                  </Button>
-                  {isOwner && (
-                    <>
-                      <p className="text-sm text-ink-muted">o subí tu propio flyer</p>
-                      <ImageUploader
-                        onSuccess={handleCustomFlyerUpload}
-                        onError={(message, code) => {
-                          // El uploader ya muestra el aviso de email sin verificar.
-                          if (code !== EMAIL_NOT_VERIFIED) setCustomFlyerError(message);
-                        }}
-                      />
-                      {customFlyerError && <ErrorMessage message={customFlyerError} />}
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start">
-                  <img
-                    src={displayFlyerUrl}
-                    alt="Flyer del reporte"
-                    width={160}
-                    height={226}
-                    loading="lazy"
-                    className="w-40 rounded-control border border-line shadow-card"
-                  />
-                  <div className="grid grid-cols-2 gap-2 sm:flex">
-                    <a
-                      href={displayFlyerUrl}
-                      download
-                      target="_blank"
-                      rel="noreferrer"
-                      className={buttonClasses("secondary")}
-                    >
-                      Descargar
-                    </a>
-                    <Button variant="primary" onClick={() => shareFlyer(displayFlyerUrl)}>
-                      Compartir
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {flyerMutation.isError && (
-                <ErrorMessage message="No se pudo generar el flyer, intentá de nuevo." className="mt-2" />
-              )}
-            </section>
+            <ReportFlyerSection
+              reportId={Number(id)}
+              title={report.title}
+              customFlyerUrl={report.customFlyerUrl}
+              canUploadCustom={isOwner}
+            />
           )}
         </article>
 
@@ -352,64 +182,14 @@ export default function ReportDetailPage() {
           ) : (
             <>
               {canSeeMatches && (
-                <>
-                  <h2 id="coincidencias" className={sectionTitle}>
-                    Coincidencias sugeridas
-                  </h2>
-                  {offerClose && (
-                    <div className="card mt-3 flex flex-col gap-3 border-signal p-4">
-                      <p className="text-ink">
-                        Confirmaste una coincidencia. Si ya resolviste el caso, podés cerrar tu reporte.
-                      </p>
-                      <CloseReportButton
-                        label="Cerrar mi reporte"
-                        onConfirm={closeReport.close}
-                        isPending={closeReport.isPending}
-                        error={closeReport.error}
-                      />
-                    </div>
-                  )}
-                  <div className="mt-3">
-                    {isLoadingMatches ? (
-                      <SkeletonGroup className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
-                        {[0, 1].map((key) => (
-                          <div key={key} className="card flex gap-3 p-3">
-                            <Skeleton className="h-[88px] w-[88px] shrink-0 rounded-[10px]" />
-                            <div className="flex flex-1 flex-col gap-2 py-1">
-                              <Skeleton className="h-4 w-3/4" />
-                              <Skeleton className="h-5 w-20 rounded-full" />
-                              <Skeleton className="mt-auto h-3.5 w-1/2" />
-                            </div>
-                          </div>
-                        ))}
-                      </SkeletonGroup>
-                    ) : matches && matches.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1">
-                        {matches.map((match, index) => (
-                          <div
-                            key={match.matchId}
-                            className="animate-rise"
-                            style={{ animationDelay: `${Math.min(index, 6) * 50}ms` }}
-                          >
-                            <MatchCard
-                              match={match}
-                              canManage={isOwner}
-                              onConfirm={matchActions.confirm}
-                              onReject={matchActions.reject}
-                              isBusy={matchActions.isBusy}
-                              error={matchActions.errorFor(match.matchId)}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="flex animate-fade items-center gap-3 rounded-card border border-dashed border-line bg-paper/60 p-4 text-sm text-ink-muted">
-                        <PawIcon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
-                        No se encontraron coincidencias todavía
-                      </p>
-                    )}
-                  </div>
-                </>
+                <ReportMatchesList
+                  reportId={Number(id)}
+                  matches={matches}
+                  isLoading={isLoadingMatches}
+                  canManage={isOwner}
+                  offerClose={offerClose}
+                  closeReport={closeReport}
+                />
               )}
 
               {/* publicidad y comercios cerca de la ubicación del reporte (ADR-0024) */}
@@ -430,54 +210,15 @@ export default function ReportDetailPage() {
               "lg:static lg:col-start-2 lg:row-start-1 lg:mx-0 lg:max-h-none lg:gap-3 lg:rounded-card lg:border lg:p-5 lg:shadow-card",
             )}
           >
-            {canContact && (
-              <div className="flex flex-col gap-2">
-                <h2 className="sr-only font-display text-display-sm lg:not-sr-only">
-                  ¿Tenés información sobre esta mascota?
-                </h2>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  isLoading={contactMutation.isPending}
-                  onClick={() => contactMutation.mutate(report.userId)}
-                >
-                  {!contactMutation.isPending && <ChatIcon className="h-5 w-5" />}
-                  Contactar al autor
-                </Button>
-                {contactMutation.isError &&
-                  (getApiErrorCode(contactMutation.error) === EMAIL_NOT_VERIFIED ? (
-                    <EmailNotVerifiedNotice />
-                  ) : (
-                    <ErrorMessage message="No se pudo abrir el chat, intentá de nuevo." />
-                  ))}
-              </div>
-            )}
+            {canContact && <ContactOwnerPanel reportId={Number(id)} ownerId={report.userId} />}
 
-            {isOwner && <InactivityWarningBanner report={report} />}
-
-            {canClose && (
-              <CloseReportButton
-                onConfirm={closeReport.close}
-                isPending={closeReport.isPending}
-                error={closeReport.error}
-              />
-            )}
-
-            {/* Editar y eliminar exigen ser el dueño; un reporte oculto solo se elimina. */}
             {isOwner && (
-              <div className="grid grid-cols-1 gap-2">
-                {!isHidden && (
-                  <Link to={`/reports/${report.id}/edit`} className={buttonClasses("secondary", "md", "w-full")}>
-                    Editar reporte
-                  </Link>
-                )}
-                <DeleteReportButton
-                  onConfirm={deleteReport.remove}
-                  isPending={deleteReport.isPending}
-                  error={deleteReport.error}
-                />
-              </div>
+              <ReportOwnerActions
+                report={report}
+                reportId={Number(id)}
+                canClose={canClose}
+                closeReport={closeReport}
+              />
             )}
 
             {canFlag && (
