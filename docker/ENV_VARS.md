@@ -22,7 +22,7 @@ Cada servicio lee su propio `.env` (`backend/.env`, `backend-ia/.env`) y Compose
 ```
 BACKEND_PORT=3001        # puerto del backend en el host
 BACKEND_IA_PORT=8000     # puerto del Backend IA en el host
-REDIS_PORT=6379          # puerto de Redis en el host
+REDIS_PORT=6379          # puerto de Redis en el host (solo 127.0.0.1)
 FRONTEND_PORT=5173       # puerto del frontend en el host (también arma FRONTEND_URL)
 INTERNAL_API_KEY=dev-internal-key   # se inyecta igual en backend y backend-ia
 VITE_SOCKET_URL=         # build arg del frontend; vacío = ruta relativa
