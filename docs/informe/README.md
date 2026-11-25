@@ -152,10 +152,11 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Tabla 1.3-9 | Tabla | Resistencia: veredictos y recursos | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
 | Tabla 1.3-10 | Tabla | Escalabilidad: capacidad de 1, 2 y 4 instancias | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
 | Tabla 1.3-11 | Tabla | Lighthouse CI: puntajes por ruta | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
-| Tabla 1.3-12 | Tabla | Overhead de Docker durante las corridas con observabilidad | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/README.md` sección 13 (commit `fe0a359`) |
+| Tabla 1.3-12 | Tabla | Overhead de Docker durante las corridas con observabilidad (L, B y E) | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/README.md` sección 13 (commits `fe0a359` y `8967e73`) |
 | Tabla 1.3-13 | Tabla | Repetición con observabilidad frente a la línea base (L y B) | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `fe0a359`) |
-| Tabla 1.3-14 | Tabla | Recursos muestreados por escenario | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
-| Tabla 1.3-15 | Tabla | Recomendaciones como issues candidatos | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-14 | Tabla | Resistencia: línea base frente a repetición con observabilidad | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commits `2eb4a9c` y `8967e73`) |
+| Tabla 1.3-15 | Tabla | Recursos muestreados por escenario | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
+| Tabla 1.3-16 | Tabla | Recomendaciones como issues candidatos | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `perf/results/` (commit `2eb4a9c`) |
 | Figura 1.3-1 | Figura | Carga: p95 por endpoint según el paso de VUs | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-1-carga-p95.png`; `perf/scripts/make-report-figures.py` |
 | Figura 1.3-2 | Figura | Punto de quiebre: curva de saturación | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-2-punto-de-quiebre.png`; `perf/scripts/make-report-figures.py` |
 | Figura 1.3-3 | Figura | Estrés: latencia y error por nivel | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-3-estres.png`; `perf/scripts/make-report-figures.py` |
@@ -166,3 +167,4 @@ Numeración por sección (`Figura 2.3.2.2-1`, `Tabla 1.3.3-2`). Este registro al
 | Figura 1.3-8 | Figura | Lighthouse: puntajes por ruta | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-8-lighthouse.png`; `perf/scripts/make-report-figures.py` |
 | Figura 1.3-9 | Figura | Grafana: corrida de carga | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-9-grafana-carga.png`; `perf/observability/capture.mjs` |
 | Figura 1.3-10 | Figura | Grafana: corrida del punto de quiebre | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-10-grafana-quiebre.png`; `perf/observability/capture.mjs` |
+| Figura 1.3-11 | Figura | Grafana: corrida de resistencia | 1.3.3.5 ([`1-3-3-pruebas.md`](1-3-3-pruebas.md)) | `docs/informe/img/1-3/fig-1-3-11-grafana-resistencia.png`; `perf/observability/capture.mjs` |
