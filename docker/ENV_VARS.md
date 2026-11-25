@@ -17,11 +17,12 @@ El backend principal arma su `DATABASE_URL` a partir de estos mismos valores (ve
 
 ### Servicios `backend`, `backend-ia` y `frontend`
 
-Cada servicio lee su propio `.env` (`backend/.env`, `backend-ia/.env`) y Compose pisa los valores que cambian dentro de la red: `DATABASE_URL` (`postgres:5432`), `AI_SERVICE_URL` (`http://backend-ia:8000`), `PORT`, `FRONTEND_URL`, `TRUST_PROXY=1` (el nginx del frontend es el proxy) e `INTERNAL_API_KEY`. Variables opcionales del `.env` de la raíz:
+Cada servicio lee su propio `.env` (`backend/.env`, `backend-ia/.env`) y Compose pisa los valores que cambian dentro de la red: `DATABASE_URL` (`postgres:5432`), `AI_SERVICE_URL` (`http://backend-ia:8000`), `REDIS_URL` (`redis://redis:6379`, cola del pipeline IA), `PORT`, `FRONTEND_URL`, `TRUST_PROXY=1` (el nginx del frontend es el proxy) e `INTERNAL_API_KEY`. Variables opcionales del `.env` de la raíz:
 
 ```
 BACKEND_PORT=3001        # puerto del backend en el host
 BACKEND_IA_PORT=8000     # puerto del Backend IA en el host
+REDIS_PORT=6379          # puerto de Redis en el host
 FRONTEND_PORT=5173       # puerto del frontend en el host (también arma FRONTEND_URL)
 INTERNAL_API_KEY=dev-internal-key   # se inyecta igual en backend y backend-ia
 VITE_SOCKET_URL=         # build arg del frontend; vacío = ruta relativa
