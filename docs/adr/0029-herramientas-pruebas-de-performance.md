@@ -15,7 +15,9 @@ Las pruebas de carga se escriben con k6 y exportan el dashboard web de k6 como H
 
 ## Alternativas
 
-InfluxDB en lugar de Prometheus: propuesta del issue, no implementada. Pendiente de entrevista: si se descartó o queda para una entrega futura.
+- InfluxDB en lugar de Prometheus: propuesta del issue, no implementada. Pendiente de entrevista: si se descartó o queda para una entrega futura.
+- Balanceador nginx en Docker para la escalabilidad: probado y descartado por el overhead de Docker Desktop medido (`com.docker.backend` en ~79 % de un núcleo); se usó un balanceador propio en Node.
+- Stack completo de exportadores (cAdvisor, node-exporter, postgres_exporter): propuesto por el issue y descartado al elegir la versión liviana, por el mismo overhead de Docker.
 
 ## Consecuencias
 
