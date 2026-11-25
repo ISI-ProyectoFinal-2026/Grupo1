@@ -81,7 +81,7 @@ Tabla 1.3-2. Escenarios ejecutados frente a lo propuesto en el issue. Fuente: `p
 
 ### 3. Resultados frente a los objetivos
 
-En el escalón de 200 VUs de la carga (L), el objetivo de referencia, ningún SLO medido se cumple. Los mismos SLO sí se cumplen con carga baja (smoke y primeros escalones del punto de quiebre).
+En el escalón de 200 VUs de la carga (L), el objetivo de referencia, ningún SLO medido se cumple. Los mismos SLO sí se cumplen con carga baja (smoke y primeros escalones del punto de quiebre). Hay capturas de Grafana de L y B (Figuras 1.3-9 y 1.3-10); las de E están pendientes.
 
 | SLO | Objetivo | Medido en L, 200 VUs | Resultado | Con carga baja |
 |---|---|---|---|---|
@@ -104,7 +104,7 @@ Tabla 1.3-3. SLO frente a lo medido en el escalón de 200 VUs. Fuente: `perf/res
 
 Tabla 1.3-4. Carga: resultados por paso de VUs (escala 0,25). Fuente: `perf/results/load.slo.md` y `load.summary.json`, commit `2eb4a9c`.
 
-SLO-1 no se cumple ni a 100 VUs: el p95 de `feed` es 900,4 ms. El throughput casi no crece al triplicar los VUs (25,5, 28,0 y 34,3 req/s): el sistema se saturó a 100 VUs o antes. Con la base en 10x, la misma prueba empeoró: 13,0 req/s a 100 VUs, p95 de `feed` de 5128 ms, 4,26 % de error a 200 VUs y 87,93 % a 500 VUs (`perf/results/load.v10x.slo.md`; ver 4, hallazgo 1).
+SLO-1 no se cumple ni a 100 VUs: el p95 de `feed` es 900,4 ms. Una repetición con observabilidad activa tampoco cumplió ningún SLO (Tabla 1.3-13). El throughput casi no crece al triplicar los VUs (25,5, 28,0 y 34,3 req/s): el sistema se saturó a 100 VUs o antes. Con la base en 10x, la misma prueba empeoró: 13,0 req/s a 100 VUs, p95 de `feed` de 5128 ms, 4,26 % de error a 200 VUs y 87,93 % a 500 VUs (`perf/results/load.v10x.slo.md`; ver 4, hallazgo 1).
 
 ![Carga: p95 por endpoint según el paso de VUs](img/1-3/fig-1-3-1-carga-p95.png)
 
@@ -125,7 +125,7 @@ Figura 1.3-1. Carga: p95 por endpoint según el paso de VUs, con el SLO-1 en 500
 
 Tabla 1.3-5. Punto de quiebre: resultados por escalón (mezcla 80/20). Fuente: `perf/results/breakpoint.slo.md`, commit `2eb4a9c`.
 
-Capacidad medida: 4,5 it/s (14,4 req/s), el último escalón consecutivo desde el inicio que cumple. El escalón de 5 it/s falló solo por el p95 de `create` (541 ms) y el de 5,5 it/s cumplió (354 ms): con unas 45 creaciones por escalón, el p95 de `create` es ruidoso, y 4,5 it/s es una estimación, no un límite exacto. Una corrida previa con paso de +2 it/s dio capacidad 2 it/s (`breakpoint.coarse.slo.md`).
+Capacidad medida: 4,5 it/s (14,4 req/s), el último escalón consecutivo desde el inicio que cumple. El escalón de 5 it/s falló solo por el p95 de `create` (541 ms) y el de 5,5 it/s cumplió (354 ms): con unas 45 creaciones por escalón, el p95 de `create` es ruidoso, y 4,5 it/s es una estimación, no un límite exacto. Una corrida previa con paso de +2 it/s dio capacidad 2 it/s (`breakpoint.coarse.slo.md`). Una repetición con observabilidad activa y los mismos parámetros dio 3,5 it/s (Tabla 1.3-13): el borde de capacidad observado está entre 3,5 y 4,5 it/s según la corrida. El valor de 4,5 it/s se mantiene como referencia documentada de SLO-6.
 
 ![Punto de quiebre: curva de saturación](img/1-3/fig-1-3-2-punto-de-quiebre.png)
 
@@ -244,12 +244,53 @@ Los umbrales (performance ≥ 80 y accesibilidad ≥ 90) son propuestas del issu
 
 Figura 1.3-8. Lighthouse: puntajes de performance y accesibilidad por ruta y factor de forma, con los umbrales propuestos. Fuente: `perf/results/lighthouse/summary.json`, generada con `perf/scripts/make-report-figures.py` (commit `2eb4a9c`); imagen `docs/informe/img/1-3/fig-1-3-8-lighthouse.png`.
 
+#### Observabilidad (Prometheus y Grafana)
+
+Se montaron Prometheus v3.15.1 y Grafana 12.4.14 en Docker, solo para uso local y con acceso anónimo de solo lectura (commit `fe0a359`, [ADR-0029](../adr/0029-herramientas-pruebas-de-performance.md)). Es una versión liviana: sin cAdvisor, node-exporter ni postgres_exporter. k6 1.3.0 envía las métricas por `experimental-prometheus-rw` (percentiles p50, p90, p95 y p99 como gauges); la CPU y la memoria RSS del backend y las conexiones a PostgreSQL provienen del muestreador del repositorio (`perf/scripts/sample-resources.mjs --metrics-port=9101`), que Prometheus consulta cada 5 s. Se incluyen el dashboard oficial de k6 (19665, revisión 3) y un dashboard propio, "Carga y recursos", con p95, req/s, VUs y porcentaje de error junto con CPU, RSS y conexiones en el mismo eje de tiempo. El panel de p95 es el promedio de los p95 por serie (endpoint), no un p95 global.
+
+![Grafana: corrida de carga](img/1-3/fig-1-3-9-grafana-carga.png)
+
+Figura 1.3-9. Grafana, dashboard "Carga y recursos", corrida de carga (testid `load-1x`, `PERF_SCALE` 0,25; 20:40:46 a 20:48:40). Se ven la escalera de 100, 200 y 500 VUs, el p95 promedio que crece hasta unos 15 s, el error que llega a un máximo de unos 77 % en una ventana del tramo de 500 VUs (el 59,06 % de la Tabla 1.3-13 es el promedio de todo el paso), la CPU del backend en torno a 100 % de un núcleo, el RSS entre unos 110 y 340 MB y las conexiones a PostgreSQL en 10. Fuente: dashboard Grafana "Carga y recursos" de la corrida `load-1x`, commit `fe0a359`; imagen `docs/informe/img/1-3/fig-1-3-9-grafana-carga.png`.
+
+![Grafana: corrida del punto de quiebre](img/1-3/fig-1-3-10-grafana-quiebre.png)
+
+Figura 1.3-10. Grafana, dashboard "Carga y recursos", corrida del punto de quiebre (testid `breakpoint-1x`; 20:51:29 a 20:56:20). Se ven el p95 promedio estable por debajo de unos 300 ms hasta el tramo final, donde sube a unos 800 ms con un salto de VUs (hasta unos 48), el error en 0 % y la CPU del backend con un máximo cercano a 160 % de un núcleo al final. Fuente: dashboard Grafana "Carga y recursos" de la corrida `breakpoint-1x`, commit `fe0a359`; imagen `docs/informe/img/1-3/fig-1-3-10-grafana-quiebre.png`.
+
+El overhead de Docker se midió durante ambas corridas (muestreo cada ~8 s). En la prueba anterior con nginx en Docker, `com.docker.backend` llegó a ~79 % de un núcleo, motivo por el que ese balanceador se descartó (ver Limitaciones). Al terminar, la memoria de Grafana era de ~108 MiB y la de Prometheus de ~42 MiB.
+
+| Proceso | Carga: media / máximo | Punto de quiebre: media / máximo |
+|---|---|---|
+| `com.docker.backend` | 9,7 / 58,7 | 8,9 / 42,8 |
+| Todos los procesos de Docker | 16,2 / 72,4 | 13,6 / 48,4 |
+| Grafana | 1,0 / 3,0 | 0,9 / 2,0 |
+| Prometheus | 0,6 / 2,6 | 0,8 / 7,9 |
+| Contenedor de PostgreSQL (ya existía; no forma parte de la observabilidad) | 8,7 / 95,7 | 6,4 / 73,9 |
+
+Tabla 1.3-12. Overhead de Docker durante las corridas con observabilidad (% de un núcleo, media y máximo). Fuente: muestreo de procesos durante las corridas `load-1x` y `breakpoint-1x`, commit `fe0a359`; `perf/README.md`, sección 13.
+
+Se repitieron la carga (L) y el punto de quiebre (B) con la observabilidad activa, con los mismos parámetros y en la misma máquina, con aplicaciones ajenas presentes. No hubo corrida de control, por lo que las diferencias no se pueden atribuir a la observabilidad: pueden deberse a ella, a la variabilidad entre corridas o a la carga ajena. No se hicieron más repeticiones.
+
+| Medición | Línea base | Con observabilidad |
+|---|---|---|
+| L, 100 VUs: p95 feed / detail / create (ms) | 900 / 1155 / 2391 | 1295 / 1830 / 4412 |
+| L, 200 VUs: p95 feed / detail / create (ms) | 3375 / 5366 / 14 728 | 4447 / 7916 / 19 070 |
+| L, 500 VUs: p95 feed (ms) | 13 940 | 11 500 |
+| L, req/s a 100 / 200 / 500 VUs | 25,5 / 28,0 / 34,3 | 22,1 / 22,5 / 37,8 |
+| L, error a 100 / 200 / 500 VUs | 0,21 / 1,07 / 24,79 % | 0,42 / 2,22 / 59,06 % |
+| L, Apdex a 100 / 200 / 500 VUs | 0,836 / 0,094 / 0,000 | 0,609 / 0,017 / 0,001 |
+| B, capacidad (it/s) | 4,5 (falló en 5) | 3,5 (4 it/s falló por p95 de `create` de 591 ms; en 4,5 it/s el p95 de `feed` / `detail` fue 2324 / 2988 ms) |
+| B, aborto de k6 por umbral | 369 s | 258 s |
+
+Tabla 1.3-13. Repetición con observabilidad activa frente a la línea base (L y B). Fuente: `perf/results/load.slo.md` y `breakpoint.slo.md` de la corrida con observabilidad, y Tablas 1.3-4 y 1.3-5 para la línea base, commit `fe0a359`.
+
+En ninguna de las dos corridas de L se cumplió algún SLO. En B, la capacidad con observabilidad (3,5 it/s) quedó por debajo de la de la línea base (4,5 it/s); junto con la Tabla 1.3-5 y la corrida de +2 it/s, el borde observado está entre 3,5 y 4,5 it/s.
+
 ### 4. Hallazgos
 
 1. **`GET /api/reports` sin paginar.** La respuesta pesa 571 942 bytes con 1000 reportes y 5 739 966 bytes con 10 000 (x10,04); el p95 pasó de 63,1 a 651,8 ms (x10,33) y SLO-1 dejó de cumplirse en `feed` (Tabla 1.3-8). Con la base en 10x, la carga L rindió 13,0 req/s a 100 VUs, frente a 25,5 req/s a 1x (Tabla 1.3-4 y `load.v10x.slo.md`).
 2. **El login es caro en CPU (hipótesis).** `auth.service.ts` usa `bcryptjs` (JavaScript puro) y el login tiene p50 de 297,5 ms en el smoke, sin carga. Hipótesis: el hash bloquea el event loop de Node y degrada al resto de la API; se verificó en el código el uso de `bcryptjs`, pero no se perfiló. Los flujos con login suman 35,3 % de la mezcla de L.
 3. **Sin contrapresión.** Con sobrecarga la latencia crece en lugar de rechazar: en x3 el p95 llega a 7390 ms en `feed` y 26 217 ms en `create` con 2,55 % de error (Tabla 1.3-6); en L a 500 VUs, p95 de hasta 32 578 ms. Los resultados no desglosan el tipo de error: no se puede afirmar si fueron timeouts o 5xx.
-4. **5 conexiones reiniciadas en `POST /api/reports` durante la resistencia.** El log de k6 registra 5 errores de lectura TCP (conexión interrumpida por el host remoto) en 748 creaciones exitosas a 3,15 it/s, con el resto de los endpoints sin fallas. Causa: No disponible.
+4. **5 conexiones reiniciadas en `POST /api/reports` durante la resistencia.** El log de k6 registra 5 errores de lectura TCP (conexión interrumpida por el host remoto) en 748 creaciones exitosas a 3,15 it/s, con el resto de los endpoints sin fallas. Causa: No disponible. En la repetición de L con observabilidad, los reinicios de conexión (`wsarecv`) en `POST /api/reports` aparecieron desde 100 VUs; no se verificó si ocurrían en la línea base.
 5. **Memoria.** En el pico con base de 10 it/s el RSS subió de 148,9 a 442,7 MB y terminó en 417,8 MB, unos 100 s después de terminar el pico; en el estrés llegó a 348,2 MB y se mantuvo en 327-348 MB durante la recuperación; con la base en 10x, la carga L llegó a 1589 MB (`spike.resources.csv`, `stress.resources.csv`, `load.v10x.resources.csv`). En el estrés, la última muestra válida muestra 134,7 MB a los 394 s y luego el proceso deja de muestrearse a los 410 s: no se puede atribuir esa caída a una liberación de memoria. En la resistencia, el RSS se estabilizó en ~250 MB (Tabla 1.3-9).
 6. **Frontend.** Un único archivo de JavaScript de 849,67 kB; performance móvil de 64 y 66 en `/reports` y `/reports/:id`, por debajo del umbral propuesto de 80; TBT de 2742 ms en `/reports` móvil. Accesibilidad: lista de definición mal formada (`definition-list`, `dlitem`) en `/reports/:id` y orden de encabezados (`heading-order`) en `/reports` (Tabla 1.3-11).
 7. **Resultados con variabilidad.** Capacidad de 1 instancia entre menor que 16 y mayor o igual que 24 it/s (Tabla 1.3-10); p95 en x2 de 1385 ms y 9284 ms en dos corridas de estrés; escalón de 5 it/s del punto de quiebre fallido y el de 5,5 it/s cumplido (Tabla 1.3-5).
@@ -268,7 +309,7 @@ Figura 1.3-8. Lighthouse: puntajes de performance y accesibilidad por ruta y fac
 | Volumen 10x | 75,3 y 112,4 | 87 | 7 (2) |
 | Resistencia | 33,8 y 56,8 | 87 | 8 (2) |
 
-Tabla 1.3-12. Recursos muestreados por escenario (la media incluye las muestras en reposo del inicio y el final; intervalo de 3 a 10 s). Fuente: `perf/results/*.resources.csv`, generado por `perf/scripts/sample-resources.mjs`, commit `2eb4a9c`.
+Tabla 1.3-14. Recursos muestreados por escenario (la media incluye las muestras en reposo del inicio y el final; intervalo de 3 a 10 s). Fuente: `perf/results/*.resources.csv`, generado por `perf/scripts/sample-resources.mjs`, commit `2eb4a9c`.
 
 - **El backend (proceso de Node) es lo primero que se acerca a un núcleo, no PostgreSQL ni la máquina.** En L el backend promedió 91,1 % de un núcleo (máximo 113,8 %) con la CPU del sistema en 59 % como máximo, y las conexiones activas a PostgreSQL promediaron 1,1 de 10 en el pool de Prisma (máximo 3): la base no estaba ocupada.
 - **El dato de CPU no identifica el hilo.** Los valores por encima de 100 % (hasta 161,1 %) indican que el proceso usó más de un núcleo (hilos del motor de Prisma, GC o serialización); la hipótesis del login con `bcryptjs` (hallazgo 2) no se puede confirmar con este muestreo.
@@ -293,14 +334,16 @@ Propuestas para el equipo; no se crearon issues ni se implementó nada. El issue
 | [FEATURE] | Repetir resistencia (4 h), picos con base de 10 it/s con un tope de VUs mayor y escalabilidad en una máquina sin carga ajena y con el generador aparte | Limitaciones |
 | [BUG] | Revisar por qué el RSS no baja tras el pico de 10 it/s (con muestreo hasta el final de la corrida) | Hallazgo 5 |
 
-Tabla 1.3-13. Recomendaciones propuestas como issues candidatos. Fuente: hallazgos 1 a 7 de este apartado; issue #40 (sección "Relacionadas").
+Tabla 1.3-15. Recomendaciones propuestas como issues candidatos. Fuente: hallazgos 1 a 7 de este apartado; issue #40 (sección "Relacionadas").
 
 ### Limitaciones
 
 - Reducción de duraciones (Tabla 1.3-2): la carga de 435 s en lugar de 29 min, la resistencia de 31 min estables en lugar de 4 h y el punto de quiebre en pasos de 0,5 it/s.
 - Una sola máquina compartida entre generador de carga, backend, base y aplicaciones ajenas; no se midió el límite de la máquina.
 - Cada escenario se corrió una vez (salvo las repeticiones de escalabilidad y estrés), no al menos dos veces con la mediana como pide el issue; hay variabilidad entre corridas.
-- SLO-2 no se midió; chat y flyer quedaron fuera; no se montó Prometheus/Grafana (ADR-0029), por lo que no hay capturas de Grafana.
+- SLO-2 no se midió; chat y flyer quedaron fuera.
+- Observabilidad (ADR-0029): hay capturas de Grafana de la carga (L) y del punto de quiebre (B), no de la resistencia (E), porque no se corrieron los 35 min con Grafana. El criterio de aceptación del issue (capturas de L, E y B) se cumple solo para L y B. La versión liviana no incluye cAdvisor, node-exporter ni postgres_exporter, y suma overhead medible (Tabla 1.3-12). No hubo corrida de control: la diferencia con la línea base no se puede atribuir a la observabilidad (Tabla 1.3-13).
+- El resumen de carga de la línea base (`load.summary.json`) fue sobrescrito por la corrida posterior con observabilidad (`perf/results/` no se versiona); solo se recuperó `load.slo.md` desde la salida estándar. Los números del informe y las Figuras 1.3-1 a 1.3-8 provienen de la línea base y se generaron antes de esa sobrescritura.
 - El volumen 10x y la mezcla de flujos son supuestos del equipo; el seed no genera embeddings ni notificaciones.
 - El balanceador de escalabilidad es un proxy de Node propio (con nginx en Docker Desktop el camino de red añadía una latencia que distorsionaba la medición); el pool de Prisma no se varió.
 - Los resultados no incluyen una comparación "antes y después" de mejoras.
