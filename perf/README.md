@@ -5,7 +5,7 @@ Scripts de performance de Patitas. Todos se ejecutan desde la raíz del repo.
 ## Requisitos
 
 - k6, Node 24, Docker (Postgres del `docker-compose.yml`, puerto 5433).
-- Dependencias instaladas en `backend/` y `frontend/` (el seed reutiliza `bcryptjs` y `pg`).
+- Dependencias instaladas en `backend/` y `frontend/` (el seed reutiliza `bcryptjs` y `pg`). Si `backend/node_modules` es anterior a la cola Redis (ADR-0034), el backend no compila por falta de `bullmq` e `ioredis`: correr `npm install` en `backend/` (el CI usa `npm ci --legacy-peer-deps`).
 
 ## 1. Base de performance
 
