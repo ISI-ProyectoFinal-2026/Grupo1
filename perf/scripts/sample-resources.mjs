@@ -1,6 +1,7 @@
 // muestrea CPU/memoria del backend y conexiones de Postgres a un CSV (Ctrl+C o --duration lo detiene)
-// uso: node perf/scripts/sample-resources.mjs --out=perf/results/load.resources.csv [--interval=5] [--duration=SEG] [--pid-file=...] [--db-size] [--log-file=ruta] [--pids=1,2,3] [--aux-pids=PID]
+// uso: node perf/scripts/sample-resources.mjs --out=perf/results/load.resources.csv [--interval=5] [--duration=SEG] [--pid-file=...] [--db-size] [--log-file=ruta] [--pids=1,2,3] [--aux-pids=PID] [--metrics-port=N]
 import { spawnSync } from 'node:child_process'
+import { createServer } from 'node:http'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { cpus } from 'node:os'
@@ -17,6 +18,7 @@ const pidFile = resolve(root, arg('pid-file', 'perf/results/backend.pid'))
 const pidList = arg('pids', '').split(',').filter(Boolean).map(Number) // varias instancias: suma en backend_* y columnas inst<k>_*
 const auxList = arg('aux-pids', '').split(',').filter(Boolean).map(Number) // procesos extra (ej. k6): solo columnas aux<k>_*
 const dbUrl = arg('db', process.env.PERF_DATABASE_URL ?? 'postgresql://patitas:patitas@localhost:5433/patitas_perf')
+const metricsPort = Number(arg('metrics-port', '0')) // opcional: sirve /metrics en formato Prometheus
 const cores = cpus().length
 
 const { Client } = createRequire(resolve(root, 'frontend', 'package.json'))('pg')
@@ -42,6 +44,29 @@ const logFile = arg('log-file', '')
 const instCols = [...(pidList.length ? pidList.flatMap((_, k) => [`inst${k + 1}_cpu_pct`, `inst${k + 1}_rss_mb`]) : []), ...auxList.flatMap((_, k) => [`aux${k + 1}_cpu_pct`, `aux${k + 1}_rss_mb`])]
 const extraCols = [...(withDbSize ? ['db_size_mb'] : []), ...(logFile ? ['log_size_kb'] : []), ...instCols]
 writeFileSync(out, `ts,elapsed_s,backend_cpu_pct_of_core,backend_rss_mb,system_cpu_pct,pg_connections,pg_active${extraCols.map((c) => `,${c}`).join('')}\n`)
+
+// última muestra para /metrics (mismos valores que el CSV)
+let latest = null
+const metricsServer = metricsPort
+  ? createServer((req, res) => {
+      if (req.url !== '/metrics') return res.writeHead(404).end()
+      const g = (name, help, v) => (v === null || v === '' || Number.isNaN(Number(v)) ? '' : `# HELP ${name} ${help}
+# TYPE ${name} gauge
+${name} ${Number(v)}
+`)
+      const m = latest
+      res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' })
+      res.end(
+        m
+          ? g('perf_backend_cpu_percent_of_core', 'CPU del backend (% de un nucleo)', m.cpu) +
+              g('perf_backend_rss_bytes', 'Memoria residente del backend', m.rssMb * 1048576) +
+              g('perf_system_cpu_percent', 'CPU total del sistema (%)', m.sys) +
+              g('perf_pg_connections', 'Conexiones a Postgres', m.pg) +
+              g('perf_pg_connections_active', 'Conexiones activas a Postgres', m.pgActive)
+          : '',
+      )
+    }).listen(metricsPort)
+  : null
 
 let stop = false
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => (stop = true))
@@ -73,9 +98,12 @@ while (!stop) {
     console.error(`[sampler] ${e.message}`)
     break
   }
+  latest = { cpu: row[2], rssMb: Number(row[3]), sys: row[4], pg: row[5], pgActive: row[6] }
   appendFileSync(out, `${row.join(',')}\n`)
   if (durationS && (Date.now() - t0) / 1000 >= durationS) break
   await new Promise((r) => setTimeout(r, intervalS * 1000))
 }
 await pg.end()
+metricsServer?.closeAllConnections()
+metricsServer?.close()
 console.log(`[sampler] listo (${cores} núcleos lógicos; backend_cpu_pct_of_core es % de un núcleo)`)

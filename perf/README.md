@@ -191,6 +191,26 @@ node perf/scripts/summarize-lighthouse.mjs
 - El frontend llega a la API por el proxy de `vite preview` (`vite.config.ts`: `/api` y `/socket.io` hacia `localhost:3001`), no por `VITE_API_URL`; el backend debe estar en el puerto 3001.
 - Salidas: `*.report.json`, `*.report.html` y `manifest.json` por form factor, `summary.md` y `summary.json` (mediana por ruta y form factor: performance, accesibilidad, FCP, LCP, TBT, CLS, TTI, peso total, requests JS, auditorías de accesibilidad fallidas).
 
+## 13. Observabilidad liviana (T11)
+
+Prometheus + Grafana en Docker, solo para uso local. No hay cAdvisor, node-exporter ni postgres_exporter: Docker Desktop (`com.docker.backend`) ya consumió ~79 % de un núcleo en la prueba de escalabilidad y distorsiona la medición, así que se mantienen pocos contenedores y con límites (`mem_limit`, `cpus`). CPU/memoria del backend y conexiones de Postgres salen del sampler del repo.
+
+```bash
+docker compose -f perf/observability/docker-compose.yml up -d     # Prometheus :9090, Grafana :3000
+node perf/scripts/start-env.mjs                                    # otra terminal
+node perf/scripts/sample-resources.mjs --out=perf/results/load.resources.csv --duration=500 --metrics-port=9101 &
+export K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write K6_PROMETHEUS_RW_TREND_STATS="p(50),p(90),p(95),p(99)"
+k6 run -o experimental-prometheus-rw --tag testid=load-1x -e PERF_SCALE=0.25 perf/load.js
+# punto de quiebre: sampler con --interval=3 --duration=420, y --tag testid=breakpoint-1x con los parámetros de la sección 6
+docker compose -f perf/observability/docker-compose.yml down       # sin -v: se descartan los datos de la corrida
+```
+
+- Ver en http://localhost:3000 (acceso anónimo de solo lectura): `Carga y recursos` (p95, RPS, VUs y error de k6 + CPU/RSS del backend y conexiones de Postgres en el mismo eje de tiempo), `Recursos del backend` y `k6 Prometheus` (dashboard oficial 19665 de Grafana k6, revisión 3, vendorizado).
+- Las métricas de k6 llevan el tag `testid`; el dashboard lo ofrece como filtro. Los percentiles llegan como gauges (`k6_http_req_duration_p95`) por `K6_PROMETHEUS_RW_TREND_STATS`.
+- `--metrics-port=<n>` del sampler sirve `/metrics` (`perf_backend_cpu_percent_of_core`, `perf_backend_rss_bytes`, `perf_system_cpu_percent`, `perf_pg_connections`, `perf_pg_connections_active`); sin el flag no cambia nada. Prometheus lo scrapea cada 5 s por `host.docker.internal:9101`.
+- `node perf/observability/capture.mjs --from=<ms> --to=<ms> --out=<png>` captura el dashboard combinado con Chromium de Playwright.
+- Limitación: el overhead de Docker Desktop se midió durante las corridas (ver el informe) y los contenedores comparten núcleos con k6 y el backend. Las corridas con observabilidad no son comparables 1:1 con las de baseline. Solo local.
+
 ## Variables de k6 (`-e NOMBRE=valor`)
 
 | Variable | Default | Uso |
