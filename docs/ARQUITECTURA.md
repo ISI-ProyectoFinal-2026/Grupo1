@@ -88,7 +88,7 @@ Plataforma web para reportar y buscar mascotas perdidas/encontradas con **matchi
 - **Zod** 4 - Validación
 - **Prisma** 5.20 - ORM + Migraciones
 - **Socket.io** 4.8 - WebSockets
-- **Redis** - Queue + Cache + Sesiones (no implementado, ver sección 7)
+- **Redis** + **BullMQ** - Cola del pipeline IA (issue #177, ver sección 7); cache y sesiones no implementados
 - **JWT** (`jsonwebtoken` 9) - Autenticación
 
 ### Backend IA
@@ -161,24 +161,21 @@ Usuario                 Frontend                 Backend Ppal          R2       
 ```
 
 > **Estado de implementación (issue #18):** el flujo de arriba es la arquitectura
-> objetivo. Lo implementado hasta ahora (sin cola todavía) es una versión
-> simplificada: el Backend Ppal llama a Backend IA de forma síncrona
-> *fire-and-forget* (sin esperar la respuesta, sin bloquear al usuario) al
-> crear el reporte; Backend IA solo devuelve el embedding y **Backend Ppal
-> guarda el embedding y los matches en Postgres**, único servicio con acceso
-> a la base ([ADR-0029](adr/0029-backend-unico-acceso-base-de-datos.md)). La
-> cola Redis queda como trabajo futuro — ver detalle real en 4.2/4.3 y en
-> `backend/README.md`.
+> objetivo. Lo implementado es una versión simplificada: al crear el reporte,
+> el Backend Ppal encola un job en Redis (BullMQ, issue #177) sin bloquear al
+> usuario; un worker del propio Backend Ppal lo consume y llama al Backend IA
+> por HTTP. Backend IA solo devuelve el embedding y **Backend Ppal guarda el
+> embedding y los matches en Postgres**, único servicio con acceso a la base
+> ([ADR-0029](adr/0029-backend-unico-acceso-base-de-datos.md)) — ver detalle
+> real en 4.2/4.3 y en `backend/README.md`.
 
 ### 4.2 Procesamiento de IA
 
 ```
-Objetivo (con cola, futuro): Backend IA desencola un job de Redis con
-{ report_id, image_url } y procesa async.
-
-Implementado hoy (issue #18, sin cola; ADR-0029): Backend Ppal llama
-fire-and-forget POST {AI_SERVICE_URL}/images/embedding con
-{ "image_url": ... } apenas crea el reporte (la foto es obligatoria).
+Implementado (issues #18 y #177; ADR-0029): Backend Ppal encola un job
+de Redis { reportId, imageUrl } apenas crea el reporte (la foto es
+obligatoria); su worker llama POST {AI_SERVICE_URL}/images/embedding con
+{ "image_url": ... }. Sin REDIS_URL, el llamado se hace en proceso.
 Backend IA es un servicio de inferencia sin base de datos y responde
 sincrónicamente dentro de esa misma request:
 
@@ -695,9 +692,13 @@ del reporte y en la notificación al dueño.
 
 ## 7. Cola de Trabajo - Flujo de Jobs
 
-> **No implementado todavía** (issue #18 usa fire-and-forget síncrono, ver
-> 4.2). Esta sección documenta la arquitectura objetivo para cuando se
-> aborde la cola en una iteración futura.
+> **Implementado con diferencias** (issue #177, ver `backend/README.md`,
+> "Cola del pipeline IA"): la cola es BullMQ sobre Redis, pero el worker vive
+> en el Backend Principal y llama al Backend IA por HTTP; el Backend IA no
+> consume la cola ni escribe en la base (ADR-0029). El job es
+> `{ reportId, imageUrl }` con `jobId = report-<id>`, 5 intentos con backoff
+> exponencial, y el reporte queda `pending` hasta el veredicto. Lo que sigue
+> es la arquitectura objetivo original.
 
 ### Modelo de Job (Redis Queue)
 
@@ -887,8 +888,8 @@ PORT=8000
 INTERNAL_API_KEY=                # mismo valor que en backend/.env
 ALLOW_INSECURE_INTERNAL=false    # true solo en desarrollo local
 
-# Redis (para queue) — no implementado todavía, ver sección 7
-# REDIS_URL=redis://redis:6379
+# Redis (cola del pipeline IA, backend/.env) — ver sección 7
+REDIS_URL=redis://redis:6379
 ```
 
 ---

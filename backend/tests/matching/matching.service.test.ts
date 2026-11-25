@@ -795,6 +795,17 @@ describe("matching.service reconcilePendingReports", () => {
     expect(calledImages().every(Boolean)).toBe(true);
   });
 
+  test("reencola por el dispatcher recibido (la cola Redis, #177) en vez de llamar al Backend IA", async () => {
+    process.env.AI_SERVICE_URL = "http://localhost:8000";
+    const dispatch = jest.fn().mockResolvedValue(undefined);
+
+    await reconcilePendingReports(dispatch);
+
+    expect(dispatch).toHaveBeenCalledWith(stuckId, image("atascado"));
+    expect(dispatch).not.toHaveBeenCalledWith(recienCreadoId, expect.anything());
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   test("no reencola un reporte guardado con una URL fuera del bucket", async () => {
     process.env.AI_SERVICE_URL = "http://localhost:8000";
     const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);

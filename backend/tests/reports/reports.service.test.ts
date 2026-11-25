@@ -3,6 +3,7 @@ import { prisma } from "../../src/db/client";
 import { AppError } from "../../src/errors/app-error";
 import * as reportsService from "../../src/services/reports.service";
 import * as matchingService from "../../src/services/matching.service";
+import * as reportPipelineService from "../../src/services/report-pipeline.service";
 import { publishReport } from "../helpers/reports";
 
 describe("reports.service", () => {
@@ -306,6 +307,27 @@ describe("reports.service", () => {
 
     expect(spy).toHaveBeenCalledWith(report.id, baseReportData.imageUrl);
     spy.mockRestore();
+  });
+
+  test("create() encola el pipeline IA con el id del reporte y su foto (#177)", async () => {
+    const spy = jest.spyOn(reportPipelineService, "enqueueReportPipeline").mockResolvedValue();
+
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+
+    expect(spy).toHaveBeenCalledWith(report.id, baseReportData.imageUrl);
+  });
+
+  test("create() devuelve el reporte en pending aunque encolar falle (#177)", async () => {
+    jest.spyOn(reportPipelineService, "enqueueReportPipeline").mockRejectedValue(new Error("redis down"));
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const report = await reportsService.create({ userId, ...baseReportData });
+    createdReportIds.push(report.id);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(report.status).toBe("pending");
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(`report ${report.id}`), expect.any(Error));
   });
 
   test("create() sigue devolviendo el reporte creado aunque triggerEmbeddingGeneration falle", async () => {

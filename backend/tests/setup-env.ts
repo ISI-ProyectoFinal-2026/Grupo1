@@ -5,3 +5,5 @@ import "dotenv/config";
 for (const key of ["SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_USER", "SMTP_PASS"]) {
   process.env[key] = "";
 }
+// sin Redis en los tests: el pipeline IA corre en proceso (los tests de la cola mockean bullmq)
+process.env.REDIS_URL = "";
