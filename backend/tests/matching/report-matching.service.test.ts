@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../../src/db/client";
 import * as notificationsService from "../../src/services/notifications.service";
 import { findAndStoreMatches, saveReportEmbedding } from "../../src/services/report-matching.service";
@@ -321,6 +321,47 @@ describe("findAndStoreMatches: parámetros de configuración", () => {
     process.env.MATCH_RADIUS_METERS = "500";
     const { foundId } = await seedPair({ lat: NEAR.lat + 0.01 });
     await expect(findAndStoreMatches(foundId)).resolves.toBe(0);
+  });
+});
+
+// filtros + HNSW: los más parecidos fuera del radio no deben tapar al cercano (#336)
+describe("findAndStoreMatches: camino por índice HNSW", () => {
+  const FAR_DECOYS = 50;
+
+  // cliente de una sola conexión: el SET de sesión aplica a todas sus consultas
+  let indexClient: PrismaClient;
+
+  beforeAll(async () => {
+    const url = new URL(process.env.DATABASE_URL!);
+    url.searchParams.set("connection_limit", "1");
+    indexClient = new PrismaClient({ datasources: { db: { url: url.toString() } } });
+    await indexClient.$executeRaw`SET enable_seqscan = off`;
+    await indexClient.$executeRaw`SET enable_sort = off`;
+  });
+
+  afterAll(async () => {
+    await indexClient.$disconnect();
+  });
+
+  // corre el matching con el índice forzado
+  async function findWithIndexForced(reportId: number): Promise<number> {
+    jest.spyOn(prisma, "$queryRaw").mockImplementation(((...args: Parameters<PrismaClient["$queryRaw"]>) =>
+      indexClient.$queryRaw(...args)) as never);
+    return findAndStoreMatches(reportId);
+  }
+
+  test("registra el match cercano aunque haya muchos lejanos más parecidos", async () => {
+    const userId = await createUser("matching-hnsw");
+    const lostId = await insertReportWithEmbedding(userId, "lost", EMBEDDING_BASE);
+    for (let i = 0; i < FAR_DECOYS; i++) {
+      await insertReportWithEmbedding(userId, "found", unitVectorAtCosine(0.99), FAR);
+    }
+    const nearId = await insertReportWithEmbedding(userId, "found", EMBEDDING_MISMA_MASCOTA);
+
+    await expect(findWithIndexForced(lostId)).resolves.toBe(1);
+
+    const matches = await matchesOf([lostId]);
+    expect(matches).toEqual([expect.objectContaining({ reportLostId: lostId, reportFoundId: nearId })]);
   });
 });
 
