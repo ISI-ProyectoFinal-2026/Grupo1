@@ -2,8 +2,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { buttonClasses } from "@/components/ui/buttonClasses";
-import { normalizeSecondFactorCode } from "@/utils/two-factor";
-import type { SecondFactorMode } from "@/utils/two-factor";
+import { normalizeSecondFactorCode } from "@/lib/two-factor";
+import type { SecondFactorMode } from "@/lib/two-factor";
 
 interface DisableTwoFactorFormProps {
   isLoading: boolean;

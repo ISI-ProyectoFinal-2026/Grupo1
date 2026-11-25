@@ -6,7 +6,7 @@ import { getApiErrorDetails } from "@/services/api";
 import AuthCard from "@/components/ui/AuthCard";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { buttonClasses } from "@/components/ui/buttonClasses";
-import { getPasswordErrors } from "@/utils/password-rules";
+import { getPasswordErrors } from "@/lib/password-rules";
 
 function Register() {
   const navigate = useNavigate();

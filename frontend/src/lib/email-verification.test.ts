@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isEmailUnverified } from '@/utils/email-verification'
+import { isEmailUnverified } from '@/lib/email-verification'
 import type { AuthUser } from '@/types/auth'
 
 const usuario: AuthUser = {

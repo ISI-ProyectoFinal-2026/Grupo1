@@ -18,8 +18,8 @@ import {
   getAccountDeleteErrorMessage,
   getExportErrorMessage,
   getProfileErrorMessage,
-} from '@/utils/account'
-import { getPhoneError } from '@/utils/phone'
+} from '@/lib/account'
+import { getPhoneError } from '@/lib/phone'
 
 const EXPORT_FILE_NAME = 'patitas-mis-datos.json'
 const FULL_NAME_MAX_LENGTH = 100

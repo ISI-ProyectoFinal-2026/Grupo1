@@ -5,7 +5,7 @@ import {
   getRetryAfterSeconds,
   getSecondFactorErrorMessage,
   normalizeSecondFactorCode,
-} from '@/utils/two-factor'
+} from '@/lib/two-factor'
 
 describe('normalizeSecondFactorCode', () => {
   it('en modo TOTP saca todos los espacios, tambien los del medio', () => {

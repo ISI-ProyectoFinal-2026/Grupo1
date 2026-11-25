@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { buttonClasses } from "@/components/ui/buttonClasses";
-import { normalizeSecondFactorCode } from "@/utils/two-factor";
+import { normalizeSecondFactorCode } from "@/lib/two-factor";
 
 interface RegenerateCodesFormProps {
   isLoading: boolean;

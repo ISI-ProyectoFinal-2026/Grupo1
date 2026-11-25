@@ -10,7 +10,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useIsModerator } from "@/hooks/useIsModerator";
 import { buttonClasses } from "@/components/ui/buttonClasses";
-import { toRedirectFrom } from "@/utils/redirect";
+import { toRedirectFrom } from "@/lib/redirect";
 import { useLocationSync } from "@/hooks/useLocationSync";
 import { cn } from "@/lib/cn";
 import {
