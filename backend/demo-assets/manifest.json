@@ -1,0 +1,76 @@
+{
+  "images": [
+    {
+      "file": "toby-lost.jpg",
+      "subject": "Toby (lost report)",
+      "author": "Chuck Kennedy",
+      "source": "https://commons.wikimedia.org/wiki/File:Bo_official_portrait_(cropped).jpg",
+      "license": "Public domain",
+      "licenseUrl": null,
+      "sha256": "35d0493b3b6a1a32b509e247cf3ebb9e0fe486bf75e3e81a4d7c43f2b35e55e0"
+    },
+    {
+      "file": "toby-found.jpg",
+      "subject": "Toby (found report, same dog)",
+      "author": "The White House from Washington, DC",
+      "source": "https://commons.wikimedia.org/wiki/File:Bo_in_the_Blue_Room_2010.jpg",
+      "license": "Public domain",
+      "licenseUrl": null,
+      "sha256": "d9954c0e59e18a0021f109060ed21e97f6e31ab20e92bccd3eda367b3413da12"
+    },
+    {
+      "file": "toby-smoke.jpg",
+      "subject": "Toby (smoke test found report)",
+      "author": "The White House",
+      "source": "https://commons.wikimedia.org/wiki/File:Bo_Obama_March_2010_(a).jpg",
+      "license": "Public domain",
+      "licenseUrl": null,
+      "sha256": "c4e4e718e7db31010c5f1c414b891028494dfab0aa8ce518ae755a89beb54a07"
+    },
+    {
+      "file": "lola-lost.jpg",
+      "subject": "Lola (lost report)",
+      "author": "Hehehefein",
+      "source": "https://commons.wikimedia.org/wiki/File:Blue_merle_border_collie.jpg",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "b6d6c989820a34cda33a589160864c2682676b2796edfbc9d6ca412ef9319aef"
+    },
+    {
+      "file": "mishi.jpg",
+      "subject": "Mishi (cat)",
+      "author": "George Chernilevsky",
+      "source": "https://commons.wikimedia.org/wiki/File:Brown_tabby_cat_2018_G1.jpg",
+      "license": "Public domain",
+      "licenseUrl": null,
+      "sha256": "d1ba6b9056c86f1b1ce349a5b7b469a10196844c152dcb1508ffed62c324a524"
+    },
+    {
+      "file": "golden-found.jpg",
+      "subject": "Golden retriever (found report)",
+      "author": "Cheetyuh",
+      "source": "https://commons.wikimedia.org/wiki/File:Golden_Retriever_Chewing_A_Stick.jpg",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "d2e918fbd02367cb5690dafce36b64823eab480c958993ed8996318ca7b32dbd"
+    },
+    {
+      "file": "pancho-lost.jpg",
+      "subject": "Pancho (lost report)",
+      "author": "Prasanth C7",
+      "source": "https://commons.wikimedia.org/wiki/File:Dachshund_Dog.jpg",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "38ac0a771c2d201dda2d58f29a1953749bab70c92d4c32429c74f00efde6b2f4"
+    },
+    {
+      "file": "dachshund-found.jpg",
+      "subject": "Another dachshund (found report)",
+      "author": "ScottCarammell",
+      "source": "https://commons.wikimedia.org/wiki/File:Long-haired_Dachshund_Rosie.jpg",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sha256": "948dd40f89c0dc47ceddceb1ab091725214ec2f5469a7e341c7a2a1f0d9e2f9c"
+    }
+  ]
+}
