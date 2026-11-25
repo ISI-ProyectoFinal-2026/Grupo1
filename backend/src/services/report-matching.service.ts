@@ -55,17 +55,22 @@ export async function findAndStoreMatches(reportId: number): Promise<number> {
   // `<=>` es distancia COSENO (la de la calibración y la del índice HNSW
   // vector_cosine_ops); `<->` es L2 y no da la similitud coseno.
   // ST_DWithin mide en metros solo con geography: `location` es geometry en grados.
+  // Búsqueda exacta (ADR-0032, #336): filtrar antes de ordenar evita que HNSW pierda candidatos.
   const candidates = await prisma.$queryRaw<MatchCandidate[]>`
-    SELECT r.id, 1 - (re.embedding <=> ${source.embedding}::vector) AS similarity
-    FROM reports r
-    JOIN report_embeddings re ON re.report_id = r.id
-    WHERE r.status = 'published'
-      AND r.report_type != CAST(${source.reportType} AS report_type)
-      AND r.id != ${reportId}
-      AND ST_DWithin(r.location::geography, CAST(${source.location} AS geography), ${config.radiusMeters}::float8)
-      AND r.created_at > NOW() - make_interval(days => ${config.windowDays}::int)
-      AND ${activeAuthorSql(Prisma.sql`r.user_id`, now)}
-    ORDER BY re.embedding <=> ${source.embedding}::vector ASC
+    WITH filtered AS MATERIALIZED (
+      SELECT r.id, re.embedding
+      FROM reports r
+      JOIN report_embeddings re ON re.report_id = r.id
+      WHERE r.status = 'published'
+        AND r.report_type != CAST(${source.reportType} AS report_type)
+        AND r.id != ${reportId}
+        AND ST_DWithin(r.location::geography, CAST(${source.location} AS geography), ${config.radiusMeters}::float8)
+        AND r.created_at > NOW() - make_interval(days => ${config.windowDays}::int)
+        AND ${activeAuthorSql(Prisma.sql`r.user_id`, now)}
+    )
+    SELECT id, 1 - (embedding <=> ${source.embedding}::vector) AS similarity
+    FROM filtered
+    ORDER BY embedding <=> ${source.embedding}::vector ASC
     LIMIT ${config.topK}
   `;
 

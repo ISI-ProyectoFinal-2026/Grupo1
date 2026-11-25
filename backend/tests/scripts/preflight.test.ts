@@ -20,6 +20,7 @@ import {
   checkAiService,
   checkInternalKey,
   checkOsmTiles,
+  checkPgvector,
   checkR2,
   checkSmtp,
   formatPreflightReport,
@@ -284,6 +285,34 @@ describe("runPreflight", () => {
     ]);
 
     expect(results[0]).toMatchObject({ status: "FAIL", message: expect.stringContaining("boom") });
+  });
+});
+
+describe("checkPgvector", () => {
+  test("OK con la versión instalada", async () => {
+    await expect(checkPgvector(async () => "0.8.6")).resolves.toEqual({
+      status: "OK",
+      message: expect.stringContaining("0.8.6"),
+    });
+  });
+
+  test("FAIL si la extensión no está instalada", async () => {
+    await expect(checkPgvector(async () => null)).resolves.toMatchObject({ status: "FAIL" });
+  });
+
+  test("FAIL si la versión no soporta HNSW", async () => {
+    await expect(checkPgvector(async () => "0.4.4")).resolves.toMatchObject({
+      status: "FAIL",
+      message: expect.stringContaining("0.5.0"),
+    });
+  });
+
+  test("FAIL si la base no responde", async () => {
+    await expect(
+      checkPgvector(async () => {
+        throw new Error("connection refused");
+      })
+    ).resolves.toMatchObject({ status: "FAIL", message: expect.stringContaining("connection refused") });
   });
 });
 

@@ -1,5 +1,6 @@
 import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import { pingAiService } from "../config/ai-service";
+import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { createMailSender } from "../services/mail";
 import { SmtpMailSender } from "../services/mail/smtp-mail-sender";
@@ -140,8 +141,42 @@ export async function checkSmtp(env: NodeJS.ProcessEnv = process.env): Promise<C
   return ok(`El servidor SMTP ${env.SMTP_HOST} acepta la conexión`);
 }
 
+// versión mínima con índices HNSW (ADR-0032, #336)
+const PGVECTOR_MIN_VERSION = [0, 5, 0];
+
+async function readPgvectorVersion(): Promise<string | null> {
+  const rows = await prisma.$queryRaw<{ extversion: string }[]>`
+    SELECT extversion FROM pg_extension WHERE extname = 'vector'
+  `;
+  return rows[0]?.extversion ?? null;
+}
+
+function isAtLeast(version: string, minimum: number[]): boolean {
+  const parts = version.split(".").map((part) => parseInt(part, 10) || 0);
+  for (let i = 0; i < minimum.length; i++) {
+    if ((parts[i] ?? 0) !== minimum[i]) return (parts[i] ?? 0) > minimum[i];
+  }
+  return true;
+}
+
+export async function checkPgvector(readVersion: () => Promise<string | null> = readPgvectorVersion): Promise<CheckOutcome> {
+  let version: string | null;
+  try {
+    version = await readVersion();
+  } catch (error) {
+    return fail(`No se pudo consultar la base de datos: ${errorMessage(error)}`);
+  }
+  const minimum = PGVECTOR_MIN_VERSION.join(".");
+  if (!version) return fail("La extensión pgvector no está instalada (revisá la imagen docker/postgres)");
+  if (!isAtLeast(version, PGVECTOR_MIN_VERSION)) {
+    return fail(`pgvector ${version} no soporta índices HNSW; se requiere ${minimum} o superior`);
+  }
+  return ok(`pgvector ${version} instalado`);
+}
+
 export function defaultChecks(env: NodeJS.ProcessEnv = process.env): PreflightCheck[] {
   return [
+    { name: "pgvector", run: () => checkPgvector() },
     { name: "R2", run: () => checkR2(env) },
     { name: "INTERNAL_API_KEY", run: () => checkInternalKey(env) },
     { name: "Backend IA", run: () => checkAiService(env) },
