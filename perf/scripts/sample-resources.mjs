@@ -65,7 +65,7 @@ ${name} ${Number(v)}
               g('perf_pg_connections_active', 'Conexiones activas a Postgres', m.pgActive)
           : '',
       )
-    }).listen(metricsPort)
+    }).listen(metricsPort, '127.0.0.1')
   : null
 
 let stop = false

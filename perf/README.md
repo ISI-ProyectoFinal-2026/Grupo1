@@ -206,6 +206,7 @@ docker compose -f perf/observability/docker-compose.yml down       # sin -v: se 
 ```
 
 - Ver en http://localhost:3000 (acceso anónimo de solo lectura): `Carga y recursos` (p95, RPS, VUs y error de k6 + CPU/RSS del backend y conexiones de Postgres en el mismo eje de tiempo), `Recursos del backend` y `k6 Prometheus` (dashboard oficial 19665 de Grafana k6, revisión 3, vendorizado).
+- Prometheus (`:9090`), Grafana (`:3000`) y el `/metrics` del sampler (`:9101`) escuchan solo en `127.0.0.1`; no son accesibles desde la red local.
 - Las métricas de k6 llevan el tag `testid`; el dashboard lo ofrece como filtro. Los percentiles llegan como gauges (`k6_http_req_duration_p95`) por `K6_PROMETHEUS_RW_TREND_STATS`.
 - `--metrics-port=<n>` del sampler sirve `/metrics` (`perf_backend_cpu_percent_of_core`, `perf_backend_rss_bytes`, `perf_system_cpu_percent`, `perf_pg_connections`, `perf_pg_connections_active`); sin el flag no cambia nada. Prometheus lo scrapea cada 5 s por `host.docker.internal:9101`.
 - `node perf/observability/capture.mjs --from=<ms> --to=<ms> --out=<png>` captura el dashboard combinado con Chromium de Playwright.
