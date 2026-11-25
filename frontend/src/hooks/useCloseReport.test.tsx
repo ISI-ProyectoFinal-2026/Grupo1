@@ -4,6 +4,8 @@ import { createQueryWrapper } from '@/test/query-wrapper'
 import * as reportsService from '@/services/reports.service'
 import { useCloseReport } from '@/hooks/useCloseReport'
 import { useReportDetailQuery } from '@/hooks/useReportDetailQuery'
+import { inactivityWarningQueryKey } from '@/hooks/useInactivityWarningQuery'
+import { myReportsQueryKey } from '@/hooks/useMyReportsQuery'
 import type { ReportDTO } from '@/types/report.types'
 
 vi.mock('@/services/reports.service')
@@ -63,6 +65,21 @@ describe('useCloseReport', () => {
     await waitFor(() => expect(result.current.detalle.data?.status).toBe('resolved'))
     expect(reportsService.closeReport).toHaveBeenCalledWith(5)
     expect(result.current.cierre.error).toBeNull()
+  })
+
+  // el backend marca leídos los avisos de inactividad al cerrar (#332)
+  it('al cerrar invalida notificaciones, aviso de inactividad, feed y mis reportes', async () => {
+    vi.mocked(reportsService.closeReport).mockResolvedValue(reporte({ status: 'resolved' }))
+    const { Wrapper, client } = createQueryWrapper()
+    const invalidar = vi.spyOn(client, 'invalidateQueries')
+    const { result } = renderHook(() => useCloseReport(5), { wrapper: Wrapper })
+
+    act(() => result.current.close())
+
+    await waitFor(() => expect(invalidar).toHaveBeenCalledWith({ queryKey: ['notifications'] }))
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: inactivityWarningQueryKey(5) })
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: ['reports'] })
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: myReportsQueryKey })
   })
 
   it('ante un 409 avisa que el reporte ya estaba cerrado', async () => {

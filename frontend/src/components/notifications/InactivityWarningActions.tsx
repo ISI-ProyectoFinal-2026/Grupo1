@@ -4,13 +4,23 @@ import { useInactivityWarningActions } from '@/hooks/useInactivityWarningActions
 interface InactivityWarningActionsProps {
   reportId: number
   isRead: boolean
+  onAction?: () => void
 }
 
 const buttonClasses =
   'press inline-flex min-h-11 items-center rounded-control px-3 text-sm font-bold disabled:opacity-50'
 
-function InactivityWarningActions({ reportId, isRead }: InactivityWarningActionsProps) {
-  const { close, keep, isPending, done, succeeded, error } = useInactivityWarningActions(reportId)
+function InactivityWarningActions({ reportId, isRead, onAction }: InactivityWarningActionsProps) {
+  const actions = useInactivityWarningActions(reportId)
+  const { isPending, done, succeeded, error } = actions
+  const close = () => {
+    onAction?.()
+    actions.close()
+  }
+  const keep = () => {
+    onAction?.()
+    actions.keep()
+  }
 
   return (
     <div className='mt-2'>
