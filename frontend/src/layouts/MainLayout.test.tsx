@@ -442,6 +442,36 @@ describe('MainLayout', () => {
     expect(clearSpy).toHaveBeenCalled()
   })
 
+  it('revoca el JWT en el backend antes de limpiar la sesion local', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    renderLayout()
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /cerrar sesión/i }))
+
+    expect(authService.logout).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(useAuthStore.getState().token).toBeNull())
+  })
+
+  it('cierra la sesion local aunque falle el logout del backend', async () => {
+    useAuthStore.setState({ token: 'token', user: usuario })
+    vi.mocked(authService.logout).mockRejectedValue(new Error('network'))
+    const { Wrapper, client } = createQueryWrapper()
+    const clearSpy = vi.spyOn(client, 'clear')
+
+    render(
+      <Wrapper>
+        <MemoryRouter>
+          <MainLayout />
+        </MemoryRouter>
+      </Wrapper>
+    )
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /cerrar sesión/i }))
+
+    await waitFor(() => expect(useAuthStore.getState().token).toBeNull())
+    expect(clearSpy).toHaveBeenCalled()
+  })
+
   // Cubre al usuario que verificó desde otro dispositivo: el store persistido
   // dice "sin verificar" hasta que /me lo corrige al abrir la app.
   it('refresca el usuario contra /auth/me al montar con sesion', async () => {

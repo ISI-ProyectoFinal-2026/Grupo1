@@ -15,6 +15,11 @@ export function login(input: LoginInput): Promise<LoginResponse> {
   return api.post<LoginResponse>("/auth/login", input).then((res) => res.data);
 }
 
+// Revoca el JWT en el backend (204 sin cuerpo).
+export function logout(): Promise<void> {
+  return api.post("/auth/logout").then(() => undefined);
+}
+
 export function register(input: RegisterInput): Promise<AuthUser> {
   return api.post<AuthUser>("/auth/register", input).then((res) => res.data);
 }
