@@ -1,5 +1,5 @@
 import { ShieldIcon } from "@/components/ui/icons";
-import { formatResetDate } from "@/utils/two-factor";
+import { formatResetDate } from "@/lib/two-factor";
 
 interface TwoFactorEnabledPanelProps {
   recoveryCodesRemaining: number;

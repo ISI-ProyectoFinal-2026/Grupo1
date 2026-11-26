@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import InactivityWarningBanner from '@/components/reports/InactivityWarningBanner'
 import { createQueryWrapper } from '@/test/query-wrapper'
+import { inactivityWarningQueryKey } from '@/hooks/useInactivityWarningQuery'
 import { useAuthStore } from '@/stores/auth.store'
 import * as reportsService from '@/services/reports.service'
 import type { InactivityWarningDTO, ReportDTO, ReportStatus } from '@/types/report.types'
@@ -131,5 +132,33 @@ describe('InactivityWarningBanner', () => {
 
     expect(reportsService.closeReport).toHaveBeenCalledWith(5)
     expect(await screen.findByRole('status')).toHaveTextContent('Cerraste el reporte.')
+  })
+
+  // cerrar, editar o confirmar desde otro lado marca el aviso como leído (#332)
+  it('si el aviso deja de estar pendiente por otra acción, el banner desaparece', async () => {
+    vi.mocked(reportsService.getInactivityWarning).mockResolvedValue(aviso(30))
+    const { Wrapper, client } = createQueryWrapper()
+    render(<InactivityWarningBanner report={{ id: 5, userId: OWNER_ID, status: 'published' } as ReportDTO} />, {
+      wrapper: Wrapper,
+    })
+    await screen.findByRole('button', { name: 'Caso resuelto' })
+
+    vi.mocked(reportsService.getInactivityWarning).mockResolvedValue(aviso(null, false))
+    await client.invalidateQueries({ queryKey: inactivityWarningQueryKey(5) })
+
+    await waitFor(() => expect(screen.queryByRole('button')).not.toBeInTheDocument())
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('si el reporte pasa a resuelto desde otro lado, el banner desaparece', async () => {
+    vi.mocked(reportsService.getInactivityWarning).mockResolvedValue(aviso(30))
+    const { Wrapper } = createQueryWrapper()
+    const report = { id: 5, userId: OWNER_ID, status: 'published' } as ReportDTO
+    const { rerender } = render(<InactivityWarningBanner report={report} />, { wrapper: Wrapper })
+    await screen.findByRole('button', { name: 'Caso resuelto' })
+
+    rerender(<InactivityWarningBanner report={{ ...report, status: 'resolved' }} />)
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })

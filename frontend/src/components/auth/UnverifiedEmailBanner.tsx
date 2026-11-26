@@ -1,6 +1,6 @@
 import ResendVerificationButton from "@/components/auth/ResendVerificationButton";
 import { useAuthStore } from "@/stores/auth.store";
-import { isEmailUnverified } from "@/utils/email-verification";
+import { isEmailUnverified } from "@/lib/email-verification";
 
 /** Banner global para quien tiene sesión pero todavía no verificó su email. */
 function UnverifiedEmailBanner() {

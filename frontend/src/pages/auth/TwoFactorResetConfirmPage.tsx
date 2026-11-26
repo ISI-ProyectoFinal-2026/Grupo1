@@ -6,7 +6,7 @@ import { buttonClasses } from "@/components/ui/buttonClasses";
 import { useConfirmTwoFactorReset } from "@/hooks/useConfirmTwoFactorReset";
 import { useUrlToken } from "@/hooks/useUrlToken";
 import { getApiErrorStatus } from "@/services/api";
-import { formatResetDate } from "@/utils/two-factor";
+import { formatResetDate } from "@/lib/two-factor";
 
 const INVALID_LINK_MESSAGE = "El enlace es inválido o expiró";
 const LINK_REJECTED_STATUS = 400;

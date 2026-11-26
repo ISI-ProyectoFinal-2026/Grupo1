@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { closeReport } from '@/services/reports.service'
 import { getApiErrorStatus } from '@/services/api'
 import { reportDetailQueryKey } from '@/hooks/useReportDetailQuery'
+import { invalidateInactivityWarnings } from '@/hooks/useInactivityWarningQuery'
+import { myReportsQueryKey } from '@/hooks/useMyReportsQuery'
 
 const ALREADY_CLOSED_MESSAGE = 'Este reporte ya estaba cerrado.'
 
@@ -11,7 +13,12 @@ export function useCloseReport(reportId: number) {
   // cache del detalle para que la página lo muestre sin otro GET.
   const mutation = useMutation({
     mutationFn: () => closeReport(reportId),
-    onSuccess: (report) => queryClient.setQueryData(reportDetailQueryKey(reportId), report),
+    onSuccess: (report) => {
+      queryClient.setQueryData(reportDetailQueryKey(reportId), report)
+      invalidateInactivityWarnings(queryClient, reportId)
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: myReportsQueryKey })
+    },
     // Un 409 significa que el detalle en pantalla quedó viejo: se vuelve a pedir.
     onError: (error) => {
       if (getApiErrorStatus(error) === 409) {

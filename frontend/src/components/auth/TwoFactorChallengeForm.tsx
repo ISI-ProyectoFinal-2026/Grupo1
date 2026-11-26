@@ -1,8 +1,8 @@
 import type { FormEvent } from "react";
 import ErrorMessage from "@/components/ui/ErrorMessage";
 import { buttonClasses } from "@/components/ui/buttonClasses";
-import { formatResetDate } from "@/utils/two-factor";
-import type { SecondFactorMode } from "@/utils/two-factor";
+import { formatResetDate } from "@/lib/two-factor";
+import type { SecondFactorMode } from "@/lib/two-factor";
 
 interface TwoFactorChallengeFormProps {
   mode: SecondFactorMode;

@@ -9,7 +9,7 @@ import { useResetPassword } from "@/hooks/useResetPassword";
 import { useUrlToken } from "@/hooks/useUrlToken";
 import { getApiErrorDetails, getApiErrorStatus } from "@/services/api";
 import { useAuthStore } from "@/stores/auth.store";
-import { getPasswordErrors } from "@/utils/password-rules";
+import { getPasswordErrors } from "@/lib/password-rules";
 
 const INVALID_LINK_MESSAGE = "El enlace es inválido o expiró";
 

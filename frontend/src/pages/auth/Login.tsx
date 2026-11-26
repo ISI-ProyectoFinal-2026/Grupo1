@@ -13,14 +13,14 @@ import { login } from "@/services/auth.service";
 import { loginWithTwoFactor, requestTwoFactorReset } from "@/services/two-factor.service";
 import { useAuthStore } from "@/stores/auth.store";
 import { isTwoFactorChallenge, TWO_FACTOR_CHALLENGE_INVALID, TWO_FACTOR_LOCKED } from "@/types/auth";
-import { postLoginPath } from "@/utils/redirect";
+import { postLoginPath } from "@/lib/redirect";
 import type { AuthUser, SuspensionDetails } from "@/types/auth";
 import {
   formatWaitMessage,
   getRetryAfterSeconds,
   normalizeSecondFactorCode,
-} from "@/utils/two-factor";
-import type { SecondFactorMode } from "@/utils/two-factor";
+} from "@/lib/two-factor";
+import type { SecondFactorMode } from "@/lib/two-factor";
 
 const DEFAULT_ERROR_MESSAGE = "Error inesperado, intentá de nuevo";
 

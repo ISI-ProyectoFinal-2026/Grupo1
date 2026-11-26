@@ -32,12 +32,13 @@ import EditPetPage from "./pages/pets/EditPetPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import SanctionQueuePage from "./pages/admin/SanctionQueuePage";
 import NotFound from "./pages/NotFound";
+import RouteError from "./pages/RouteError";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <MainLayout />,
-    errorElement: <NotFound />,
+    errorElement: <RouteError />,
     children: [
       {
         element: <GuestOnlyRoute />,

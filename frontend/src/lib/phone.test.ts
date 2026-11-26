@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getPhoneError } from '@/utils/phone'
+import { getPhoneError } from '@/lib/phone'
 
 describe('getPhoneError', () => {
   it.each([

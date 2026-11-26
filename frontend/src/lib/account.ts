@@ -8,7 +8,7 @@ import {
   TWO_FACTOR_CODE_REQUIRED,
   TWO_FACTOR_LOCKED,
 } from '@/types/auth'
-import { getSecondFactorErrorMessage } from '@/utils/two-factor'
+import { getSecondFactorErrorMessage } from '@/lib/two-factor'
 
 const TOO_MANY_REQUESTS = 429
 const DEFAULT_ERROR_MESSAGE = 'Error inesperado, intentá de nuevo'
