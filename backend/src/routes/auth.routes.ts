@@ -39,6 +39,7 @@ authRouter.post("/2fa/recovery-codes", twoFactorLimiter, requireAuth, twoFactorC
 authRouter.post("/2fa/reset/request", accountLimiter, twoFactorController.requestReset);
 authRouter.post("/2fa/reset/confirm", accountLimiter, twoFactorController.confirmReset);
 authRouter.post("/2fa/reset/cancel", accountLimiter, twoFactorController.cancelReset);
+authRouter.post("/logout", requireAuth, authController.logout);
 authRouter.get("/me", requireAuth, authController.me);
 authRouter.patch("/me", requireAuth, profileUpdateLimiter, authController.updateMe);
 authRouter.get("/me/export", requireAuth, accountExportLimiter, authController.exportMe);

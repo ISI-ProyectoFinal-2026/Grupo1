@@ -31,6 +31,11 @@ export async function me(req: Request, res: Response): Promise<void> {
   res.status(200).json(user);
 }
 
+export async function logout(req: Request, res: Response): Promise<void> {
+  await authService.logout(req.userId!);
+  res.status(204).end();
+}
+
 export async function updateMe(req: Request, res: Response): Promise<void> {
   const data = updateProfileSchema.parse(req.body);
   const user = await authService.updateProfile(req.userId!, data);
