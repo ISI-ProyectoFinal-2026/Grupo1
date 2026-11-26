@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  # sampler de recursos (perf/scripts/sample-resources.mjs --metrics-port=9101)
+  - job_name: perf-resources
+    static_configs:
+      - targets: ['host.docker.internal:9101']

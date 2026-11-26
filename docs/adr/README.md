@@ -49,6 +49,7 @@ Cada decisión de arquitectura o tecnología del proyecto tiene un ADR corto en 
 | [ADR-0031](0031-demo-local-docker-compose.md) | Demo local con Docker Compose y una imagen por servicio | Aceptada | Matías Alvarado | — | — |
 | [ADR-0032](0032-busqueda-exacta-matching.md) | Búsqueda exacta de candidatos en el matching por similitud | Aceptada | Gabriel Valdivieso | — | — |
 | [ADR-0034](0034-cola-redis-pipeline-ia.md) | Cola Redis con BullMQ para el pipeline IA de los reportes | Aceptada | Gabriel Valdivieso | — | — |
+| [ADR-0035](0035-herramientas-pruebas-de-performance.md) | Herramientas de las pruebas de performance con k6, Lighthouse CI y un muestreador propio | Aceptada | Franco Marín | — | — |
 
 ## Pendientes
 

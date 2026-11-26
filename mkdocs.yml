@@ -124,4 +124,5 @@ nav:
       - adr/0020-sitio-web-del-informe.md
       - adr/0021-modelo-embeddings-dinov2.md
       - adr/0024-modelo-monetizacion.md
+      - adr/0035-herramientas-pruebas-de-performance.md
   - Registro: informe/README.md

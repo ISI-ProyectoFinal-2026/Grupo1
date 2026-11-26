@@ -1,0 +1,148 @@
+# Pruebas de performance (issue #40), solo manual.
+# Los runners compartidos de GitHub solo sirven para el smoke; las cifras de
+# carga y Lighthouse obtenidas acá son indicativas, no comparables con las locales.
+name: Performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: Factor de duración de la carga (PERF_SCALE)
+        type: string
+        default: "0.25"
+      k6_version:
+        description: Versión de k6 ("latest" o una versión exacta)
+        type: string
+        default: latest
+      run_load:
+        description: Ejecutar la prueba de carga después del smoke
+        type: boolean
+        default: true
+      run_lighthouse:
+        description: Ejecutar Lighthouse CI (móvil y escritorio)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  perf:
+    name: Performance (k6 + Lighthouse CI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PERF_DATABASE_URL: postgresql://patitas:patitas@localhost:5432/patitas_perf
+      DATABASE_URL: postgresql://patitas:patitas@localhost:5432/patitas_perf
+      JWT_SECRET: perf-jwt-secret-not-for-production
+      INTERNAL_API_KEY: perf-internal-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start PostgreSQL
+        run: |
+          docker build -t patitas-postgres ./docker/postgres
+          docker run -d \
+            --name postgres \
+            -e POSTGRES_USER=patitas \
+            -e POSTGRES_PASSWORD=patitas \
+            -e POSTGRES_DB=postgres \
+            -p 5432:5432 \
+            patitas-postgres
+          until docker exec postgres pg_isready -U patitas; do sleep 2; done
+          docker exec postgres psql -U patitas -d postgres -c "CREATE DATABASE patitas_perf"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --legacy-peer-deps
+
+      - name: Run migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      # el seed resuelve pg desde frontend/node_modules
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Seed performance database
+        run: node perf/seed/seed.mjs --users=2000 --reports=1000
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1.2.2
+        with:
+          k6-version: ${{ inputs.k6_version }}
+
+      # start-env.mjs levanta el stub de IA y el backend compilado (NODE_ENV=test)
+      - name: Start backend and AI stub
+        run: |
+          mkdir -p perf/results
+          node perf/scripts/start-env.mjs > perf/results/env.log 2>&1 &
+          timeout 120 bash -c 'until curl -fs http://localhost:3001/health > /dev/null; do sleep 2; done' || { cat perf/results/env.log; exit 1; }
+
+      - name: k6 smoke
+        run: k6 run perf/smoke.js
+        env:
+          K6_WEB_DASHBOARD: "true"
+          K6_WEB_DASHBOARD_EXPORT: perf/results/smoke.html
+
+      # continue-on-error: un threshold fallido no debe impedir subir los reportes
+      - name: k6 load
+        if: ${{ inputs.run_load }}
+        continue-on-error: true
+        env:
+          PERF_SCALE: ${{ inputs.scale }}
+          K6_WEB_DASHBOARD: "true"
+          K6_WEB_DASHBOARD_EXPORT: perf/results/load.html
+        run: |
+          [[ "$PERF_SCALE" =~ ^[0-9]+([.][0-9]+)?$ ]] || { echo "scale inválido: $PERF_SCALE"; exit 1; }
+          k6 run -e PERF_SCALE="$PERF_SCALE" perf/load.js
+
+      - name: Build frontend
+        if: ${{ inputs.run_lighthouse }}
+        working-directory: frontend
+        run: npm run build
+
+      # vite preview proxea /api al backend en 3001; los umbrales viven en los lighthouserc.
+      # run-lighthouse.mjs usa perf/data/report-ids.json (lo genera el seed) para /reports/:id
+      - name: Lighthouse CI
+        if: ${{ inputs.run_lighthouse }}
+        continue-on-error: true
+        run: |
+          npm --prefix frontend run preview -- --port 4173 > perf/results/preview.log 2>&1 &
+          timeout 120 bash -c 'until curl -fs http://localhost:4173 > /dev/null; do sleep 2; done' || { cat perf/results/preview.log; exit 1; }
+          node perf/scripts/run-lighthouse.mjs || status=$?
+          node perf/scripts/summarize-lighthouse.mjs
+          exit ${status:-0}
+
+      - name: Upload performance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results
+          path: |
+            perf/results/*.html
+            perf/results/*.summary.json
+            perf/results/*.slo.md
+            perf/results/*.log
+            perf/results/lighthouse/
+          if-no-files-found: warn
+          retention-days: 14
