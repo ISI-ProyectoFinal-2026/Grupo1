@@ -102,7 +102,7 @@ function member() {
   track('mine', mine)
   think(...THINK)
   const notifications = get('notifications', '/api/notifications', token)
-  checkStep(notifications, 'notifications', 200, (b) => Array.isArray(b))
+  checkStep(notifications, 'notifications', 200, (b) => Array.isArray(b.items))
   track('notifications', notifications)
 }
 

@@ -3,12 +3,27 @@ import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { isAuthorSuspended } from "./account-sanctions/visibility";
 import { isNotificationEnabled } from "./notification-preferences.service";
+import { CursorPage, KeysetCursor, keysetOrderDesc, olderThan, toCursorPage } from "../utils/keyset-cursor";
 
-export async function listByUser(userId: number): Promise<Notification[]> {
-  return prisma.notification.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
+interface ListByUserOptions {
+  limit: number;
+  cursor?: KeysetCursor;
+}
+
+export async function listByUser(
+  userId: number,
+  { limit, cursor }: ListByUserOptions
+): Promise<CursorPage<Notification>> {
+  const rows = await prisma.notification.findMany({
+    where: { userId, ...(cursor ? olderThan(cursor) : {}) },
+    orderBy: keysetOrderDesc,
+    take: limit + 1,
   });
+  return toCursorPage(rows, limit);
+}
+
+export async function countUnread(userId: number): Promise<number> {
+  return prisma.notification.count({ where: { userId, isRead: false } });
 }
 
 async function findOwnedOrThrow(notificationId: number, userId: number): Promise<Notification> {

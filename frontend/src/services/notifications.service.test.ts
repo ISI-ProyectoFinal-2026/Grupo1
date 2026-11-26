@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/services/api'
 import {
   deleteNotification,
+  getUnreadNotificationsCount,
   listNotifications,
   markNotificationAsRead,
 } from '@/services/notifications.service'
@@ -36,14 +37,29 @@ describe('notifications.service', () => {
     vi.clearAllMocks()
   })
 
-  it('lista las notificaciones desde /notifications', async () => {
-    const esperadas = [notificacion(), notificacion({ id: 2, isRead: true })]
+  it('lista la primera pagina desde /notifications', async () => {
+    const esperadas = { items: [notificacion(), notificacion({ id: 2, isRead: true })], nextCursor: 'c1' }
     vi.mocked(api.get).mockResolvedValue(respuesta(esperadas))
 
     const resultado = await listNotifications()
 
-    expect(api.get).toHaveBeenCalledWith('/notifications')
+    expect(api.get).toHaveBeenCalledWith('/notifications', { params: undefined })
     expect(resultado).toEqual(esperadas)
+  })
+
+  it('pide la pagina siguiente con el cursor (#338)', async () => {
+    vi.mocked(api.get).mockResolvedValue(respuesta({ items: [], nextCursor: null }))
+
+    await listNotifications('c1')
+
+    expect(api.get).toHaveBeenCalledWith('/notifications', { params: { cursor: 'c1' } })
+  })
+
+  it('trae el contador de no leidas desde /notifications/unread-count', async () => {
+    vi.mocked(api.get).mockResolvedValue(respuesta({ count: 4 }))
+
+    await expect(getUnreadNotificationsCount()).resolves.toBe(4)
+    expect(api.get).toHaveBeenCalledWith('/notifications/unread-count')
   })
 
   it('marca como leida contra /notifications/:id/read', async () => {

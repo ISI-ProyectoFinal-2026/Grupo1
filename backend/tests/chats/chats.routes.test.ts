@@ -143,9 +143,51 @@ describe("/api/chats", () => {
     const res = await request(app).get(`/api/chats/${chatId}/messages`).set("Authorization", `Bearer ${tokenA}`);
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((m: { id: number }) => m.id);
+    const ids = res.body.items.map((m: { id: number }) => m.id);
     expect(ids.indexOf(first.id)).toBeLessThan(ids.indexOf(second.id));
   });
+
+  // #338: últimos N y cursor para cargar anteriores
+  test("GET /api/chats/:id/messages devuelve los últimos N y carga los anteriores con el cursor", async () => {
+    const chat = await prisma.chat.create({ data: { userAId, userBId } });
+    createdChatIds.push(chat.id);
+    const sameInstant = new Date("2024-02-01T00:00:00.000Z");
+    const seeded = [];
+    for (let i = 0; i < 5; i++) {
+      // mismo instante en todos: el orden lo define el desempate por id
+      seeded.push(
+        await prisma.message.create({
+          data: { chatId: chat.id, senderId: userAId, content: `m${i}`, createdAt: sameInstant },
+        })
+      );
+    }
+    const ids = seeded.map((m) => m.id);
+    const get = (query: Record<string, string | number>) =>
+      request(app).get(`/api/chats/${chat.id}/messages`).query(query).set("Authorization", `Bearer ${tokenA}`);
+
+    const latest = await get({ limit: 2 });
+    expect(latest.status).toBe(200);
+    expect(latest.body.items.map((m: { id: number }) => m.id)).toEqual(ids.slice(3));
+    expect(typeof latest.body.nextCursor).toBe("string");
+
+    const older = await get({ limit: 2, cursor: latest.body.nextCursor });
+    expect(older.body.items.map((m: { id: number }) => m.id)).toEqual(ids.slice(1, 3));
+
+    const oldest = await get({ limit: 2, cursor: older.body.nextCursor });
+    expect(oldest.body.items.map((m: { id: number }) => m.id)).toEqual(ids.slice(0, 1));
+    expect(oldest.body.nextCursor).toBeNull();
+  });
+
+  test.each([{ limit: 0 }, { limit: 51 }, { cursor: "x" }])(
+    "GET /api/chats/:id/messages responde 400 con query inválida %o",
+    async (query) => {
+      const res = await request(app)
+        .get(`/api/chats/${chatId}/messages`)
+        .query(query)
+        .set("Authorization", `Bearer ${tokenA}`);
+      expect(res.status).toBe(400);
+    }
+  );
 
   test("GET /api/chats/:id/messages responde 403 si el usuario no participa del chat", async () => {
     const res = await request(app)

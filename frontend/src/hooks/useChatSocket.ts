@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { io, type Socket } from 'socket.io-client'
-import { chatMessagesQueryKey } from '@/hooks/useChatMessagesQuery'
+import { appendMessage, chatMessagesQueryKey, type ChatMessagesData } from '@/hooks/useChatMessagesQuery'
 import { chatsQueryKey } from '@/hooks/useChatsQuery'
 import { getApiErrorCode } from '@/services/api'
 import { sendMessage as sendMessageRest } from '@/services/chats.service'
@@ -18,14 +18,6 @@ type ChatClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>
 
 // vacio => ruta relativa y proxy de vite (ver vite.config.ts)
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? ''
-
-function appendMessage(current: MessageDTO[] | undefined, message: MessageDTO): MessageDTO[] {
-  const previous = current ?? []
-  if (previous.some((item) => item.id === message.id)) {
-    return previous
-  }
-  return [...previous, message]
-}
 
 export function useChatSocket(chatId: number | undefined) {
   const token = useAuthStore((state) => state.token)
@@ -106,7 +98,7 @@ export function useChatSocket(chatId: number | undefined) {
     }
 
     function handleReceiveMessage(message: MessageDTO) {
-      queryClient.setQueryData<MessageDTO[]>(chatMessagesQueryKey(message.chatId), (current) =>
+      queryClient.setQueryData<ChatMessagesData>(chatMessagesQueryKey(message.chatId), (current) =>
         appendMessage(current, message)
       )
     }
@@ -165,7 +157,7 @@ export function useChatSocket(chatId: number | undefined) {
         // sin socket el mensaje igual se persiste por REST
         try {
           const message = await sendMessageRest(chatId, input)
-          queryClient.setQueryData<MessageDTO[]>(chatMessagesQueryKey(chatId), (current) =>
+          queryClient.setQueryData<ChatMessagesData>(chatMessagesQueryKey(chatId), (current) =>
             appendMessage(current, message)
           )
           setError(null)
@@ -188,7 +180,7 @@ export function useChatSocket(chatId: number | undefined) {
           }
           setError(null)
           setErrorCode(null)
-          queryClient.setQueryData<MessageDTO[]>(chatMessagesQueryKey(chatId), (current) =>
+          queryClient.setQueryData<ChatMessagesData>(chatMessagesQueryKey(chatId), (current) =>
             appendMessage(current, response.data)
           )
           resolve(response.data)

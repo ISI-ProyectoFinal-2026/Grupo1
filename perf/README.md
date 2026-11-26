@@ -133,7 +133,7 @@ node perf/scripts/compare-volume.mjs
 - Duración: warm-up `60 s × PERF_SCALE` (tag `step=warmup`, no se evalúa) + medición `300 s × PERF_SCALE` (`step=measure`). `VOLUME_WARMUP_S` / `VOLUME_MEASURE_S` fijan los segundos. Los 400 s del sampler cubren `PERF_SCALE=1` (360 s + cierre).
 - Mezcla `VOLUME_VISITOR_WEIGHT` (default 70): 70 % visitante (feed + detalle ×2-3) y 30 % usuario (login + `GET /api/reports/mine` + `GET /api/notifications`, tag `name=notifications`). Think time 0,2-0,5 s. VUs: `VOLUME_PRE_VUS` 50 / `VOLUME_MAX_VUS` 300.
 - Tamaño de respuesta: `Trend` `feed_body_bytes`, `detail_body_bytes`, `mine_body_bytes`, `notifications_body_bytes` (`res.body.length`, solo fase medida).
-- El seed no genera notificaciones: `GET /api/notifications` devuelve lista vacía en ambos volúmenes (mide el costo de la consulta, no el tamaño de la respuesta).
+- El seed no genera notificaciones: `GET /api/notifications` devuelve lista vacía en ambos volúmenes (mide el costo de la consulta, no el tamaño de la respuesta). Desde #338 la respuesta es paginada (`{ items, nextCursor }`, 20 por defecto).
 - Criterio: SLO-1 (p95 < 500 ms por endpoint, sin login) cumplido a 10x, y error < 1 % (SLO-3). Los thresholds de k6 se aplican solo a `step:measure`.
 - Salidas por corrida: `volume.<label>.summary.json`, `volume.<label>.slo.md`, `volume.<label>.html`. `compare-volume.mjs` genera `volume.compare.md` (tabla 1x vs 10x: p95, error %, bytes de respuesta, SLO-1) y `volume.compare.json` (series por endpoint para gráficos de barras: `p95Ms`, `errorPct`, `bodyBytes`).
 - Para comparar solo cambia el volumen de la base: backend, stub y parámetros de k6 deben ser idénticos entre ambas corridas.
@@ -248,6 +248,19 @@ Limitaciones:
 - Tras la corrida la base queda con reportes y embeddings nuevos: volver a sembrar.
 - El sampler con `--aux-pids` sin `--pids` desplaza las columnas: las métricas del proceso auxiliar quedan en las columnas 10 y 11 (sin encabezado) y las columnas `aux1_*` repiten las del backend.
 
+## 15. Polling de notificaciones (#338)
+
+```bash
+node perf/seed/seed.mjs --users=2000 --reports=1000
+node perf/scripts/start-env.mjs                      # en otra terminal
+K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_EXPORT=perf/results/notifications-polling.html k6 run perf/notifications-polling.js
+```
+
+- Escenario "N usuarios con polling de notificaciones": cada VU inicia sesión una vez y consulta `GET /api/notifications/unread-count` (tag `name=unread_count`) cada `POLLING_INTERVAL_S` (default 30 s, el intervalo del frontend). La primera consulta de cada VU se desfasa al azar dentro del intervalo.
+- Modelo cerrado `ramping-vus`: 0→`POLLING_VUS` (default 200, la concurrencia de SLO-1) en 60 s, meseta 300 s, bajada 30 s; `PERF_SCALE` multiplica las duraciones.
+- Umbral: SLO-1 (p95 < 500 ms) y SLO-3 (error < 1 %) sobre `name=unread_count`; checks > 99 %. El login queda afuera.
+- Salidas: `notifications-polling.summary.json`, `notifications-polling.slo.md`.
+
 ## Variables de k6 (`-e NOMBRE=valor`)
 
 | Variable | Default | Uso |
@@ -257,6 +270,7 @@ Limitaciones:
 | `R2_PUBLIC_URL` | `https://pub-e2e.r2.dev` | origen de las imágenes |
 | `PERF_SCALE` | 1 | factor de duración de las etapas de `load.js` y `volume.js` |
 | `VOLUME_LABEL` / `VOLUME_RATE` | 1x / 3 | etiqueta de la corrida (1x, 10x) y tasa de `volume.js` (it/s) |
+| `POLLING_VUS` / `POLLING_INTERVAL_S` | 200 / 30 | usuarios y segundos entre consultas de `notifications-polling.js` |
 
 ## Resultados
 
@@ -266,4 +280,4 @@ En `perf/results/` (ignorado por git): `<nombre>.summary.json`, `<nombre>.slo.md
 
 - `lib/`: configuración, login, usuarios (`SharedArray`), think time, métricas (`matching_duration`, Apdex), flujos y `handleSummary`.
 - `seed/seed.mjs`: datos. `scripts/start-env.mjs`: entorno.
-- Tags `name`: feed, detail, create, matches, mine, flyer, login, me.
+- Tags `name`: feed, detail, create, matches, mine, flyer, login, me, notifications (`volume.js`), unread_count (`notifications-polling.js`).

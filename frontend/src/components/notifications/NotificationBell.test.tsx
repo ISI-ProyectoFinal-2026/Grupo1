@@ -24,6 +24,14 @@ function notificacion(overrides: Partial<NotificationDTO> = {}): NotificationDTO
   }
 }
 
+// contador del badge y lista del panel salen de endpoints distintos (#338)
+function mockServidor(lista: NotificationDTO[]) {
+  vi.mocked(notificationsService.listNotifications).mockResolvedValue({ items: lista, nextCursor: null })
+  vi.mocked(notificationsService.getUnreadNotificationsCount).mockResolvedValue(
+    lista.filter((n) => !n.isRead).length
+  )
+}
+
 function renderBell() {
   const { Wrapper } = createQueryWrapper()
   return render(<NotificationBell />, { wrapper: Wrapper })
@@ -35,7 +43,7 @@ describe('NotificationBell', () => {
   })
 
   it('muestra la cantidad de no leidas en el badge', async () => {
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([
+    mockServidor([
       notificacion({ id: 1 }),
       notificacion({ id: 2 }),
       notificacion({ id: 3, isRead: true }),
@@ -47,32 +55,58 @@ describe('NotificationBell', () => {
   })
 
   it('no muestra badge si esta todo leido', async () => {
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([
+    mockServidor([
       notificacion({ isRead: true }),
     ])
 
     renderBell()
 
-    await waitFor(() => expect(notificationsService.listNotifications).toHaveBeenCalled())
+    await waitFor(() => expect(notificationsService.getUnreadNotificationsCount).toHaveBeenCalled())
     expect(screen.queryByLabelText(/notificaciones sin leer/)).not.toBeInTheDocument()
+  })
+
+  it('con el panel cerrado no pide la lista, solo el contador (#338)', async () => {
+    mockServidor([notificacion()])
+
+    renderBell()
+
+    expect(await screen.findByLabelText('1 notificaciones sin leer')).toBeInTheDocument()
+    expect(notificationsService.listNotifications).not.toHaveBeenCalled()
+  })
+
+  it('carga mas notificaciones con Ver más', async () => {
+    const user = userEvent.setup()
+    vi.mocked(notificationsService.getUnreadNotificationsCount).mockResolvedValue(0)
+    vi.mocked(notificationsService.listNotifications)
+      .mockResolvedValueOnce({ items: [notificacion({ id: 2, title: 'Pagina uno' })], nextCursor: 'c1' })
+      .mockResolvedValueOnce({ items: [notificacion({ id: 1, title: 'Pagina dos' })], nextCursor: null })
+
+    renderBell()
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones' }))
+    await user.click(await screen.findByRole('button', { name: 'Ver más' }))
+
+    expect(await screen.findByText('Pagina dos')).toBeInTheDocument()
+    expect(screen.getByText('Pagina uno')).toBeInTheDocument()
+    expect(notificationsService.listNotifications).toHaveBeenLastCalledWith('c1')
+    expect(screen.queryByRole('button', { name: 'Ver más' })).not.toBeInTheDocument()
   })
 
   it('abre el panel y lista las notificaciones', async () => {
     const user = userEvent.setup()
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([
+    mockServidor([
       notificacion({ title: 'Posible coincidencia' }),
     ])
 
     renderBell()
     await user.click(await screen.findByRole('button', { name: 'Notificaciones' }))
 
-    expect(screen.getByText('Posible coincidencia')).toBeInTheDocument()
+    expect(await screen.findByText('Posible coincidencia')).toBeInTheDocument()
   })
 
   it('marcar como leida actualiza el badge', async () => {
     const user = userEvent.setup()
     const sinLeer = notificacion({ id: 5 })
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([sinLeer])
+    mockServidor([sinLeer])
     vi.mocked(notificationsService.markNotificationAsRead).mockResolvedValue({
       ...sinLeer,
       isRead: true,
@@ -82,10 +116,10 @@ describe('NotificationBell', () => {
     await user.click(await screen.findByRole('button', { name: 'Notificaciones' }))
     expect(await screen.findByLabelText('1 notificaciones sin leer')).toBeInTheDocument()
 
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([
+    mockServidor([
       { ...sinLeer, isRead: true },
     ])
-    await user.click(screen.getByRole('button', { name: 'Marcar como leída' }))
+    await user.click(await screen.findByRole('button', { name: 'Marcar como leída' }))
 
     await waitFor(() =>
       expect(screen.queryByLabelText(/notificaciones sin leer/)).not.toBeInTheDocument()
@@ -95,14 +129,14 @@ describe('NotificationBell', () => {
 
   it('elimina una notificacion desde el panel', async () => {
     const user = userEvent.setup()
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([notificacion({ id: 8 })])
+    mockServidor([notificacion({ id: 8 })])
     vi.mocked(notificationsService.deleteNotification).mockResolvedValue(undefined)
 
     renderBell()
     await user.click(await screen.findByRole('button', { name: 'Notificaciones' }))
 
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([])
-    await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+    mockServidor([])
+    await user.click(await screen.findByRole('button', { name: 'Eliminar' }))
 
     await waitFor(() => expect(notificationsService.deleteNotification).toHaveBeenCalledWith(8))
     expect(await screen.findByText('No tenés notificaciones')).toBeInTheDocument()
@@ -110,7 +144,7 @@ describe('NotificationBell', () => {
 
   it('cierra el panel al volver a clickear', async () => {
     const user = userEvent.setup()
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([
+    mockServidor([
       notificacion({ title: 'Posible coincidencia' }),
     ])
 
@@ -130,7 +164,7 @@ describe('NotificationBell', () => {
       title: 'Posible coincidencia',
       reportId: 30,
     })
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([coincidencia])
+    mockServidor([coincidencia])
     vi.mocked(notificationsService.markNotificationAsRead).mockResolvedValue({
       ...coincidencia,
       isRead: true,
@@ -148,7 +182,7 @@ describe('NotificationBell', () => {
       { wrapper: Wrapper }
     )
     await user.click(await screen.findByRole('button', { name: 'Notificaciones' }))
-    await user.click(screen.getByRole('link', { name: /Posible coincidencia/ }))
+    await user.click(await screen.findByRole('link', { name: /Posible coincidencia/ }))
 
     expect(screen.getByText('Detalle del reporte')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /Posible coincidencia/ })).not.toBeInTheDocument()

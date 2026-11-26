@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cursorPageQuerySchema } from "./pagination.validator";
 import { r2ImageUrlSchema } from "./shared.validator";
 
 export const createChatSchema = z.object({
@@ -9,6 +10,8 @@ export const createChatSchema = z.object({
 export const chatIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
+
+export const listMessagesQuerySchema = cursorPageQuerySchema(50);
 
 export const sendMessageBodySchema = z
   .object({

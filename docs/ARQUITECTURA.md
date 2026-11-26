@@ -594,7 +594,7 @@ GET /api/geo/reverse (proxy de Nominatim con caché, ADR-0025)
 ```http
 GET /api/chats
 POST /api/chats (create o get)
-GET /api/chats/:id/messages
+GET /api/chats/:id/messages?limit=&cursor= (últimos 50 por defecto, máx. 50; #338)
 POST /api/chats/:id/messages
 
 WebSocket: /ws/chat/:chat_id
@@ -602,7 +602,8 @@ WebSocket: /ws/chat/:chat_id
 
 ### Notificaciones
 ```http
-GET /api/notifications
+GET /api/notifications?limit=&cursor= (20 por defecto, máx. 50; #338)
+GET /api/notifications/unread-count
 PUT /api/notifications/:id/read
 DELETE /api/notifications/:id
 

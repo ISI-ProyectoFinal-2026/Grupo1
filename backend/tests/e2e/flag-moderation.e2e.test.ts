@@ -117,7 +117,7 @@ describe("E2E: moderación de reportes denunciados (B5)", () => {
     expect(asOwner.body.status).toBe("hidden");
 
     const notifications = await request(app).get("/api/notifications").set(auth(owner));
-    expect(notifications.body).toEqual(
+    expect(notifications.body.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ type: "report_status_change", title: "Tu reporte fue ocultado", reportId }),
       ])

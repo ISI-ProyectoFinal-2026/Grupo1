@@ -60,14 +60,22 @@ describe('chats.service', () => {
     expect(resultado).toEqual(creado)
   })
 
-  it('trae el historial desde GET /chats/:id/messages', async () => {
-    const historial = [mensaje()]
+  it('trae los ultimos mensajes desde GET /chats/:id/messages', async () => {
+    const historial = { items: [mensaje()], nextCursor: 'c1' }
     vi.mocked(api.get).mockResolvedValue(respuesta(historial))
 
     const resultado = await getMessages(3)
 
-    expect(api.get).toHaveBeenCalledWith('/chats/3/messages')
+    expect(api.get).toHaveBeenCalledWith('/chats/3/messages', { params: undefined })
     expect(resultado).toEqual(historial)
+  })
+
+  it('pide los mensajes anteriores con el cursor (#338)', async () => {
+    vi.mocked(api.get).mockResolvedValue(respuesta({ items: [], nextCursor: null }))
+
+    await getMessages(3, 'c1')
+
+    expect(api.get).toHaveBeenCalledWith('/chats/3/messages', { params: { cursor: 'c1' } })
   })
 
   // Este POST es el fallback REST: se usa cuando el socket no esta conectado,

@@ -82,7 +82,7 @@ describe("E2E: moderación de imágenes con el Backend IA (B2-B4)", () => {
       const notifications = await waitFor(async () => {
         const res = await request(app).get("/api/notifications").set(auth(owner));
         expect(res.status).toBe(200);
-        const found = res.body.filter(
+        const found = res.body.items.filter(
           (n: { type: string; reportId: number }) => n.type === "report_status_change" && n.reportId === reportId
         );
         return found.length > 0 ? found : undefined;
