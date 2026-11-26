@@ -47,13 +47,18 @@ Restantes (requieren upgrade mayor, no aplicado):
 
 25 vulnerabilidades únicas, **ninguna crítica**: 16 altas, 8 moderadas, 1 baja.
 
-| Paquete | Versión | Altas | Moderadas | Bajas | Versión corregida |
-|---|---|---|---|---|---|
-| `pillow` | 10.4.0 | 13 | 4 | 0 | 12.3.0 |
-| `starlette` | 0.38.6 | 3 | 3 | 1 | 1.3.1 |
-| `pytest` | 8.3.3 | 0 | 1 | 0 | 9.0.3 |
+| Paquete | Versión original | Altas | Moderadas | Bajas | Versión corregida | Aplicado en #321 |
+|---|---|---|---|---|---|---|
+| `pillow` | 10.4.0 | 13 | 4 | 0 | 12.3.0 | `pillow==12.3.0` |
+| `starlette` | 0.38.6 | 3 | 3 | 1 | 1.3.1 | `starlette==1.10.0` (vía `fastapi==0.165.0`, que exige `starlette>=1.6.0`) |
+| `pytest` | 8.3.3 | 0 | 1 | 0 | 9.0.3 | Pendiente (no incluido en #321) |
 
-No se modificaron: el upgrade cruza versiones mayores y puede afectar al pipeline de `torch`/`ultralytics`/`fastapi`. Requiere su propia verificación.
+`fastapi` pasa de 0.115.0 a 0.165.0. Ambas versiones requieren Python >= 3.11, compatible con la imagen `python:3.11-slim` del `Dockerfile`. Verificación: `pytest` 77 pasados y 2 omitidos; con `RUN_REAL_MODEL_TESTS=1`, `test_pipeline_real_model.py` 2 pasados.
+
+Defensa en profundidad del Backend IA (#321):
+
+- `image_url` se valida contra `R2_PUBLIC_URL` antes de descargar (422 si no coincide o si la variable está vacía).
+- `Image.MAX_IMAGE_PIXELS` fijado en 50.000.000 y `DecompressionBombWarning` tratada como error: las imágenes sobre el límite no se decodifican.
 
 ### Snyk Open Source
 
@@ -61,8 +66,8 @@ Sin críticas. Escaneo posterior a los fixes de la sección anterior.
 
 | Paquete | Críticas | Altas | Medias | Detalle |
 |---|---|---|---|---|
-| `backend` | 0 | 1 | 0 | `zod@4.4.3` (consumo de recursos sin límite). Fix: `zod@4.6.6` |
-| `frontend` | 0 | 2 | 2 | `zod@4.4.3` (alta); `react-router@6.30.6` (open redirect, alta; reflexión insegura, media); `leaflet@1.9.4` (XSS, media, sin fix disponible) |
+| `backend` | 0 | 1 | 0 | `zod@4.4.3` (consumo de recursos sin límite). Fix: `zod@4.6.6`. **Aplicado en #321: `zod@4.6.7`** (lockfile; `package.json` sin cambios) |
+| `frontend` | 0 | 2 | 2 | `zod@4.4.3` (alta, **aplicado en #321: `zod@4.6.7`**); `react-router@6.30.6` (open redirect, alta; reflexión insegura, media); `leaflet@1.9.4` (XSS, media, sin fix disponible) |
 
 `zod` no figuraba en `npm audit`: lo detectó solo Snyk.
 
@@ -106,6 +111,12 @@ Frontend, hallazgos medios:
 - Backend: `tsc --noEmit` sin errores; Jest 63/63 suites, 929/929 tests.
 - Frontend: Vitest 72/72 archivos, 648/648 tests; `npm run build` exitoso.
 
+Revalidación en #321 (2026-11-26):
+
+- Backend IA: `pytest` 77 pasados, 2 omitidos (`test_pipeline_real_model.py`, que requiere `RUN_REAL_MODEL_TESTS=1`); con esa variable, los 2 pasan.
+- Frontend: Vitest 131/131 archivos, 1393/1393 tests pasados tras el cambio de `zod`.
+- Backend: Jest sin base de datos disponible en el entorno de la revalidación (sin `DATABASE_URL` ni Postgres): 90 suites fallan por `PrismaClientInitializationError`. El resultado completo queda pendiente de una corrida con Postgres.
+
 ## CI
 
 `snyk-security.yml` ahora ejecuta `snyk test --severity-threshold=critical` sobre `backend` y `frontend` sin `|| true`: el pipeline falla si aparece una vulnerabilidad crítica. `snyk code test` (ahora también sobre `frontend` y `backend-ia`) y `snyk monitor` siguen siendo informativos.
@@ -113,6 +124,7 @@ Frontend, hallazgos medios:
 ## Pendientes
 
 - Verificar HTTPS obligatorio (redirección y HSTS) contra el entorno desplegado.
-- Actualizar `zod` a 4.6.6 en `backend` y `frontend`.
 - `prisma/seed.ts`: no permitir la contraseña de admin por defecto fuera de desarrollo.
-- Upgrades mayores: `tailwindcss` 4, `react-router-dom`, `pillow`, `starlette`/`fastapi`, `jest`.
+- `react-router-dom` / `react-router` 6.30.6 (open redirect, alta; reflexión insegura, media): **decisión del equipo**, pendiente. Opciones: upgrade mayor o riesgo aceptado en un ADR. No resuelto en #321.
+- Upgrades mayores pendientes: `tailwindcss` 4, `jest` (20 moderadas de testing), `pytest` 9.x.
+- `leaflet@1.9.4` (XSS, media): sin fix disponible.
