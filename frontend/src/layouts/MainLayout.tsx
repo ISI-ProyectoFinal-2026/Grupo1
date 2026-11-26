@@ -37,7 +37,10 @@ function MainLayout() {
 
   function handleLogout() {
     setIsMoreOpen(false);
-    logout();
+    // Navegar antes de limpiar la sesión: si el token cae primero, ProtectedRoute
+    // redirige a /login con state.from y el login vuelve a la ruta protegida.
+    navigate("/login", { replace: true });
+    setTimeout(logout);
     // Limpiar el caché de queries evita que, en un navegador compartido, el
     // próximo usuario vea datos cacheados del anterior (['notifications'],
     // ['business','me'], ['chats']) durante el primer render antes del refetch.
@@ -45,7 +48,6 @@ function MainLayout() {
     // logout; el camino de 401 lo limpia en api.ts y el botón de logout acá
     // (issue #175).
     queryClient.clear();
-    navigate("/login");
   }
 
   const closeMore = () => setIsMoreOpen(false);

@@ -108,9 +108,9 @@ function AccountPage() {
       return
     }
     // la cuenta ya no existe: misma limpieza que el cierre de sesión
-    logout()
-    queryClient.clear()
     navigate('/login', { replace: true, state: { accountDeleted: true } })
+    setTimeout(logout)
+    queryClient.clear()
   }
 
   return (
