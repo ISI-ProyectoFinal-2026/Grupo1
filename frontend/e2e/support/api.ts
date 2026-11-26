@@ -151,7 +151,10 @@ export function flagReport(
   return call('POST', `/reports/${reportId}/flags`, { token, body: detail ? { reason, detail } : { reason } })
 }
 
-export function listNotifications(token: string): Promise<{ status: number; body: unknown }> {
+// primera página (20 más recientes, #338)
+export function listNotifications(
+  token: string
+): Promise<{ status: number; body: { items: unknown[]; nextCursor: string | null } }> {
   return call('GET', '/notifications', { token })
 }
 

@@ -49,7 +49,7 @@ describe("/api/notifications paginado (#338)", () => {
     await prisma.$disconnect();
   });
 
-  function list(query: Record<string, string | number>, authToken = token) {
+  function list(query: object, authToken = token) {
     return request(app).get("/api/notifications").query(query).set("Authorization", `Bearer ${authToken}`);
   }
 

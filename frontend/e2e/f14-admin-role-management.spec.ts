@@ -43,7 +43,7 @@ test('F14: an admin promotes a user to moderator, the change is audited and the 
 
   // The affected user is told, regardless of notification preferences.
   const notifications = await api.listNotifications(target.token)
-  expect(notifications.body).toEqual(
+  expect(notifications.body.items).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ type: 'role_change', title: 'Tu rol cambió' }),
     ])
