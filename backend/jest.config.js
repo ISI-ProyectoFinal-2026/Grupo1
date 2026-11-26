@@ -26,6 +26,7 @@ module.exports = {
     "!src/db/check-connection.ts",
     "!src/db/reembed-reports.ts",
     "!src/scripts/preflight.ts",
+    "!src/scripts/seed-demo.ts",
   ],
   coverageDirectory: "coverage",
   // Criterio de aceptacion de #42. Con esto `npm run test:coverage` falla si

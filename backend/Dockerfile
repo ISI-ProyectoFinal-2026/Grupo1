@@ -27,6 +27,8 @@ COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=build /app/node_modules/prisma ./node_modules/prisma
 COPY prisma ./prisma
 COPY --from=build /app/dist ./dist
+# fotos del seed de demo (#371)
+COPY demo-assets ./demo-assets
 USER node
 EXPOSE 3001
 # migraciones pendientes y después el servidor

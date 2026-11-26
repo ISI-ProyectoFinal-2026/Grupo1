@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Regla única de contraseña: la usan el registro y el reset, así una cuenta
 // nunca puede quedar con una contraseña más débil que la que pide el alta.
-const passwordSchema = z
+export const passwordSchema = z
   .string()
   .min(8)
   .regex(/[a-z]/, "La contraseña debe tener al menos una minúscula")
