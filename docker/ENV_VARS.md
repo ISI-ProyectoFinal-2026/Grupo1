@@ -63,6 +63,19 @@ ALLOW_INSECURE_INTERNAL=true
 
 Con eso los endpoints atienden sin autenticar y el servicio loguea un warning en cada arranque. La diferencia con el comportamiento anterior es cuál es el default: antes, *no configurar nada* abría la puerta; ahora hay que escribir esa línea a mano.
 
+---
+
+## `R2_PUBLIC_URL` — prefijo de las imágenes (solo `backend-ia/.env`)
+
+Los endpoints `/images/analyze` y `/images/embedding` solo descargan URLs que empiezan con este prefijo; cualquier otra responde `422` antes de descargar. **Tiene que ser el mismo valor que `R2_PUBLIC_URL` en `backend/.env`.**
+
+```
+# backend-ia/.env
+R2_PUBLIC_URL=https://pub-xxxx.r2.dev
+```
+
+Sin valor, el Backend IA rechaza **todas** las URLs (falla cerrado). La barra final es opcional: el servicio la normaliza.
+
 
 ---
 

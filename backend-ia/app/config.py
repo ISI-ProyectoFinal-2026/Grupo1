@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # issue #106.
     allow_insecure_internal: bool = False
 
+    # Prefijo de las imágenes en R2; vacío = /images/* rechaza toda image_url (falla cerrado).
+    r2_public_url: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

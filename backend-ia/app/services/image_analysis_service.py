@@ -7,6 +7,7 @@ pet looks blurry (#212), or returns its embedding to rank similar reports
 
 import asyncio
 import io
+import warnings
 from dataclasses import dataclass
 
 import httpx
@@ -14,6 +15,9 @@ from PIL import Image, UnidentifiedImageError
 
 from app.ml.pipeline import detect_and_crop, generate_embedding
 from app.ml.quality import is_low_quality
+
+# Explícito: Pillow avisa entre este límite y 2x, y ahí decodifica igual (ver _decode).
+Image.MAX_IMAGE_PIXELS = 50_000_000
 
 # Short on purpose: the user is waiting on this answer while filling the form.
 _DOWNLOAD_TIMEOUT_SECONDS = 10.0
@@ -55,8 +59,16 @@ async def _download(image_url: str) -> bytes:
 
 def _decode(content: bytes) -> Image.Image:
     try:
-        return Image.open(io.BytesIO(content)).convert("RGB")
-    except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as exc:
+        # La advertencia de bomba pasa a error: no se decodifica nada sobre el límite.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            return Image.open(io.BytesIO(content)).convert("RGB")
+    except (
+        UnidentifiedImageError,
+        Image.DecompressionBombError,
+        Image.DecompressionBombWarning,
+        OSError,
+    ) as exc:
         raise ImageUnavailableError(f"could not decode image: {exc}") from exc
 
 

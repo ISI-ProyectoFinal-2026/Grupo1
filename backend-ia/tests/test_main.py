@@ -16,8 +16,9 @@ from app.services import image_analysis_service
 from app.services.image_analysis_service import ImageAnalysis, ImageUnavailableError
 
 VALID_KEY = "test-internal-key"
+R2_PREFIX = "https://pub-test.r2.dev"
 AUTH_HEADERS = {"X-Internal-Key": VALID_KEY}
-IMAGE_BODY = {"image_url": "https://example.com/foto.jpg"}
+IMAGE_BODY = {"image_url": f"{R2_PREFIX}/foto.jpg"}
 
 
 @pytest.fixture(autouse=True)
@@ -30,6 +31,7 @@ def _internal_key_configurada(monkeypatch):
     """
     monkeypatch.setattr(settings, "internal_api_key", VALID_KEY)
     monkeypatch.setattr(settings, "allow_insecure_internal", False)
+    monkeypatch.setattr(settings, "r2_public_url", R2_PREFIX)
 
 
 @pytest.fixture
@@ -43,6 +45,36 @@ def embed_mock(monkeypatch):
     mock = AsyncMock(return_value=[0.1] * 512)
     monkeypatch.setattr(image_analysis_service, "embed_image", mock)
     return mock
+
+
+@pytest.mark.parametrize(
+    "image_url",
+    [
+        "https://evil.example.com/foto.jpg",
+        "https://pub-test.r2.dev.evil.example.com/foto.jpg",
+        "https://pub-test.r2.dev@evil.example.com/foto.jpg",
+        "http://169.254.169.254/latest/meta-data",
+        "",
+    ],
+)
+@pytest.mark.parametrize("path", ["/images/analyze", "/images/embedding"])
+def test_rechaza_con_422_sin_descargar_una_url_fuera_de_r2(analyze_mock, embed_mock, client, path, image_url):
+    response = client.post(path, json={"image_url": image_url}, headers=AUTH_HEADERS)
+
+    assert response.status_code == 422
+    # El rechazo ocurre antes de descargar: ni el servicio de análisis ni el de embedding se invocan.
+    analyze_mock.assert_not_awaited()
+    embed_mock.assert_not_awaited()
+
+
+def test_rechaza_con_422_toda_url_si_r2_public_url_no_esta_configurada(monkeypatch, analyze_mock, client):
+    # Falla cerrado: sin prefijo configurado no hay nada confiable contra qué validar.
+    monkeypatch.setattr(settings, "r2_public_url", "")
+
+    response = client.post("/images/analyze", json=IMAGE_BODY, headers=AUTH_HEADERS)
+
+    assert response.status_code == 422
+    analyze_mock.assert_not_awaited()
 
 
 def test_rechaza_con_401_si_no_viene_el_header(embed_mock, client):
@@ -117,13 +149,13 @@ def analyze_mock(monkeypatch):
 def test_analyze_returns_has_animal_true_for_an_animal_image(analyze_mock, client):
     response = client.post(
         "/images/analyze",
-        json={"image_url": "https://example.com/dog.jpg"},
+        json={"image_url": "https://pub-test.r2.dev/dog.jpg"},
         headers=AUTH_HEADERS,
     )
 
     assert response.status_code == 200
     assert response.json() == {"has_animal": True, "low_quality": False}
-    analyze_mock.assert_awaited_once_with("https://example.com/dog.jpg")
+    analyze_mock.assert_awaited_once_with("https://pub-test.r2.dev/dog.jpg")
 
 
 # Low quality is only a warning for the user (#212): still a 200, never a 422.
@@ -132,7 +164,7 @@ def test_analyze_flags_a_blurry_animal_photo_as_low_quality(analyze_mock, client
 
     response = client.post(
         "/images/analyze",
-        json={"image_url": "https://example.com/blurry-dog.jpg"},
+        json={"image_url": "https://pub-test.r2.dev/blurry-dog.jpg"},
         headers=AUTH_HEADERS,
     )
 
@@ -145,7 +177,7 @@ def test_analyze_returns_has_animal_false_for_a_non_animal_image(analyze_mock, c
 
     response = client.post(
         "/images/analyze",
-        json={"image_url": "https://example.com/landscape.jpg"},
+        json={"image_url": "https://pub-test.r2.dev/landscape.jpg"},
         headers=AUTH_HEADERS,
     )
 
@@ -158,7 +190,7 @@ def test_analyze_returns_422_when_the_image_cannot_be_processed(analyze_mock, cl
 
     response = client.post(
         "/images/analyze",
-        json={"image_url": "https://example.com/broken.jpg"},
+        json={"image_url": "https://pub-test.r2.dev/broken.jpg"},
         headers=AUTH_HEADERS,
     )
 
@@ -166,7 +198,7 @@ def test_analyze_returns_422_when_the_image_cannot_be_processed(analyze_mock, cl
 
 
 def test_analyze_rejects_with_401_without_the_internal_key(analyze_mock, client):
-    response = client.post("/images/analyze", json={"image_url": "https://example.com/dog.jpg"})
+    response = client.post("/images/analyze", json={"image_url": "https://pub-test.r2.dev/dog.jpg"})
 
     assert response.status_code == 401
     analyze_mock.assert_not_awaited()
@@ -178,13 +210,13 @@ def test_analyze_rejects_with_401_without_the_internal_key(analyze_mock, client)
 def test_embedding_returns_the_vector_without_persisting_it(embed_mock, client):
     response = client.post(
         "/images/embedding",
-        json={"image_url": "https://example.com/dog.jpg"},
+        json={"image_url": "https://pub-test.r2.dev/dog.jpg"},
         headers=AUTH_HEADERS,
     )
 
     assert response.status_code == 200
     assert response.json() == {"has_animal": True, "embedding": [0.1] * 512}
-    embed_mock.assert_awaited_once_with("https://example.com/dog.jpg")
+    embed_mock.assert_awaited_once_with("https://pub-test.r2.dev/dog.jpg")
 
 
 # 200 y no 422: el backend distingue "sin mascota" (rechazo) de "imagen no disponible" (pending)
@@ -193,7 +225,7 @@ def test_embedding_returns_has_animal_false_when_no_pet_is_detected(embed_mock, 
 
     response = client.post(
         "/images/embedding",
-        json={"image_url": "https://example.com/landscape.jpg"},
+        json={"image_url": "https://pub-test.r2.dev/landscape.jpg"},
         headers=AUTH_HEADERS,
     )
 
@@ -206,7 +238,7 @@ def test_embedding_returns_422_when_the_image_cannot_be_processed(embed_mock, cl
 
     response = client.post(
         "/images/embedding",
-        json={"image_url": "https://example.com/broken.jpg"},
+        json={"image_url": "https://pub-test.r2.dev/broken.jpg"},
         headers=AUTH_HEADERS,
     )
 
@@ -214,7 +246,7 @@ def test_embedding_returns_422_when_the_image_cannot_be_processed(embed_mock, cl
 
 
 def test_embedding_rejects_with_401_without_the_internal_key(embed_mock, client):
-    response = client.post("/images/embedding", json={"image_url": "https://example.com/dog.jpg"})
+    response = client.post("/images/embedding", json={"image_url": "https://pub-test.r2.dev/dog.jpg"})
 
     assert response.status_code == 401
     embed_mock.assert_not_awaited()

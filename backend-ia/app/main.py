@@ -84,6 +84,17 @@ class ImageAnalysisRequest(BaseModel):
     image_url: str
 
 
+def _validar_url_de_r2(image_url: str) -> None:
+    """Rechaza con 422 cualquier URL fuera del prefijo R2, antes de descargar (SSRF).
+
+    El prefijo se normaliza con barra final: así "https://pub.r2.dev.evil.com/..."
+    y "https://pub.r2.dev@evil.com/..." no pasan. Sin R2_PUBLIC_URL se rechaza todo.
+    """
+    base = settings.r2_public_url.rstrip("/")
+    if not base.startswith(("https://", "http://")) or not image_url.startswith(base + "/"):
+        raise HTTPException(status_code=422, detail="La imagen no pertenece al bucket de R2")
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -99,6 +110,7 @@ async def analyze_image(
     200 with `has_animal` and `low_quality` on success (low quality is only a
     warning, #212), 422 if the image cannot be downloaded or decoded.
     """
+    _validar_url_de_r2(body.image_url)
     try:
         analysis = await image_analysis_service.analyze_image(body.image_url)
     except ImageUnavailableError as exc:
@@ -122,6 +134,7 @@ async def embed_image(
     200 with `has_animal` false and no embedding if no pet is detected, 422 if
     the image cannot be downloaded or decoded.
     """
+    _validar_url_de_r2(body.image_url)
     try:
         embedding = await image_analysis_service.embed_image(body.image_url)
     except ImageUnavailableError as exc:

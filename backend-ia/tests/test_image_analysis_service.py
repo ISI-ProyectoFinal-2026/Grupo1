@@ -10,7 +10,7 @@ import threading
 
 import httpx
 import pytest
-from PIL import Image
+from PIL import Image, ImageFile
 
 from app.services import image_analysis_service
 from app.services.image_analysis_service import MAX_IMAGE_BYTES, ImageAnalysis, ImageUnavailableError
@@ -18,10 +18,14 @@ from app.services.image_analysis_service import MAX_IMAGE_BYTES, ImageAnalysis, 
 _RealAsyncClient = httpx.AsyncClient
 
 
-def _png_bytes(size: int = 32) -> bytes:
+def _png_bytes_sized(width: int, height: int) -> bytes:
     buf = io.BytesIO()
-    Image.new("RGB", (size, size), color="blue").save(buf, format="PNG")
+    Image.new("RGB", (width, height), color="blue").save(buf, format="PNG")
     return buf.getvalue()
+
+
+def _png_bytes(size: int = 32) -> bytes:
+    return _png_bytes_sized(size, size)
 
 
 def _serve(monkeypatch, handler):
@@ -163,6 +167,30 @@ async def test_raises_image_unavailable_on_a_decompression_bomb(monkeypatch):
 
     with pytest.raises(ImageUnavailableError):
         await image_analysis_service.analyze_image("https://example.com/bomb.png")
+
+
+def test_fija_el_limite_de_pixeles_de_pillow():
+    assert Image.MAX_IMAGE_PIXELS == 50_000_000
+
+
+@pytest.mark.asyncio
+async def test_rechaza_sin_decodificar_una_imagen_sobre_el_limite(monkeypatch):
+    # 15x12 = 180 px: sobre el límite de 100 pero bajo 2x, zona que Pillow solo advierte.
+    # Tiene que fallar al abrir, sin llegar a cargar los píxeles.
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+    loads = []
+    real_load = ImageFile.ImageFile.load
+
+    def spy_load(self, *args, **kwargs):
+        loads.append(self)
+        return real_load(self, *args, **kwargs)
+
+    monkeypatch.setattr(ImageFile.ImageFile, "load", spy_load)
+    _serve_bytes(monkeypatch, _png_bytes_sized(15, 12))
+
+    with pytest.raises(ImageUnavailableError):
+        await image_analysis_service.analyze_image("https://example.com/borderline.png")
+    assert loads == []
 
 
 # --- embed_image ------------------------------------------------------------

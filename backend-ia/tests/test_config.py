@@ -20,3 +20,7 @@ from app.config import Settings
 )
 def test_no_tiene_configuracion_de_base_ni_de_matching(field):
     assert field not in Settings.model_fields
+
+
+def test_tiene_la_url_publica_de_r2():
+    assert "r2_public_url" in Settings.model_fields
