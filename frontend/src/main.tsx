@@ -6,6 +6,9 @@ import './index.css'
 import { router } from './router'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { queryClient } from './lib/query-client'
+import { startAuthSync } from './lib/auth-sync'
+
+startAuthSync()
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Missing #root element')

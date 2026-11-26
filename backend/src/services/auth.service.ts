@@ -198,3 +198,9 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
   // desconectar sockets
   disconnectUserSockets(userId);
 }
+
+export async function logout(userId: number): Promise<void> {
+  // revoca todos los JWT emitidos
+  await prisma.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } });
+  disconnectUserSockets(userId);
+}

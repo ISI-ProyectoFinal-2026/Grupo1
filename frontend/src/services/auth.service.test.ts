@@ -7,6 +7,7 @@ import {
   forgotPassword,
   getMe,
   login,
+  logout,
   register,
   resendVerification,
   resetPassword,
@@ -202,5 +203,13 @@ describe('auth.service', () => {
     expect(api.delete).toHaveBeenCalledWith('/auth/me', {
       data: { password: 'secreta123', code: '123456' },
     })
+  })
+
+  it('llama a POST /auth/logout', async () => {
+    vi.mocked(api.post).mockResolvedValue(respuesta(undefined))
+
+    await logout()
+
+    expect(api.post).toHaveBeenCalledWith('/auth/logout')
   })
 })

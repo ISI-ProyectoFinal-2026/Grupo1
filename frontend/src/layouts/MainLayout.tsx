@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
+import { logout as logoutRequest } from "@/services/auth.service";
 import LocationConsentModal from "@/components/account/LocationConsentModal";
 import UnverifiedEmailBanner from "@/components/auth/UnverifiedEmailBanner";
 import NotificationBell from "@/components/notifications/NotificationBell";
@@ -35,17 +36,24 @@ function MainLayout() {
     setIsMoreOpen(false);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     setIsMoreOpen(false);
-    logout();
-    // Limpiar el caché de queries evita que, en un navegador compartido, el
-    // próximo usuario vea datos cacheados del anterior (['notifications'],
-    // ['business','me'], ['chats']) durante el primer render antes del refetch.
-    // El QueryClient vive una sola vez (lib/query-client.ts) y sobrevive al
-    // logout; el camino de 401 lo limpia en api.ts y el botón de logout acá
-    // (issue #175).
-    queryClient.clear();
-    navigate("/login");
+    try {
+      // revoca el JWT; si falla, el logout local sigue igual
+      await logoutRequest();
+    } catch {
+      // sin red o token ya inválido
+    } finally {
+      logout();
+      // Limpiar el caché de queries evita que, en un navegador compartido, el
+      // próximo usuario vea datos cacheados del anterior (['notifications'],
+      // ['business','me'], ['chats']) durante el primer render antes del refetch.
+      // El QueryClient vive una sola vez (lib/query-client.ts) y sobrevive al
+      // logout; el camino de 401 lo limpia en api.ts y el botón de logout acá
+      // (issue #175).
+      queryClient.clear();
+      navigate("/login");
+    }
   }
 
   const closeMore = () => setIsMoreOpen(false);
