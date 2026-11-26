@@ -2,7 +2,12 @@ import { Request, Response } from "express";
 import * as chatsService from "../services/chats.service";
 import * as notificationsService from "../services/notifications.service";
 import { chatRoom, getChatIO } from "../sockets/chat.socket";
-import { chatIdParamSchema, createChatSchema, sendMessageBodySchema } from "../validators/chats.validator";
+import {
+  chatIdParamSchema,
+  createChatSchema,
+  listMessagesQuerySchema,
+  sendMessageBodySchema,
+} from "../validators/chats.validator";
 
 export async function list(req: Request, res: Response): Promise<void> {
   const chats = await chatsService.listByUser(req.userId!);
@@ -18,9 +23,9 @@ export async function create(req: Request, res: Response): Promise<void> {
 
 export async function getMessages(req: Request, res: Response): Promise<void> {
   const { id } = chatIdParamSchema.parse(req.params);
+  const query = listMessagesQuerySchema.parse(req.query);
   await chatsService.assertParticipant(id, req.userId!);
-  const messages = await chatsService.getMessages(id);
-  res.status(200).json(messages);
+  res.status(200).json(await chatsService.getMessages(id, query));
 }
 
 export async function sendMessage(req: Request, res: Response): Promise<void> {

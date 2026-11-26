@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { io } from 'socket.io-client'
-import { chatMessagesQueryKey } from '@/hooks/useChatMessagesQuery'
+import { chatMessagesQueryKey, flattenMessages, type ChatMessagesData } from '@/hooks/useChatMessagesQuery'
 import { chatsQueryKey } from '@/hooks/useChatsQuery'
 import { useChatSocket } from '@/hooks/useChatSocket'
 import { sendMessage as sendMessageRest } from '@/services/chats.service'
@@ -78,6 +78,11 @@ function mensaje(overrides: Partial<MessageDTO> = {}): MessageDTO {
 
 let falso: ReturnType<typeof crearSocketFalso>
 
+function mensajesEnCache(client: QueryClient, chatId = 3): MessageDTO[] | undefined {
+  const data = client.getQueryData<ChatMessagesData>(chatMessagesQueryKey(chatId))
+  return data && flattenMessages(data)
+}
+
 function montar(chatId: number | undefined) {
   // Cliente propio en vez de createTestQueryClient: aquel usa gcTime 0 y aca
   // nadie observa la query de mensajes (el hook solo escribe con
@@ -85,6 +90,11 @@ function montar(chatId: number | undefined) {
   // test fallaba de forma intermitente.
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  // historial ya cargado y vacío: el hook agrega sobre la página más reciente (#338)
+  client.setQueryData<ChatMessagesData>(chatMessagesQueryKey(3), {
+    pages: [{ items: [], nextCursor: null }],
+    pageParams: [undefined],
   })
   const { Wrapper } = createQueryWrapper(client)
   const vista = renderHook(({ id }: { id: number | undefined }) => useChatSocket(id), {
@@ -267,7 +277,7 @@ describe('useChatSocket: mensajes entrantes', () => {
 
     falso.disparar('receive_message', mensaje())
 
-    expect(client.getQueryData(chatMessagesQueryKey(3))).toEqual([mensaje()])
+    expect(mensajesEnCache(client)).toEqual([mensaje()])
   })
 
   // El mismo mensaje puede llegar dos veces (eco del propio envio + broadcast).
@@ -278,7 +288,17 @@ describe('useChatSocket: mensajes entrantes', () => {
     falso.disparar('receive_message', mensaje())
     falso.disparar('receive_message', mensaje())
 
-    expect(client.getQueryData<MessageDTO[]>(chatMessagesQueryKey(3))).toHaveLength(1)
+    expect(mensajesEnCache(client)).toHaveLength(1)
+  })
+
+  it('no crea cache si el historial todavia no se cargo', () => {
+    const { client } = montar(3)
+    client.removeQueries({ queryKey: chatMessagesQueryKey(3) })
+    falso.conectar()
+
+    falso.disparar('receive_message', mensaje())
+
+    expect(client.getQueryData(chatMessagesQueryKey(3))).toBeUndefined()
   })
 
   it('expone los errores que emite el server', () => {
@@ -312,7 +332,7 @@ describe('useChatSocket: envio de mensajes', () => {
     })
 
     expect(sendMessageRest).toHaveBeenCalledWith(3, { content: 'hola' })
-    expect(client.getQueryData(chatMessagesQueryKey(3))).toEqual([enviado])
+    expect(mensajesEnCache(client)).toEqual([enviado])
   })
 
   it('emite por socket y guarda la respuesta del ack', async () => {
@@ -330,7 +350,7 @@ describe('useChatSocket: envio de mensajes', () => {
     })
 
     expect(sendMessageRest).not.toHaveBeenCalled()
-    expect(client.getQueryData(chatMessagesQueryKey(3))).toEqual([enviado])
+    expect(mensajesEnCache(client)).toEqual([enviado])
   })
 
   it('rechaza y expone el error cuando el ack viene en falla', async () => {

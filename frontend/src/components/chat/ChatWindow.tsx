@@ -31,6 +31,10 @@ interface ChatWindowProps {
   title?: string
   /** Contenido al inicio del header, como el link de volver en mobile. */
   headerStart?: ReactNode
+  /** Hay mensajes anteriores sin cargar (#338). */
+  hasOlder?: boolean
+  isLoadingOlder?: boolean
+  onLoadOlder?: () => void
 }
 
 const MAX_UPLOAD_MB = Math.floor(MAX_UPLOAD_BYTES / 1_000_000)
@@ -62,6 +66,9 @@ function ChatWindow({
   onSend,
   title,
   headerStart,
+  hasOlder = false,
+  isLoadingOlder = false,
+  onLoadOlder,
 }: ChatWindowProps) {
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -75,9 +82,11 @@ function ChatWindow({
   const needsVerification =
     sendErrorCode === EMAIL_NOT_VERIFIED || imageErrorCode === EMAIL_NOT_VERIFIED
 
+  // solo baja con un mensaje nuevo al final, no al cargar anteriores
+  const lastMessageId = messages.at(-1)?.id
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' })
-  }, [messages.length])
+  }, [lastMessageId])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -153,6 +162,14 @@ function ChatWindow({
             No hay mensajes todavía. Escribí el primero.
           </p>
         ) : (
+          <>
+          {hasOlder && onLoadOlder && (
+            <div className='mb-3 flex justify-center'>
+              <Button type='button' variant='ghost' isLoading={isLoadingOlder} onClick={onLoadOlder}>
+                Cargar mensajes anteriores
+              </Button>
+            </div>
+          )}
           <ul className='flex flex-col gap-2'>
             {messages.map((message) => (
               <MessageBubble
@@ -162,6 +179,7 @@ function ChatWindow({
               />
             ))}
           </ul>
+          </>
         )}
         <div ref={bottomRef} />
       </div>

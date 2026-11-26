@@ -55,7 +55,7 @@ test('F3: a user flags a report and a moderator hides it and then confirms, noti
 
   // The owner is told why the report disappeared (#223).
   const notifications = await api.listNotifications(owner.token)
-  expect(notifications.body).toEqual(
+  expect(notifications.body.items).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ type: 'report_status_change', title: 'Tu reporte fue ocultado', reportId: report.id }),
     ])

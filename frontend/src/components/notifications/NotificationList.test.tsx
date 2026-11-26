@@ -87,28 +87,57 @@ describe('NotificationList', () => {
     expect(screen.getByText('Un administrador cambió tu rol a Moderador.')).toBeInTheDocument()
   })
 
-  it('muestra solo la primera pagina', () => {
+  // #338: el paginado es por cursor en el backend; la lista muestra todo lo cargado
+  it('muestra todas las notificaciones cargadas', () => {
     render(<NotificationList notifications={muchas(7)} onMarkRead={vi.fn()} onDelete={vi.fn()} />)
 
     expect(screen.getByText('Notificacion 1')).toBeInTheDocument()
-    expect(screen.getByText('Notificacion 5')).toBeInTheDocument()
-    expect(screen.queryByText('Notificacion 6')).not.toBeInTheDocument()
+    expect(screen.getByText('Notificacion 7')).toBeInTheDocument()
   })
 
-  it('navega a la pagina siguiente', async () => {
+  it('pide la pagina siguiente con Ver más', async () => {
     const user = userEvent.setup()
-    render(<NotificationList notifications={muchas(7)} onMarkRead={vi.fn()} onDelete={vi.fn()} />)
+    const onLoadMore = vi.fn()
+    render(
+      <NotificationList
+        notifications={muchas(3)}
+        hasMore
+        onLoadMore={onLoadMore}
+        onMarkRead={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
 
-    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await user.click(screen.getByRole('button', { name: 'Ver más' }))
 
-    expect(screen.getByText('Notificacion 6')).toBeInTheDocument()
-    expect(screen.queryByText('Notificacion 1')).not.toBeInTheDocument()
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
   })
 
-  it('no pagina cuando entra todo en una pagina', () => {
-    render(<NotificationList notifications={muchas(3)} onMarkRead={vi.fn()} onDelete={vi.fn()} />)
+  it('deshabilita Ver más mientras carga la pagina siguiente', () => {
+    render(
+      <NotificationList
+        notifications={muchas(3)}
+        hasMore
+        isLoadingMore
+        onLoadMore={vi.fn()}
+        onMarkRead={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
 
-    expect(screen.queryByRole('button', { name: 'Siguiente' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cargando…' })).toBeDisabled()
+  })
+
+  it('no ofrece Ver más al llegar al final', () => {
+    render(<NotificationList notifications={muchas(3)} onLoadMore={vi.fn()} onMarkRead={vi.fn()} onDelete={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: 'Ver más' })).not.toBeInTheDocument()
+  })
+
+  it('muestra un spinner mientras carga la primera pagina', () => {
+    render(<NotificationList notifications={[]} isLoading onMarkRead={vi.fn()} onDelete={vi.fn()} />)
+
+    expect(screen.queryByText('No tenés notificaciones')).not.toBeInTheDocument()
   })
 
   it('avisa cuando se marca una como leida', async () => {

@@ -1,15 +1,18 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import InactivityWarningActions from '@/components/notifications/InactivityWarningActions'
+import Spinner from '@/components/ui/Spinner'
 import { BellIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { formatShortDateTime } from '@/lib/format'
 import type { NotificationDTO } from '@/types/notification.types'
 
-const NOTIFICATIONS_PAGE_SIZE = 5
-
 interface NotificationListProps {
   notifications: NotificationDTO[]
+  isLoading?: boolean
+  /** Paginado por cursor en el backend (#338). */
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
   onMarkRead: (id: number) => void
   onDelete: (id: number) => void
   onNavigate?: () => void
@@ -36,15 +39,16 @@ function targetOf(notification: NotificationDTO): string | null {
   return null
 }
 
-function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: NotificationListProps) {
-  const [page, setPage] = useState(0)
-
-  const totalPages = Math.ceil(notifications.length / NOTIFICATIONS_PAGE_SIZE)
-  // el paginado es en cliente: el backend devuelve la lista completa
-  const currentPage = Math.min(page, Math.max(totalPages - 1, 0))
-  const start = currentPage * NOTIFICATIONS_PAGE_SIZE
-  const visible = notifications.slice(start, start + NOTIFICATIONS_PAGE_SIZE)
-
+function NotificationList({
+  notifications,
+  isLoading = false,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
+  onMarkRead,
+  onDelete,
+  onNavigate,
+}: NotificationListProps) {
   function renderBody(notification: NotificationDTO) {
     const target = targetOf(notification)
     if (target === null) return renderContent(notification)
@@ -62,6 +66,14 @@ function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: N
     )
   }
 
+  if (isLoading) {
+    return (
+      <div className='flex justify-center px-4 py-10 text-ink-muted'>
+        <Spinner size='md' />
+      </div>
+    )
+  }
+
   if (notifications.length === 0) {
     return (
       <div className='flex flex-col items-center gap-3 px-4 py-10 text-center'>
@@ -76,7 +88,7 @@ function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: N
   return (
     <div>
       <ul className='divide-y divide-line'>
-        {visible.map((notification) => (
+        {notifications.map((notification) => (
           <li
             key={notification.id}
             className={cn(
@@ -113,26 +125,15 @@ function NotificationList({ notifications, onMarkRead, onDelete, onNavigate }: N
         ))}
       </ul>
 
-      {totalPages > 1 && (
-        <div className='flex items-center justify-between border-t border-line px-2 py-1'>
+      {hasMore && onLoadMore && (
+        <div className='flex justify-center border-t border-line px-2 py-1'>
           <button
             type='button'
-            onClick={() => setPage(currentPage - 1)}
-            disabled={currentPage === 0}
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
             className={cn(actionClasses, 'text-ink disabled:text-ink-muted/50 disabled:hover:bg-transparent')}
           >
-            Anterior
-          </button>
-          <span className='tabular text-sm text-ink-muted'>
-            {currentPage + 1} de {totalPages}
-          </span>
-          <button
-            type='button'
-            onClick={() => setPage(currentPage + 1)}
-            disabled={currentPage >= totalPages - 1}
-            className={cn(actionClasses, 'text-ink disabled:text-ink-muted/50 disabled:hover:bg-transparent')}
-          >
-            Siguiente
+            {isLoadingMore ? 'Cargando…' : 'Ver más'}
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@ import { prisma } from "../db/client";
 import { AppError } from "../errors/app-error";
 import { isAuthorSuspended } from "./account-sanctions/visibility";
 import { touchActivity } from "./report-inactivity.service";
+import { CursorPage, KeysetCursor, keysetOrderDesc, olderThan, toCursorPage } from "../utils/keyset-cursor";
 
 function isPrismaKnownError(error: unknown, code: string): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
@@ -88,8 +89,23 @@ export async function createChat(
   }
 }
 
-export async function getMessages(chatId: number): Promise<Message[]> {
-  return prisma.message.findMany({ where: { chatId }, orderBy: { createdAt: "asc" } });
+interface GetMessagesOptions {
+  limit: number;
+  cursor?: KeysetCursor;
+}
+
+// últimos N en orden ascendente; nextCursor apunta a los anteriores (#338)
+export async function getMessages(
+  chatId: number,
+  { limit, cursor }: GetMessagesOptions
+): Promise<CursorPage<Message>> {
+  const rows = await prisma.message.findMany({
+    where: { chatId, ...(cursor ? olderThan(cursor) : {}) },
+    orderBy: keysetOrderDesc,
+    take: limit + 1,
+  });
+  const page = toCursorPage(rows, limit);
+  return { items: page.items.reverse(), nextCursor: page.nextCursor };
 }
 
 export async function assertParticipant(chatId: number, userId: number): Promise<Chat> {

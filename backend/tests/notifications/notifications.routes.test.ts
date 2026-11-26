@@ -89,14 +89,14 @@ describe("/api/notifications", () => {
     const res = await request(app).get("/api/notifications").set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((n: { id: number }) => n.id);
+    const ids = res.body.items.map((n: { id: number }) => n.id);
     expect(ids).toContain(olderNotificationId);
     expect(ids).toContain(newerNotificationId);
     expect(ids.indexOf(newerNotificationId)).toBeLessThan(ids.indexOf(olderNotificationId));
 
     const otherRes = await request(app).get("/api/notifications").set("Authorization", `Bearer ${otherToken}`);
     expect(otherRes.status).toBe(200);
-    expect(otherRes.body.some((n: { id: number }) => n.id === olderNotificationId)).toBe(false);
+    expect(otherRes.body.items.some((n: { id: number }) => n.id === olderNotificationId)).toBe(false);
   });
 
   test("PUT /api/notifications/:id/read sin token responde 401", async () => {

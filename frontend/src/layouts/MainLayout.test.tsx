@@ -37,7 +37,8 @@ function renderLayout(ruta = '/') {
 describe('MainLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(notificationsService.listNotifications).mockResolvedValue([])
+    vi.mocked(notificationsService.listNotifications).mockResolvedValue({ items: [], nextCursor: null })
+    vi.mocked(notificationsService.getUnreadNotificationsCount).mockResolvedValue(0)
     vi.mocked(authService.getMe).mockResolvedValue(usuario)
   })
 

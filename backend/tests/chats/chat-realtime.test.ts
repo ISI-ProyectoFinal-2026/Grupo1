@@ -308,7 +308,8 @@ describe("chat en tiempo real (#141)", () => {
         .set("Authorization", `Bearer ${tokenB}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.some((m: { content: string }) => m.content === contenido)).toBe(true);
+      // el mensaje recuperado está entre los últimos (primera página)
+      expect(res.body.items.some((m: { content: string }) => m.content === contenido)).toBe(true);
     });
   });
 
@@ -363,8 +364,10 @@ describe("chat en tiempo real (#141)", () => {
   });
 
   describe("carga del historial", () => {
-    test("el historial con 150 mensajes se sirve completo, ordenado y dentro del presupuesto", async () => {
+    // #338: el historial se pagina (últimos 50 + cursor); se recorre entero página a página
+    test("el historial con 150 mensajes se recorre paginado, ordenado y dentro del presupuesto", async () => {
       const TOTAL = 150;
+      const PAGE_SIZE = 50;
       await prisma.message.createMany({
         data: Array.from({ length: TOTAL }, (_, i) => ({
           chatId,
@@ -373,25 +376,39 @@ describe("chat en tiempo real (#141)", () => {
         })),
       });
 
+      type Item = { id: number; content: string | null; createdAt: string };
+      const pages: Item[][] = [];
+      let cursor: string | null = null;
       const inicio = Date.now();
-      const res = await request(app)
-        .get(`/api/chats/${chatId}/messages`)
-        .set("Authorization", `Bearer ${tokenA}`);
+      do {
+        const res: request.Response = await request(app)
+          .get(`/api/chats/${chatId}/messages`)
+          .query(cursor ? { cursor } : {})
+          .set("Authorization", `Bearer ${tokenA}`);
+        expect(res.status).toBe(200);
+        expect(res.body.items.length).toBeLessThanOrEqual(PAGE_SIZE);
+        pages.push(res.body.items);
+        cursor = res.body.nextCursor;
+      } while (cursor);
       const duracion = Date.now() - inicio;
 
-      expect(res.status).toBe(200);
-      expect(res.body.length).toBeGreaterThanOrEqual(TOTAL);
+      // la primera página trae los últimos 50 por defecto
+      expect(pages[0]).toHaveLength(PAGE_SIZE);
+      expect(pages[0].at(-1)?.content).toBe(`carga-${SUITE_TAG}-${String(TOTAL - 1).padStart(4, "0")}`);
 
-      const deLaCarga = res.body.filter((m: { content: string | null }) =>
-        m.content?.startsWith(`carga-${SUITE_TAG}-`)
+      // páginas de la más nueva a la más vieja, cada una ascendente
+      const historial = [...pages].reverse().flat();
+      const deLaCarga = historial.filter((m) => m.content?.startsWith(`carga-${SUITE_TAG}-`));
+      expect(deLaCarga.map((m) => m.content)).toEqual(
+        Array.from({ length: TOTAL }, (_, i) => `carga-${SUITE_TAG}-${String(i).padStart(4, "0")}`)
       );
-      expect(deLaCarga).toHaveLength(TOTAL);
+      expect(new Set(historial.map((m) => m.id)).size).toBe(historial.length);
 
       // Orden ascendente por fecha, que es lo que el frontend asume al pintar.
-      const fechas = res.body.map((m: { createdAt: string }) => new Date(m.createdAt).getTime());
+      const fechas = historial.map((m) => new Date(m.createdAt).getTime());
       expect(fechas).toEqual([...fechas].sort((a, b) => a - b));
 
-      console.log(`[#141] GET /messages con ${res.body.length} mensajes: ${duracion}ms`);
+      console.log(`[#141] GET /messages paginado: ${historial.length} mensajes en ${pages.length} páginas, ${duracion}ms`);
       expect(duracion).toBeLessThan(2000);
     }, 30000);
 

@@ -81,6 +81,9 @@ function ChatPage() {
             sendError={socketError}
             sendErrorCode={socketErrorCode}
             onSend={handleSend}
+            hasOlder={messagesQuery.hasNextPage}
+            isLoadingOlder={messagesQuery.isFetchingNextPage}
+            onLoadOlder={() => void messagesQuery.fetchNextPage()}
             title={participantId !== undefined ? `Usuario #${participantId}` : undefined}
             headerStart={
               <Link

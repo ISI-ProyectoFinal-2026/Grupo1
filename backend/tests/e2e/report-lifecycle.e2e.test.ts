@@ -83,7 +83,7 @@ describe("E2E: ciclo de vida de un reporte (B1 camino feliz)", () => {
     const notifications = await waitFor(async () => {
       const res = await request(app).get("/api/notifications").set(auth(owner));
       expect(res.status).toBe(200);
-      const found = res.body.filter(
+      const found = res.body.items.filter(
         (n: { type: string; reportId: number }) => n.type === "report_status_change" && n.reportId === lostReportId
       );
       return found.length > 0 ? found : undefined;
@@ -121,7 +121,7 @@ describe("E2E: ciclo de vida de un reporte (B1 camino feliz)", () => {
     const matchNotification = await waitFor(async () => {
       const res = await request(app).get("/api/notifications").set(auth(owner));
       expect(res.status).toBe(200);
-      return res.body.find(
+      return res.body.items.find(
         (n: { type: string; reportId: number }) => n.type === "match_suggested" && n.reportId === foundReportId
       );
     });

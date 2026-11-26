@@ -1,29 +1,41 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteNotification,
+  getUnreadNotificationsCount,
   listNotifications,
   markNotificationAsRead,
 } from '@/services/notifications.service'
-import type { NotificationDTO } from '@/types/notification.types'
 
 const notificationsQueryKey = ['notifications'] as const
+export const notificationsListQueryKey = [...notificationsQueryKey, 'list'] as const
+export const unreadNotificationsCountQueryKey = [...notificationsQueryKey, 'unread-count'] as const
 
 // el backend no emite evento de socket para notificaciones: el tiempo real va por polling
 export const NOTIFICATIONS_POLL_INTERVAL_MS = 30000
 
-export function countUnread(notifications: NotificationDTO[] | undefined): number {
-  return notifications?.filter((notification) => !notification.isRead).length ?? 0
-}
-
-export function useNotificationsQuery(enabled = true) {
+// el polling consulta solo el contador (#338)
+export function useUnreadNotificationsCount(enabled = true) {
   return useQuery({
-    queryKey: notificationsQueryKey,
-    queryFn: listNotifications,
+    queryKey: unreadNotificationsCountQueryKey,
+    queryFn: getUnreadNotificationsCount,
     enabled,
     refetchInterval: enabled ? NOTIFICATIONS_POLL_INTERVAL_MS : false,
   })
 }
 
+// lista paginada por cursor, sin polling
+export function useNotificationsQuery(enabled = true) {
+  return useInfiniteQuery({
+    queryKey: notificationsListQueryKey,
+    queryFn: ({ pageParam }) => listNotifications(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    select: (data) => data.pages.flatMap((page) => page.items),
+    enabled,
+  })
+}
+
+// refresca lista y contador
 function useInvalidateNotifications() {
   const queryClient = useQueryClient()
   return () => queryClient.invalidateQueries({ queryKey: notificationsQueryKey })

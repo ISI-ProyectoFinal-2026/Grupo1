@@ -298,3 +298,53 @@ describe('ChatWindow: email sin verificar (EMAIL_NOT_VERIFIED)', () => {
     expect(await screen.findAllByRole('button', { name: 'Reenviar email de verificación' })).toHaveLength(1)
   })
 })
+
+describe('ChatWindow: mensajes anteriores (#338)', () => {
+  it('ofrece cargar los anteriores y avisa al pedirlos', async () => {
+    const user = userEvent.setup()
+    const onLoadOlder = vi.fn()
+    renderWindow({ hasOlder: true, onLoadOlder })
+
+    await user.click(screen.getByRole('button', { name: 'Cargar mensajes anteriores' }))
+
+    expect(onLoadOlder).toHaveBeenCalledTimes(1)
+  })
+
+  it('no ofrece cargar anteriores al llegar al inicio del historial', () => {
+    renderWindow({ hasOlder: false, onLoadOlder: vi.fn() })
+
+    expect(screen.queryByRole('button', { name: 'Cargar mensajes anteriores' })).not.toBeInTheDocument()
+  })
+
+  it('no baja al final al anteponer mensajes anteriores, si con uno nuevo', () => {
+    const props = {
+      currentUserId: USUARIO_ACTUAL,
+      connectionStatus: 'connected' as const,
+      isLoading: false,
+      loadError: null,
+      sendError: null,
+      onSend: vi.fn(),
+    }
+    const { rerender } = render(
+      <MemoryRouter>
+        <ChatWindow {...props} messages={[mensaje({ id: 5 })]} />
+      </MemoryRouter>
+    )
+    const scroll = vi.mocked(Element.prototype.scrollIntoView)
+    scroll.mockClear()
+
+    rerender(
+      <MemoryRouter>
+        <ChatWindow {...props} messages={[mensaje({ id: 4 }), mensaje({ id: 5 })]} />
+      </MemoryRouter>
+    )
+    expect(scroll).not.toHaveBeenCalled()
+
+    rerender(
+      <MemoryRouter>
+        <ChatWindow {...props} messages={[mensaje({ id: 4 }), mensaje({ id: 5 }), mensaje({ id: 6 })]} />
+      </MemoryRouter>
+    )
+    expect(scroll).toHaveBeenCalled()
+  })
+})

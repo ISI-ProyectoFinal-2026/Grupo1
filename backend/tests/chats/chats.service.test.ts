@@ -100,7 +100,7 @@ describe("chats.service", () => {
       const first = await chatsService.createMessage(chatId, userAId, { content: "primero" });
       const second = await chatsService.createMessage(chatId, userBId, { content: "segundo" });
 
-      const messages = await chatsService.getMessages(chatId);
+      const { items: messages } = await chatsService.getMessages(chatId, { limit: 50 });
       const firstIndex = messages.findIndex((m) => m.id === first.id);
       const secondIndex = messages.findIndex((m) => m.id === second.id);
 

@@ -78,7 +78,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn()
   useAuthStore.setState({ token: 'token', user: usuario })
   vi.mocked(chatsService.listChats).mockResolvedValue([chat()])
-  vi.mocked(chatsService.getMessages).mockResolvedValue([mensaje()])
+  vi.mocked(chatsService.getMessages).mockResolvedValue({ items: [mensaje()], nextCursor: null })
 })
 
 afterEach(() => {
@@ -132,7 +132,7 @@ describe('ChatPage: chat seleccionado', () => {
     renderPage('/chats/3')
 
     expect(await screen.findByText('Hola, creo que vi a tu perro')).toBeInTheDocument()
-    expect(chatsService.getMessages).toHaveBeenCalledWith(3)
+    expect(chatsService.getMessages).toHaveBeenCalledWith(3, undefined)
     expect(screen.getByRole('link', { name: /Usuario #8/ })).toHaveAttribute('aria-current', 'page')
     expect(
       screen.queryByText('Elegí una conversación para ver los mensajes.')

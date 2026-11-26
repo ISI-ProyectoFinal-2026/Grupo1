@@ -3,19 +3,19 @@ import NotificationList from '@/components/notifications/NotificationList'
 import { BellIcon } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import {
-  countUnread,
   useDeleteNotification,
   useMarkNotificationAsRead,
   useNotificationsQuery,
+  useUnreadNotificationsCount,
 } from '@/hooks/useNotificationsQuery'
 
 function NotificationBell() {
   const [open, setOpen] = useState(false)
-  const { data: notifications } = useNotificationsQuery()
+  const { data: unread = 0 } = useUnreadNotificationsCount()
+  // la lista se pide solo con el panel abierto (#338)
+  const notificationsQuery = useNotificationsQuery(open)
   const markRead = useMarkNotificationAsRead()
   const remove = useDeleteNotification()
-
-  const unread = countUnread(notifications)
 
   return (
     <div
@@ -59,7 +59,11 @@ function NotificationBell() {
         >
           <h2 className='sticky top-0 z-10 border-b border-line bg-paper px-4 py-3 font-display text-display-sm'>Notificaciones</h2>
           <NotificationList
-            notifications={notifications ?? []}
+            notifications={notificationsQuery.data ?? []}
+            isLoading={notificationsQuery.isPending}
+            hasMore={notificationsQuery.hasNextPage}
+            isLoadingMore={notificationsQuery.isFetchingNextPage}
+            onLoadMore={() => void notificationsQuery.fetchNextPage()}
             onMarkRead={(id) => markRead.mutate(id)}
             onDelete={(id) => remove.mutate(id)}
             onNavigate={() => setOpen(false)}

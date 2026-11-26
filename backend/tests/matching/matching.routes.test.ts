@@ -205,7 +205,7 @@ describe("confirmar y descartar coincidencias (#181)", () => {
 
       const res = await notificationsOf(foundOwnerToken);
       expect(res.status).toBe(200);
-      expect(res.body).toEqual([
+      expect(res.body.items).toEqual([
         expect.objectContaining({ userId: foundOwnerId, type: "match_confirmed", reportId: lostReportId, isRead: false }),
       ]);
     });
@@ -214,14 +214,14 @@ describe("confirmar y descartar coincidencias (#181)", () => {
       await decide(lostReportId, matchId, "confirm", lostOwnerToken);
 
       const res = await notificationsOf(lostOwnerToken);
-      expect(res.body).toEqual([]);
+      expect(res.body.items).toEqual([]);
     });
 
     test("descartar no genera notificaciones", async () => {
       await decide(lostReportId, matchId, "reject", lostOwnerToken);
 
-      expect((await notificationsOf(foundOwnerToken)).body).toEqual([]);
-      expect((await notificationsOf(lostOwnerToken)).body).toEqual([]);
+      expect((await notificationsOf(foundOwnerToken)).body.items).toEqual([]);
+      expect((await notificationsOf(lostOwnerToken)).body.items).toEqual([]);
     });
 
     test("una confirmación rechazada (403 o 409) no genera notificaciones", async () => {
@@ -230,8 +230,8 @@ describe("confirmar y descartar coincidencias (#181)", () => {
       expect((await decide(foundReportId, matchId, "confirm", foundOwnerToken)).status).toBe(409);
 
       const res = await notificationsOf(foundOwnerToken);
-      expect(res.body).toHaveLength(1);
-      expect((await notificationsOf(lostOwnerToken)).body).toEqual([]);
+      expect(res.body.items).toHaveLength(1);
+      expect((await notificationsOf(lostOwnerToken)).body.items).toEqual([]);
     });
   });
 
