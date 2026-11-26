@@ -74,6 +74,15 @@ docker compose exec backend node dist/scripts/preflight.js
 
 Termina con código distinto de 0 si algún chequeo falla. Fuera de Docker: `cd backend && npm run preflight`.
 
+Datos de demo y smoke test con la IA real (guion completo en [docs/demo/guion.md](docs/demo/guion.md)):
+
+```bash
+docker compose exec -e SEED_DEMO_PASSWORD='<contraseña>' backend node dist/scripts/seed-demo.js
+cd frontend && SEED_DEMO_PASSWORD='<contraseña>' npm run smoke:demo   # correrlo antes de cada presentación
+```
+
+El seed es idempotente, no corre con `NODE_ENV=production` y publica los reportes a través del Backend IA, así que las coincidencias salen del modelo. Fuera de Docker: `cd backend && npm run seed:demo`.
+
 **Dependencias de red de la demo:**
 
 | Recurso | Sin internet |
